@@ -272,8 +272,6 @@ def get_environ(user_yt_spec):
     for key in env_copy.keys():
         if key in ["TMP", "TMPDIR", "TEMPDIR", "TEMP"]:
             env_copy[key] = "/var/tmp"
-    node_start_timestamp = os.environ.get("TEST_NODE_START_TIMESTAMP", None) or int(time.time())
-    env_copy["TEST_NODE_START_TIMESTAMP"] = str(node_start_timestamp)
     env_copy = ["{}={}".format(k, v) for k, v in six.iteritems(env_copy) if k not in ENV_SKIP]
     return env_copy
 

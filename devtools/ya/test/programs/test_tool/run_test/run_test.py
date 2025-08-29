@@ -1170,7 +1170,7 @@ def get_chunk_timeout_msg(user_timeout, actual_timeout, startup_delay):
     if user_timeout == actual_timeout:
         return "[[bad]]Chunk exceeded [[imp]]{}s[[bad]] timeout".format(actual_timeout)
     else:
-        return "[[bad]]Chunk exceeded [[imp]]{}s[[bad]] timeout (user timeout: [[imp]]{}s[[bad]], YT op startup delay: [[imp]]{}s[[bad]])".format(
+        return "[[bad]]Chunk exceeded [[imp]]{}s[[bad]] timeout (user timeout: [[imp]]{}s[[bad]], startup delay: [[imp]]{}s[[bad]])".format(
             actual_timeout, user_timeout, startup_delay
         )
 
@@ -1229,11 +1229,14 @@ def main():
         options.split_file,
     )
 
-    startup_delay = (
-        int(time.time()) - int(os.environ.get("TEST_NODE_START_TIMESTAMP", 0))
-        if "TEST_NODE_START_TIMESTAMP" in os.environ
-        else 0
-    )
+    # NOTE: bin_exec_ts is a timestamp when a runner (local or distbuild) starts executing a node
+    # These env variables are retained when run_test is executed on YT,
+    # see devtools/ya/test/programs/test_tool/ytexec_run_test/ytexec_run_test.py::get_environ
+    bin_exec_ts = os.getenv('_BINARY_EXEC_TIMESTAMP') or os.getenv('DISTBUILD_RUNNER_BINARY_START_TIMESTAMP')
+    if bin_exec_ts:
+        startup_delay = int(time.time()) - int(float(bin_exec_ts) / 1e6)
+    else:
+        startup_delay = 0
 
     if options.node_timeout and not exts.windows.on_win():
         timeout = options.node_timeout - 10
@@ -1520,24 +1523,24 @@ def main():
         wrapper_stderr_tail = None
 
         test_command_retry_num = 0
-        # 1. run_chunk_timeout is a time left for the whole start_recipe-run_test-stop_recipe cycle (including retries).
-        # It's set to chunk_timeout and updated after every step (except for recipes when there is node timeout)
+        # 1. chunk_time_left is a time left for the whole start_recipe-run_test-stop_recipe cycle (including retries).
+        # It's set to chunk_timeout and updated after every step (except for recipes when there is no node timeout)
         # 2. chunk_timeout is a timeout of a node (if one is set)
-        # 3. run_test_timeout is a time left for the test to run (including retries). It doesn't account for time spent on recipes.
+        # 3. test_time_left is a time left for the test to run (including retries). It doesn't account for time spent on recipes.
         # It's set to test_timeout and updated after every test step.
-        # 4. test_timeout is a timeout set specifically for the test, without recipes
-        if options.node_timeout and startup_delay:
+        # 4. test_timeout is a timeout alloted specifically to the test, without recipes
+        if options.node_timeout:
             # 30s reserved for overhead to make sure we won't get killed
-            run_chunk_timeout = chunk_timeout = options.node_timeout - startup_delay - 30
-            run_test_timeout = test_timeout = min(chunk_timeout, options.timeout)
+            chunk_time_left = chunk_timeout = options.node_timeout - startup_delay - 30
+            test_time_left = test_timeout = min(chunk_timeout, options.timeout)
             enable_recipe_timeout = True
             if test_timeout <= 0:
                 raise TestRunTimeExhausted(
                     "No time left for testing - chunk run is aborted (startup delay: {}s)".format(startup_delay)
                 )
         else:
-            run_test_timeout = test_timeout = run_chunk_timeout = chunk_timeout = options.timeout
-            # don't wait for recipes and don't update run_chunk_timeout with time spent on recipes
+            test_time_left = test_timeout = chunk_time_left = chunk_timeout = options.timeout
+            # wait for recipes indefinitely and don't update chunk_time_left with time spent on recipes
             enable_recipe_timeout = False
         test_run_dirs = []
         timeout_callback = None
@@ -1612,9 +1615,7 @@ def main():
                     stages.stage("retry_preparations")
                     logger.debug("Running %d test attempt", test_command_retry_num + 1)
                     # Check time left just in case
-                    time_passed = int(main_start_timestamp - time.time() + 0.5)
-                    if (time_passed + chunk_timeout) <= 0 or (time_passed + test_timeout) <= 0:
-                        # no time left for run
+                    if chunk_time_left <= 1 or test_time_left <= 1:
                         break
                     renamed_work_dir = "{}_try_{}".format(work_dir, test_command_retry_num - 1)
                     move_test_work_dir(work_dir, renamed_work_dir, cmd)
@@ -1622,8 +1623,8 @@ def main():
 
                     logger.info(
                         "Test will be restarted with chunk timeout %s, test timeout %s, logs of the previous retry are saved to %s",
-                        run_chunk_timeout,
-                        run_test_timeout,
+                        chunk_time_left,
+                        test_time_left,
                         renamed_work_dir,
                     )
 
@@ -1699,7 +1700,7 @@ def main():
                                         stdout_to_stderr=options.test_stdout,
                                     )
                                     if enable_recipe_timeout:
-                                        res.wait(timeout=run_chunk_timeout)
+                                        res.wait(timeout=chunk_time_left)
                                     else:
                                         res.wait()
                             except Exception as e:
@@ -1711,11 +1712,11 @@ def main():
 
                             env.update(get_recipes_env(recipes_env_file))
                             if enable_recipe_timeout:
-                                run_chunk_timeout -= int(time.time() - recipe_start)
+                                chunk_time_left -= int(time.time() - recipe_start)
 
                     # we use min because we don't want the test to be killed the hard way if node timeout expires
                     # and at the same time we want the test to use only that time given specifically for the test
-                    current_run_test_timeout = min(run_chunk_timeout, run_test_timeout)
+                    current_run_test_timeout = min(chunk_time_left, test_time_left)
                     logger.debug(
                         "Executing test cmd: '%s' with timeout %d, with env: %s",
                         " ".join(cmd),
@@ -1762,8 +1763,8 @@ def main():
 
                         res.wait(check_exit_code=False, timeout=current_run_test_timeout, on_timeout=timeout_callback)
                     test_time = int(time.time() - test_start)
-                    run_chunk_timeout -= test_time
-                    run_test_timeout -= test_time
+                    chunk_time_left -= test_time
+                    test_time_left -= test_time
                     exit_code = res.exit_code
                     exit_status = exit_code
 
@@ -1819,7 +1820,7 @@ def main():
                                         stdout_to_stderr=options.test_stdout,
                                     )
                                     if enable_recipe_timeout:
-                                        res.wait(timeout=run_chunk_timeout)
+                                        res.wait(timeout=chunk_time_left)
                                     else:
                                         res.wait()
                             except Exception as e:
@@ -1833,7 +1834,7 @@ def main():
 
                             env.update(get_recipes_env(recipes_env_file))
                             if enable_recipe_timeout:
-                                run_chunk_timeout -= int(time.time() - recipe_stop)
+                                chunk_time_left -= int(time.time() - recipe_stop)
 
                     wrapper_stdout.close()
                     wrapper_stderr.close()
@@ -1938,7 +1939,8 @@ def main():
             suite,
             exit_status,
             testing_finished,
-            chunk_timeout if enable_recipe_timeout else test_timeout,
+            # chunk_time_left < test_time_left means that recipes have consumed more than (chunk_timeout - test_timeout)
+            chunk_timeout if enable_recipe_timeout and chunk_time_left < test_time_left else test_timeout,
             test_command_retry_num,
             stdout,
             stderr,
