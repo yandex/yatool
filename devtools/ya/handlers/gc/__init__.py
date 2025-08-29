@@ -11,7 +11,7 @@ import devtools.ya.core.config as cc
 import devtools.ya.build.ya_make as ym
 from exts import fs
 from devtools.ya.core.common_opts import CustomBuildRootOptions
-from devtools.ya.build.build_opts import LocalCacheOptions, DistCacheSetupOptions, parse_size_arg, parse_timespan_arg
+from devtools.ya.build.build_opts import LocalCacheOptions, parse_size_arg, parse_timespan_arg
 from exts.windows import on_win
 from yalibrary.runner import result_store
 import yalibrary.toolscache as tc
@@ -94,16 +94,6 @@ class GarbageCollectionYaHandler(devtools.ya.core.yarg.CompositeHandler):
                 devtools.ya.core.common_opts.AuthOptions(),
             ],
             visible=True,
-        )
-        self['dist_cache'] = devtools.ya.core.yarg.OptsHandler(
-            action=devtools.ya.app.execute(action=do_strip_yt_cache, respawn=devtools.ya.app.RespawnType.NONE),
-            description='Strip distributed (YT) cache',
-            opts=[
-                devtools.ya.core.common_opts.ShowHelpOptions(),
-                DistCacheSetupOptions(),
-                devtools.ya.core.common_opts.AuthOptions(),
-            ],
-            visible=False,
         )
 
 
@@ -321,30 +311,3 @@ def _do_collect_cache(cache, build_root, opts):
             cache.strip_max_age(opts.age_limit)
 
     return errors
-
-
-def do_strip_yt_cache(opts):
-    try:
-        from yalibrary.store.yt_store import yt_store
-    except ImportError as e:
-        logger.warning("YT store is not available: %s", e)
-
-    token = opts.yt_token or opts.oauth_token
-    cache = yt_store.YtStore(
-        opts.yt_proxy,
-        opts.yt_dir,
-        None,
-        token=token,
-        readonly=opts.yt_readonly,
-        max_cache_size=opts.yt_max_cache_size,
-        ttl=opts.yt_store_ttl,
-    )
-
-    counters = cache.strip()
-    if counters:
-        logger.info(
-            'Deleted: meta rows:%d, data rows:%d, net data size:%d',
-            counters['meta_rows'],
-            counters['data_rows'],
-            counters['data_size'],
-        )

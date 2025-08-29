@@ -27,6 +27,7 @@ struct TCommandLineError: public yexception { };
 
 void PrintUsage(const TString& progName) {
     Cerr <<
+        "DEPRECATED. Use 'ya tool yt data-gc' instead\n\n"
         "Usage: " + progName + " OPTIONS\n"
         "  OPTIONS:\n"
         "    --yt-proxy PROXY           YT proxy url. If missed YT_PROXY env variable is used\n"
