@@ -43,11 +43,6 @@ RESOURCE_FILES(
     .dist-info/top_level.txt
     marisa-trie/AUTHORS
     marisa-trie/COPYING.md
-    src/marisa_trie.egg-info/PKG-INFO
-    src/marisa_trie.egg-info/SOURCES.txt
-    src/marisa_trie.egg-info/dependency_links.txt
-    src/marisa_trie.egg-info/requires.txt
-    src/marisa_trie.egg-info/top_level.txt
 )
 
 END()

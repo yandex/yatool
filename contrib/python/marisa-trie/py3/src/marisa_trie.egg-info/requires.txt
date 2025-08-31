@@ -1,5 +1,0 @@
-
-[test]
-hypothesis
-pytest
-readme_renderer
