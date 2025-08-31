@@ -4,13 +4,9 @@ PY3_LIBRARY()
 
 PROVIDES(MARISA-TRIE)
 
-VERSION(1.2.1)
+VERSION(1.3.0)
 
 LICENSE(MIT)
-
-PEERDIR(
-    contrib/python/setuptools
-)
 
 ADDINCL(
     contrib/python/marisa-trie/py3/marisa-trie/include
@@ -45,6 +41,13 @@ RESOURCE_FILES(
     PREFIX contrib/python/marisa-trie/py3/
     .dist-info/METADATA
     .dist-info/top_level.txt
+    marisa-trie/AUTHORS
+    marisa-trie/COPYING.md
+    src/marisa_trie.egg-info/PKG-INFO
+    src/marisa_trie.egg-info/SOURCES.txt
+    src/marisa_trie.egg-info/dependency_links.txt
+    src/marisa_trie.egg-info/requires.txt
+    src/marisa_trie.egg-info/top_level.txt
 )
 
 END()
