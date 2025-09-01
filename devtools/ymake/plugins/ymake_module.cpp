@@ -75,12 +75,18 @@ namespace {
             return self;
         } else if (cmdContext->Name == TStringBuf("enabled")) {
             Y_ABORT_UNLESS(methodArgs.size() == 1);
-            bool contains = cmdContext->Unit->Enabled(methodArgs[0]);
-            return NPyBind::BuildPyObject(contains);
-        } else if (cmdContext->Name == TStringBuf("get")) {
+            return NPyBind::BuildPyObject(cmdContext->Unit->Enabled(methodArgs[0]));
+        } else if (cmdContext->Name == TStringBuf("get") || cmdContext->Name == TStringBuf("get_nosubst")) { // get var value without substs
             Y_ABORT_UNLESS(methodArgs.size() == 1);
-            TStringBuf value = cmdContext->Unit->Get(methodArgs[0]);
-            return NPyBind::BuildPyObject(value);
+            return NPyBind::BuildPyObject(cmdContext->Unit->Get(methodArgs[0]));
+        } else if (cmdContext->Name == TStringBuf("get_subst")) { // get var value with subst all vars
+            Y_ABORT_UNLESS(methodArgs.size() == 1);
+            auto value = cmdContext->Unit->GetSubst(methodArgs[0]);
+            if (std::holds_alternative<TStringBuf>(value)) {
+                return NPyBind::BuildPyObject(std::get<TStringBuf>(value)); // if !value.IsInited() - return None in Python
+            } else {
+                return NPyBind::BuildPyObject(std::get<TString>(value));
+            }
         } else if (cmdContext->Name == TStringBuf("name")) {
             return NPyBind::BuildPyObject(cmdContext->Unit->UnitName());
         } else if (cmdContext->Name == TStringBuf("filename")) {

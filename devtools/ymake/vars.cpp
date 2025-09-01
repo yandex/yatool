@@ -12,8 +12,9 @@ TStringBuf Get1(const TYVar* var) {
 }
 
 TStringBuf Eval1(const TYVar* var) {
-    if (!Get1(var).empty()) {
-        return GetCmdValue(Get1(var));
+    auto val = Get1(var);
+    if (!val.empty()) {
+        return GetCmdValue(val);
     }
     return ("");
 }

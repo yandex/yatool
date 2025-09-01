@@ -49,6 +49,8 @@ public:
 
     virtual TStringBuf Get(TStringBuf name) const = 0;
 
+    virtual std::variant<TStringBuf, TString> GetSubst(TStringBuf name) const = 0;
+
     virtual void Set(TStringBuf name, TStringBuf value) = 0;
 
     virtual TString ResolveToAbsPath(TStringBuf path) = 0;
