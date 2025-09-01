@@ -11,6 +11,26 @@ from yalibrary import status_view
 logger = logging.getLogger(__name__)
 
 
+class DispatchingCounter:
+    def __init__(self):
+        self._value = 0
+        self._lock = threading.Lock()
+
+    def __enter__(self):
+        with self._lock:
+            self._value += 1
+        return self
+
+    def __exit__(self, *excinfo):
+        with self._lock:
+            self._value -= 1
+
+    @property
+    def value(self):
+        with self._lock:
+            return self._value
+
+
 class RunQueue:
     class _Wrapper:
         __slots__ = ("_run_queue", "_task", "_deps")
@@ -61,6 +81,8 @@ class RunQueue:
 
         self._timing = {}
 
+        self._dispatching_counter = DispatchingCounter()
+
     def _wrap(self, task, deps):
         return RunQueue._Wrapper(self, task, deps)
 
@@ -89,13 +111,17 @@ class RunQueue:
             yield [TaskInfo(task, deps, self._timing.get(task)) for task, deps in group]
 
     def dispatch(self, task, *args, **kwargs):
-        if task not in self._not_dispatched:
-            raise KeyError(task)
-        inplace_execution = kwargs.pop('inplace_execution', False)
-        if hasattr(task, 'on_dispatch'):
-            task.on_dispatch(*args, **kwargs)
-        self._topo.schedule_node(task, when_ready=self._when_ready, inplace_execution=inplace_execution)
-        self._not_dispatched.remove(task)
+        with self._dispatching_counter:
+            try:
+                self._not_dispatched.remove(task)
+            except KeyError:
+                logger.debug("Second attempt to dispatch %s", task)
+                return
+
+            inplace_execution = kwargs.pop('inplace_execution', False)
+            if hasattr(task, 'on_dispatch'):
+                task.on_dispatch(*args, **kwargs)
+            self._topo.schedule_node(task, when_ready=self._when_ready, inplace_execution=inplace_execution)
 
     def dispatch_all(self, *args, **kwargs):
         for task in frozenset(self._not_dispatched):
@@ -103,7 +129,10 @@ class RunQueue:
 
     @property
     def pending(self):
-        return len(self._not_dispatched)
+        # The order below is IMPORTANT!
+        pending = len(self._not_dispatched)
+        pending += self._dispatching_counter.value
+        return pending
 
     def add(self, task, dispatch=True, joint=None, deps=None, inplace_execution=False):
         if deps is None:
