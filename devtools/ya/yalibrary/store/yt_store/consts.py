@@ -60,11 +60,12 @@ YT_CACHE_DATA_SCHEMA = [
         'expression': 'farm_hash(hash) % {}'.format(YT_CACHE_HASH_SPACE),
         'type': 'uint64',
         'sort_order': 'ascending',
+        'group': 'light',
     },
-    {'name': 'hash', 'type': 'string', 'sort_order': 'ascending'},
-    {'name': 'chunk_i', 'type': 'uint64', 'sort_order': 'ascending'},
-    {'name': 'create_time', 'type': 'timestamp'},
-    {'name': 'data', 'type': 'string'},
+    {'name': 'hash', 'type': 'string', 'sort_order': 'ascending', 'group': 'light'},
+    {'name': 'chunk_i', 'type': 'uint64', 'sort_order': 'ascending', 'group': 'light'},
+    {'name': 'create_time', 'type': 'timestamp', 'group': 'light'},
+    {'name': 'data', 'type': 'string', 'group': 'heavy'},
 ]
 
 YT_CACHE_STAT_SCHEMA = [
