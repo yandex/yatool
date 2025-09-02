@@ -44,6 +44,22 @@ void SigInt(int) {
     _Exit(BR_INTERRUPTED);
 }
 
+#if !defined(_win_)
+void SigSegv(int, siginfo_t*, void*) {
+    Cerr << "SIGSEGV, backtrace is:" << Endl;
+    PrintBackTrace();
+    raise(SIGSEGV);
+}
+
+using THandler = void (*)(int, siginfo_t*, void*);
+void SetupSignalHandler(int signum, THandler handler) {
+    struct sigaction sa = {};
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESETHAND,
+    sa.sa_sigaction = handler;
+    Y_ENSURE(sigaction(signum, &sa, nullptr) == 0, strerror(errno));
+}
+#endif // !_win_
+
 struct TConfigDesc {
     size_t Id;
     TVector<const char*> CmdLine;
@@ -247,6 +263,10 @@ int YMakeMain(int argc, char** argv) {
 #endif // !_MSC_VER
 
     SetAsyncSignalHandler(SIGINT, SigInt);
+#if !defined(_win_)
+    SetupSignalHandler(SIGSEGV, SigSegv);
+#endif // !_win_
+
     int threads = 0;
     bool useSubinterpreters = false;
     InitGlobalOpts(argc, argv, threads, useSubinterpreters);
