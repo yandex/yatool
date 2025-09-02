@@ -285,11 +285,17 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             globStat += globPatternStat;
 
             if (!globVarElemId) {
-                globVarElemId = Names.AddName(EMNT_Property, FormatProperty(moduleElemId, NProps::REFERENCED_BY, varName));
+                if (Conf.PerModuleGlobVar) {
+                    globVarElemId = Names.AddName(EMNT_Property, FormatProperty(moduleElemId, NProps::REFERENCED_BY, varName));
+                } else {
+                    globVarElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+                }
             }
             const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
             const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);
-            TModuleDef::SaveGlobPatternStat(Vars, globPatternStat, globPatternId);
+            if (Conf.SaveLoadGlobStat) {
+                TModuleDef::SaveGlobPatternStat(Vars, globPatternStat, globPatternId);
+            }
             ModuleGlobs.push_back(
                 TModuleGlobInfo {
                     .GlobPatternId = globPatternId,
@@ -305,7 +311,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
-    if (globVarElemId) {
+    if (Conf.SaveGlobRestrictions && globVarElemId) {
         TModuleDef::SaveGlobRestrictions(Vars, globRestrictions, globVarElemId);
     }
     if (Conf.CheckGlobRestrictions) {

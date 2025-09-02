@@ -69,6 +69,10 @@ public:
     THashSet<TStringBuf> GlobRestrictionExtends{};
     bool FillModule2Nodes{false};
     bool CheckKVP{false};
+    bool PerModuleGlobVar{false};
+    bool SaveLoadGlobStat{false};
+    bool UpdateGlobStat{false};
+    bool SaveGlobRestrictions{false};
     bool CheckGlobRestrictions{false};
 
     void* SubState = nullptr;
