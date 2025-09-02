@@ -204,6 +204,7 @@ class ListingOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.list_tests = False
         self.list_before_test = False
+        self.list_tests_output_file = None
 
     def consumer(self):
         return [
@@ -218,6 +219,13 @@ class ListingOptions(devtools.ya.core.yarg.Options):
                 ['--list-before-test'],
                 help='pass list of tests before tests run',
                 hook=devtools.ya.core.yarg.SetConstValueHook('list_before_test', True),
+                subgroup=RUN_TEST_SUBGROUP,
+                visible=help_level.HelpLevel.INTERNAL,
+            ),
+            TestArgConsumer(
+                ['--list-tests-output-file'],
+                help='specifies the path to the file with test information',
+                hook=devtools.ya.core.yarg.SetValueHook('list_tests_output_file'),
                 subgroup=RUN_TEST_SUBGROUP,
                 visible=help_level.HelpLevel.INTERNAL,
             ),

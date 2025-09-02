@@ -2599,6 +2599,9 @@ def inject_list_result_node(graph, tests, opts, tests_filter_descr):
     if opts.report_skipped_suites or opts.report_skipped_suites_only:
         show_list_cmd += ["--report-skipped-suites"]
 
+    if opts.list_tests_output_file:
+        show_list_cmd += ["--output", opts.list_tests_output_file]
+
     for tf in getattr(opts, 'tests_filters', []) + getattr(opts, 'test_files_filter', []):
         show_list_cmd.extend(["--test-name-filter", tf])
 
