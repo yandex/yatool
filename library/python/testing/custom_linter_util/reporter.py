@@ -1,3 +1,5 @@
+# XXX: This module is used in linter tools in `tools/` which are run by test_tool.
+# test_tool and `tools/` have different release cycles. Beware when modifying.
 import json
 import sys
 from enum import Enum
