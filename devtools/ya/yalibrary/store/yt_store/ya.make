@@ -53,6 +53,7 @@ CHECK_DEPENDENT_DIRS(
 
     yt/python
     yt/yt/build
+    yt/yt/client
     yt/yt/core
     yt/yt/library
     yt/yt/python
