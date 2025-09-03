@@ -2448,6 +2448,24 @@ def _build_graph_and_tests(
 
     graph = _OptimizableGraph(graph)
     graph.optimize_resources()
+    # Temporary experimental option. TODO: remove when DISTBUILD-4438 is done.
+    if getattr(opts, "force_build_root_cwd", None):
+        logger.debug("Change cwd to $(BUILD_ROOT)")
+        uid_map = {}
+        for node in graph["graph"]:
+            changed = False
+            for cmd in node.get("cmds", ()):
+                if "cwd" not in cmd:
+                    changed = True
+                    cmd["cwd"] = "$(BUILD_ROOT)"
+            if changed:
+                new_uid = node["uid"] + "-FBR"
+                uid_map[node["uid"]] = new_uid
+                node["uid"] = new_uid
+        if uid_map:
+            for node in graph["graph"]:
+                node["deps"] = [uid_map.get(d, d) for d in node["deps"]]
+            graph["result"] = [uid_map.get(r, r) for r in graph["result"]]
 
     with stager.scope('clean-intern-string-storage'):
         # After this point all ccgraphs become useless (all python graphs remain good).
