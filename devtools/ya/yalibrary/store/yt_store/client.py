@@ -182,6 +182,9 @@ class YtStoreClient(object):
 
     def merge_stat_table(self):
         logger.debug("Merge table %s", self._stat_table)
+        if self._client.get('{}/@dynamic'.format(self._stat_table)):
+            logger.info("There is no need to merge the dynamic table: %s", self._stat_table)
+            return
         self._client.run_merge(TablePath(self._stat_table), TablePath(self._stat_table), spec={'combine_chunks': True})
 
     def create_dynamic_table(self, table, attrs):
