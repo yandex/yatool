@@ -12,7 +12,10 @@ from build.plugins.lib.nots.package_manager.base.constants import (
     NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
     PACKAGE_JSON_FILENAME,
 )
-from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME
+from build.plugins.lib.nots.package_manager.pnpm.constants import (
+    PNPM_LOCKFILE_FILENAME,
+    VIRTUAL_STORE_DIRNAME,
+)
 from build.plugins.lib.nots.test_utils import ts_utils
 
 from devtools.ya.test import facility
@@ -34,8 +37,10 @@ def main():
     build_dir = os.path.join(args.build_root, args.source_folder_path)
     cwd = build_dir
 
+    bindir_node_modules_path = os.path.join(build_dir, NODE_MODULES_DIRNAME)
     node_path = [
-        os.path.join(build_dir, "node_modules"),
+        bindir_node_modules_path,
+        os.path.join(bindir_node_modules_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
     ]
 
     suite = PerformedTestSuite(None, None, None)
