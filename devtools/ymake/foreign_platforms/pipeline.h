@@ -38,7 +38,7 @@ private:
     // shared ptr to mitigate iterator invalidation
     THashMap<TString, THashMap<ETransition, TAtomicSharedPtr<Queue>>> PipesByTargetPlatformId_;
     THashMap<std::pair<TString, ETransition>, TVector<ETransition>> Subscribers_;
-    THashMap<std::pair<TString, ETransition>, size_t> Subscriptions_;
+    THashMap<std::pair<TString, ETransition>, std::atomic<size_t>> Subscriptions_;
     asio::any_io_executor Executor_;
 };
 
