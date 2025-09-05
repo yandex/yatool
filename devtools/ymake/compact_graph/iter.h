@@ -2,6 +2,7 @@
 
 #include "dep_graph.h"
 #include "dep_types.h"
+#include "query.h"
 
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/dbg.h>
@@ -491,9 +492,11 @@ public:
     /// we allow edge if it points to never seen node or seen node which is
     /// not currently in stack. This allows processing repeating nodes outside loops
     bool AcceptDep(TState& state) {
-        const auto& to = state.NextDep().To();
+        const auto& dep = state.NextDep();
+        const auto& to = dep.To();
         typename TNodes::iterator i = Nodes.find(to.Id());
-        return i == Nodes.end() || !i->second.InStack;
+        return (i == Nodes.end() || !i->second.InStack)
+            && !IsProp2BuildCommandDep(dep); // Skip backward edges REFERENCE_BY(Property) -> GLOB(BuildCommand)
     }
 
 protected:
@@ -552,10 +555,6 @@ public:
     ///        BuildFrom dependency
     bool AcceptDep(TState& state) {
         const auto& dep = state.NextDep();
-        if (IsProp2BuildCommandDep(dep)) {
-            // Skip backward edges REFERENCE_BY(Property) -> GLOB(BuildCommand)
-            return false;
-        }
         if (*dep == EDT_BuildFrom) {
             CurEnt->HasBuildFrom = true;
         } else if (*dep == EDT_BuildCommand && IsFileType(dep.From()->NodeType)) {
