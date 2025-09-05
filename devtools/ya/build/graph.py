@@ -1380,6 +1380,7 @@ class _GraphMaker:
         self._allow_changelist = True
         self._cl_generator = cl_generator
         self.ymakes_scheduled = 0
+        self.has_cmdline_generation_error = False
 
     def disable_changelist(self):
         self._allow_changelist = False
@@ -1475,21 +1476,26 @@ class _GraphMaker:
                 ymake_opts_nopic.update(**nopic_servermode_opts)
 
             def gen_no_pic():
-                return no_pic_func(
-                    flags,
-                    target_tc,
-                    abs_targets,
-                    debug_id=debug_id,
-                    enabled_events=enabled_events,
-                    extra_conf=extra_conf,
-                    cache_dir=cache_dir,
-                    change_list=self._opts.build_graph_cache_cl,
-                    no_caches_on_retry=self._opts.no_caches_on_retry,
-                    no_ymake_retry=self._opts.no_ymake_retry,
-                    tool_targets_queue_putter=no_pic_tool_queue_putter,
-                    pic_queue_putter=no_pic_queue_putter,
-                    ymake_opts=ymake_opts_nopic,
-                )
+                try:
+                    return no_pic_func(
+                        flags,
+                        target_tc,
+                        abs_targets,
+                        debug_id=debug_id,
+                        enabled_events=enabled_events,
+                        extra_conf=extra_conf,
+                        cache_dir=cache_dir,
+                        change_list=self._opts.build_graph_cache_cl,
+                        no_caches_on_retry=self._opts.no_caches_on_retry,
+                        no_ymake_retry=self._opts.no_ymake_retry,
+                        tool_targets_queue_putter=no_pic_tool_queue_putter,
+                        pic_queue_putter=no_pic_queue_putter,
+                        ymake_opts=ymake_opts_nopic,
+                    )
+                except Exception:
+                    # this is merely a workaround to stop multiconfig if there is an error in ymake command generation
+                    self.has_cmdline_generation_error = True
+                    raise
 
             no_pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_no_pic).result))
 
@@ -1541,20 +1547,25 @@ class _GraphMaker:
                 abs_targets_pic = []
 
             def gen_pic():
-                return pic_func(
-                    flags,
-                    target_tc,
-                    abs_targets_pic,
-                    debug_id=debug_id,
-                    enabled_events=enabled_events,
-                    extra_conf=extra_conf,
-                    cache_dir=cache_dir,
-                    change_list=self._opts.build_graph_cache_cl,
-                    no_caches_on_retry=self._opts.no_caches_on_retry,
-                    no_ymake_retry=self._opts.no_ymake_retry,
-                    tool_targets_queue_putter=pic_queue_putter,
-                    ymake_opts=ymake_opts_pic,
-                )
+                try:
+                    return pic_func(
+                        flags,
+                        target_tc,
+                        abs_targets_pic,
+                        debug_id=debug_id,
+                        enabled_events=enabled_events,
+                        extra_conf=extra_conf,
+                        cache_dir=cache_dir,
+                        change_list=self._opts.build_graph_cache_cl,
+                        no_caches_on_retry=self._opts.no_caches_on_retry,
+                        no_ymake_retry=self._opts.no_ymake_retry,
+                        tool_targets_queue_putter=pic_queue_putter,
+                        ymake_opts=ymake_opts_pic,
+                    )
+                except Exception:
+                    # this is merely a workaround to stop multiconfig if there is an error in ymake command generation
+                    self.has_cmdline_generation_error = True
+                    raise
 
             pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_pic).result))
 
@@ -3001,7 +3012,9 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
             **kwargs,
         )
         if opts.ymake_multiconfig:
-            ymake2.run_ymake_scheduled(graph_maker.ymakes_scheduled, opts.ya_threads)
+            ymake2.run_ymake_scheduled(
+                graph_maker.ymakes_scheduled, opts.ya_threads, lambda: graph_maker.has_cmdline_generation_error
+            )
         graph_tools = tg.pic().graph
 
     graph_tools.add_host_mark(strtobool(host_tc['flags'].get('SANDBOXING', "no")))

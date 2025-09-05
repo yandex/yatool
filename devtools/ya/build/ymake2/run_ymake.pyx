@@ -103,12 +103,15 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
     return res.Get().ExitCode, output, six.ensure_str(res.Get().Stderr)
 
 
-def run_scheduled(count, threads):
+def run_scheduled(count, threads, check_error_fn):
     cdef TList[TRunYmakeParams] params
     cdef TRunYmakeParams param
     cdef TRunYmakeMulticonfigResultPtr results_c
 
     while len(arg_collection) < count:
+        if check_error_fn():
+            arg_collection.clear()
+            return
         time.sleep(0.1)
     for _, v in sorted(arg_collection.items()):
         param.Binary = six.ensure_binary(v['binary'])
