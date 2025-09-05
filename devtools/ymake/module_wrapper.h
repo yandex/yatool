@@ -28,8 +28,8 @@ public:
     }
     std::variant<TStringBuf, TString> GetSubst(TStringBuf name) const override {
         const auto value = Module.Get(name);
-        if (!value.IsInited() || !value.contains('$') || !Module.Vars.Base) {
-            return value; // IsInited() - return None in Python
+        if (!value.IsInited() || !Module.Vars.Base || !value.contains('$')) {
+            return value; // !IsInited() - return None in Python
         }
         return Strip(TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(name, Module.Vars));
     }
