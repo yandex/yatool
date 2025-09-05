@@ -98,6 +98,10 @@ class RecipeTearDownError(RecipeError):
     pass
 
 
+class RecipeTimeoutError(RecipeError):
+    pass
+
+
 def log_stage(name):
     logger.debug("%s", "{s:{c}^{n}}".format(s=" {} ".format(name.upper()), n=80, c="="))
 
@@ -1708,6 +1712,8 @@ def main():
                                 with open(recipe_err_filename, 'a') as afile:
                                     afile.write("\nRecipe start up exception:\n")
                                     traceback.print_exc(file=afile)
+                                if isinstance(e, process.ExecutionTimeoutError):
+                                    raise RecipeTimeoutError(recipe_name, recipe_err_filename, recipe_out_filename)
                                 raise RecipeStartUpError(recipe_name, recipe_err_filename, recipe_out_filename)
 
                             env.update(get_recipes_env(recipes_env_file))
@@ -1828,9 +1834,14 @@ def main():
                                 with open(recipe_err_filename, 'a') as afile:
                                     afile.write("\nRecipe tear down exception:\n")
                                     traceback.print_exc(file=afile)
-                                failed_recipes.append(
-                                    RecipeTearDownError(recipe_name, recipe_err_filename, recipe_out_filename)
-                                )
+                                if isinstance(e, process.ExecutionTimeoutError):
+                                    failed_recipes.append(
+                                        RecipeTimeoutError(recipe_name, recipe_err_filename, recipe_out_filename)
+                                    )
+                                else:
+                                    failed_recipes.append(
+                                        RecipeTearDownError(recipe_name, recipe_err_filename, recipe_out_filename)
+                                    )
 
                             env.update(get_recipes_env(recipes_env_file))
                             if enable_recipe_timeout:
@@ -2092,7 +2103,10 @@ def main():
             error_msg = traceback.format_exc()
             is_user_error = False
 
-        if is_user_error:
+        if isinstance(exc, RecipeTimeoutError):
+            status = const.Status.TIMEOUT
+            test_rc = const.TestRunExitCode.TimeOut
+        elif is_user_error:
             status = const.Status.FAIL
             test_rc = const.TestRunExitCode.Failed
         else:
