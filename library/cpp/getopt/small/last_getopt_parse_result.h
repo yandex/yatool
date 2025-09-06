@@ -61,7 +61,7 @@ namespace NLastGetopt {
      * In most common case constructed by argc,argv pair and rules (TOpts).
      * The instance being constructed validates rules and performs parsing, stores result for futher access.
      *
-     * If error during parsing occures, the program aborts with exit code 1.
+     * If error during parsing occurres, the program aborts with exit code 1.
      * Note, that if PERMUTE mode is on, then data, pointed by argv can be changed.
      */
     class TOptsParseResult {
@@ -314,7 +314,7 @@ namespace NLastGetopt {
     /**
      * NLastGetopt::TOptsParseResultException contains result of parsing argc,argv be parser.
      *
-     * Unlike TOptsParseResult, if error during parsing occures, an exception is thrown.
+     * Unlike TOptsParseResult, if error during parsing occurres, an exception is thrown.
      *
      */
     class TOptsParseResultException: public TOptsParseResult {
