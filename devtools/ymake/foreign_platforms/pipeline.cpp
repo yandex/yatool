@@ -24,14 +24,13 @@ public:
     }
 };
 
+
 THolder<TLineReader> TForeignTargetPipelineExternal::CreateReader(TBuildConfiguration& conf) {
     return MakeHolder<TStreamLineReader>(*conf.InputStream);
 }
-
 THolder<TLineWriter> TForeignTargetPipelineExternal::CreateWriter(TBuildConfiguration&){
     return MakeHolder<TTraceLineWriter>();
 }
-
 bool TForeignTargetPipelineExternal::RegisterConfig(const TVector<const char*>&) {
     return true;
 }
@@ -47,10 +46,6 @@ public:
     {}
 
     asio::awaitable<std::optional<TString>> ReadLine() override {
-        if (FinalsRemaining_ == 0) {
-            co_return std::nullopt;
-        }
-
         TString line;
         while (true) {
             line = co_await Queue_->async_receive();
@@ -98,13 +93,6 @@ public:
     explicit TQueueLineWriter(THashMap<ETransition, TAtomicSharedPtr<Queue>>& dests)
          : Destinations_(dests)
     {}
-
-    ~TQueueLineWriter() {
-        asio::error_code ec;
-        for (auto& [_, dst] : Destinations_) {
-            dst->try_send(ec, NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
-        }
-    }
 
     void WriteLine(const TString& target) override {
         // This double-tracing is needed for some tests
@@ -202,8 +190,7 @@ THolder<TLineReader> TForeignTargetPipelineInternal::CreateReader(TBuildConfigur
     const auto& queue = PipesByTargetPlatformId_.at(conf.TargetPlatformId).at(conf.TransitionSource);
     return MakeHolder<TQueueLineReader>(queue, Subscriptions_.at(std::make_pair(conf.TargetPlatformId, conf.TransitionSource)));
 }
-
-THolder<TLineWriter> TForeignTargetPipelineInternal::CreateWriter(TBuildConfiguration& conf) {
+THolder<TLineWriter> TForeignTargetPipelineInternal::CreateWriter(TBuildConfiguration& conf){
     if (Subscribers_.count(std::make_pair(conf.TargetPlatformId, conf.TransitionSource)) == 0) {
         return MakeHolder<TDummyLineWriter>();
     }
@@ -212,11 +199,9 @@ THolder<TLineWriter> TForeignTargetPipelineInternal::CreateWriter(TBuildConfigur
     const auto& subscribers = Subscribers_.at(std::make_pair(conf.TargetPlatformId, conf.TransitionSource));
     for (const auto subscriber : subscribers) {
         dests[subscriber] = queuesForPlatform.at(subscriber);
-        Subscriptions_.at(std::make_pair(conf.TargetPlatformId, subscriber))++;
     }
     return MakeHolder<TQueueLineWriter>(dests);
 }
-
 bool TForeignTargetPipelineInternal::RegisterConfig(const TVector<const char*>& config) {
     TBuildConfiguration conf;  // TStartupOptions alone doesn't work somehow
     NLastGetopt::TOpts opts;
@@ -229,15 +214,15 @@ bool TForeignTargetPipelineInternal::RegisterConfig(const TVector<const char*>& 
     switch (conf.TransitionSource) {
         case ETransition::NoPic:
             Subscribers_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)].push_back(ETransition::Tool);
-            Subscriptions_[std::make_pair(conf.TargetPlatformId, ETransition::Tool)] = 0;
+            Subscriptions_[std::make_pair(conf.TargetPlatformId, ETransition::Tool)]++;
             break;
         case ETransition::Pic:
             if (PipesByTargetPlatformId_[conf.TargetPlatformId].contains(ETransition::NoPic)) {
                 Subscribers_[std::make_pair(conf.TargetPlatformId, ETransition::NoPic)].push_back(conf.TransitionSource);
-                Subscriptions_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)] = 0;
+                Subscriptions_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)]++;
             }
             Subscribers_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)].push_back(ETransition::Tool);
-            Subscriptions_[std::make_pair(conf.TargetPlatformId, ETransition::Tool)] = 0;
+            Subscriptions_[std::make_pair(conf.TargetPlatformId, ETransition::Tool)]++;
             break;
         case ETransition::Tool:
         case ETransition::None:
