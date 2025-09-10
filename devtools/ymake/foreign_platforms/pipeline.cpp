@@ -94,6 +94,10 @@ public:
          : Destinations_(dests)
     {}
 
+    ~TQueueLineWriter() {
+        WriteLineInt(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
+    }
+
     void WriteLine(const TString& target) override {
         // This double-tracing is needed for some tests
         // and pool loops waiting for TAllForeignPlatformsReported.
@@ -203,7 +207,11 @@ THolder<TLineWriter> TForeignTargetPipelineInternal::CreateWriter(TBuildConfigur
     return MakeHolder<TQueueLineWriter>(dests);
 }
 bool TForeignTargetPipelineInternal::RegisterConfig(const TVector<const char*>& config) {
-    TBuildConfiguration conf;  // TStartupOptions alone doesn't work somehow
+    // TStartupOptions alone doesn't work somehow.
+    // When replacing TBuildConfiguration parsing here with smth else,
+    // make sure that errors during main TBuildConfiguration parsing
+    // don't lead to hanging readers.
+    TBuildConfiguration conf;
     NLastGetopt::TOpts opts;
     opts.ArgPermutation_ = NLastGetopt::REQUIRE_ORDER;
     conf.AddOptions(opts);
