@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: marisa-trie
-Version: 1.3.0
+Version: 1.3.1
 Summary: Static memory-efficient and fast Trie-like structures for Python.
 Author-email: Mikhail Korobov <kmike84@gmail.com>
 License-Expression: MIT AND (BSD-2-Clause OR LGPL-2.1-or-later)
@@ -109,6 +109,11 @@ LGPL or BSD 2-clause license.
 
 CHANGES
 =======
+
+1.3.1 (2025-08-26)
+------------------
+
+* Set the Cython language level to "3" (#126)
 
 1.3.0 (2025-08-16)
 ------------------
