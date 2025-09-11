@@ -238,15 +238,6 @@ bool IsPropertyDep(const TDep& dep) {
     return IsPropertyDep(dep.From()->NodeType, *dep, dep.To()->NodeType);
 }
 
-inline bool IsProp2BuildCommandDep(EMakeNodeType nodeFrom, EDepType dep, EMakeNodeType nodeTo) {
-    return nodeFrom == EMNT_Property && dep == EDT_Property && nodeTo == EMNT_BuildCommand;
-}
-
-template <class TDep>
-bool IsProp2BuildCommandDep(const TDep& dep) {
-    return IsProp2BuildCommandDep(dep.From()->NodeType, *dep, dep.To()->NodeType);
-}
-
 inline bool IsModulePropertyDep(EMakeNodeType nodeFrom, EDepType dep, EMakeNodeType nodeTo) {
     return IsModuleType(nodeFrom) && IsPropertyDep(nodeFrom, dep, nodeTo);
 }

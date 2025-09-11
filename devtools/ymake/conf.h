@@ -67,13 +67,14 @@ public:
     TVector<TString> AutoincludeJsonPaths;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
     THashSet<TStringBuf> GlobRestrictionExtends{};
-    bool FillModule2Nodes{false};
-    bool CheckKVP{false};
-    bool PerModuleGlobVar{false};
-    bool SaveLoadGlobStat{false};
-    bool UpdateGlobStat{false};
-    bool SaveGlobRestrictions{false};
-    bool CheckGlobRestrictions{false};
+    bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
+    bool CheckKVP{false}; // conf error if absent kv->p in any command in rendering json
+    bool PerModuleGlobVar{false}; // create glob vars as ModuleElemId:REFERENCED_BY=VAR
+    bool SaveLoadGlobPatterns{false}; // (only if PerModuleGlobVar) save-load glob pattern elemIds by vars to module vars
+    bool SaveLoadGlobStat{false}; // (only if PerModuleGlobVar && SaveLoadGlobPatterns) save-load glob pattern stats to module vars
+    bool UpdateGlobStat{false}; // (only if PerModuleGlobVar && SaveLoadGlobPatterns && SaveLoadGlobStat) update glob pattern stats in module vars in UdpIter
+    bool SaveGlobRestrictions{false}; // save glob restrictions to module vars
+    bool CheckGlobRestrictions{false}; // check glob restrictions in create and update modes
 
     void* SubState = nullptr;
 

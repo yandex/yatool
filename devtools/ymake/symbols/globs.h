@@ -64,6 +64,8 @@ struct TGlobRestrictions {
     }
 
     bool Check(const TStringBuf& name, const TGlobStat& globStat) const;
+
+    bool operator==(const TGlobRestrictions&) const = default;
 };
 
 // Short-live object with 2 scenarios of usage:

@@ -45,9 +45,9 @@ namespace {
                 entryStats.SetReassemble(true);
                 PopulateGlobNode(globNode, globInfo);
             }
-            if (conf.PerModuleGlobVar) {
+            if (conf.PerModuleGlobVar && conf.SaveLoadGlobPatterns) {
                 for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
-                    CreateGlobVar2PatternDeps(globVarElemId, globPatternElemIds, node.YMake, node.UpdIter, node.Module);
+                    TModuleDef::SaveGlobPatterns(module->GetVars(), globVarElemId, globPatternElemIds);
                 }
             }
         }
@@ -693,16 +693,5 @@ void PopulateGlobNode(TNodeAddCtx& node, const TModuleGlobInfo& globInfo) {
     deps.clear();
     for (const auto& dir : globInfo.WatchedDirs) {
         deps.Push(dir);
-    }
-}
-
-void CreateGlobVar2PatternDeps(ui32 globVarElemId, const TVector<ui32>& globPatternElemIds, TYMake& YMake, TUpdIter& UpdIter, TModule* Module) {
-    const auto emnt = EMNT_Property;
-    auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(emnt, globVarElemId), &YMake, Module);
-    auto& globVarNode = entryStats.GetAddCtx(Module, YMake);
-    globVarNode.NodeType = emnt;
-    globVarNode.ElemId = globVarElemId;
-    for (auto globPatternElemId: globPatternElemIds) {
-        globVarNode.AddUniqueDep(EDT_Property, EMNT_Property, globPatternElemId);
     }
 }

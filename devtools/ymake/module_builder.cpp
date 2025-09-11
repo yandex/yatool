@@ -1015,7 +1015,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
             const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
             globPatternElemIds.push_back(globPatternElemId);
             if (Conf.SaveLoadGlobStat) {
-                TModuleDef::SaveGlobPatternStat(Vars, globStat, globPatternElemId);
+                TModuleDef::SaveGlobPatternStat(Vars, globPatternElemId, globStat);
             }
             TModuleGlobInfo globInfo = {
                 .GlobPatternId = globPatternElemId,
@@ -1032,7 +1032,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
 
     if (Conf.SaveGlobRestrictions && globVarElemId) {
-        TModuleDef::SaveGlobRestrictions(Vars, globRestrictions, globVarElemId);
+        TModuleDef::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
     }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat);
@@ -1062,8 +1062,8 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         CreateGlobNode(globInfo, globCmd);
     }
 
-    if (globVarElemId && Conf.PerModuleGlobVar) {
-        CreateGlobVar2PatternDeps(globVarElemId, globPatternElemIds, UpdIter.YMake, UpdIter, &Module);
+    if (globVarElemId && Conf.PerModuleGlobVar && Conf.SaveLoadGlobPatterns) {
+        TModuleDef::SaveGlobPatterns(Vars, globVarElemId, globPatternElemIds);
     }
     return true;
 }

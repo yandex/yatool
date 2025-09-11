@@ -294,7 +294,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
             const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);
             if (Conf.SaveLoadGlobStat) {
-                TModuleDef::SaveGlobPatternStat(Vars, globPatternStat, globPatternId);
+                TModuleDef::SaveGlobPatternStat(Vars, globPatternId, globPatternStat);
             }
             ModuleGlobs.push_back(
                 TModuleGlobInfo {
@@ -312,7 +312,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     }
 
     if (Conf.SaveGlobRestrictions && globVarElemId) {
-        TModuleDef::SaveGlobRestrictions(Vars, globRestrictions, globVarElemId);
+        TModuleDef::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
     }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat);
@@ -377,6 +377,64 @@ const TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() const {
     return ModuleGlobs;
 }
 
+template<typename V>
+static void GetVal(const TString& var, const TStringBuf& val, V&value) {
+    V v;
+    if (!TryFromString(val, v)) {
+        YConfWarn(Syntax) << "Invalid value '" << val << "' in " << var << Endl;
+    } else {
+        value = v;
+    }
+}
+
+static TString GlobvarPatternsVar(const TString& strGlobVarElemId) {
+    return TStringBuilder() << NArgs::GLOBVAR_PATTERN_ELEM_IDS << "-" << strGlobVarElemId;
+}
+
+static void SaveGlobVarElemId(TVars& vars, const TString& strGlobVarElemId) {
+    const auto& value = GetCmdValue(vars.Get1(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS));
+    if (value.IsInited() && value.size() >= strGlobVarElemId.size()) {
+        bool alreadyAppended = false;
+        size_t p = 0;
+        while (!alreadyAppended && (p = value.find(strGlobVarElemId, p)) != TStringBuf::npos) {
+            const auto spaceBefore = (p == 0) || (value[p - 1] == ' ');
+            const auto spaceAfter = (p == value.size() - strGlobVarElemId.size()) || (value[p + 1] == ' ');
+            alreadyAppended = spaceBefore && spaceAfter;
+        }
+        if (alreadyAppended) {
+            return;
+        }
+    }
+    vars.SetAppend(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS, strGlobVarElemId);
+}
+
+void TModuleDef::SaveGlobPatterns(TVars& vars, const ui32 globVarElemId, const TVector<ui32>& globPatternElemIds) {
+    auto strGlobVarElemId = ToString(globVarElemId);
+    SaveGlobVarElemId(vars, strGlobVarElemId);
+    vars.SetValue(GlobvarPatternsVar(strGlobVarElemId), JoinVectorIntoString(globPatternElemIds, " "));
+}
+
+TVector<ui32> TModuleDef::LoadGlobPatterns(TVars& vars, const ui32 globVarElemId) {
+    auto strGlobVarElemId = ToString(globVarElemId);
+    const auto globVarPatternsVar = GlobvarPatternsVar(strGlobVarElemId);
+    const auto globVarPatternsVal = GetCmdValue(vars.Get1(globVarPatternsVar));
+    TVector<ui32> r;
+    if (!globVarPatternsVal.empty()) {
+        TStringBuf v{globVarPatternsVal};
+        size_t pend = 0;
+        do {
+            if (pend && pend != TStringBuf::npos) {
+                v = v.substr(pend + 1);
+            }
+            pend = v.find(' ');
+            ui32 patternElemId;
+            GetVal(globVarPatternsVar, v.substr(0, pend), patternElemId);
+            r.push_back(patternElemId);
+        } while (pend != TStringBuf::npos);
+    }
+    return r;
+}
+
 static TString MaxMatchesVar(const TString& strGlobVarElemId) {
     return TStringBuilder() << NArgs::MAX_MATCHES << "-" << strGlobVarElemId;
 }
@@ -385,18 +443,9 @@ static TString MaxWatchDirsVar(const TString& strGlobVarElemId) {
     return TStringBuilder() << NArgs::MAX_WATCH_DIRS << "-" << strGlobVarElemId;
 }
 
-static void GetVal(const TString& var, const TStringBuf& val, size_t&value) {
-    size_t v;
-    if (!TryFromString(val, v)) {
-        YConfWarn(Syntax) << "Invalid value '" << val << "' in " << var << Endl;
-    } else {
-        value = v;
-    }
-}
-
-void TModuleDef::SaveGlobRestrictions(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 globVarElemId) {
+void TModuleDef::SaveGlobRestrictions(TVars& vars, const ui32 globVarElemId, const TGlobRestrictions& globRestrictions) {
     auto strGlobVarElemId = ToString(globVarElemId);
-    vars.SetAppend(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS, strGlobVarElemId);
+    SaveGlobVarElemId(vars, strGlobVarElemId);
     vars.SetValue(MaxMatchesVar(strGlobVarElemId), ToString(globRestrictions.MaxMatches));
     vars.SetValue(MaxWatchDirsVar(strGlobVarElemId), ToString(globRestrictions.MaxWatchDirs));
 }
@@ -405,12 +454,12 @@ TGlobRestrictions TModuleDef::LoadGlobRestrictions(const TVars& vars, const ui32
     TGlobRestrictions globRestrictions;
     auto strGlobVarElemId = ToString(globVarElemId);
     const auto maxMatchesVar = MaxMatchesVar(strGlobVarElemId);
-    const auto maxMatchesVal = vars.Get1(maxMatchesVar);
+    const auto maxMatchesVal = GetCmdValue(vars.Get1(maxMatchesVar));
     if (!maxMatchesVal.empty()) {
         GetVal(maxMatchesVar, maxMatchesVal, globRestrictions.MaxMatches);
     }
     const auto maxWatchDirsVar = MaxWatchDirsVar(strGlobVarElemId);
-    const auto maxWatchDirsVal = vars.Get1(maxWatchDirsVar);
+    const auto maxWatchDirsVal = GetCmdValue(vars.Get1(maxWatchDirsVar));
     if (!maxWatchDirsVal.empty()) {
         GetVal(maxWatchDirsVar, maxWatchDirsVal, globRestrictions.MaxWatchDirs);
     }
@@ -429,9 +478,8 @@ static TString DirsVar(const TString& strGlobPatternElemId) {
     return TStringBuilder() << NArgs::DIRS << "-" << strGlobPatternElemId;
 }
 
-void TModuleDef::SaveGlobPatternStat(TVars& vars, const TGlobStat& globPatternStat, const ui32 globPatternElemId) {
+void TModuleDef::SaveGlobPatternStat(TVars& vars, const ui32 globPatternElemId, const TGlobStat& globPatternStat) {
     auto strGlobPatternElemId = ToString(globPatternElemId);
-    vars.SetAppend(NVariableDefs::VAR_GLOB_PATTERN_ELEM_IDS, strGlobPatternElemId);
     vars.SetValue(MatchedVar(strGlobPatternElemId), ToString(globPatternStat.MatchedFilesCount));
     vars.SetValue(SkippedVar(strGlobPatternElemId), ToString(globPatternStat.SkippedFilesCount));
     vars.SetValue(DirsVar(strGlobPatternElemId), ToString(globPatternStat.WatchedDirsCount));
@@ -441,17 +489,17 @@ TGlobStat TModuleDef::LoadGlobPatternStat(const TVars& vars, const ui32 globPatt
     auto strGlobPatternElemId = ToString(globPatternElemId);
     TGlobStat globPatternStat;
     const auto matchedVar = MatchedVar(strGlobPatternElemId);
-    const auto matchedVal = vars.Get1(matchedVar);
+    const auto matchedVal = GetCmdValue(vars.Get1(matchedVar));
     if (!matchedVal.empty()) {
         GetVal(matchedVar, matchedVal, globPatternStat.MatchedFilesCount);
     }
     const auto skipperVar = SkippedVar(strGlobPatternElemId);
-    const auto skippedVal = vars.Get1(skipperVar);
+    const auto skippedVal = GetCmdValue(vars.Get1(skipperVar));
     if (!skippedVal.empty()) {
         GetVal(skipperVar, skippedVal, globPatternStat.SkippedFilesCount);
     }
     const auto dirsVar = DirsVar(strGlobPatternElemId);
-    const auto dirsVal = vars.Get1(dirsVar);
+    const auto dirsVal = GetCmdValue(vars.Get1(dirsVar));
     if (!dirsVal.empty()) {
         GetVal(dirsVar, dirsVal, globPatternStat.WatchedDirsCount);
     }

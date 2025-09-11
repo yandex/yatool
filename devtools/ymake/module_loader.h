@@ -264,8 +264,10 @@ public:
 
     TDepsCacheId Commit();
 
-    static void SaveGlobRestrictions(TVars& vars, const TGlobRestrictions& globRestrictions, const ui32 globVarElemId);
+    static void SaveGlobPatterns(TVars& vars, const ui32 globVarElemId, const TVector<ui32>& globPatternElemIds);
+    static TVector<ui32> LoadGlobPatterns(TVars& vars, const ui32 globVarElemId);
+    static void SaveGlobRestrictions(TVars& vars, const ui32 globVarElemId, const TGlobRestrictions& globRestrictions);
     static TGlobRestrictions LoadGlobRestrictions(const TVars& vars, const ui32 globVarElemId);
-    static void SaveGlobPatternStat(TVars& vars, const TGlobStat& globPatternStat, const ui32 globPatternElemId);
+    static void SaveGlobPatternStat(TVars& vars, const ui32 globPatternElemId, const TGlobStat& globPatternStat);
     static TGlobStat LoadGlobPatternStat(const TVars& vars, const ui32 globPatternElemId);
 };

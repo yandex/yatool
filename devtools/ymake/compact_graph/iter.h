@@ -495,8 +495,7 @@ public:
         const auto& dep = state.NextDep();
         const auto& to = dep.To();
         typename TNodes::iterator i = Nodes.find(to.Id());
-        return (i == Nodes.end() || !i->second.InStack)
-            && !IsProp2BuildCommandDep(dep); // Skip backward edges REFERENCE_BY(Property) -> GLOB(BuildCommand)
+        return (i == Nodes.end() || !i->second.InStack);
     }
 
 protected:

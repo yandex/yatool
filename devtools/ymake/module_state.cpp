@@ -232,30 +232,34 @@ void TModule::Save(TModuleSavedState& saved) const {
     const auto itGlobVarElemIds = Vars.find(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS);
     if (itGlobVarElemIds != Vars.end()) {
         for (const auto& globVarName: itGlobVarElemIds->second) {
-            static TVector<TString> globRestrictionFields = {TString{NArgs::MAX_MATCHES}, TString{NArgs::MAX_WATCH_DIRS}};
-            for (const auto& globRestrictionField: globRestrictionFields) {
-                auto globFieldVarName = globRestrictionField + "-" + globVarName.Name;
-                TStringBuf value = Get(globFieldVarName);
+            static TVector<TString> globvarFields = {TString{NArgs::MAX_MATCHES}, TString{NArgs::MAX_WATCH_DIRS}, TString{NArgs::GLOBVAR_PATTERN_ELEM_IDS}};
+            for (const auto& globvarField: globvarFields) {
+                auto globvarFieldName = globvarField + "-" + globVarName.Name;
+                TStringBuf value = Get(globvarFieldName);
                 if (!value.empty()) {
-                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globFieldVarName, value)));
+                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globvarFieldName, value)));
+                    if (globvarFieldName == NArgs::GLOBVAR_PATTERN_ELEM_IDS) {
+                        size_t pend = 0;
+                        do {
+                            if (pend && pend != TStringBuf::npos) {
+                                value = value.substr(pend + 1);
+                            }
+                            pend = value.find(' ');
+                            auto strGlobPatternElemId = value.substr(0, pend);
+                            static TVector<TString> globStatFields = {TString{NArgs::MATCHED}, TString{NArgs::SKIPPED}, TString{NArgs::DIRS}};
+                            for (const auto& globStatField: globStatFields) {
+                                auto globPatternFieldVarName = globStatField + "-" + strGlobPatternElemId;
+                                TStringBuf value = Get(globPatternFieldVarName);
+                                if (!value.empty()) {
+                                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globPatternFieldVarName, value)));
+                                }
+                            }
+                        } while (pend != TStringBuf::npos);
+                    }
                 }
             }
         }
     }
-    const auto itGlobPatternElemIds = Vars.find(NVariableDefs::VAR_GLOB_PATTERN_ELEM_IDS);
-    if (itGlobPatternElemIds != Vars.end()) {
-        for (const auto& globPatternName: itGlobPatternElemIds->second) {
-            static TVector<TString> globStatFields = {TString{NArgs::MATCHED}, TString{NArgs::SKIPPED}, TString{NArgs::DIRS}};
-            for (const auto& globStatField: globStatFields) {
-                auto globFieldVarName = globStatField + "-" + globPatternName.Name;
-                TStringBuf value = Get(globFieldVarName);
-                if (!value.empty()) {
-                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globFieldVarName, value)));
-                }
-            }
-        }
-    }
-
 
     for (auto item: TRANSITIVE_CHECK_REGISTRY) {
         for (auto name: item.ConfVars) {
