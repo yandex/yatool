@@ -1063,7 +1063,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
 
     if (globVarElemId && Conf.PerModuleGlobVar && Conf.SaveLoadGlobPatterns) {
-        TModuleDef::SaveGlobPatterns(Vars, globVarElemId, globPatternElemIds);
+        TModuleDef::SaveGlobPatternElemIds(Vars, globVarElemId, globPatternElemIds);
     }
     return true;
 }

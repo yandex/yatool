@@ -47,7 +47,7 @@ namespace {
             }
             if (conf.PerModuleGlobVar && conf.SaveLoadGlobPatterns) {
                 for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
-                    TModuleDef::SaveGlobPatterns(module->GetVars(), globVarElemId, globPatternElemIds);
+                    TModuleDef::SaveGlobPatternElemIds(module->GetVars(), globVarElemId, globPatternElemIds);
                 }
             }
         }

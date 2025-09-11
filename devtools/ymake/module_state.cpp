@@ -5,6 +5,7 @@
 #include "macro_processor.h"
 #include "peers.h"
 #include "command_store.h"
+#include "module_loader.h"
 
 #include <devtools/ymake/lang/plugin_facade.h>
 
@@ -224,38 +225,45 @@ void TModule::Save(TModuleSavedState& saved) const {
         saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_PROVIDES, JoinStrings(Provides.begin(), Provides.end(), TStringBuf(" ")))));
     }
     for (const auto& name : CONFIG_VAR_NAMES) {
-        TStringBuf value = Get(name);
+        const auto value = Get(name);
         if (!value.empty()) {
             saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
         }
     }
-    const auto itGlobVarElemIds = Vars.find(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS);
-    if (itGlobVarElemIds != Vars.end()) {
-        for (const auto& globVarName: itGlobVarElemIds->second) {
-            static TVector<TString> globvarFields = {TString{NArgs::MAX_MATCHES}, TString{NArgs::MAX_WATCH_DIRS}, TString{NArgs::GLOBVAR_PATTERN_ELEM_IDS}};
-            for (const auto& globvarField: globvarFields) {
-                auto globvarFieldName = globvarField + "-" + globVarName.Name;
-                TStringBuf value = Get(globvarFieldName);
-                if (!value.empty()) {
-                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globvarFieldName, value)));
-                    if (globvarFieldName == NArgs::GLOBVAR_PATTERN_ELEM_IDS) {
-                        size_t pend = 0;
-                        do {
-                            if (pend && pend != TStringBuf::npos) {
-                                value = value.substr(pend + 1);
-                            }
-                            pend = value.find(' ');
-                            auto strGlobPatternElemId = value.substr(0, pend);
-                            static TVector<TString> globStatFields = {TString{NArgs::MATCHED}, TString{NArgs::SKIPPED}, TString{NArgs::DIRS}};
-                            for (const auto& globStatField: globStatFields) {
-                                auto globPatternFieldVarName = globStatField + "-" + strGlobPatternElemId;
-                                TStringBuf value = Get(globPatternFieldVarName);
-                                if (!value.empty()) {
-                                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globPatternFieldVarName, value)));
-                                }
-                            }
-                        } while (pend != TStringBuf::npos);
-                    }
+    const auto globVarElemIdsVal = Get(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS);
+    THashSet<TStringBuf> strGlobPatternElemIds;
+    if (globVarElemIdsVal.IsInited() && !globVarElemIdsVal.empty()) {
+        TVector<TStringBuf> strGlobVarElemIds;
+        Split(globVarElemIdsVal, " ", strGlobVarElemIds);
+        for (const auto& strGlobVarElemId: strGlobVarElemIds) {
+            TVector<TString> globVarFields{
+                TModuleDef::GlobPatternElemIdsVar(strGlobVarElemId),
+                TModuleDef::MaxMatchesVar(strGlobVarElemId),
+                TModuleDef::MaxWatchDirsVar(strGlobVarElemId),
+            };
+            for (const auto& globVarField: globVarFields) {
+                const auto value = Get(globVarField);
+                if (value.IsInited() && !value.empty()) {
+                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globVarField, value)));
+                }
+            }
+            const auto patternStrElemIds = TModuleDef::LoadStrGlobPatternElemIds(Vars, globVarFields[0]);
+            for (auto& patternStrElemId: patternStrElemIds) {
+                strGlobPatternElemIds.emplace(std::move(patternStrElemId));
+            }
+        }
+    }
+    if (!strGlobPatternElemIds.empty()) {
+        for (auto& strGlobPatternElemId: strGlobPatternElemIds) {
+            TVector<TString> globPatternFields{
+                TModuleDef::MatchedVar(strGlobPatternElemId),
+                TModuleDef::SkippedVar(strGlobPatternElemId),
+                TModuleDef::DirsVar(strGlobPatternElemId),
+            };
+            for (const auto& globPatternField: globPatternFields) {
+                const auto value = Get(globPatternField);
+                if (value.IsInited() && !value.empty()) {
+                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globPatternField, value)));
                 }
             }
         }
@@ -263,7 +271,7 @@ void TModule::Save(TModuleSavedState& saved) const {
 
     for (auto item: TRANSITIVE_CHECK_REGISTRY) {
         for (auto name: item.ConfVars) {
-            TStringBuf value = Get(name);
+            const auto value = Get(name);
             if (!value.empty()) {
                 saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
             }

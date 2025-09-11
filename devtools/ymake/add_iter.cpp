@@ -54,7 +54,7 @@ namespace {
                     const auto globVarElemId = edge.To()->ElemId;
                     auto& otherGlobPatternElemIds = res.Var2OtherPatterns[globVarElemId];
                     if (conf.PerModuleGlobVar && conf.SaveLoadGlobPatterns && module) {
-                        auto globPatternElemIds = TModuleDef::LoadGlobPatterns(module->Vars, globVarElemId);
+                        auto globPatternElemIds = TModuleDef::LoadGlobPatternElemIds(module->Vars, globVarElemId);
                         for (const auto otherGlobPatternElemId: globPatternElemIds) {
                             if (otherGlobPatternElemId != globPatternElemId) {
                                 otherGlobPatternElemIds.push_back(otherGlobPatternElemId);
@@ -80,7 +80,9 @@ namespace {
         TModuleDef::SaveGlobPatternStat(moduleVars, globPatternElemId, globPatternStat);
         for (const auto& [globVarElemId, otherGlobPatternElemIds]: globInfo.Var2OtherPatterns) {
             TGlobRestrictions globRestrictions;
-            globRestrictions = TModuleDef::LoadGlobRestrictions(moduleVars, globVarElemId);
+            if (conf.SaveGlobRestrictions) {
+                globRestrictions = TModuleDef::LoadGlobRestrictions(moduleVars, globVarElemId);
+            }
             TGlobStat globStat;
             globStat += globPatternStat;
             for (const auto otherGlobPatternElemId: otherGlobPatternElemIds) {
