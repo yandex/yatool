@@ -105,7 +105,8 @@ class VSCodeProject:
             self.links_dir = os.path.join(self.project_root, ".links")
             if not os.path.exists(self.links_dir):
                 ide_common.emit_message(f"Creating directory: {self.links_dir}")
-                fs.ensure_dir(self.links_dir)
+            fs.remove_tree_safe(self.links_dir)
+            fs.ensure_dir(self.links_dir)
             if self.params.debug_enabled:
                 self.python_wrappers_dir = os.path.join(self.project_root, "python_wrappers")
                 if not os.path.exists(self.python_wrappers_dir):
@@ -432,7 +433,9 @@ class VSCodeProject:
         if self.is_py3:
             ide_common.emit_message("Collecting python extra paths")
             python_srcdirs = vscode.dump.get_python_srcdirs(modules)
-            extra_paths = vscode.dump.collect_python_path(self.params.arc_root, self.links_dir, modules, python_srcdirs)
+            extra_paths = vscode.dump.collect_python_path(
+                self.params.arc_root, self.links_dir, modules, python_srcdirs, self.params.python_new_extra_paths
+            )
             python_excludes = vscode.workspace.gen_pyrights_excludes(self.params.arc_root, python_srcdirs)
             if self.params.ruff_formatter_enabled:
                 workspace["settings"]["ruff.exclude"] = python_excludes
