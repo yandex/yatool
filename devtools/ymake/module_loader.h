@@ -2,8 +2,6 @@
 
 #include "module_state.h"
 
-#include "macro_processor.h"
-#include "general_parser.h" // EMakeNodeType
 #include "vars.h"
 #include "conf.h"
 
