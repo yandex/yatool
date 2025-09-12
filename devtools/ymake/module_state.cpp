@@ -1,11 +1,11 @@
 #include "module_state.h"
 
 #include "builtin_macro_consts.h"
+#include "glob_helper.h"
 #include "macro_string.h"
 #include "macro_processor.h"
 #include "peers.h"
 #include "command_store.h"
-#include "module_loader.h"
 
 #include <devtools/ymake/lang/plugin_facade.h>
 
@@ -237,9 +237,9 @@ void TModule::Save(TModuleSavedState& saved) const {
         Split(globVarElemIdsVal, " ", strGlobVarElemIds);
         for (const auto& strGlobVarElemId: strGlobVarElemIds) {
             TVector<TString> globVarFields{
-                TModuleDef::GlobPatternElemIdsVar(strGlobVarElemId),
-                TModuleDef::MaxMatchesVar(strGlobVarElemId),
-                TModuleDef::MaxWatchDirsVar(strGlobVarElemId),
+                TGlobHelper::GlobPatternElemIdsVar(strGlobVarElemId),
+                TGlobHelper::MaxMatchesVar(strGlobVarElemId),
+                TGlobHelper::MaxWatchDirsVar(strGlobVarElemId),
             };
             for (const auto& globVarField: globVarFields) {
                 const auto value = Get(globVarField);
@@ -247,7 +247,7 @@ void TModule::Save(TModuleSavedState& saved) const {
                     saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globVarField, value)));
                 }
             }
-            const auto patternStrElemIds = TModuleDef::LoadStrGlobPatternElemIds(Vars, globVarFields[0]);
+            const auto patternStrElemIds = TGlobHelper::LoadStrGlobPatternElemIds(Vars, globVarFields[0]);
             for (auto& patternStrElemId: patternStrElemIds) {
                 strGlobPatternElemIds.emplace(std::move(patternStrElemId));
             }
@@ -256,9 +256,9 @@ void TModule::Save(TModuleSavedState& saved) const {
     if (!strGlobPatternElemIds.empty()) {
         for (auto& strGlobPatternElemId: strGlobPatternElemIds) {
             TVector<TString> globPatternFields{
-                TModuleDef::MatchedVar(strGlobPatternElemId),
-                TModuleDef::SkippedVar(strGlobPatternElemId),
-                TModuleDef::DirsVar(strGlobPatternElemId),
+                TGlobHelper::MatchedVar(strGlobPatternElemId),
+                TGlobHelper::SkippedVar(strGlobPatternElemId),
+                TGlobHelper::DirsVar(strGlobPatternElemId),
             };
             for (const auto& globPatternField: globPatternFields) {
                 const auto value = Get(globPatternField);

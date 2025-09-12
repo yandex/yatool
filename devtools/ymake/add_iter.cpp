@@ -2,7 +2,7 @@
 
 #include "add_iter.h"
 #include "add_iter_debug.h"
-#include "module_loader.h"
+#include "glob_helper.h"
 #include "module_dir.h"
 #include "module_builder.h"
 #include "module_state.h"
@@ -54,7 +54,7 @@ namespace {
                     const auto globVarElemId = edge.To()->ElemId;
                     auto& otherGlobPatternElemIds = res.Var2OtherPatterns[globVarElemId];
                     if (conf.PerModuleGlobVar && conf.SaveLoadGlobPatterns && module) {
-                        auto globPatternElemIds = TModuleDef::LoadGlobPatternElemIds(module->Vars, globVarElemId);
+                        auto globPatternElemIds = TGlobHelper::LoadGlobPatternElemIds(module->Vars, globVarElemId);
                         for (const auto otherGlobPatternElemId: globPatternElemIds) {
                             if (otherGlobPatternElemId != globPatternElemId) {
                                 otherGlobPatternElemIds.push_back(otherGlobPatternElemId);
@@ -77,16 +77,16 @@ namespace {
         if (!conf.PerModuleGlobVar || !conf.SaveLoadGlobPatterns || !conf.SaveLoadGlobStat) {
             return;
         }
-        TModuleDef::SaveGlobPatternStat(moduleVars, globPatternElemId, globPatternStat);
+        TGlobHelper::SaveGlobPatternStat(moduleVars, globPatternElemId, globPatternStat);
         for (const auto& [globVarElemId, otherGlobPatternElemIds]: globInfo.Var2OtherPatterns) {
             TGlobRestrictions globRestrictions;
             if (conf.SaveGlobRestrictions) {
-                globRestrictions = TModuleDef::LoadGlobRestrictions(moduleVars, globVarElemId);
+                globRestrictions = TGlobHelper::LoadGlobRestrictions(moduleVars, globVarElemId);
             }
             TGlobStat globStat;
             globStat += globPatternStat;
             for (const auto otherGlobPatternElemId: otherGlobPatternElemIds) {
-                globStat += TModuleDef::LoadGlobPatternStat(moduleVars, otherGlobPatternElemId);
+                globStat += TGlobHelper::LoadGlobPatternStat(moduleVars, otherGlobPatternElemId);
             }
             if (conf.CheckGlobRestrictions) {
                 globRestrictions.Check(name, globStat);
@@ -105,7 +105,7 @@ namespace {
             const auto globPatternElemId = st.Node.ElemId;
             TGlobStat prevGlobPatternStat;
             if (conf.UpdateGlobStat) {
-                prevGlobPatternStat = TModuleDef::LoadGlobPatternStat(module->Vars, globPatternElemId);
+                prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->Vars, globPatternElemId);
             }
             TGlobStat globPatternStat;
             const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher, &globPatternStat);
@@ -152,7 +152,7 @@ namespace {
             const auto globPatternElemId = st.Node.ElemId;
             TGlobStat prevGlobPatternStat;
             if (conf.SaveLoadGlobStat) {
-                prevGlobPatternStat = TModuleDef::LoadGlobPatternStat(module->Vars, globPatternElemId);
+                prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->Vars, globPatternElemId);
             }
             TGlobStat globPatternStat;
             result = glob.NeedUpdate(globInfo.ExcludesMatcher, &globPatternStat);

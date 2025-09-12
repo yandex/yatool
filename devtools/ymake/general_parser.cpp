@@ -1,6 +1,7 @@
 #include "general_parser.h"
 
 #include "add_node_context_inline.h"
+#include "glob_helper.h"
 #include "makefile_loader.h"
 #include "macro_string.h"
 #include "macro_processor.h"
@@ -47,7 +48,7 @@ namespace {
             }
             if (conf.PerModuleGlobVar && conf.SaveLoadGlobPatterns) {
                 for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
-                    TModuleDef::SaveGlobPatternElemIds(module->GetVars(), globVarElemId, globPatternElemIds);
+                    TGlobHelper::SaveGlobPatternElemIds(module->GetVars(), globVarElemId, globPatternElemIds);
                 }
             }
         }

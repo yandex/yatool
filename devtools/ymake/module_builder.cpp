@@ -2,6 +2,7 @@
 
 #include "args_converter.h"
 #include "builtin_macro_consts.h"
+#include "glob_helper.h"
 #include "makefile_loader.h"
 #include "macro_string.h"
 #include "out.h"
@@ -952,7 +953,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     const auto [globsWithExcludes, restrictions] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::RESTRICTIONS);
     TGlobRestrictions globRestrictions;
     if (!restrictions.empty()) {
-        globRestrictions = TModuleDef::ParseGlobRestrictions(restrictions.subspan(1), NMacro::_LATE_GLOB);
+        globRestrictions = TGlobHelper::ParseGlobRestrictions(restrictions.subspan(1), NMacro::_LATE_GLOB);
     }
     if (ModuleDef && ModuleDef->IsExtendGlobRestriction()) {
         globRestrictions.Extend();
@@ -1015,7 +1016,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
             const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
             globPatternElemIds.push_back(globPatternElemId);
             if (Conf.SaveLoadGlobStat) {
-                TModuleDef::SaveGlobPatternStat(Vars, globPatternElemId, globStat);
+                TGlobHelper::SaveGlobPatternStat(Vars, globPatternElemId, globStat);
             }
             TModuleGlobInfo globInfo = {
                 .GlobPatternId = globPatternElemId,
@@ -1032,7 +1033,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
 
     if (Conf.SaveGlobRestrictions && globVarElemId) {
-        TModuleDef::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
+        TGlobHelper::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
     }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat);
@@ -1063,7 +1064,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
 
     if (globVarElemId && Conf.PerModuleGlobVar && Conf.SaveLoadGlobPatterns) {
-        TModuleDef::SaveGlobPatternElemIds(Vars, globVarElemId, globPatternElemIds);
+        TGlobHelper::SaveGlobPatternElemIds(Vars, globVarElemId, globPatternElemIds);
     }
     return true;
 }
