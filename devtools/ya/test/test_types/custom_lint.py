@@ -96,6 +96,13 @@ class CustomLintTestSuite(LintTestSuite):
         relative_path = os.path.relpath(filename, self.project_path)
         return "{}::{}".format(relative_path, self._lint_name)
 
+    def get_global_resources(self):
+        if self.meta.lint_global_resources_keys:
+            global_resources_keys = set(self.meta.lint_global_resources_keys) & self.meta.global_resources.keys()
+        else:
+            global_resources_keys = self.meta.global_resources.keys()
+        return sorted('::'.join(i) for i in self.meta.global_resources.items() if i[0] in global_resources_keys)
+
     def get_computed_test_names(self, opts):
         return [self._get_test_name(filename) for filename in self._get_files()]
 

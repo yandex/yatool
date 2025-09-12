@@ -154,6 +154,10 @@ class MetaInfo(object):
         return self._lint_file_processing_time
 
     @property
+    def lint_global_resources_keys(self):
+        return self._lint_global_resources_keys or ()
+
+    @property
     def lint_name(self):
         if self._lint_name is None:
             raise ValueError('lint_name cannot be None')
@@ -367,6 +371,7 @@ class DartInfo(MetaInfo):
         self._lint_wrapper_script = dart_info.get("LINT-WRAPPER-SCRIPT")
         self._lint_extra_params = dart_info.get("LINT-EXTRA-PARAMS")
         self._lint_file_processing_time = dart_info.get("LINT-FILE-PROCESSING-TIME")
+        self._lint_global_resources_keys = dart_info.get('LINT-GLOBAL-RESOURCES')
         self._lint_name = dart_info.get("LINT-NAME")
         self._module_lang = dart_info.get("MODULE_LANG")
         self._no_check = dart_info.get('NO-CHECK')
