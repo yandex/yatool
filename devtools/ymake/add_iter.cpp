@@ -53,7 +53,7 @@ namespace {
                     const auto globPatternElemId = edge.From()->ElemId;
                     const auto globVarElemId = edge.To()->ElemId;
                     auto& otherGlobPatternElemIds = res.Var2OtherPatterns[globVarElemId];
-                    if (conf.PerModuleGlobVar && conf.SaveLoadGlobPatterns && module) {
+                    if (conf.SaveLoadGlobPatterns && module) {
                         auto globPatternElemIds = TGlobHelper::LoadGlobPatternElemIds(module->Vars, globVarElemId);
                         for (const auto otherGlobPatternElemId: globPatternElemIds) {
                             if (otherGlobPatternElemId != globPatternElemId) {
@@ -74,7 +74,7 @@ namespace {
     }
 
     void OnChangeGlobPatternStat(TVars& moduleVars, const ui32 globPatternElemId, const TGlobStat& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TBuildConfiguration& conf) {
-        if (!conf.PerModuleGlobVar || !conf.SaveLoadGlobPatterns || !conf.SaveLoadGlobStat) {
+        if (!conf.SaveLoadGlobPatterns || !conf.SaveLoadGlobStat) {
             return;
         }
         TGlobHelper::SaveGlobPatternStat(moduleVars, globPatternElemId, globPatternStat);

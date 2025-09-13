@@ -286,11 +286,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             globStat += globPatternStat;
 
             if (!globVarElemId) {
-                if (Conf.PerModuleGlobVar) {
-                    globVarElemId = Names.AddName(EMNT_Property, FormatProperty(moduleElemId, NProps::REFERENCED_BY, varName));
-                } else {
-                    globVarElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
-                }
+                globVarElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
             }
             const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
             const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);

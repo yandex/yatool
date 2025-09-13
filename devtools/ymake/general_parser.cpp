@@ -46,7 +46,7 @@ namespace {
                 entryStats.SetReassemble(true);
                 PopulateGlobNode(globNode, globInfo);
             }
-            if (conf.PerModuleGlobVar && conf.SaveLoadGlobPatterns) {
+            if (conf.SaveLoadGlobPatterns) {
                 for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
                     TGlobHelper::SaveGlobPatternElemIds(module->GetVars(), globVarElemId, globPatternElemIds);
                 }
