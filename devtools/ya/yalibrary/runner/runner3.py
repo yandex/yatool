@@ -303,9 +303,10 @@ class TaskContext(object):
         )
 
     def run_dist_node(self, node: "Node") -> "DistDownloadTask":
-        import yalibrary.runner.tasks.distbuild
+        # XXX: (DEVTOOLSSUPPORT-69240) Intentionally importing a single class
+        from yalibrary.runner.tasks.distbuild import DistDownloadTask
 
-        return yalibrary.runner.tasks.distbuild.DistDownloadTask(
+        return DistDownloadTask(
             node,
             self,
             self._build_root_set,
