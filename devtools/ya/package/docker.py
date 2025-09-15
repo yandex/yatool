@@ -67,6 +67,7 @@ def create_package(
     add_host,
     target,
     docker_secret,
+    docker_use_buildx,
     labels=None,
 ):
     package_name = package_context.package_name
@@ -114,7 +115,7 @@ def create_package(
         for k, v in labels.items():
             build_command += ["--label", "{}={}".format(k, v)]
 
-    if buildx_required:
+    if buildx_required or docker_use_buildx:
         build_command = ["buildx"] + build_command
 
     build_out, _ = package.process.run_process(

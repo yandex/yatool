@@ -947,6 +947,7 @@ def create_package(package_context, output_root, builds):
                     params.docker_add_host,
                     params.docker_target,
                     params.docker_secrets,
+                    params.docker_use_buildx,
                     package_context.context,
                 )
                 package_context.set_context("docker_image", info.image_tag)

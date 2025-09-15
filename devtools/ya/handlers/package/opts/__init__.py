@@ -36,6 +36,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.docker_push_image = False
         self.docker_remote_image_version = None
         self.docker_use_remote_cache = False
+        self.docker_use_buildx = False
         self.dump_build_targets = None
         self.dump_inputs = None
         self.ignore_fail_tests = False
@@ -272,6 +273,13 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 names=['--docker-remote-image-version'],
                 help='Specify image version to be used as cache source',
                 hook=devtools.ya.core.yarg.SetValueHook('docker_remote_image_version'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-use-buildx'],
+                help='Use buildx to build docker image',
+                hook=devtools.ya.core.yarg.SetConstValueHook('docker_use_buildx', True),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DOCKER_SUBGROUP,
             ),
