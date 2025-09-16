@@ -283,6 +283,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DOCKER_SUBGROUP,
             ),
+            devtools.ya.core.yarg.ConfigConsumer("docker_use_buildx"),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--nanny-release'],
                 help='Notify nanny about new release',
