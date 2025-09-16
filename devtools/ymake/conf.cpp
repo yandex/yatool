@@ -104,7 +104,6 @@ namespace {
 
     void ReadFeatureFlags(TBuildConfiguration& conf) {
         conf.FillModule2Nodes = NYMake::IsTrue(conf.CommandConf.EvalValue("FILL_MODULE2NODES"));
-        conf.CheckKVP = NYMake::IsTrue(conf.CommandConf.EvalValue("CHECK_KVP"));
         conf.SaveLoadGlobPatterns = NYMake::IsTrue(conf.CommandConf.EvalValue("SAVELOAD_GLOB_PATTERNS"));
         conf.SaveLoadGlobStat = NYMake::IsTrue(conf.CommandConf.EvalValue("SAVELOAD_GLOB_STAT"));
         conf.UpdateGlobStat = NYMake::IsTrue(conf.CommandConf.EvalValue("UPDATE_GLOB_STAT"));

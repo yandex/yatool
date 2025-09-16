@@ -233,12 +233,11 @@ inline void TJsonCmdAcceptor::FinishToken(TString& res, const char* at, bool nex
     InToken = nextIsMacro || TopQuote;
 }
 
-TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeNode* makeNode, bool fillModule2Nodes, bool checkKVP, const TModule* module)
+TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeNode* makeNode, bool fillModule2Nodes, const TModule* module)
     : DumpInfo(dumpInfo)
     , JSONVisitor(vis)
     , MakeNode(makeNode)
     , FillModule2Nodes(fillModule2Nodes)
-    , CheckKVP_(checkKVP)
     , Module_(module)
 {}
 
@@ -393,7 +392,7 @@ void TSubst2Json::OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInf
     makeNode.ResourceUris.swap(resources);
     makeNode.TaredOuts.swap(taredOuts);
 
-    if (CheckKVP_ && (!makeNode.KV || !makeNode.KV.contains("p"))) {
+    if (!makeNode.KV || !makeNode.KV.contains("p")) {
         THolder<TScopedContext> context = Module_ ? MakeHolder<TScopedContext>(Module_->GetName()) : nullptr;
         YConfErr(Misconfiguration) << "No kv->p in command with output: " << makeNode.Outputs.substr(2 /* [" */, makeNode.Outputs.find('"', 2) - 2) << Endl;
     }

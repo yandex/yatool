@@ -68,7 +68,6 @@ public:
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
     THashSet<TStringBuf> GlobRestrictionExtends{};
     bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
-    bool CheckKVP{false}; // conf error if absent kv->p in any command in rendering json
     bool SaveLoadGlobPatterns{false}; // save-load glob pattern elemIds by vars to module vars
     bool SaveLoadGlobStat{false}; // (only if SaveLoadGlobPatterns) save-load glob pattern stats to module vars
     bool UpdateGlobStat{false}; // (only if SaveLoadGlobPatterns && SaveLoadGlobStat) update glob pattern stats in module vars in UdpIter
