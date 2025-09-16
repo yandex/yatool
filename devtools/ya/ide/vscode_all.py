@@ -257,7 +257,7 @@ class VSCodeProject:
                 ("npm.autoDetect", "off"),
                 ("python.analysis.autoSearchPaths", False),
                 ("python.analysis.diagnosticMode", "openFilesOnly"),
-                ("python.analysis.enablePytestSupport", False),
+                ("python.analysis.enablePytestSupport", pm.my_platform().startswith("linux")),
                 ("python.analysis.indexing", False),
                 ("python.languageServer", "None"),
                 ("python.testing.autoTestDiscoverOnSaveEnabled", False),

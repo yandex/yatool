@@ -1,6 +1,5 @@
 import json
 import os
-import platform
 import shutil
 import sys
 from collections import OrderedDict
@@ -120,7 +119,7 @@ def gen_exclude_settings(params, modules):
         for path in params.rel_targets:
             tree.add_path(path)
 
-        if not platform.platform().lower().startswith("linux"):
+        if not pm.my_platform().startswith("linux"):
             watcher_excludes = OrderedDict()
             for path in tree.gen_excludes(params.arc_root, relative=True, only_dirs=True):
                 watcher_excludes[path] = True
@@ -144,7 +143,7 @@ def gen_exclude_settings(params, modules):
                 settings["files.exclude"] = deps_excludes
             elif params.files_visibility == "all":
                 settings["search.exclude"] = deps_excludes
-    if platform.platform().lower().startswith("linux"):
+    if pm.my_platform().startswith("linux"):
         settings["files.watcherExclude"] = {"**": True}
     return settings
 
