@@ -45,10 +45,10 @@ void SigInt(int) {
 }
 
 #if !defined(_win_)
-void SigSegv(int, siginfo_t*, void*) {
-    Cerr << "SIGSEGV, backtrace is:" << Endl;
+void PrintBackTraceOnSignal(int signum, siginfo_t*, void*) {
+    Cerr << "Signal " << signum << ", backtrace is:" << Endl;
     PrintBackTrace();
-    raise(SIGSEGV);
+    raise(signum);
 }
 
 using THandler = void (*)(int, siginfo_t*, void*);
@@ -268,7 +268,8 @@ int YMakeMain(int argc, char** argv) {
 
     SetAsyncSignalHandler(SIGINT, SigInt);
 #if !defined(_win_)
-    SetupSignalHandler(SIGSEGV, SigSegv);
+    SetupSignalHandler(SIGSEGV, PrintBackTraceOnSignal);
+    SetupSignalHandler(SIGABRT, PrintBackTraceOnSignal);
 #endif // !_win_
 
     int threads = 0;
