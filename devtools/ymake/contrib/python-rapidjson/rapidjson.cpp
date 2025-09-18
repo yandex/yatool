@@ -25,7 +25,7 @@
 #include "rapidjson/error/en.h"
 
 
-using namespace rapidjson;
+using namespace RAPIDJSON_NAMESPACE;
 
 
 /* On some MacOS combo, using Py_IS_XXX() macros does not work (see
