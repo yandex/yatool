@@ -67,17 +67,12 @@ TString TGlobHelper::GlobPatternElemIdsVar(const TStringBuf& strGlobVarElemId) {
 }
 
 static void SaveGlobVarElemId(TVars& vars, const TStringBuf& strGlobVarElemId) {
-    const auto& value = GetCmdValue(vars.Get1(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS));
-    if (value.IsInited() && value.size() >= strGlobVarElemId.size()) {
-        bool alreadyAppended = false;
-        size_t p = 0;
-        while (!alreadyAppended && (p = value.find(strGlobVarElemId, p)) != TStringBuf::npos) {
-            const auto spaceBefore = (p == 0) || (value[p - 1] == ' ');
-            const auto spaceAfter = (p >= value.size() - strGlobVarElemId.size()) || (value[p + strGlobVarElemId.size()] == ' ');
-            alreadyAppended = spaceBefore && spaceAfter;
-        }
-        if (alreadyAppended) {
-            return;
+    const auto& strGlobVarElemIds = GetCmdValue(vars.Get1(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS));
+    if (strGlobVarElemIds.IsInited() && strGlobVarElemIds.size() >= strGlobVarElemId.size()) {
+        TVector<TStringBuf> strElemIds;
+        Split(strGlobVarElemIds, " ", strElemIds);
+        if (Find(strElemIds, strGlobVarElemId) != strElemIds.end()) {
+            return; // already appended
         }
     }
     vars.SetAppend(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS, strGlobVarElemId);
