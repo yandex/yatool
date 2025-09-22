@@ -711,6 +711,7 @@ class SandboxAuthOptions(AuthOptions):
         self.sandbox_oauth_token = None
         self.sandbox_oauth_token_path = None
         self.sandbox_oauth_token_path_depr = None
+        self._sandbox_session_token = None
 
     def consumer(self):
         return super().consumer() + [
@@ -734,6 +735,11 @@ class SandboxAuthOptions(AuthOptions):
                 hook=SetValueHook('username'),
                 group=AUTH_OPT_GROUP,
             ),
+            EnvConsumer(
+                'SANDBOX_SESSION_TOKEN',
+                help='oAuth token that is available only in SB task (takes precedance on everything else)',
+                hook=SetValueHook('_sandbox_session_token'),
+            ),
         ]
 
     def postprocess(self):
@@ -756,6 +762,12 @@ class SandboxAuthOptions(AuthOptions):
                 self.sandbox_oauth_token = token
             else:
                 self.sandbox_oauth_token_path = None
+
+        if self._sandbox_session_token:
+            # If the token is leaked we don't care, since it's available only inside a task
+            logger.debug('Using SANDBOX_SESSION_TOKEN for authorization')
+            self.sandbox_oauth_token = self._sandbox_session_token
+            self.sandbox_oauth_token_path = None
 
         if not self.sandbox_oauth_token:
             # fall back to common oauth token if sandbox options are not set.
