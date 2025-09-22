@@ -1120,7 +1120,7 @@ def do_uids(params):
         build_type=params.build_type,
         build_targets=params.abs_targets,
         debug_options=[],
-        flags={},
+        flags=params.flags,
         ymake_bin=None,
     )
     json.dump(uids, sys.stdout, indent=4, sort_keys=True)
