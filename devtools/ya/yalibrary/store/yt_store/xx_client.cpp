@@ -1,4 +1,5 @@
 #include "xx_client.hpp"
+#include "table_defs.h"
 
 #include <contrib/libs/libarchive/libarchive/archive.h>
 #include <contrib/libs/libarchive/libarchive/archive_entry.h>
@@ -15,6 +16,7 @@
 #include <yt/cpp/mapreduce/common/retry_lib.h>
 #include <yt/cpp/mapreduce/http_client/raw_client.h>
 #include <yt/cpp/mapreduce/interface/logging/logger.h>
+#include <yt/cpp/mapreduce/util/wait_for_tablets_state.h>
 #include <yt/cpp/mapreduce/util/ypath_join.h>
 
 #include <util/digest/city_streaming.h>
@@ -671,7 +673,7 @@ namespace NYa {
 
     class TYtStore2::TImpl {
     public:
-        TImpl(const TString proxy, const TString& dataDir, const TYtStore2Options& options)
+        TImpl(const TString& proxy, const TString& dataDir, const TYtStore2Options& options)
             : Token_{options.Token}
             , ReadOnly_(options.ReadOnly)
             , OnDisable_{options.OnDisable}
@@ -1048,11 +1050,195 @@ namespace NYa {
             TRegExMatch x{re};
         }
 
+        static inline void CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options) {
+            InitializeLogger();
+            NYT::TYPath metadataTable = NYT::JoinYPaths(dataDir, METADATA_TABLE);
+            NYT::TYPath dataTable = NYT::JoinYPaths(dataDir, DATA_TABLE);
+            NYT::TYPath statTable = NYT::JoinYPaths(dataDir, STAT_TABLE);
+            std::array allTables{metadataTable, dataTable, statTable};
+            Y_ASSERT(allTables.size() == ALL_TABLES.size());
+
+            TString metadataSchema{};
+            if (options.Version < YT_CACHE_METADATA_SCHEMAS.size()) {
+                metadataSchema = YT_CACHE_METADATA_SCHEMAS[options.Version];
+            }
+            if (metadataSchema.empty()) {
+                ythrow TYtStoreError::Muted() << "Incorrect cache version " << options.Version;
+            }
+
+            auto ytc = ConnectToCluster(proxy, options.Token);
+
+            if (!ytc->Exists(dataDir)) {
+                ythrow TYtStoreError::Muted() << "Path '" << dataDir << "' doesn't exist";
+            }
+            if (!options.IgnoreExisting) {
+                for (const NYT::TYPath& table : allTables) {
+                    if (ytc->Exists(table)) {
+                        ythrow TYtStoreError::Muted() << "Table '" << table << "' already exists";
+                    }
+                }
+            }
+
+            INFO_LOG << "Create tables";
+            NYT::ENodeType tableType = options.Replicated ? NYT::ENodeType::NT_REPLICATED_TABLE : NYT::ENodeType::NT_TABLE;
+            CreateDynamicTable(
+                ytc,
+                metadataTable,
+                tableType,
+                metadataSchema,
+                options.MetadataTabletCount.value_or(DEFAULT_METADATA_TABLET_COUNT),
+                options.IgnoreExisting,
+                options.Tracked,
+                options.InMemory ? NYT::TNode()("in_memory_mode", "uncompressed") : NYT::TNode{}
+            );
+            CreateDynamicTable(
+                ytc,
+                dataTable,
+                tableType,
+                YT_CACHE_DATA_SCHEMA,
+                options.DataTabletCount.value_or(DEFAULT_DATA_TABLET_COUNT),
+                options.IgnoreExisting,
+                options.Tracked,
+                NYT::TNode()
+                    ("tablet_balancer_config", NYT::TNode()
+                        // Prevent balancer from creating too many tablets
+                        ("enable_auto_reshard", false)
+                        ("enable_auto_tablet_move", true)
+                    )
+            );
+            CreateDynamicTable(ytc, statTable, tableType, YT_CACHE_STAT_SCHEMA, 0, options.IgnoreExisting, options.Tracked);
+
+            if (options.Replicated && !ytc->Exists(NYT::JoinYPaths(metadataTable, "@replication_collocation_id"))) {
+                auto tablePaths = NYT::TNode::CreateList();
+                for (const TYPath& path : allTables) {
+                    tablePaths.Add(path);
+                }
+                auto opts = TCreateOptions().Attributes(
+                    NYT::TNode()
+                        ("collocation_type", "replication")
+                        ("table_paths", tablePaths)
+                );
+                try {
+                    ytc->Create("", NYT::ENodeType::NT_TABLE_COLLOCATION, opts);
+                } catch (const yexception& e) {
+                    WARNING_LOG << "Cannot create table collocation (not supported on the cluster?): " << e.what();
+                }
+            }
+
+            if (options.Mount) {
+                INFO_LOG << "Mount tables";
+                MountTables(ytc, allTables);
+            }
+        }
+
+        static inline void ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) {
+            InitializeLogger();
+            using EAction = TModifyTablesStateOptions::EAction;
+
+            auto ytc = ConnectToCluster(proxy, options.Token);
+            TVector<NYT::TYPath> allTables;
+            for (const auto& table : ALL_TABLES) {
+                allTables.push_back(NYT::JoinYPaths(dataDir, table));
+            }
+            switch (options.Action) {
+                case EAction::MOUNT:
+                    MountTables(ytc, allTables);
+                    break;
+                case EAction::UNMOUNT:
+                    UnmountTables(ytc, allTables);
+                    break;
+                default:
+                    Y_UNREACHABLE();
+            }
+        }
+
+        static inline void ModifyReplica(
+            const TString& proxy,
+            const TString& dataDir,
+            const TString& replicaProxy,
+            const TString& replicaDataDir,
+            const TModifyReplicaOptions& options
+        ) {
+            InitializeLogger();
+            auto ytc_main = ConnectToCluster(proxy, options.Token);
+            auto ytc_replica = ConnectToCluster(replicaProxy, options.Token);
+
+            THashMap<NYT::TYPath, NYT::TYPath> allReplicaTables;
+            for (const TYPath& table : ALL_TABLES) {
+                NYT::TYPath mainTable = NYT::JoinYPaths(dataDir, table);
+                NYT::TYPath replicaTable = NYT::JoinYPaths(replicaDataDir, table);
+                allReplicaTables[mainTable] = replicaTable;
+            }
+
+            // Get existing replicas
+            THashMap<NYT::TYPath, NYT::TReplicaId> existingReplicas{};
+            auto getOpts = TGetOptions().AttributeFilter(TAttributeFilter().Attributes({"type", "replicas"}));
+            for (const auto& [mainTable, replicaTable] : allReplicaTables) {
+                auto mainAttrs = ytc_main->Get(NYT::JoinYPaths(mainTable, "@"), getOpts);
+                // Just in case user passes incorrect cluster
+                if (mainAttrs.ChildAsString("type") != "replicated_table") {
+                    ythrow TYtStoreError::Muted() << "Table '" << mainTable << "' must be a replicated table";
+                }
+
+                for(const auto& [id, info] : mainAttrs.ChildAsMap("replicas")) {
+                    if (info.ChildAsString("cluster_name") == replicaProxy && info.ChildAsString("replica_path") == replicaTable) {
+                        existingReplicas[mainTable] = GetGuid(id);
+                        break;
+                    }
+                }
+            }
+
+            if (options.Action == TModifyReplicaOptions::EAction::REMOVE) {
+                for (const auto& [mainTable, replicaTable] : allReplicaTables) {
+                    if (NYT::TReplicaId* idPtr = existingReplicas.FindPtr(mainTable)) {
+                        ytc_main->Remove("#" + GetGuidAsString(*idPtr));
+                        INFO_LOG << "Replica " << proxy << ":" << mainTable << " -> " << replicaProxy << ":" << replicaTable << " is removed";
+                    } else {
+                        WARNING_LOG << "Replica " << proxy << ":" << mainTable << " -> " << replicaProxy << ":" << replicaTable << " doesn't exist";
+                    }
+                }
+                return;
+            }
+
+            Y_ENSURE(options.Action == TModifyReplicaOptions::EAction::CREATE);
+
+            bool alterReplica = false;
+            TAlterTableReplicaOptions alterTableReplicaOptions{};
+            if (options.Enable.has_value()) {
+                alterTableReplicaOptions.Enabled(options.Enable.value());
+                alterReplica = true;
+            }
+            if (options.SyncMode.has_value()) {
+                alterTableReplicaOptions.Mode(options.SyncMode.value() ? NYT::ETableReplicaMode::Sync : NYT::ETableReplicaMode::Async);
+                alterReplica = true;
+            }
+            for (const auto& [mainTable, replicaTable] : allReplicaTables) {
+                NYT::TReplicaId replicaId;
+                if (NYT::TReplicaId* idPtr = existingReplicas.FindPtr(mainTable)) {
+                    DEBUG_LOG << "Replica " << proxy << ":" << mainTable << " -> " << replicaProxy << ":" << replicaTable << " already exists";
+                    replicaId = *idPtr;
+                } else {
+                    auto replAttrs = NYT::TNode()
+                        ("table_path", mainTable)
+                        ("cluster_name", replicaProxy)
+                        ("replica_path", replicaTable);
+                    replicaId = ytc_main->Create("", NYT::NT_TABLE_REPLICA, NYT::TCreateOptions().Attributes(replAttrs));
+                    ytc_replica->AlterTable(replicaTable, TAlterTableOptions().UpstreamReplicaId(replicaId));
+                    INFO_LOG << "Replica " << proxy << ":" << mainTable << " -> " << replicaProxy << ":" << replicaTable << " is created";
+                }
+                if (alterReplica) {
+                    INFO_LOG << "Replica " << proxy << ":" << mainTable << " -> " << replicaProxy << ":" << replicaTable << " is altered";
+                    ytc_main->AlterTableReplica(replicaId, alterTableReplicaOptions);
+                }
+            }
+        }
+
     private:
         static inline const NYT::TYPath TMP_DIR = "//tmp";
         static inline const NYT::TYPath METADATA_TABLE = "metadata";
         static inline const NYT::TYPath DATA_TABLE = "data";
         static inline const NYT::TYPath STAT_TABLE = "stat";
+        static inline const std::array ALL_TABLES = {METADATA_TABLE, DATA_TABLE, STAT_TABLE};
         static inline const size_t REMOVE_BATCH_SIZE = 10'000;
         static constexpr size_t REPLICATION_FACTOR = 3;
         static constexpr TDuration RETRY_MIN_DELAY = TDuration::Seconds(0.1);
@@ -1060,6 +1246,8 @@ namespace NYa {
         static constexpr TDuration RETRY_MAX_DELAY = TDuration::Seconds(10);
         static constexpr size_t RETRY_MAX_COUNT = 5;
         static constexpr TDuration DATA_GC_MIN_AGE = TDuration::Hours(2);
+        static constexpr ui64 DEFAULT_METADATA_TABLET_COUNT = 128;
+        static constexpr ui64 DEFAULT_DATA_TABLET_COUNT = 256;
 
         using TRetryPolicy = IRetryPolicy<const yexception&>;
         using TRetryPolicyPtr = TRetryPolicy::TPtr;
@@ -1119,12 +1307,19 @@ namespace NYa {
             return WithRetry(std::function(func), [this, cToken](const yexception&) {if (cToken.IsCancellationRequested()) throw;});
         }
 
-        NYT::IClientPtr ConnectToCluster(TString proxy, bool defaultRetryPolicy = false) {
-            auto options = TCreateClientOptions().Token(Token_);
+        NYT::IClientPtr ConnectToCluster(const TString& proxy, bool defaultRetryPolicy = false) {
+            auto options = TCreateClientOptions();
             if (!defaultRetryPolicy) {
                 NYT::TConfigPtr cfg = MakeIntrusive<NYT::TConfig>();
                 cfg->RetryCount = 1;
                 options.Config(cfg);
+            }
+            return ConnectToCluster(proxy, Token_, options);
+        }
+
+        static inline NYT::IClientPtr ConnectToCluster(const TString& proxy, const TString& token, TCreateClientOptions options = {}) {
+            if (token) {
+                options.Token(token);
             }
             return CreateClient(proxy, options);
         }
@@ -1329,6 +1524,75 @@ namespace NYa {
             }
         }
 
+        static inline void CreateDynamicTable(
+            NYT::IClientPtr ytc,
+            const TString& tableName,
+            NYT::ENodeType tableType,
+            const TStringBuf tableSchema,
+            ui64 tabletCount,
+            bool ignoreExisting,
+            bool tracked,
+            const NYT::TNode& addAttrs = {}
+        ) {
+            auto schema = NodeFromYsonString(tableSchema);
+
+            NYT::TNode pivotKeys = NYT::TNode::CreateList();
+            pivotKeys.Add(NYT::TNode::CreateList()); // the first pivot is always an empty list
+            if (tabletCount > 1) {
+                // It's not too hard to support a signed column but this is useless
+                Y_ENSURE(schema.At(0).ChildAsString("type") == "uint64", "First key column must have uint64 type");
+                // Divide (1 << 64) by tabletCount
+                ui64 step = Max<ui64>() / tabletCount;
+                ui64 rem = Max<ui64>() % tabletCount + 1;
+                if (rem == tabletCount) {
+                    rem = 0;
+                    ++step;
+                }
+                for (ui64 i = 1; i < tabletCount; ++i) {
+                    ui64 pivot = step * i + rem * i / tabletCount;
+                    pivotKeys.Add(NYT::TNode::CreateList().Add(pivot));
+                }
+            }
+
+            auto tableAttrs = NYT::TNode()
+                ("dynamic", true)
+                ("schema", schema)
+                ("optimize_for", "scan")  // recommended by the YT team
+                ("compression_codec", "none")  // all big data is written in compressed form on the client side
+                ("pivot_keys", pivotKeys);
+
+            if (tracked) {
+                Y_ENSURE(tableType == NYT::ENodeType::NT_REPLICATED_TABLE, "The replicated table tracker only applies to a replicated table");
+                tableAttrs("replicated_table_options", NYT::TNode()("enable_replicated_table_tracker", true));
+            }
+
+            if (!addAttrs.IsUndefined()) {
+                for (const auto& [attrName, attrVal] : addAttrs.AsMap()) {
+                    tableAttrs(attrName, attrVal);
+                }
+            }
+
+            ytc->Create(tableName, tableType, NYT::TCreateOptions().Attributes(tableAttrs).IgnoreExisting(ignoreExisting));
+        }
+
+        static inline void MountTables(NYT::IClientPtr ytc, std::span<const NYT::TYPath> tablePaths) {
+            for (const NYT::TYPath& path : tablePaths) {
+                ytc->MountTable(path);
+            }
+            for (const NYT::TYPath& path : tablePaths) {
+                NYT::WaitForTabletsState(ytc, path, NYT::ETabletState::TS_MOUNTED);
+            }
+        }
+
+        static inline void UnmountTables(NYT::IClientPtr ytc, std::span<const NYT::TYPath> tablePaths) {
+            for (const NYT::TYPath& path : tablePaths) {
+                ytc->UnmountTable(path);
+            }
+            for (const NYT::TYPath& path : tablePaths) {
+                NYT::WaitForTabletsState(ytc, path, NYT::ETabletState::TS_UNMOUNTED);
+            }
+        }
+
     private:
         TMainCluster MainCluster_{};
         TVector<TReplica> Replicas_{};
@@ -1374,5 +1638,23 @@ namespace NYa {
 
     void TYtStore2::ValidateRegexp(const TString& re) {
         TImpl::ValidateRegexp(re);
+    }
+
+    void TYtStore2::CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options) {
+        TImpl::CreateTables(proxy, dataDir, options);
+    }
+
+    void TYtStore2::ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) {
+        TImpl::ModifyTablesState(proxy, dataDir, options);
+    }
+
+    void TYtStore2::ModifyReplica(
+        const TString& proxy,
+        const TString& dataDir,
+        const TString& replicaProxy,
+        const TString& replicaDataDir,
+        const TModifyReplicaOptions& options
+    ) {
+        TImpl::ModifyReplica(proxy, dataDir, replicaProxy, replicaDataDir, options);
     }
 }

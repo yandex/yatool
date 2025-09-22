@@ -58,6 +58,10 @@ class YtClusterOptions(yarg.Options):
 
     def postprocess(self):
         super().postprocess()
+        if self.yt_proxy is None:
+            raise yarg.ArgsValidatingException("Missing mandatory --yt-proxy option")
+        if self.yt_dir is None:
+            raise yarg.ArgsValidatingException("Missing mandatory --yt-dir option")
         if self.yt_token_path:
             self.yt_token_path = os.path.expanduser(self.yt_token_path)
             self._read_token_file()
@@ -198,6 +202,133 @@ class DataGcOptions(yarg.Options):
         ]
 
 
+class CreateTablesOptions(yarg.Options):
+    def __init__(self):
+        self.cache_version = 2
+        self.replicated = False
+        self.tracked = False
+        self.in_memory = False
+        self.mount = False
+        self.ignore_existing = False
+        self.metadata_tablet_count = None
+        self.data_tablet_count = None
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--version"],
+                help="Version of the cache (2 - simple cache, 3 - with content uids support)",
+                hook=yarg.SetValueHook("cache_version", transform=int),
+            ),
+            yarg.ArgConsumer(
+                ["--replicated"],
+                help="Create replicated tables",
+                hook=yarg.SetConstValueHook("replicated", True),
+            ),
+            yarg.ArgConsumer(
+                ["--tracked"],
+                help="Enable replicated table tracker",
+                hook=yarg.SetConstValueHook("tracked", True),
+            ),
+            yarg.ArgConsumer(
+                ["--in-memory"],
+                help="Load metadata table into RAM",
+                hook=yarg.SetConstValueHook("in_memory", True),
+            ),
+            yarg.ArgConsumer(
+                ["--mount"],
+                help="Mount tables after creation",
+                hook=yarg.SetConstValueHook("mount", True),
+            ),
+            yarg.ArgConsumer(
+                ["--ignore-existing"],
+                help="Ignore existing tables",
+                hook=yarg.SetConstValueHook("ignore_existing", True),
+            ),
+            yarg.ArgConsumer(
+                ["--metadata-tablet-count"],
+                help="metadata table tablet count",
+                hook=yarg.SetValueHook("metadata_tablet_count", transform=int),
+            ),
+            yarg.ArgConsumer(
+                ["--data-tablet-count"],
+                help="data table tablet count",
+                hook=yarg.SetValueHook("data_tablet_count", transform=int),
+            ),
+        ]
+
+    def postprocess(self):
+        super().postprocess()
+        if self.cache_version < 2 or self.cache_version > 3:
+            raise yarg.ArgsValidatingException(f"Invalid version value: {self.version}")
+        if self.tracked and not self.replicated:
+            self.tracked = False
+            logger.warning("The '--tracked' option only applies to replicated tables")
+        if self.in_memory and self.replicated:
+            self.in_memory = False
+            logger.warning("The '--in-memory' option only applies to non-replicated tables")
+
+
+class ReplicaOptions(yarg.Options):
+    def __init__(self):
+        self.replica_proxy = None
+        self.replica_dir = None
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--replica-proxy"],
+                help="Replica target proxy",
+                hook=yarg.SetValueHook("replica_proxy"),
+            ),
+            yarg.ArgConsumer(
+                ["--replica-dir"],
+                help="Replica target cypress directory",
+                hook=yarg.SetValueHook("replica_dir"),
+            ),
+        ]
+
+    def postprocess(self):
+        super().postprocess()
+        if self.replica_proxy is None:
+            raise yarg.ArgsValidatingException("Missing mandatory --replica-proxy option")
+        if self.replica_dir is None:
+            raise yarg.ArgsValidatingException("Missing mandatory --replica-dir option")
+
+
+class SetupReplicaOptions(yarg.Options):
+    def __init__(self):
+        self.enable_replica = None
+        self.replica_sync_mode = None
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.ArgConsumer(
+                ["--sync"],
+                help="Synchronous replication mode",
+                hook=yarg.SetConstValueHook("replica_sync_mode", True),
+            ),
+            yarg.ArgConsumer(
+                ["--async"],
+                help="Asynchronous replication mode",
+                hook=yarg.SetConstValueHook("replica_sync_mode", False),
+            ),
+            yarg.ArgConsumer(
+                ["--enable"],
+                help="Enable replica",
+                hook=yarg.SetConstValueHook("enable_replica", True),
+            ),
+            yarg.ArgConsumer(
+                ["--disable"],
+                help="Disable replica",
+                hook=yarg.SetConstValueHook("enable_replica", False),
+            ),
+        ]
+
+
 class CacheYtHandler(yarg.CompositeHandler):
     description = "Yt cache maintenance"
 
@@ -221,6 +352,41 @@ class CacheYtHandler(yarg.CompositeHandler):
                 DataGcOptions(),
                 PoolOption(),
                 DryRunOption(),
+            ],
+        )
+        self["create-tables"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(create_tables, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Create cache tables",
+            opts=get_common_opts()
+            + [
+                CreateTablesOptions(),
+            ],
+        )
+        self["mount"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(mount, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Mount cache tables",
+            opts=get_common_opts(),
+        )
+        self["unmount"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(unmount, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Unmount cache tables",
+            opts=get_common_opts(),
+        )
+        self["setup-replica"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(setup_replica, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Create and modify replica",
+            opts=get_common_opts()
+            + [
+                ReplicaOptions(),
+                SetupReplicaOptions(),
+            ],
+        )
+        self["remove-replica"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(remove_replica, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Remove replica",
+            opts=get_common_opts()
+            + [
+                ReplicaOptions(),
             ],
         )
 
@@ -264,3 +430,47 @@ def data_gc(params):
 
     # Run in the separate thread to allow INT signal processing in the main thread
     future(do_data_gc)()
+
+
+def create_tables(params):
+    YtStore2.create_tables(
+        params.yt_proxy,
+        params.yt_dir,
+        version=params.cache_version,
+        token=params.yt_token,
+        replicated=params.replicated,
+        tracked=params.tracked,
+        in_memory=params.in_memory,
+        mount=params.mount,
+        ignore_existing=params.ignore_existing,
+        metadata_tablet_count=params.metadata_tablet_count,
+        data_tablet_count=params.data_tablet_count,
+    )
+
+
+def mount(params):
+    YtStore2.mount(params.yt_proxy, params.yt_dir, token=params.yt_token)
+
+
+def unmount(params):
+    YtStore2.unmount(params.yt_proxy, params.yt_dir, token=params.yt_token)
+
+
+def setup_replica(params):
+    YtStore2.setup_replica(
+        params.yt_proxy,
+        params.yt_dir,
+        params.replica_proxy,
+        params.replica_dir,
+        replica_sync_mode=params.replica_sync_mode,
+        enable=params.enable_replica,
+    )
+
+
+def remove_replica(params):
+    YtStore2.remove_replica(
+        params.yt_proxy,
+        params.yt_dir,
+        params.replica_proxy,
+        params.replica_dir,
+    )

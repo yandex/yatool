@@ -45,11 +45,14 @@ namespace NYa {
         TDuration Ttl;
     };
 
+    struct TYtTokenOption {
+        TString Token{};
+    };
+
     using TMaxCacheSize = std::variant<size_t, double>;
-    struct TYtStore2Options {
+    struct TYtStore2Options : public TYtTokenOption {
         TYtStore2Options() = default;
 
-        TString Token;
         bool ReadOnly{true};
         void* OnDisable{};
         TMaxCacheSize MaxCacheSize{0u};
@@ -60,12 +63,57 @@ namespace NYa {
         bool SyncDurability{};
     };
 
-    struct TDataGcOptions {
-        i64 DataSizePerJob{};
-        ui64 DataSizePerKeyRange{};
+    struct TYtStoreError : public yexception {
+        TYtStoreError(bool mute = false)
+            : Mute{mute}
+        {
+        }
+
+        static inline TYtStoreError Muted() {
+            return TYtStoreError(true);
+        }
+
+        bool Mute{};
     };
 
     class TYtStore2 {
+    public:
+        struct TDataGcOptions {
+            i64 DataSizePerJob{};
+            ui64 DataSizePerKeyRange{};
+        };
+
+        struct TCreateTablesOptions : public TYtTokenOption {
+            unsigned Version{};
+            bool Replicated{};
+            bool Tracked{};
+            bool InMemory{};
+            bool Mount{};
+            bool IgnoreExisting{};
+            std::optional<ui64> MetadataTabletCount{};
+            std::optional<ui64> DataTabletCount{};
+        };
+
+        struct TModifyTablesStateOptions : public TYtTokenOption {
+            enum EAction {
+                MOUNT,
+                UNMOUNT
+            };
+
+            EAction Action;
+        };
+
+        struct TModifyReplicaOptions : public TYtTokenOption {
+            enum EAction {
+                CREATE,
+                REMOVE
+            };
+
+            EAction Action{CREATE};
+            std::optional<bool> SyncMode{};
+            std::optional<bool> Enable{};
+        };
+
     public:
         TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options);
         ~TYtStore2();
@@ -76,6 +124,9 @@ namespace NYa {
         void DataGc(const TDataGcOptions& options);
 
         static void ValidateRegexp(const TString& re);
+        static void CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options);
+        static void ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options);
+        static void ModifyReplica(const TString& proxy, const TString& dataDir, const TString& replicaProxy, const TString& replicaDataDir, const TModifyReplicaOptions& options);
     private:
         class TImpl;
         std::unique_ptr<TImpl> Impl_;

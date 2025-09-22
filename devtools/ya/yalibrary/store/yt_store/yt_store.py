@@ -792,3 +792,75 @@ class YtStore2(DistStore):
     def validate_regexp(re_str: str) -> None:
         """Check C++ regexp syntax (it may differ from the python one)"""
         xx_client.YtStoreWrapper2.validate_regexp(re_str)
+
+    @staticmethod
+    def create_tables(
+        proxy: str,
+        data_dir: str,
+        version: int,
+        token: str | None = None,
+        replicated: bool = False,
+        tracked: bool = False,
+        in_memory: bool = False,
+        mount: bool = False,
+        ignore_existing: bool = False,
+        metadata_tablet_count: int | None = None,
+        data_tablet_count: int | None = None,
+    ):
+        xx_client.YtStoreWrapper2.create_tables(
+            proxy,
+            data_dir,
+            version,
+            token=token,
+            replicated=replicated,
+            tracked=tracked,
+            in_memory=in_memory,
+            mount=mount,
+            ignore_existing=ignore_existing,
+            metadata_tablet_count=metadata_tablet_count,
+            data_tablet_count=data_tablet_count,
+        )
+
+    @staticmethod
+    def mount(proxy: str, data_dir: str, token: str | None = None):
+        xx_client.YtStoreWrapper2.mount(proxy, data_dir, token=token)
+
+    @staticmethod
+    def unmount(proxy: str, data_dir: str, token: str | None = None):
+        xx_client.YtStoreWrapper2.unmount(proxy, data_dir, token=token)
+
+    @staticmethod
+    def setup_replica(
+        proxy: str,
+        data_dir: str,
+        replica_proxy: str,
+        replica_data_dir: str,
+        token: str | None = None,
+        replica_sync_mode: bool | None = None,
+        enable: bool | None = None,
+    ):
+        xx_client.YtStoreWrapper2.setup_replica(
+            proxy,
+            data_dir,
+            replica_proxy,
+            replica_data_dir,
+            token=token,
+            replica_sync_mode=replica_sync_mode,
+            enable=enable,
+        )
+
+    @staticmethod
+    def remove_replica(
+        proxy: str,
+        data_dir: str,
+        replica_proxy: str,
+        replica_data_dir: str,
+        token: str | None = None,
+    ):
+        xx_client.YtStoreWrapper2.remove_replica(
+            proxy,
+            data_dir,
+            replica_proxy,
+            replica_data_dir,
+            token=token,
+        )

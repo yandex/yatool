@@ -1,4 +1,5 @@
 from libcpp cimport bool
+from libcpp.optional cimport optional
 from cpython.object cimport PyObject
 from cpython.unicode cimport PyUnicode_AsUTF8
 from util.generic.vector cimport TVector
@@ -50,9 +51,15 @@ cdef extern void YaYtStoreDisableHook(void* callback, const TString& errorType, 
 
 
 class YtStoreError(Exception):
-    pass
+    def __init__(self, message, mute=False):
+        super().__init__(message)
+        self.mute = mute
 
 cdef public PyObject* yt_store_error = <PyObject*>YtStoreError
+
+# include NYa::TYtStoreError definition
+cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
+    pass
 
 cdef extern from *:
     """
@@ -60,8 +67,15 @@ cdef extern from *:
         static void raise_yt_store_error() {
             try {
                 throw;
+            } catch (const NYa::TYtStoreError& e) {
+                PyObject* err = PyObject_CallFunction(yt_store_error, "sO", e.what(), e.Mute ? Py_True : Py_False);
+                if (!err) {
+                    return;
+                }
+                PyErr_SetObject(yt_store_error, err);
             } catch (const std::exception& e) {
-                PyErr_SetString(yt_store_error, e.what());
+                TString error = TypeName(e) + ": " + e.what();
+                PyErr_SetString(yt_store_error, error.c_str());
             }
     }
     """
@@ -103,8 +117,10 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         TMaxCacheSize(size_t val)
         TMaxCacheSize(double val)
 
-    cdef cppclass TYtStore2Options "NYa::TYtStore2Options":
+    cdef cppclass TYtTokenOption "NYa::TYtTokenOption":
         TString Token
+
+    cdef cppclass TYtStore2Options "NYa::TYtStore2Options" (TYtTokenOption):
         bool ReadOnly
         void* OnDisable
         TMaxCacheSize MaxCacheSize
@@ -114,9 +130,35 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         TDuration RetryTimeLimit
         bool SyncDurability
 
-    cdef cppclass TDataGcOptions "NYa::TDataGcOptions":
+    cdef cppclass TDataGcOptions "NYa::TYtStore2::TDataGcOptions":
         i64 DataSizePerJob
         ui64 DataSizePerKeyRange
+
+    cdef cppclass TCreateTablesOptions "NYa::TYtStore2::TCreateTablesOptions" (TYtTokenOption):
+        int Version
+        bool Replicated
+        bool Tracked
+        bool InMemory
+        bool Mount
+        bool IgnoreExisting
+        optional[ui64] MetadataTabletCount
+        optional[ui64] DataTabletCount
+
+    enum ModifyTablesStateAction "NYa::TYtStore2::TModifyTablesStateOptions::EAction":
+        MOUNT "NYa::TYtStore2::TModifyTablesStateOptions::EAction::MOUNT"
+        UNMOUNT "NYa::TYtStore2::TModifyTablesStateOptions::EAction::UNMOUNT"
+
+    cdef cppclass TModifyTablesStateOptions "NYa::TYtStore2::TModifyTablesStateOptions" (TYtTokenOption):
+        ModifyTablesStateAction Action
+
+    enum ModifyReplicaAction "NYa::TYtStore2::TModifyReplicaOptions::EAction":
+        CREATE "NYa::TYtStore2::TModifyReplicaOptions::EAction::CREATE"
+        REMOVE "NYa::TYtStore2::TModifyReplicaOptions::EAction::REMOVE"
+
+    cdef cppclass TModifyReplicaOptions "NYa::TYtStore2::TModifyReplicaOptions" (TYtTokenOption):
+        ModifyReplicaAction Action
+        optional[bool] SyncMode
+        optional[bool] Enable
 
     cdef cppclass TYtStore2 "NYa::TYtStore2" nogil:
         TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options) except +raise_yt_store_error
@@ -126,6 +168,18 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         void DataGc(const TDataGcOptions& options) except +raise_yt_store_error
         @staticmethod
         void ValidateRegexp(const TString& re) except +ValueError
+        @staticmethod
+        void CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options) except +raise_yt_store_error
+        @staticmethod
+        void ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) except +raise_yt_store_error
+        @staticmethod
+        void ModifyReplica(
+            const TString& proxy,
+            const TString& dataDir,
+            const TString& replicaProxy,
+            const TString& replicaDataDir,
+            const TModifyReplicaOptions& options,
+        ) except +raise_yt_store_error
 
 class NetworkException(Exception):
     pass
@@ -260,3 +314,107 @@ cdef class YtStoreWrapper2:
     @staticmethod
     def validate_regexp(re_str: str) -> None:
         TYtStore2.ValidateRegexp(re_str.encode())
+
+    @staticmethod
+    def create_tables(
+        proxy: str,
+        data_dir: str,
+        version: int,
+        token: str | None,
+        replicated: bool = False,
+        tracked: bool = False,
+        in_memory: bool = False,
+        mount: bool = False,
+        ignore_existing: bool = False,
+        metadata_tablet_count: int | None = None,
+        data_tablet_count: int | None = None,
+    ):
+        cdef TString c_proxy = proxy.encode()
+        cdef TString c_data_dir = data_dir.encode()
+        cdef TCreateTablesOptions options
+        cdef ui64 c_metadata_tablet_count
+        cdef ui64 c_data_tablet_count
+        if token:
+            options.Token = token.encode()
+        options.Version = version
+        options.Replicated = replicated
+        options.Tracked = tracked
+        options.InMemory = in_memory
+        options.Mount = mount
+        options.IgnoreExisting = ignore_existing
+        if metadata_tablet_count is not None:
+            # Cython cannot cast python object to the std::optional
+            c_metadata_tablet_count = metadata_tablet_count
+            options.MetadataTabletCount = c_metadata_tablet_count
+        if data_tablet_count is not None:
+            # Cython cannot cast python object to the std::optional
+            c_data_tablet_count = data_tablet_count
+            options.DataTabletCount = c_data_tablet_count
+
+        TYtStore2.CreateTables(c_proxy, c_data_dir, options)
+
+    @staticmethod
+    def _change_state(proxy: str, data_dir: str, action: ModifyTablesStateAction, token: str | None):
+        cdef TString c_proxy = proxy.encode()
+        cdef TString c_data_dir = data_dir.encode()
+        cdef TModifyTablesStateOptions options
+        if token:
+            options.Token = token.encode()
+        options.Action = action
+        TYtStore2.ModifyTablesState(c_proxy, c_data_dir, options)
+
+    @staticmethod
+    def mount(proxy: str, data_dir: str, token: str | None):
+        YtStoreWrapper2._change_state(proxy, data_dir, ModifyTablesStateAction.MOUNT, token)
+
+    @staticmethod
+    def unmount(proxy: str, data_dir: str, token: str | None):
+        YtStoreWrapper2._change_state(proxy, data_dir, ModifyTablesStateAction.UNMOUNT, token)
+
+    @staticmethod
+    def setup_replica(
+        proxy: str,
+        data_dir: str,
+        replica_proxy: str,
+        replica_data_dir: str,
+        token: str | None = None,
+        replica_sync_mode: bool | None = None,
+        enable: bool | None = None,
+    ):
+        cdef TString c_proxy = proxy.encode()
+        cdef TString c_data_dir = data_dir.encode()
+        cdef TString c_replica_proxy = replica_proxy.encode()
+        cdef TString c_replica_data_dir = replica_data_dir.encode()
+        cdef bool c_replica_sync_mode
+        cdef bool c_enable
+        cdef TModifyReplicaOptions options
+        if token:
+            options.Token = token.encode()
+        options.Action = ModifyReplicaAction.CREATE
+        if replica_sync_mode is not None:
+            # Cython cannot cast python object to the std::optional
+            c_replica_sync_mode = replica_sync_mode
+            options.SyncMode = c_replica_sync_mode
+        if enable is not None:
+            # Cython cannot cast python object to the std::optional
+            c_enable = enable
+            options.Enable = c_enable
+        TYtStore2.ModifyReplica(c_proxy, c_data_dir, c_replica_proxy, c_replica_data_dir, options)
+
+    @staticmethod
+    def remove_replica(
+        proxy: str,
+        data_dir: str,
+        replica_proxy: str,
+        replica_data_dir: str,
+        token: str | None = None,
+    ):
+        cdef TString c_proxy = proxy.encode()
+        cdef TString c_data_dir = data_dir.encode()
+        cdef TString c_replica_proxy = replica_proxy.encode()
+        cdef TString c_replica_data_dir = replica_data_dir.encode()
+        cdef TModifyReplicaOptions options
+        if token:
+            options.Token = token.encode()
+        options.Action = ModifyReplicaAction.REMOVE
+        TYtStore2.ModifyReplica(c_proxy, c_data_dir, c_replica_proxy, c_replica_data_dir, options)
