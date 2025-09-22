@@ -236,6 +236,14 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.build_report_type = params.build_report_type
     build_options.build_results_resource_id = params.build_results_resource_id
     build_options.build_results_report_tests_only = params.build_results_report_tests_only
+    if params.json_line_report_file:
+        base, ext = os.path.splitext(params.json_line_report_file)
+        build_options.json_line_report_file = '{base}_{name}{hash}{ext}'.format(
+            base=base,
+            name=parsed_package["meta"]["name"],
+            hash=f'_{exts.hashing.md5_value(build_key)}' if build_key else '',
+            ext=ext,
+        )
     build_options.report_skipped_suites = params.report_skipped_suites
     build_options.report_skipped_suites_only = params.report_skipped_suites_only
     build_options.use_links_in_report = params.use_links_in_report
@@ -248,6 +256,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     if params.run_tests:
         build_options.print_test_console_report = True
         if params.junit_path:
+            # FIXME: The file is overwritten by subsequent builds
+            # if there are more than one build or package
             build_options.junit_path = params.junit_path
         else:
             filename = 'junit_{}'.format(parsed_package["meta"]["name"])
