@@ -1,14 +1,18 @@
 import array
+import collections
 import logging
 import os
-import six
 import struct
 import sys
+import typing as tp
 
 import ujson as json
 
 
 logger = logging.getLogger(__name__)
+
+# Too big counter cannot be serialized to json by ujson module
+COUNTER_LIMIT = 1 << 62
 
 
 def merge_raw_sancov(files, dst):
@@ -49,19 +53,19 @@ def merge_resolved_sancov(cov_files, test_mode):
 
         covered_points.update(covdata["covered-points"])
 
-        for bname, bhash in six.iteritems(covdata["binary-hash"]):
+        for bname, bhash in covdata["binary-hash"].items():
             if bname in binary_hash:
                 assert binary_hash[bhash] == bhash
             else:
                 binary_hash[bname] = bhash
 
-        for src_filename, symbol_info in six.iteritems(covdata["point-symbol-info"]):
+        for src_filename, symbol_info in covdata["point-symbol-info"].items():
             if src_filename not in point_symbol_info:
                 point_symbol_info[src_filename] = symbol_info
                 continue
 
             target_src_entry = point_symbol_info[src_filename]
-            for symbol_name, addresses in six.iteritems(symbol_info):
+            for symbol_name, addresses in symbol_info.items():
                 if symbol_name not in target_src_entry:
                     target_src_entry[symbol_name] = addresses
                     continue
@@ -69,7 +73,7 @@ def merge_resolved_sancov(cov_files, test_mode):
                 if test_mode:
                     # pedant update
                     entry = target_src_entry[symbol_name]
-                    for addr, pos in six.iteritems(addresses):
+                    for addr, pos in addresses.items():
                         if addr not in entry:
                             entry[addr] = pos
                         else:
@@ -235,13 +239,13 @@ def merge_granular_coverage_segments(record, segments):
 
 
 def merge_functions_inplace(result, record):
-    for start_pos, entries in six.iteritems(record):
+    for start_pos, entries in record.items():
         if start_pos not in result:
             result[start_pos] = entries
             continue
 
         target = result[start_pos]
-        for funcname, count in six.iteritems(entries):
+        for funcname, count in entries.items():
             if funcname not in target:
                 target[funcname] = count
             else:
@@ -404,9 +408,6 @@ def merge_clang_segments(segments):
     ISREGIONENTRY_FIELD = 4
     ISGAPREGION_FIELD = 5
 
-    # Too big counter cannot be serialized to json by ujson module
-    COUNTER_LIMIT = 1 << 62
-
     def update_by(seg_to_update, seg):
         seg_to_update[COUNTER_FIELD] = min(seg_to_update[COUNTER_FIELD] + seg[COUNTER_FIELD], COUNTER_LIMIT)
         seg_to_update[HASCOUNT_FIELD] = seg_to_update[HASCOUNT_FIELD] or seg[HASCOUNT_FIELD]
@@ -482,3 +483,118 @@ def compact_segments(segments):
         prev_ln = sln
 
     yield (start_ln, 0, eln, 0, start_state)
+
+
+class ClangBranch(tp.NamedTuple):
+    """
+    Example of clang branch record (which llvm-cov export gives you) looks like this:
+    [2, 12, 2, 16, 1, 5, 0, 0, 6]
+    """
+
+    line_start: int
+    column_start: int
+    line_end: int
+    column_end: int
+    true_execution_count: int
+    false_execution_count: int
+
+    # metadata
+    file_id: int  # internal llvm field that is used to resolve conflicts between filenames
+    expanded_file_id: int  # same as above BUT with macro handling
+    region_kind: int  # Could be: 4 BranchRegion, 6 MC/DC branch region, 5 MC/DC decision region, 0 CodeRegion
+
+    def compare_branch_with(self, other) -> tp.Literal[-1, 0, 1]:
+        """
+        returns
+        0  - same branch (=)
+        -1 - earlier branch (<)
+        1  - later branch (>)
+        """
+        if self.local_branch_descriptor == other.local_branch_descriptor:
+            if self.region_descriptor != other.region_descriptor:
+                raise AssertionError(
+                    f"Branch mismatch left={self}, right={other}. Please contact DEVTOOLSSUPPORT with reproducer."
+                )
+
+            return 0
+
+        if self.local_branch_descriptor < other.local_branch_descriptor:
+            return -1
+
+        return 1
+
+    def __add__(self, other):
+        if self.branch_descriptor != other.branch_descriptor:
+            raise AssertionError(
+                f"Branch mismatch left={self}, right={other}. Please contact DEVTOOLSSUPPORT with reproducer."
+            )
+
+        true_count = self.true_execution_count + other.true_execution_count
+        false_count = self.false_execution_count + other.false_execution_count
+
+        new_branch = self._replace(
+            true_execution_count=min(true_count, COUNTER_LIMIT),
+            false_execution_count=min(false_count, COUNTER_LIMIT),
+        )
+
+        return new_branch
+
+    @property
+    def branch_descriptor(self) -> tuple[int, ...]:
+        return self.local_branch_descriptor + self.region_descriptor
+
+    @property
+    def local_branch_descriptor(self) -> tuple[int, ...]:
+        return self.line_start, self.column_start, self.line_end, self.column_end
+
+    @property
+    def region_descriptor(self) -> tuple[int, ...]:
+        return self.file_id, self.expanded_file_id, self.region_kind
+
+    def is_covered(self):
+        return self.true_execution_count and self.false_execution_count
+
+
+def merge_clang_branches_generator(
+    left: tp.Sequence[ClangBranch], right: tp.Sequence[ClangBranch]
+) -> collections.abc.Generator[ClangBranch]:
+    l_idx = 0
+    r_idx = 0
+
+    while l_idx < len(left) and r_idx < len(right):
+        lb = left[l_idx]
+        rb = right[r_idx]
+
+        compare_stat = lb.compare_branch_with(rb)
+
+        if compare_stat == 0:
+            new_branch = lb + rb
+            l_idx += 1
+            r_idx += 1
+        elif compare_stat == -1:
+            new_branch = lb
+            l_idx += 1
+        else:
+            new_branch = rb
+            r_idx += 1
+
+        yield new_branch
+
+    while l_idx < len(left):
+        yield left[l_idx]
+        l_idx += 1
+
+    while r_idx < len(right):
+        yield right[r_idx]
+        r_idx += 1
+
+
+def merge_clang_branches(branches: tp.Sequence[list[int]]) -> list[ClangBranch]:
+    """
+    branches must be size of 2
+    each of them is supposed to be sorted https://llvm.org/docs/CoverageMappingFormat.html#sub-array-of-regions
+    """
+    left = [ClangBranch(*branch) for branch in branches[0]]
+    right = [ClangBranch(*branch) for branch in branches[1]]
+
+    return list(merge_clang_branches_generator(left, right))
