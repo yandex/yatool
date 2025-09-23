@@ -43,6 +43,7 @@ YT_CACHE_METADATA_V3_SCHEMA = [
     },
     {'name': 'self_uid', 'type': 'string', 'sort_order': 'ascending'},
     {'name': 'uid', 'type': 'string', 'sort_order': 'ascending'},
+    {'name': 'cuid', 'type': 'string'},
     {'name': 'chunks_count', 'type': 'uint64'},
     {'name': 'data_size', 'type': 'uint64'},
     {'name': 'create_time', 'type': 'timestamp'},

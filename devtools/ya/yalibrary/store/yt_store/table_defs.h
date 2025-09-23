@@ -30,6 +30,7 @@ namespace NYa {
         };
         {name = self_uid; type_v3 = string; sort_order = ascending};
         {name = uid; type_v3 = string; sort_order = ascending};
+        {name = cuid; type = string};
         {name = chunks_count; type = uint64};
         {name = data_size; type = uint64};
         {name = create_time; type = timestamp};

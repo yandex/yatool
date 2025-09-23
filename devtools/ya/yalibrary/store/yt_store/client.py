@@ -240,6 +240,7 @@ class YtStoreClient(object):
         else:
             data_size = forced_node_size or 0
 
+        key_columns = ['uid']
         meta = {
             'uid': uid,
             'chunks_count': chunks_count,
@@ -255,21 +256,12 @@ class YtStoreClient(object):
             meta['data_size'] = data_size
 
         if self.is_table_format_v3:
+            key_columns = ['self_uid', 'uid']
             meta['self_uid'] = self_uid
+            meta['cuid'] = cuid if cuid and cuid != uid else ''
             meta['create_time'] = cur_timestamp_ms
 
-        try:
-            self._client.insert_rows(self._metadata_table, [meta], **self._integrity)
-        except YtTabletTransactionLockConflict:
-            logger.debug("uid=%s is not inserted into metadata because another heater has already done it", uid)
-
-        if self.is_table_format_v3 and cuid and cuid != uid:
-            cuid_meta = meta.copy()
-            cuid_meta['uid'] = cuid
-            try:
-                self._client.insert_rows(self._metadata_table, [cuid_meta], **self._integrity)
-            except YtTabletTransactionLockConflict:
-                logger.debug("cuid=%s is not inserted into metadata because another heater has already done it", cuid)
+        self._safe_insert_rows(self._metadata_table, [meta], key_columns)
 
         return meta
 
@@ -313,8 +305,12 @@ class YtStoreClient(object):
     def get_metadata_rows(self, self_uids=None, uids=None, where=None, order_by=None, limit=None, content_uids=False):
         if self.is_table_format_v3 and content_uids:
             assert self_uids
+            columns = ",".join(
+                col['name'] for col in self._meta_schema if col['name'] not in self.NOT_LOADED_META_COLUMNS
+            )
 
-            query = '* from [{}] where self_uid in ({})'.format(
+            query = '{} from [{}] where self_uid in ({})'.format(
+                columns,
                 self._metadata_table,
                 ','.join('"{}"'.format(self_uid) for self_uid in self_uids),
             )
@@ -367,6 +363,8 @@ class YtStoreClient(object):
 
         for row in rows:
             meta[row['uid']] = row
+            if cuid := row.get('cuid'):
+                meta[cuid] = row
 
         if refresh_access_time and not self.max_data_ttl_presents:
             if self.is_table_format_v3 and content_uids:

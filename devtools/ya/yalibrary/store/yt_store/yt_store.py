@@ -276,7 +276,7 @@ class YtStore(DistStore):
             raise Exception("Codec {} is not supported here".format(consts.YT_CACHE_NO_DATA_CODEC))
         if self._client.is_table_format_v3 and cuid and cuid in self._meta:
             meta = self._meta[cuid]
-            self._client.refresh_access_time([meta])
+            # Create a new reference to the existing data record
             return self._client.put(
                 self_uid,
                 uid,
@@ -285,6 +285,7 @@ class YtStore(DistStore):
                 codec=meta["codec"],
                 forced_node_size=meta["data_size"],
                 forced_hash=meta["hash"],
+                cuid=cuid,
             )
         data_path = self._prepare_data(stack, files, codec, root_dir)
         return self._client.put(self_uid, uid, data_path, name=name, codec=codec, cuid=cuid)
