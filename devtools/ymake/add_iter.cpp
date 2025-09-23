@@ -89,7 +89,7 @@ namespace {
                 globStat += TGlobHelper::LoadGlobPatternStat(moduleVars, otherGlobPatternElemId);
             }
             if (conf.CheckGlobRestrictions) {
-                globRestrictions.Check(name, globStat);
+                globRestrictions.Check(name, globStat, conf.GlobSkippedErrorPercent);
             }
         }
     }

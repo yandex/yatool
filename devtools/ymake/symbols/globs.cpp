@@ -62,14 +62,15 @@ namespace {
     }
 }
 
-bool TGlobRestrictions::Check(const TStringBuf& name, const TGlobStat& globStat) const {
+bool TGlobRestrictions::Check(const TStringBuf& name, const TGlobStat& globStat, ui8 globSkippedErrorPercent) const {
     size_t tooManyMatches = 0;
     if (globStat.MatchedFilesCount >= MaxMatches) {
         tooManyMatches = globStat.MatchedFilesCount;
     }
     auto watchedFilesCount = globStat.MatchedFilesCount + globStat.SkippedFilesCount;
     size_t tooManySkipped = 0;
-    if (watchedFilesCount >= 500 && globStat.SkippedFilesCount >= watchedFilesCount/2) {
+    ui8 globSkippedPercent = watchedFilesCount ? (globStat.SkippedFilesCount * 100 + watchedFilesCount/2)/watchedFilesCount : 0;
+    if (watchedFilesCount >= 500 && globSkippedErrorPercent && globSkippedPercent >= globSkippedErrorPercent) {
         tooManySkipped = globStat.SkippedFilesCount;
     }
     size_t tooManyWatchDirs = 0;
@@ -88,7 +89,7 @@ bool TGlobRestrictions::Check(const TStringBuf& name, const TGlobStat& globStat)
         }
     }
     if (tooManySkipped) {
-        s << "too many skipped files - " << ToString(tooManySkipped) << " of " << ToString(watchedFilesCount) << " ( " << ToString((tooManySkipped * 100 + watchedFilesCount/2)/watchedFilesCount) << "% )";
+        s << "too many skipped files - " << ToString(tooManySkipped) << " of " << ToString(watchedFilesCount) << " ( " << ToString(globSkippedPercent) << "% )";
         if (tooManyWatchDirs) {
             s << ", ";
         }

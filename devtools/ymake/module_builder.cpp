@@ -1032,7 +1032,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         TGlobHelper::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
     }
     if (Conf.CheckGlobRestrictions) {
-        globRestrictions.Check(name, globStat);
+        globRestrictions.Check(name, globStat, Conf.GlobSkippedErrorPercent);
     }
 
     if (globs.empty()) {

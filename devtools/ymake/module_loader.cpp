@@ -312,7 +312,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         TGlobHelper::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
     }
     if (Conf.CheckGlobRestrictions) {
-        globRestrictions.Check(name, globStat);
+        globRestrictions.Check(name, globStat, Conf.GlobSkippedErrorPercent);
     }
 
     auto&& range = MakeMappedRange(values, [](auto x) {

@@ -63,7 +63,7 @@ struct TGlobRestrictions {
         MaxWatchDirs *= 10;
     }
 
-    bool Check(const TStringBuf& name, const TGlobStat& globStat) const;
+    bool Check(const TStringBuf& name, const TGlobStat& globStat, ui8 globSkippedErrorPercent) const;
 
     bool operator==(const TGlobRestrictions&) const = default;
 };

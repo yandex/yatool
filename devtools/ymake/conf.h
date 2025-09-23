@@ -73,6 +73,7 @@ public:
     bool UpdateGlobStat{false}; // (only if SaveLoadGlobPatterns && SaveLoadGlobStat) update glob pattern stats in module vars in UdpIter
     bool SaveGlobRestrictions{false}; // save glob restrictions to module vars
     bool CheckGlobRestrictions{false}; // check glob restrictions in create and update modes
+    ui8 GlobSkippedErrorPercent{95}; // percent of skipped files for configure error, 0 - don't check skipped
 
     void* SubState = nullptr;
 
