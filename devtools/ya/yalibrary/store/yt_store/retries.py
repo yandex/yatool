@@ -1,15 +1,11 @@
 import logging
 import functools
 import threading
-import time
 from collections.abc import Callable
 
 import yt.wrapper as yt
 
 from library.python.retry import RetryConf, retry_call
-from yt.wrapper.dynamic_table_commands import (
-    get_dynamic_table_retriable_errors as get_yt_retriable_errors,
-)
 from yt.wrapper.errors import YtTabletTransactionLockConflict
 
 logger = logging.getLogger(__name__)
@@ -33,7 +29,6 @@ def get_default_client(proxy: str, token: str) -> yt.YtClient:
 class RetryPolicy:
     MIN_SLEEP = 0.3
     MAX_SLEEP = 10
-    TRANSACTION_CONFLICT_LIMIT = 90
 
     def __init__(
         self, max_retries: int = 5, on_error_callback: Callable | None = None, retry_time_limit: float | None = None
@@ -41,13 +36,12 @@ class RetryPolicy:
         self.disabled = False
         self._lock = threading.Lock()
         self._on_error_callback = on_error_callback
-        # XXX: DEVTOOLSSUPPORT-63336
-        retry_exceptions = [Exception] if retry_time_limit is not None else get_yt_retriable_errors()
-        retry_conf = (
-            RetryConf()
-            .on(*retry_exceptions)
-            .waiting(delay=self.MIN_SLEEP, backoff=1.3, jitter=0.2, limit=self.MAX_SLEEP)
-        )
+        retry_conf = RetryConf().waiting(delay=self.MIN_SLEEP, backoff=1.3, jitter=0.2, limit=self.MAX_SLEEP)
+
+        def retriable(err):
+            return not isinstance(err, YtTabletTransactionLockConflict)
+
+        retry_conf.retriable = retriable
         if retry_time_limit:
             self._retry_conf = retry_conf.upto(retry_time_limit)
         elif max_retries:
@@ -58,19 +52,13 @@ class RetryPolicy:
     def wrap(self, func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            end = time.time() + self.TRANSACTION_CONFLICT_LIMIT
-            while True:
-                try:
-                    return retry_call(func, f_args=args, f_kwargs=kwargs, conf=self._retry_conf)
-                except YtTabletTransactionLockConflict as err:
-                    # Repeated transaction conflicts are rare and we should never reach this code at all
-                    if time.time() > end:
-                        # It should never happen, but it's better to prevent an endless loop than to debug it
-                        self.on_error(err)
-                        raise
-                except Exception as err:
-                    self.on_error(err)
-                    raise
+            try:
+                return retry_call(func, f_args=args, f_kwargs=kwargs, conf=self._retry_conf)
+            except YtTabletTransactionLockConflict:
+                raise  # User code should retry the operation with new data
+            except Exception as err:
+                self.on_error(err)
+                raise
 
         return wrapper
 

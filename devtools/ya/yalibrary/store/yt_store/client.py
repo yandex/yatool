@@ -4,11 +4,12 @@ import random
 import threading
 import time
 from functools import wraps
+from itertools import batched
 
-import six
 from six.moves import xrange
 from yt.wrapper import YtClient, TablePath
 from yt.wrapper.common import update as yt_config_update
+from yt.wrapper.errors import YtTabletTransactionLockConflict
 from yt.wrapper.default_config import retries_config, retry_backoff_config, get_config_from_env
 from yt.wrapper.format import YsonFormat
 from yt.yson import get_bytes
@@ -23,23 +24,13 @@ from exts.func import memoize
 logger = logging.getLogger(__name__)
 
 
-INSERT_ROWS_LIMIT = 75000  # Shouldn't be greater than 100k (YT limitation)
+INSERT_ROWS_LIMIT = 5000  # Too high value increases transaction conflicts
+METADATA_REFRESH_AGE_THRESHOLD_SEC = 300
+TRANSACTION_CONFLICT_SLEEP_INTERVAL = (0.05, 0.15)
 
 
-if six.PY3:
-    from itertools import batched
-else:
-    import itertools
-
-    def batched(iterable, n):
-        if n < 1:
-            raise ValueError('n must be at least one')
-        iterator = iter(iterable)
-        while True:
-            batch = tuple(itertools.islice(iterator, n))
-            if not batch:
-                break
-            yield batch
+def _sleep_after_transaction_conflict():
+    time.sleep(random.uniform(*TRANSACTION_CONFLICT_SLEEP_INTERVAL))
 
 
 class YtStoreClient(object):
@@ -245,7 +236,7 @@ class YtStoreClient(object):
                             row['create_time'] = cur_timestamp_ms
                         rows.append(row)
                         chunks_count += 1
-                    self._client.insert_rows(self._data_table, rows, **self._integrity)
+                    self._safe_insert_rows(self._data_table, rows, ['hash', 'chunk_i'])
         else:
             data_size = forced_node_size or 0
 
@@ -267,11 +258,18 @@ class YtStoreClient(object):
             meta['self_uid'] = self_uid
             meta['create_time'] = cur_timestamp_ms
 
-        self._client.insert_rows(self._metadata_table, [meta], **self._integrity)
+        try:
+            self._client.insert_rows(self._metadata_table, [meta], **self._integrity)
+        except YtTabletTransactionLockConflict:
+            logger.debug("uid=%s is not inserted into metadata because another heater has already done it", uid)
 
         if self.is_table_format_v3 and cuid and cuid != uid:
-            meta['uid'] = cuid
-            self._client.insert_rows(self._metadata_table, [meta], **self._integrity)
+            cuid_meta = meta.copy()
+            cuid_meta['uid'] = cuid
+            try:
+                self._client.insert_rows(self._metadata_table, [cuid_meta], **self._integrity)
+            except YtTabletTransactionLockConflict:
+                logger.debug("cuid=%s is not inserted into metadata because another heater has already done it", cuid)
 
         return meta
 
@@ -342,7 +340,7 @@ class YtStoreClient(object):
                 self._client.lookup_rows(
                     self._metadata_table,
                     keys,
-                    column_names=tuple(map(six.ensure_binary, columns)),
+                    column_names=columns,
                 )
             )
         else:
@@ -406,19 +404,48 @@ class YtStoreClient(object):
             raise Exception('Can\'t read {} data: wrong hash {}'.format(hash, real_hash))
 
     def refresh_access_time(self, meta_rows):
-        if meta_rows:
-            cur_timestamp_ms = utils.time_to_microseconds(time.time())
+        if not meta_rows:
+            return
 
-            def make_row(r):
-                u = {'uid': r['uid'], 'access_time': cur_timestamp_ms}
-                if self.is_table_format_v3:
-                    u['self_uid'] = r['self_uid']
-                return u
+        if self.is_table_format_v3:
+            key_columns = ['self_uid', 'uid']
+        else:
+            key_columns = ['uid']
+        lookup_columns = key_columns + ['access_time']
 
-            rows = [make_row(r) for r in meta_rows]
-            for batch in batched(rows, INSERT_ROWS_LIMIT):
-                self._client.insert_rows(self._metadata_table, batch, update=True, **self._integrity)
-            logger.debug("Update access_time in %d metadata rows", len(rows))
+        def make_key(r):
+            return {k: r[k] for k in key_columns}
+
+        def make_row(r, ts):
+            u = make_key(r)
+            u['access_time'] = ts
+            return u
+
+        cur_time = time.time()
+        cur_timestamp_us = utils.time_to_microseconds(cur_time)
+        threshold_timestamp_us = utils.time_to_microseconds(cur_time - METADATA_REFRESH_AGE_THRESHOLD_SEC)
+        updated_row_count = 0
+        conflict_count = 0
+        for batch in batched(meta_rows, INSERT_ROWS_LIMIT):
+            while True:
+                rows = [make_row(r, cur_timestamp_us) for r in batch if r['access_time'] < threshold_timestamp_us]
+                if not rows:
+                    break
+                try:
+                    self._client.insert_rows(self._metadata_table, rows, update=True, **self._integrity)
+                    updated_row_count += len(rows)
+                    break
+                except YtTabletTransactionLockConflict:
+                    conflict_count += 1
+                    _sleep_after_transaction_conflict()
+                batch = self._client.lookup_rows(
+                    self._metadata_table,
+                    [make_key(r) for r in rows],
+                    column_names=lookup_columns,
+                )
+        logger.debug(
+            "Update access_time in %d metadata rows with %d transaction conflicts", updated_row_count, conflict_count
+        )
 
     def get_hashes_to_delete(self, hashes_to_check):
         hashes_in_store = set()
@@ -501,3 +528,18 @@ class YtStoreClient(object):
         yt.wrapper.http_driver.HeavyProxyProvider._get_light_proxy = self._cache_proxy(
             yt.wrapper.http_driver.HeavyProxyProvider._get_light_proxy
         )
+
+    def _safe_insert_rows(self, table, rows, key_columns):
+        """Insert and skip existing rows on transaction conflict"""
+        while rows:
+            try:
+                self._client.insert_rows(table, rows, **self._integrity)
+                return
+            except YtTabletTransactionLockConflict:
+                _sleep_after_transaction_conflict()
+            keys = [{k: r[k] for k in key_columns} for r in rows]
+            existing_rows = self._client.lookup_rows(table, keys, column_names=key_columns)
+            already_inserted = set()
+            for r in existing_rows:
+                already_inserted.add(tuple(r[k] for k in key_columns))
+            rows = [r for r in rows if tuple(r[k] for k in key_columns) not in already_inserted]

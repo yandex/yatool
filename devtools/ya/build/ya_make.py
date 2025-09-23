@@ -444,7 +444,9 @@ class CacheFactory:
     def _can_use_yt_dist_cache(self):
         return all(
             (
-                getattr(self._opts, 'build_threads') > 0 or getattr(self._opts, 'yt_replace_result'),
+                getattr(self._opts, 'build_threads') > 0
+                or getattr(self._opts, 'yt_replace_result')
+                or getattr(self._opts, 'yt_store_refresh_on_read'),
                 getattr(self._opts, 'yt_store', False),
                 not (getattr(self._opts, 'use_distbuild', False) and getattr(self._opts, 'yt_readonly', False)),
             )
@@ -502,7 +504,7 @@ def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
         logger.debug("Loading meta from dist cache")
 
         # could raise error here if not async
-        _async = not (opts.yt_store_exclusive or heater_mode)
+        _async = not (opts.yt_store_exclusive or heater_mode or opts.yt_store_refresh_on_read)
 
         cache.prepare(
             self_uids,
