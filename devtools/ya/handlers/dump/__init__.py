@@ -1112,7 +1112,6 @@ def do_imprint(params):
         writer.writerow(line)
 
 
-# TODO: support host/target platforms opts
 def do_uids(params):
     uids = gen_uids(
         arc_root=params.arc_root,
@@ -1122,6 +1121,8 @@ def do_uids(params):
         debug_options=[],
         flags=params.flags,
         ymake_bin=None,
+        host_platform=params.host_platform,
+        target_platforms=params.target_platforms,
     )
     json.dump(uids, sys.stdout, indent=4, sort_keys=True)
 

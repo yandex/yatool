@@ -670,7 +670,28 @@ def _extract_uids(build_plan):
     return target_uid_map
 
 
-def gen_uids(arc_root, build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None):
+def gen_uids(
+    arc_root,
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    platform=None,
+    host_platform=None,
+    target_platforms=None,
+):
+    generation_conf = gen_conf(
+        arc_root=arc_root,
+        build_root=build_root,
+        build_type=build_type,
+        build_targets=build_targets,
+        flags=flags,
+        host_platform=host_platform,
+        target_platforms=target_platforms,
+    )
+
     return _extract_uids(
         devtools.ya.build.gen_plan.gen_plan(
             gen_plan_options(
@@ -682,6 +703,7 @@ def gen_uids(arc_root, build_root, build_type, build_targets, debug_options, fla
                 flags=flags,
                 ymake_bin=ymake_bin,
                 platform=platform,
+                custom_conf=generation_conf,
             )
         )
     )
