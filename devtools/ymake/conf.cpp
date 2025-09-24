@@ -110,7 +110,7 @@ namespace {
         conf.SaveGlobRestrictions = NYMake::IsTrue(conf.CommandConf.EvalValue("SAVE_GLOB_RESTRICTIONS"));
         conf.CheckGlobRestrictions = NYMake::IsTrue(conf.CommandConf.EvalValue("CHECK_GLOB_RESTRICTIONS"));
         decltype(conf.GlobSkippedErrorPercent) globSkippedErrorPercent;
-        if (!TryFromString(conf.CommandConf.EvalValue("GLOB_SKIPPED_ERROR_PERCENT"), globSkippedErrorPercent)) {
+        if (TryFromString(conf.CommandConf.EvalValue("GLOB_SKIPPED_ERROR_PERCENT"), globSkippedErrorPercent)) {
             conf.GlobSkippedErrorPercent = globSkippedErrorPercent;
         }
     }
