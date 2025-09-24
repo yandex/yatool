@@ -267,7 +267,7 @@ typedef struct __JSONObjectEncoder
   void *prv;
 
   /*
-  Set to an error message if error occured */
+  Set to an error message if error occurred */
   const char *errorMsg;
   JSOBJ errorObj;
 
