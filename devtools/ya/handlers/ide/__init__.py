@@ -396,7 +396,7 @@ class GradleOptions(yarg.Options):
         self.settings_root: str = None
         self.disable_errorprone: bool = False
         self.disable_lombok_plugin: bool = False
-        self.disable_generated_symlinks: bool = False
+        self.disable_generated_symlinks: bool = True
         self.force_jdk_version: str = None
         self.remove: bool = False
         self.exclude: list[str] = []
