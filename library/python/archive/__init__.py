@@ -85,8 +85,9 @@ def extract_tar(
                     mtime2fix.append((dest, e.mtime))
                 continue
 
+            dest_exists = os.path.exists(dest)
             if strip_components and fail_on_duplicates:
-                if os.path.exists(dest):
+                if dest_exists:
                     raise Exception(
                         "The file {} is duplicated because of strip_components={}".format(dest, strip_components)
                     )
@@ -97,6 +98,9 @@ def extract_tar(
 
             if e.ishardlink():
                 src = os.path.join(output_dir, _strip_prefix(e.hardlink, strip_components))
+                if dest_exists:
+                    os.remove(dest)
+
                 _hardlink(src, dest)
                 if apply_mtime:
                     mtime2fix.append((dest, e.mtime))
@@ -104,6 +108,9 @@ def extract_tar(
 
             if e.issym():
                 src = _strip_prefix(e.linkname, strip_components)
+                if dest_exists:
+                    os.remove(dest)
+
                 _symlink(src, dest)
                 if apply_mtime:
                     if six.PY2:
