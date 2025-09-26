@@ -15,6 +15,7 @@ import app_config
 import devtools.ya.build.build_opts
 import devtools.ya.build.targets_deref
 import devtools.ya.build.ya_make
+import devtools.ya.build.genconf as bg
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
 import devtools.ya.core.error
@@ -23,9 +24,7 @@ import devtools.ya.core.stage_tracer as stage_tracer
 import devtools.ya.core.yarg
 import devtools.ya.handlers.package.opts as package_opts
 import devtools.ya.test.opts as test_opts
-import exts.archive
 import exts.fs
-import exts.func
 import exts.hashing
 import exts.os2
 import exts.path2
@@ -1112,6 +1111,23 @@ class PackageContext:
             }
         )
         self._spec['meta']['version'] = self._version
+
+        if canonized_platforms := self._get_canonized_platforms():
+            self._spec["build"]["target-platforms"] = canonized_platforms
+
+    def _get_canonized_platforms(self):
+        build_section = self._spec.get('build')
+        targets = build_section.get('targets')
+        if not targets:
+            return []
+
+        result = []
+        target_platforms = build_section.get('target-platforms') or ["DEFAULT-LINUX-X86_64"]
+        for platform_name in target_platforms:
+            canonized = bg.mine_platform_name(platform_name)
+            result.append(canonized)
+
+        return result
 
     def _calc_version(self):
         if self._params.custom_version:
