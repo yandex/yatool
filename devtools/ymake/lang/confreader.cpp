@@ -330,7 +330,7 @@ namespace {
                 } else if (auto defaultInit = arg->defaultInit()) {
                     argDesc.Type = EArgType::NamedScalar;
                     argDesc.InitFalse = TString(defaultInit->string()->stringContent()->getText());
-                } else if (auto specArg = arg->specArg()) {
+                } else if (/* auto specArg = */ arg->specArg()) {
                     ReportConfigError(fmt::format(
                         "Specialization parameter [{}] must precede all positional and named arguments in the definition of macro [{}]", arg->getText(), MacroName_
                     ), FileName_);

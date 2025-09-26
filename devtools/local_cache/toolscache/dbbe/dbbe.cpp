@@ -157,9 +157,9 @@ namespace NToolsCache {
     }
 
     void DefaultErrorHandler(TLog& log, const std::exception& exc) {
-        if (auto sqlExc = dynamic_cast<const NSQLite::TSQLiteError*>(&exc)) {
+        if (/* auto sqlExc = */ dynamic_cast<const NSQLite::TSQLiteError*>(&exc)) {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_ERR, "ERR[TCBE]") << "SQLite exception: " << exc.what() << Endl;
-        } else if (auto yExc = dynamic_cast<const yexception*>(&exc)) {
+        } else if (/* auto yExc = */ dynamic_cast<const yexception*>(&exc)) {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_CRIT, "CRIT[TCBE]") << "yexception: " << exc.what() << Endl;
         } else {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_EMERG, "EMERG[TCBE]") << "std::exception: " << exc.what() << Endl;
