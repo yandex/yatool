@@ -89,7 +89,7 @@ bool TGlobRestrictions::Check(const TStringBuf& name, const TGlobStat& globStat,
         }
     }
     if (tooManySkipped) {
-        s << "too many skipped files - " << ToString(tooManySkipped) << " of " << ToString(watchedFilesCount) << " ( " << ToString(globSkippedPercent) << "% )";
+        s << "too many skipped files - " << ToString(tooManySkipped) << " of " << ToString(watchedFilesCount) << " ( " << (globSkippedPercent > 99 ? ">99" : ToString(globSkippedPercent)) << "% )";
         if (tooManyWatchDirs) {
             s << ", ";
         }
