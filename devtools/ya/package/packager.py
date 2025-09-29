@@ -1112,23 +1112,6 @@ class PackageContext:
         )
         self._spec['meta']['version'] = self._version
 
-        if canonized_platforms := self._get_canonized_platforms():
-            self._spec["build"]["target-platforms"] = canonized_platforms
-
-    def _get_canonized_platforms(self):
-        build_section = self._spec.get('build')
-        targets = build_section.get('targets')
-        if not targets:
-            return []
-
-        result = []
-        target_platforms = build_section.get('target-platforms') or ["DEFAULT-LINUX-X86_64"]
-        for platform_name in target_platforms:
-            canonized = bg.mine_platform_name(platform_name)
-            result.append(canonized)
-
-        return result
-
     def _calc_version(self):
         if self._params.custom_version:
             ver = self._params.custom_version
@@ -1672,7 +1655,8 @@ def _do_dump_input_build(build_info, params):
     build_type = build_info.get("build_type", params.build_type)
     flags = {item["name"]: item.get("value") for item in build_info.get("flags", [])}
     for platform in build_info.get("target-platforms", []) or ["DEFAULT-LINUX-X86_64"]:
-        platform_key = json.dumps({f"{platform},{build_type}": flags}, sort_keys=True)
+        canonized_platform = bg.mine_platform_name(platform)
+        platform_key = json.dumps({f"{canonized_platform},{build_type}": flags}, sort_keys=True)
         for t in targets:
             yield platform_key, t
 
