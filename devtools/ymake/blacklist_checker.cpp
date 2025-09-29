@@ -135,11 +135,11 @@ namespace {
             auto dir = dirView.GetTargetStr();
             if (const auto* ptr = RestoreContext_.Conf.BlackList.IsValidPath(dir)) {
                 if (!scopedContext) {
-                    scopedContext.Reset(new TScopedContext(
+                    scopedContext = MakeHolder<TScopedContext>(
                         RestoreContext_.Graph.Names().FileConf.GetStoredName(
                             NPath::SmartJoin(module->GetDir().GetTargetStr(), "ya.make")
                         )
-                    ));
+                    );
                 }
                 GenerateBlacklistError(ptr, dir, macro);
             }
@@ -155,11 +155,11 @@ namespace {
                 THolder<TScopedContext> scopedContext{nullptr};
                 const auto moduleIt = FindModule(state);
                 if (moduleIt != state.end()) { // if module exists in state, fill it to context
-                    scopedContext.Reset(new TScopedContext(RestoreContext_.Modules.Get(moduleIt->Node()->ElemId)->GetName()));
+                    scopedContext = MakeHolder<TScopedContext>(RestoreContext_.Modules.Get(moduleIt->Node()->ElemId)->GetName());
                 } else {
                     const auto& parentNode = state.ParentNode();
                     if (parentNode.IsValid()) { // else fill parent node to context
-                        scopedContext.Reset(new TScopedContext(RestoreContext_.Graph.GetFileName(parentNode->ElemId)));
+                        scopedContext = MakeHolder<TScopedContext>(RestoreContext_.Graph.GetFileName(parentNode->ElemId));
                     }
                 }
                 GenerateBlacklistError(ptr, path, macro);
@@ -216,7 +216,7 @@ namespace {
                     dir = names.FileNameById(topNode->ElemId).GetTargetStr(); // if no parent use my ya.make as context
                     macro = "command arguments";
                 }
-                THolder<TScopedContext> scopedContext(new TScopedContext(names.FileConf.GetStoredName(NPath::SmartJoin(dir, "ya.make"))));
+                auto scopedContext = MakeHolder<TScopedContext>(names.FileConf.GetStoredName(NPath::SmartJoin(dir, "ya.make")));
                 GenerateBlacklistError(ptr, path, macro);
             }
             return true;

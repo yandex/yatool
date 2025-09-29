@@ -391,7 +391,7 @@ void TIsolatedProjects::CheckMakefilePlacedInProject(TStringBuf statement, TFile
     ) {
         // has deps from isolated projects to itself, it's ok
     } else {
-        THolder<TScopedContext> scopedContext(new TScopedContext(makefile));
+        auto scopedContext = MakeHolder<TScopedContext>(makefile);
         TStringStream dependencyDetails;
         dependencyDetails << makefileBuf << " [[alt1]]"sv << statement << "[[rst]] -> "sv << path;
         GenerateIsolatedProjectsError(project, makefile, dependencyDetails.Str());
@@ -458,7 +458,7 @@ void TIsolatedProjects::ReportDeps(const TRestoreContext& restoreContext, const 
                     TFileView moduleView;
                     if (itDeps->ModuleId) {
                         moduleView = restoreContext.Graph.Names().FileConf.GetTargetName(itDeps->ModuleId);
-                        scopedContext.Reset(new TScopedContext(itDeps->ModuleId, moduleView.GetTargetStr()));
+                        scopedContext = MakeHolder<TScopedContext>(itDeps->ModuleId, moduleView.GetTargetStr());
                     }
                     GenerateIsolatedProjectsError(*itProject,  moduleView.IsValid() ? moduleView : fromNameView, visitor.StringDepWithPath(*itDeps));
                 }
