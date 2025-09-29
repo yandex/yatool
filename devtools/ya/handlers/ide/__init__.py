@@ -389,7 +389,7 @@ class GradleOptions(yarg.Options):
     EXPOPT_DUMP_YMAKE_STDERR = '--dump-ymake-stderr'
     EXPOPT_YEXPORT_DEBUG_MODE = '--yexport-debug-mode'
 
-    AVAILABLE_JDK_VERSIONS = ('11', '17', '20', '21', '22', '23', '24')
+    AVAILABLE_JDK_VERSIONS = ('11', '17', '20', '21', '22', '23', '24', '25')
 
     def __init__(self):
         self.gradle_name: str = None

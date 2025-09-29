@@ -190,6 +190,9 @@ public class Shared {
     }
 
     public static boolean loadFilters(Parameters params) throws FileNotFoundException {
+        if (params.testListPath.isEmpty()) {
+            return false;
+        }
         File jsonTestListFile = new File(params.testListPath);
         if (jsonTestListFile.exists()) {
             Scanner myReader = new Scanner(jsonTestListFile);
