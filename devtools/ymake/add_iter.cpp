@@ -40,7 +40,7 @@ namespace {
         TExcludeMatcher ExcludesMatcher;
     };
 
-    TGlobPatternInfo ExtractGlobInfo(const TDGIterAddable& st, TFileView dirName, const TBuildConfiguration& conf, TModule* module) {
+    TGlobPatternInfo ExtractGlobInfo(const TDGIterAddable& st, TFileView dirName, TModule* module) {
         TGlobPatternInfo res;
         const auto node = st.Graph.Get(st.NodeStart);
         for (const auto& edge : node.Edges()) {
@@ -53,7 +53,7 @@ namespace {
                     const auto globPatternElemId = edge.From()->ElemId;
                     const auto globVarElemId = edge.To()->ElemId;
                     auto& otherGlobPatternElemIds = res.Var2OtherPatterns[globVarElemId];
-                    if (conf.SaveLoadGlobPatterns && module) {
+                    if (module) {
                         auto globPatternElemIds = TGlobHelper::LoadGlobPatternElemIds(module->Vars, globVarElemId);
                         for (const auto otherGlobPatternElemId: globPatternElemIds) {
                             if (otherGlobPatternElemId != globPatternElemId) {
@@ -74,15 +74,10 @@ namespace {
     }
 
     void OnChangeGlobPatternStat(TVars& moduleVars, const ui32 globPatternElemId, const TGlobStat& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TBuildConfiguration& conf) {
-        if (!conf.SaveLoadGlobPatterns || !conf.SaveLoadGlobStat) {
-            return;
-        }
         TGlobHelper::SaveGlobPatternStat(moduleVars, globPatternElemId, globPatternStat);
         for (const auto& [globVarElemId, otherGlobPatternElemIds]: globInfo.Var2OtherPatterns) {
             TGlobRestrictions globRestrictions;
-            if (conf.SaveGlobRestrictions) {
-                globRestrictions = TGlobHelper::LoadGlobRestrictions(moduleVars, globVarElemId);
-            }
+            globRestrictions = TGlobHelper::LoadGlobRestrictions(moduleVars, globVarElemId);
             TGlobStat globStat;
             globStat += globPatternStat;
             for (const auto otherGlobPatternElemId: otherGlobPatternElemIds) {
@@ -95,7 +90,7 @@ namespace {
     }
 
     void UpdateGlobNode(TUpdIter& updIter, TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module, const TBuildConfiguration& conf) {
-        auto globInfo = ExtractGlobInfo(st, dirName, conf, module);
+        auto globInfo = ExtractGlobInfo(st, dirName, module);
         if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return;
         }
@@ -103,10 +98,7 @@ namespace {
         try {
             TGlobPattern glob{st.Graph.Names().FileConf, pattern, dirName};
             const auto globPatternElemId = st.Node.ElemId;
-            TGlobStat prevGlobPatternStat;
-            if (conf.UpdateGlobStat) {
-                prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->Vars, globPatternElemId);
-            }
+            TGlobStat prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->Vars, globPatternElemId);
             TGlobStat globPatternStat;
             const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher, &globPatternStat);
             if (glob.GetMatchesHash() == globInfo.GlobHash && glob.GetWatchDirs().Data() == globInfo.WatchDirs.Data()) {
@@ -132,7 +124,7 @@ namespace {
             for (const auto& [globVarElemId, otherGlobPatternElemIds]: globInfo.Var2OtherPatterns) {
                 st.Add->AddDep(EDT_Property, EMNT_Property, globVarElemId);
             }
-            if (conf.UpdateGlobStat && prevGlobPatternStat != globPatternStat) {
+            if (prevGlobPatternStat != globPatternStat) {
                 OnChangeGlobPatternStat(module->Vars, globPatternElemId, globPatternStat, globInfo, pattern, conf);
             }
         } catch (const yexception&) {
@@ -141,7 +133,7 @@ namespace {
     }
 
     bool GlobNeedUpdate(const TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module, const TBuildConfiguration& conf) {
-        auto globInfo = ExtractGlobInfo(st, dirName, conf, module);
+        auto globInfo = ExtractGlobInfo(st, dirName, module);
         if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return false;
         }
@@ -150,13 +142,10 @@ namespace {
         try {
             TGlobPattern glob{st.Graph.Names().FileConf, dirName, pattern, globInfo.GlobHash, std::move(globInfo.WatchDirs)};
             const auto globPatternElemId = st.Node.ElemId;
-            TGlobStat prevGlobPatternStat;
-            if (conf.SaveLoadGlobStat) {
-                prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->Vars, globPatternElemId);
-            }
+            TGlobStat prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->Vars, globPatternElemId);
             TGlobStat globPatternStat;
             result = glob.NeedUpdate(globInfo.ExcludesMatcher, &globPatternStat);
-            if (result && conf.UpdateGlobStat && globPatternStat != prevGlobPatternStat) {
+            if (result && globPatternStat != prevGlobPatternStat) {
                 OnChangeGlobPatternStat(module->Vars, globPatternElemId, globPatternStat, globInfo, pattern, conf);
             }
         } catch (const yexception&) {

@@ -104,10 +104,6 @@ namespace {
 
     void ReadFeatureFlags(TBuildConfiguration& conf) {
         conf.FillModule2Nodes = NYMake::IsTrue(conf.CommandConf.EvalValue("FILL_MODULE2NODES"));
-        conf.SaveLoadGlobPatterns = NYMake::IsTrue(conf.CommandConf.EvalValue("SAVELOAD_GLOB_PATTERNS"));
-        conf.SaveLoadGlobStat = NYMake::IsTrue(conf.CommandConf.EvalValue("SAVELOAD_GLOB_STAT"));
-        conf.UpdateGlobStat = NYMake::IsTrue(conf.CommandConf.EvalValue("UPDATE_GLOB_STAT"));
-        conf.SaveGlobRestrictions = NYMake::IsTrue(conf.CommandConf.EvalValue("SAVE_GLOB_RESTRICTIONS"));
         conf.CheckGlobRestrictions = NYMake::IsTrue(conf.CommandConf.EvalValue("CHECK_GLOB_RESTRICTIONS"));
         decltype(conf.GlobSkippedErrorPercent) globSkippedErrorPercent;
         if (TryFromString(conf.CommandConf.EvalValue("GLOB_SKIPPED_ERROR_PERCENT"), globSkippedErrorPercent)) {

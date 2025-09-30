@@ -290,9 +290,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             }
             const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
             const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);
-            if (Conf.SaveLoadGlobStat) {
-                TGlobHelper::SaveGlobPatternStat(Vars, globPatternId, globPatternStat);
-            }
+            TGlobHelper::SaveGlobPatternStat(Vars, globPatternId, globPatternStat);
             ModuleGlobs.push_back(
                 TModuleGlobInfo {
                     .GlobPatternId = globPatternId,
@@ -308,7 +306,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
-    if (Conf.SaveGlobRestrictions && globVarElemId) {
+    if (globVarElemId) {
         TGlobHelper::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
     }
     if (Conf.CheckGlobRestrictions) {

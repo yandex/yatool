@@ -29,7 +29,7 @@
 namespace {
     TStringBuf MsgPad; // debug only
 
-    void ProcessMakefileGlobs(TNodeAddCtx& node, const TVector<TModuleDef*>& modules, const TBuildConfiguration& conf) {
+    void ProcessMakefileGlobs(TNodeAddCtx& node, const TVector<TModuleDef*>& modules) {
         for (const auto module : modules) {
             THashMap<ui32, TVector<ui32>> globVarElemId2PatternElemIds;
             for (const auto& globInfo : module->GetModuleGlobs()) {
@@ -46,10 +46,8 @@ namespace {
                 entryStats.SetReassemble(true);
                 PopulateGlobNode(globNode, globInfo);
             }
-            if (conf.SaveLoadGlobPatterns) {
-                for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
-                    TGlobHelper::SaveGlobPatternElemIds(module->GetVars(), globVarElemId, globPatternElemIds);
-                }
+            for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
+                TGlobHelper::SaveGlobPatternElemIds(module->GetVars(), globVarElemId, globPatternElemIds);
             }
         }
     }
@@ -541,7 +539,7 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
     }
 
     ProcessMakefileIncludes(node, parser.GetModules(), parser.GetIncludes());
-    ProcessMakefileGlobs(node, parser.GetModules(), Conf);
+    ProcessMakefileGlobs(node, parser.GetModules());
     ProcessNeverCacheModules(node, parser.GetModules());
 }
 

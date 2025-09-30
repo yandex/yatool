@@ -68,10 +68,6 @@ public:
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
     THashSet<TStringBuf> GlobRestrictionExtends{};
     bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
-    bool SaveLoadGlobPatterns{false}; // save-load glob pattern elemIds by vars to module vars
-    bool SaveLoadGlobStat{false}; // (only if SaveLoadGlobPatterns) save-load glob pattern stats to module vars
-    bool UpdateGlobStat{false}; // (only if SaveLoadGlobPatterns && SaveLoadGlobStat) update glob pattern stats in module vars in UdpIter
-    bool SaveGlobRestrictions{false}; // save glob restrictions to module vars
     bool CheckGlobRestrictions{false}; // check glob restrictions in create and update modes
     ui8 GlobSkippedErrorPercent{95}; // percent of skipped files for configure error, 0 - don't check skipped
 
