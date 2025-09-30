@@ -68,6 +68,7 @@ from devtools.ya.build.build_opts import (
 )
 from devtools.ya.build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
 from devtools.ya.core.common_opts import (
+    BeVerboseOptions,
     CrossCompilationOptions,
     YaBin3Options,
     OutputStyleOptions,
@@ -77,7 +78,7 @@ from devtools.ya.core.common_opts import (
 from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
 
-from devtools.ya.build.ya_make import YmakeEvlogSubscriber, PrintMessageSubscriber
+from devtools.ya.build.ya_make import DisplayMessageSubscriber, YmakeEvlogSubscriber
 
 import devtools.ya.app
 import app_config
@@ -401,7 +402,7 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
         import app_ctx
 
         subscribers = [
-            PrintMessageSubscriber(),
+            DisplayMessageSubscriber(BeVerboseOptions(False), getattr(app_ctx, 'display', None)),
         ]
 
         if hasattr(app_ctx, 'evlog'):
@@ -411,6 +412,7 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
 
         if hasattr(app_ctx, 'event_queue'):
             app_ctx.event_queue.subscribe(*subscribers)
+
     except ImportError:
         pass
 
