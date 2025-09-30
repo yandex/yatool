@@ -329,13 +329,16 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_token = params.yt_token
     build_options.yt_readonly = params.yt_readonly
     build_options.yt_max_cache_size = params.yt_max_cache_size
-    build_options.yt_cache_filter = params.yt_cache_filter
     build_options.yt_store_ttl = params.yt_store_ttl
     build_options.yt_store_codec = params.yt_store_codec
     build_options.yt_store_threads = params.yt_store_threads
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
     build_options.yt_create_tables = params.yt_create_tables
     build_options.yt_store_retry_time_limit = params.yt_store_retry_time_limit
+    build_options.yt_store2 = params.yt_store2
+    build_options.yt_store_init_timeout = params.yt_store_init_timeout
+    build_options.yt_store_prepare_timeout = params.yt_store_prepare_timeout
+    build_options.yt_store_crit = params.yt_store_crit
     # heater options
     build_options.yt_store_wt = params.yt_store_wt
     build_options.eager_execution = params.eager_execution

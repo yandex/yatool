@@ -409,27 +409,44 @@ class CacheFactory:
         from yalibrary.store.yt_store import yt_store
 
         token = self._get_yt_token()
-        yt_store_class = yt_store.YndexerYtStore if self._opts.yt_replace_result_yt_upload_only else yt_store.YtStore
+        if self._opts.yt_replace_result_yt_upload_only:
+            yt_store_class = yt_store.YndexerYtStore
+        elif self._opts.yt_store2:
+            yt_store_class = yt_store.YtStore2
+        else:
+            yt_store_class = yt_store.YtStore
+
+        kwargs = {}
+        if yt_store_class == yt_store.YtStore2:
+            kwargs = dict(
+                init_timeout=self._opts.yt_store_init_timeout,
+                prepare_timeout=self._opts.yt_store_prepare_timeout,
+                crit_level=self._opts.yt_store_crit,
+            )
+        else:
+            # These options will be deleted after migration to YtStore2
+            kwargs = dict(
+                new_client=self._opts.yt_store_cpp_client,
+                cpp_prepare_data=self._opts.yt_store_cpp_prepare_data,
+                create_tables=self._opts.yt_create_tables,
+                with_self_uid=self._opts.yt_self_uid,
+                heater_mode=self._opts.yt_store_crit == "put",
+                yt_store_exclusive=self._opts.yt_store_exclusive,
+            )
 
         return yt_store_class(
             self._opts.yt_proxy,
             self._opts.yt_dir,
-            self._opts.yt_cache_filter,
             token=token,
             readonly=self._opts.yt_readonly,
-            create_tables=self._opts.yt_create_tables,
             max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
             max_cache_size=self._opts.yt_max_cache_size,
             ttl=self._opts.yt_store_ttl,
-            heater_mode=not self._opts.yt_store_wt,
             stager=stager,
-            with_self_uid=self._opts.yt_self_uid,
-            new_client=self._opts.yt_store_cpp_client,
             probe_before_put=self._opts.yt_store_probe_before_put,
             probe_before_put_min_size=self._opts.yt_store_probe_before_put_min_size,
-            cpp_prepare_data=self._opts.yt_store_cpp_prepare_data,
-            yt_store_exclusive=self._opts.yt_store_exclusive,
             retry_time_limit=self._opts.yt_store_retry_time_limit,
+            **kwargs,
         )
 
     def _can_use_bazel_remote_cache(self):
@@ -502,18 +519,12 @@ def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
     cache = dist_cache_future()
     if cache:
         logger.debug("Loading meta from dist cache")
-
-        # could raise error here if not async
-        _async = not (opts.yt_store_exclusive or heater_mode or opts.yt_store_refresh_on_read)
-
         cache.prepare(
             self_uids,
             uids,
             refresh_on_read=opts.yt_store_refresh_on_read,
             content_uids=opts.force_content_uids,
-            _async=_async,
         )
-
     logger.debug("Dist cache prepared")
     return cache
 

@@ -1,3 +1,4 @@
+import enum
 import json
 import logging
 import os
@@ -32,7 +33,6 @@ class YtStore(DistStore):
         self,
         proxy,
         data_dir,
-        cache_filter,
         token=None,
         readonly=False,
         create_tables=False,
@@ -58,13 +58,12 @@ class YtStore(DistStore):
             readonly=readonly,
             max_file_size=max_file_size,
             fits_filter=fits_filter,
-            heater_mode=heater_mode,
         )
         self._proxy = proxy
         self._ttl = ttl
-        self._cache_filter = cache_filter
         self._probe_before_put = probe_before_put
         self._probe_before_put_min_size = probe_before_put_min_size
+        self._heater_mode = heater_mode
 
         self._data_dir = data_dir
 
@@ -226,13 +225,15 @@ class YtStore(DistStore):
             meta_to_delete = self._client.get_metadata_rows(where=where, limit=limit)
         return meta_to_delete
 
-    def prepare(self, self_uids, uids, refresh_on_read=False, content_uids=False, _async=False):
-        if _async:
-            self._prepare_future = asyncthread.future(
-                lambda: self._load_meta(self_uids, uids, refresh_on_read, content_uids)
-            )
-        else:
-            self._load_meta(self_uids, uids, refresh_on_read, content_uids)
+    def prepare(self, self_uids, uids, refresh_on_read=False, content_uids=False):
+        self._prepare_future = asyncthread.future(
+            lambda: self._load_meta(self_uids, uids, refresh_on_read, content_uids)
+        )
+        if self._yt_store_exclusive or self._heater_mode or refresh_on_read:
+            self.wait_prepared()
+
+    def wait_prepared(self):
+        self._prepare_future()
 
     def _load_meta(self, self_uids, uids, refresh_on_read=False, content_uids=False):
         with self._stager.scope('loading-yt-meta'):
@@ -564,14 +565,10 @@ class YtStore(DistStore):
 
     def fits(self, node):
         if isinstance(node, dict):
-            uid = node["uid"]
             outputs = node["outputs"]
-            target_properties = node.get("target_properties") or {}
             kv = node.get("kv") or {}
         else:
-            uid = node.uid
             outputs = node.outputs
-            target_properties = node.target_properties
             kv = node.kv or {}
 
         if not len(outputs):
@@ -580,34 +577,16 @@ class YtStore(DistStore):
         if self._fits_filter:
             return self._fits_filter(node)
 
-        if self._cache_filter is None:
-            p = kv.get('p')
-            if p in consts.YT_CACHE_EXCLUDED_P:
-                return False
-            for o in outputs:
-                for p in 'library/cpp/svnversion', 'library/cpp/build_info':
-                    if o.startswith('$(BUILD_ROOT)/' + p):
-                        return False
-            if all(o.endswith('.tar') for o in outputs):
-                return False
-            return True
-
-        try:
-            return eval(
-                self._cache_filter,
-                {'__builtins__': None},
-                {
-                    'is_module': lambda: 'module_type' in target_properties,
-                    'outputs_to': lambda *paths: any(
-                        any(o.startswith('$(BUILD_ROOT)/' + p) for p in paths) for o in outputs
-                    ),
-                    'kv': lambda k, v: k in kv if v is None else k in kv and kv[k] == v,
-                    'module_type': lambda mt: mt == target_properties.get('module_type'),
-                },
-            )
-        except Exception as e:
-            logger.error('Can\'t evaluate YT cache filter for %s(%s): %s', uid, outputs[0], str(e))
+        p = kv.get('p')
+        if p in consts.YT_CACHE_EXCLUDED_P:
             return False
+        for o in outputs:
+            for p in 'library/cpp/svnversion', 'library/cpp/build_info':
+                if o.startswith('$(BUILD_ROOT)/' + p):
+                    return False
+        if all(o.endswith('.tar') for o in outputs):
+            return False
+        return True
 
     def get_status(self):
         '''Return basic cache status'''
@@ -680,6 +659,10 @@ class YndexerYtStore(YtStore):
 
 
 class YtStore2(DistStore):
+    class CritLevel(enum.StrEnum):
+        GET = enum.auto()
+        PUT = enum.auto()
+
     def __init__(
         self,
         proxy: str,
@@ -691,12 +674,14 @@ class YtStore2(DistStore):
         name_re_ttls: dict[str, int] | None = None,
         max_file_size: int = 0,
         fits_filter: Callable[[tp.Any], bool] = None,
-        heater_mode=False,
         probe_before_put=False,
         probe_before_put_min_size=0,
-        retry_time_limit=None,
-        sync_durability=None,
-        operation_pool=None,
+        retry_time_limit: float | None = None,
+        sync_durability=False,
+        operation_pool: str | None = None,
+        init_timeout: float | None = None,
+        prepare_timeout: float | None = None,
+        crit_level: str | None = None,
         **kwargs
     ):
         super().__init__(
@@ -706,7 +691,6 @@ class YtStore2(DistStore):
             readonly=readonly,
             max_file_size=max_file_size,
             fits_filter=fits_filter,
-            heater_mode=heater_mode,
         )
         self._proxy = proxy
         self._ttl = ttl
@@ -715,7 +699,7 @@ class YtStore2(DistStore):
         self._data_dir = data_dir
         self._time_to_first_recv_meta = None
         self._time_to_first_call_has = None
-        self._yt_store_exclusive = kwargs.get('yt_store_exclusive', False)
+        self._crit_level = self.CritLevel(crit_level.upper()) if crit_level is not None else None
 
         self._client = xx_client.YtStoreWrapper2(
             proxy,
@@ -729,9 +713,12 @@ class YtStore2(DistStore):
             operation_pool=operation_pool,
             retry_time_limit=retry_time_limit,
             sync_durability=sync_durability,
+            # TODO (YA-2800)
+            # init_timeout=init_timeout,
+            # prepare_timeout=prepare_timeout
         )
 
-        if self._heater_mode:
+        if self._crit_level is not None:
             self._client.wait_initialized()
 
         self._stager = kwargs.get("stager", utils.DummyStager())
@@ -741,7 +728,7 @@ class YtStore2(DistStore):
         return self._client.disabled()
 
     def _on_disable_callback(self, err_type, msg):
-        if self._yt_store_exclusive or self._heater_mode or len(msg) <= 100:
+        if self._crit_level is not None or len(msg) <= 100:
             logger.warning("Disabling dist cache. Last caught error: %s", msg)
         else:
             logger.warning(
@@ -754,7 +741,7 @@ class YtStore2(DistStore):
             "error_type": err_type,
             "yt_proxy": self._proxy,
             "yt_dir": self._data_dir,
-            "is_heater": self._heater_mode,
+            "is_heater": self._crit_level == self.CritLevel.PUT,
         }
 
         try:

@@ -2635,7 +2635,6 @@ class DistCacheSetupOptions(LocalCacheOptions):
         self.yt_readonly = True
         self.yt_max_cache_size = None
         self.yt_store_ttl = None
-        self.yt_store_retry_time_limit = None
 
     @staticmethod
     def consumer():
@@ -2725,11 +2724,6 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 help='YT store ttl in hours',
                 hook=SetValueHook('yt_store_ttl'),
             ),
-            EnvConsumer(
-                'YA_YT_STORE_RETRY_TIME_LIMIT',
-                help='Maximum duration of YT method execution attempts',
-                hook=SetValueHook('yt_store_retry_time_limit', transform=float),
-            ),
             ConfigConsumer('yt_proxy'),
             ConfigConsumer('yt_dir'),
             ConfigConsumer('yt_token_path'),
@@ -2784,7 +2778,6 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store = True if app_config.in_house else False  # should be false for opensource
         self.yt_create_tables = False
         self.yt_self_uid = False
-        self.yt_cache_filter = None
         self.yt_store_codec = None
         self.yt_replace_result = False
         self.yt_replace_result_yt_upload_only = False
@@ -2797,6 +2790,11 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_cpp_prepare_data = False
         self.yt_store_probe_before_put = False
         self.yt_store_probe_before_put_min_size = 0
+        self.yt_store_retry_time_limit = None
+        self.yt_store2 = False
+        self.yt_store_init_timeout = None
+        self.yt_store_prepare_timeout = None
+        self.yt_store_crit = None
         self.bazel_remote_store = False
         self.bazel_remote_baseuri = 'http://[::1]:8080/'
         self.bazel_remote_username = None
@@ -2932,31 +2930,34 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ),
                 ArgConsumer(
                     ['--no-yt-write-through'],
-                    help='Don\'t populate local cache while updating YT store (heater mode)',
+                    help='Don\'t populate local cache while updating YT store',
                     hook=SetConstValueHook('yt_store_wt', False),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
                 ),
                 ArgConsumer(
                     ['--yt-create-tables'],
-                    help='Create YT storage tables',
+                    help='Create YT storage tables (DEPRECATED. Use "ya cache yt create-tables")',
                     hook=SetConstValueHook('yt_create_tables', True),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
+                    deprecated=True,
                 ),
                 ArgConsumer(
                     ['--yt-self-uid'],
-                    help='Include self_uid in YT store metadata (use with --yt-create-tables)',
+                    help='Include self_uid in YT store metadata (DEPRECATED. Use "ya cache yt create-tables --version 3")',
                     hook=SetConstValueHook('yt_self_uid', True),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
+                    deprecated=True,
                 ),
                 ArgConsumer(
                     ['--yt-store-filter'],
-                    help='YT store filter',
-                    hook=SetValueHook('yt_cache_filter'),
+                    help='YT store filter (DEPRECATED. Do nothing)',
+                    hook=SwallowValueDummyHook(),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
-                    visible=HelpLevel.EXPERT,
+                    visible=HelpLevel.NONE,
+                    deprecated=True,
                 ),
                 ArgConsumer(
                     ['--yt-store-codec'],
@@ -2987,7 +2988,6 @@ class DistCacheOptions(DistCacheSetupOptions):
                     help='Create YT storage tables',
                     hook=SetConstValueHook('yt_create_tables', True),
                 ),
-                EnvConsumer('YA_YT_STORE_FILTER', help='YT store filter', hook=SetValueHook('yt_cache_filter')),
                 EnvConsumer('YA_YT_STORE_CODEC', help='YT store codec', hook=SetValueHook('yt_store_codec')),
                 EnvConsumer(
                     'YA_YT_STORE_THREADS',
@@ -2995,7 +2995,6 @@ class DistCacheOptions(DistCacheSetupOptions):
                     hook=SetValueHook('yt_store_threads', transform=int),
                 ),
                 ConfigConsumer('yt_store'),
-                ConfigConsumer('yt_cache_filter'),
                 ConfigConsumer('yt_store_wt'),
                 ConfigConsumer('yt_store_threads'),
                 ConfigConsumer('yt_store_codec'),
@@ -3110,6 +3109,70 @@ class DistCacheOptions(DistCacheSetupOptions):
                     hook=lambda n: SetConstValueHook(n, True),
                 ),
             )
+            + make_opt_consumers(
+                'yt_store_retry_time_limit',
+                help='Maximum duration of YT method execution attempts',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                ),
+            )
+            + make_opt_consumers(
+                'yt_store2',
+                help='Use yt store client v2',
+                arg_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    # TODO (YA-2800) Make visible when YtStore2 becomes ready
+                    visible=HelpLevel.NONE,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                ),
+                cfg_opts={},
+            )
+            + make_opt_consumers(
+                'yt_store_init_timeout',
+                help='Maximum duration of store initialization',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                ),
+                cfg_opts={},
+            )
+            + make_opt_consumers(
+                'yt_store_prepare_timeout',
+                help='Maximum duration of metadata reading',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                ),
+                cfg_opts={},
+            )
+            + make_opt_consumers(
+                'yt_store_crit',
+                help='Break execution if YT store fails ("get" - if get fails, "put" - if either get or put fails)',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, values=["get", "put"]),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, values=["get", "put"]),
+                ),
+            )
         )
 
     def postprocess(self):
@@ -3136,6 +3199,15 @@ class DistCacheOptions(DistCacheSetupOptions):
                 raise ArgsValidatingException('YT storage is enabled but YT proxy is not set')
             if not self.yt_dir:
                 raise ArgsValidatingException('YT storage is enabled but YT dir is not set')
+
+        if self.yt_store_exclusive and self.yt_store_crit is None:
+            self.yt_store_crit = "get"
+
+        if not self.yt_store_wt:
+            self.yt_store_crit = "put"
+
+        if self.yt_readonly and self.yt_store_crit == "put":
+            self.yt_store_crit = "get"
 
 
 class JavaSpecificOptions(Options):

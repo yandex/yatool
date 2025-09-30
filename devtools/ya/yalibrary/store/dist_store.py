@@ -27,7 +27,7 @@ class Status(enum.Enum):
 
 
 class DistStore(object):
-    def __init__(self, name, stats_name, tag, readonly, max_file_size=0, fits_filter=None, heater_mode=False):
+    def __init__(self, name, stats_name, tag, readonly, max_file_size=0, fits_filter=None):
         self._readonly = readonly
         metrics = ['has', 'put', 'get', 'get-meta', 'probe-meta-before-put']
         self._timers = {m: 0 for m in metrics}
@@ -42,7 +42,6 @@ class DistStore(object):
         self._tag = tag
         self._fits_filter = fits_filter
         self._exclude_filter = self._gen_exclude_filter(max_file_size)
-        self._heater_mode = heater_mode
 
     def _inc_time(self, x, tag):
         cur_time = time.time()
