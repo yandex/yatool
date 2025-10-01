@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shlex
+import sys
 
 import devtools.ya.core.yarg
 from devtools.ya.core import error
@@ -2045,6 +2046,11 @@ class InterimOptions(devtools.ya.core.yarg.Options):
             devtools.ya.core.yarg.ConfigConsumer('no_tests_is_error'),
             devtools.ya.core.yarg.ConfigConsumer('tests_limit_in_suite'),
         ]
+
+    def postprocess(self):
+        # XXX: YA-273
+        if sys.platform == 'win32':
+            self.use_jstyle_server = False
 
     def postprocess2(self, params):
         if (
