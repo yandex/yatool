@@ -34,7 +34,7 @@ class JavaStyleTestSuite(test_types.StyleTestSuite):
         self.deps = None
         self.my_sources = []
         self.config_xml = ''
-        for f in self.meta.files:
+        for f in self.meta.test_files:
             if '.srclst::' in f:
                 self.my_sources.append(f)
             else:

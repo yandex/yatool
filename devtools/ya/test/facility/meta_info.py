@@ -56,10 +56,6 @@ class MetaInfo(object):
         return self._eslint_config_path
 
     @property
-    def files(self):
-        return self._files or ()
-
-    @property
     def fork_mode(self):
         return self._fork_mode or ''
 
@@ -350,7 +346,6 @@ class DartInfo(MetaInfo):
         self._custom_dependencies = dart_info.get('CUSTOM-DEPENDENCIES')
         self._docker_images = dart_info.get('DOCKER-IMAGES')
         self._eslint_config_path = dart_info.get("ESLINT_CONFIG_PATH")
-        self._files = dart_info.get("FILES")
         self._fork_mode = dart_info.get('FORK-MODE')
         self._fork_test_files = dart_info.get('FORK-TEST-FILES')
         self._fuzz_dicts = dart_info.get('FUZZ-DICTS')

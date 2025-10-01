@@ -427,8 +427,7 @@ class ExecTest(PyTestBinSuite):
 
 class LintTestSuite(common.StyleTestSuite):
     def get_suite_files(self):
-        files = [f.replace("$S", "$(SOURCE_ROOT)") for f in [_f for _f in self.meta.files if _f]]
-        return sorted(files)
+        return sorted(f.replace("$S", "$(SOURCE_ROOT)") for f in self.meta.test_files if f)
 
     def support_retries(self):
         return False
