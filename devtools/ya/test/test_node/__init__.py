@@ -1074,6 +1074,10 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
 
         # TODO DEVTOOLS-5416
         # Transfer requirements from node to the YT operation
+        preserved_requirement_keys = {"test_output_limit"}
+        preserved_requirements = {
+            k: v for k, v in node.get("requirements", {}).items() if k in preserved_requirement_keys
+        }
         node.update(
             {
                 "inputs": testdeps.unique(node["inputs"] + inputs),
@@ -1085,7 +1089,8 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
                     "cpu": "{}m".format(opts.ytexec_wrapper_m_cpu),
                     "network": "full",
                     "ram": 8,
-                },
+                }
+                | preserved_requirements,
             }
         )
 
