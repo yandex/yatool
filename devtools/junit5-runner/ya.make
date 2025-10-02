@@ -6,9 +6,7 @@ ENDIF()
 
 PROVIDES(junit-runner)
 
-IF(JDK_VERSION == "")
-    JDK_VERSION(11)
-ENDIF()
+DEFAULT_JDK_VERSION(11)
 
 JAVA_SRCS(
     SRCDIR src/main/java **/*.java
