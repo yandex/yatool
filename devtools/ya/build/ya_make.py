@@ -753,54 +753,48 @@ def replace_yt_results(graph, opts, dist_cache):
     new_results = []
     cached_results = []
 
-    if not opts.yt_cache_filter:
-        original_results = set(graph.get('result', []))
-        network_limited_nodes = set()
+    original_results = set(graph.get('result', []))
+    network_limited_nodes = set()
 
-        def network_limited(node):
-            return node.get("requirements", {}).get("network") == "full"
+    def network_limited(node):
+        return node.get("requirements", {}).get("network") == "full"
 
-        def suitable(node):
-            if opts.yt_replace_result_yt_upload_only:
-                return any(out.endswith('.ydx.pb2.yt') for out in node.get('outputs', []))
-            if opts.yt_replace_result_add_objects and any(
-                out.endswith('.o') or out.endswith('.obj') for out in node.get('outputs', [])
-            ):
-                return True
+    def suitable(node):
+        if opts.yt_replace_result_yt_upload_only:
+            return any(out.endswith('.ydx.pb2.yt') for out in node.get('outputs', []))
+        if opts.yt_replace_result_add_objects and any(
+            out.endswith('.o') or out.endswith('.obj') for out in node.get('outputs', [])
+        ):
+            return True
 
-            return is_dist_cache_suitable(node, original_results, opts)
+        return is_dist_cache_suitable(node, original_results, opts)
 
-        first_pass = []
-        for node in graph['graph']:
-            uid = node.get('uid')
+    first_pass = []
+    for node in graph['graph']:
+        uid = node.get('uid')
 
-            if network_limited(node):
-                network_limited_nodes.add(uid)
+        if network_limited(node):
+            network_limited_nodes.add(uid)
 
-            if dist_cache.fits(node) and suitable(node):
-                # (node, new_result)
-                first_pass.append((node, not dist_cache.has(node.get('uid'))))
+        if dist_cache.fits(node) and suitable(node):
+            # (node, new_result)
+            first_pass.append((node, not dist_cache.has(node.get('uid'))))
 
-        # Another pass to filter out network intensive nodes.
-        for node, new_result in first_pass:
-            uid = node.get('uid')
-            if not opts.yt_replace_result_yt_upload_only:
-                if uid in network_limited_nodes:
-                    continue
-                deps = node.get('deps', [])
-                # It is dependence on single fetch_from-like node.
-                if len(deps) == 1 and deps[0] in network_limited_nodes:
-                    continue
+    # Another pass to filter out network intensive nodes.
+    for node, new_result in first_pass:
+        uid = node.get('uid')
+        if not opts.yt_replace_result_yt_upload_only:
+            if uid in network_limited_nodes:
+                continue
+            deps = node.get('deps', [])
+            # It is dependence on single fetch_from-like node.
+            if len(deps) == 1 and deps[0] in network_limited_nodes:
+                continue
 
-            if new_result:
-                new_results.append(uid)
-            else:
-                cached_results.append(uid)
-    else:
-        for node in graph.get('graph'):
-            uid = node.get('uid')
-            if dist_cache.fits(node) and not dist_cache.has(uid):
-                new_results.append(uid)
+        if new_result:
+            new_results.append(uid)
+        else:
+            cached_results.append(uid)
 
     return new_results, cached_results
 
