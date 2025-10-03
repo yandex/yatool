@@ -911,6 +911,7 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
         TVarStrEx cmd(name);
         cmd.IsMacro = true;
+        cmdInfo->SetCommandSink(&Commands);
         cmdInfo->Init("SRCS", cmd, &args, *this);
 
         FileGroupCmds.emplace_back(varId, cmdInfo);
