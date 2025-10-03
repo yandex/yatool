@@ -10,7 +10,6 @@ import re
 import signal
 
 import exts.fs
-import exts.func
 import exts.archive
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 from devtools.common import libmagic
@@ -66,6 +65,11 @@ def merge_segments(s1, s2):
 
 
 @shared.timeit
+def merge_branches(b1, b2):
+    return lib_coverage.merge.merge_clang_branches([b1, b2])
+
+
+@shared.timeit
 def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches=False):
     if covtype == 'files':
         filename = covdata['filename']
@@ -85,6 +89,9 @@ def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches
             'segments': [],
             'functions': {},
         }
+        if branches:
+            cache[relfilename]['branches'] = []
+
     cache_entry = cache[relfilename]
 
     if covtype == 'files':
@@ -100,10 +107,11 @@ def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches
                 raise AssertionError("Found MC/DC coverage duplicate")
             cache_entry['mcdc'] = covdata['mcdc_records']
 
-        if branches and 'branches' in covdata:
-            if 'branches' in cache_entry:
-                raise AssertionError("Found branch coverage duplicate")
-            cache_entry['branches'] = covdata['branches']
+        if branches:
+            if not cache_entry['branches']:
+                cache_entry['branches'] = covdata['branches']
+            else:
+                cache_entry['branches'] = merge_branches(cache_entry['branches'], covdata['branches'])
 
         if not cache_entry['segments']:
             cache_entry['segments'] = covdata['segments']
