@@ -1582,9 +1582,15 @@ def do_dump_input(params, arcadia_root, output):
         Fields not presented in formatter dict will be skipped.
         """
         for key, val in formatter.items():
-            key = "{%s}" % key
-            if key in string:
-                string = string.replace(key, str(val))
+            if isinstance(val, dict):
+                for subkey, subval in val.items():
+                    pattern = f"{{{key}[{subkey}]}}"
+                    if pattern in string:
+                        string = string.replace(pattern, str(subval))
+            else:
+                key = "{%s}" % key
+                if key in string:
+                    string = string.replace(key, str(val))
         return string
 
     result = {}
