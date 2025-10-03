@@ -12,6 +12,7 @@ import exts.yjson as json
 
 from devtools.ya.test.system import process
 from devtools.ya.test import common as test_common
+from devtools.ya.test import facility
 from devtools.ya.test.test_types import common
 import devtools.ya.core.config
 import devtools.ya.test.const
@@ -281,8 +282,8 @@ class PyTestBinSuite(PyTestSuite):
     def __init__(self, meta, *args, **kwargs):
         super(PyTestBinSuite, self).__init__(meta, *args, **kwargs)
         if self.meta.binary_path:
-            # FIXME meta must be read only
-            self.meta.test_name = self.get_type()
+            # FIXME: Meta must be read only
+            self.meta = facility.meta_dart_replace_test_name(self.meta, self.get_type())
 
     def binary_path(self, root):
         return common.AbstractTestSuite.binary_path(self, root)

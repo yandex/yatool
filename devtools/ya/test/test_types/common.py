@@ -65,11 +65,11 @@ class AbstractTestSuite(facility.Suite):
         """
         raise NotImplementedError()
 
-    def _get_meta_info_parser(self):
+    def _get_meta_constructor(self):
         """
-        Return parser for meta information from which test suites are generated
+        Return constructor for meta information from which test suites are generated
         """
-        return facility.DartInfo
+        return facility.make_meta_from_dart
 
     @property
     def class_type(self):
@@ -96,7 +96,7 @@ class AbstractTestSuite(facility.Suite):
 
     def __init__(
         self,
-        meta_dict,
+        raw_meta,
         modulo=1,
         modulo_index=0,
         target_platform_descriptor=None,
@@ -107,7 +107,7 @@ class AbstractTestSuite(facility.Suite):
         :param meta: meta info like parsed `test.dart` file
         """
         super(AbstractTestSuite, self).__init__()
-        self.meta = self._get_meta_info_parser()(meta_dict)
+        self.meta = self._get_meta_constructor()(raw_meta)
         self._result_uids = []
         self._output_uids = []
         self.dep_uids = []
@@ -165,7 +165,7 @@ class AbstractTestSuite(facility.Suite):
     def save(self):
         #  needed for ya dump
         return {
-            'dart_info': self.meta.meta_dict,
+            'dart_info': self.meta.meta_raw,
             'tests': self.tests,
             'result_uids': self._result_uids,
             'output_uids': self._output_uids,
