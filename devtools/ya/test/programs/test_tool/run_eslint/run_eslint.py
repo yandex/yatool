@@ -16,6 +16,10 @@ from build.plugins.lib.nots.package_manager.pnpm.constants import (
     PNPM_LOCKFILE_FILENAME,
     VIRTUAL_STORE_DIRNAME,
 )
+from build.plugins.lib.nots.package_manager.base.utils import (
+    build_vs_store_path,
+    init_nots_path,
+)
 from build.plugins.lib.nots.test_utils import ts_utils
 
 from devtools.ya.test import facility
@@ -37,10 +41,13 @@ def main():
     build_dir = os.path.join(args.build_root, args.source_folder_path)
     cwd = build_dir
 
+    init_nots_path(build_root=args.build_root, local_cli=False)
     bindir_node_modules_path = os.path.join(build_dir, NODE_MODULES_DIRNAME)
     node_path = [
-        bindir_node_modules_path,
+        os.path.join(build_vs_store_path(args.source_folder_path), NODE_MODULES_DIRNAME),
+        # TODO: remove - no longer needed
         os.path.join(bindir_node_modules_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
+        bindir_node_modules_path,
     ]
 
     suite = PerformedTestSuite(None, None, None)

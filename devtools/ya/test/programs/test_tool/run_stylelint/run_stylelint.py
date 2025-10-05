@@ -4,6 +4,7 @@ import logging
 import os
 
 import build.plugins.lib.nots.package_manager.base.constants as pm_const
+import build.plugins.lib.nots.package_manager.base.utils as pm_utils
 import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
 import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
 from devtools.ya.test.const import Status
@@ -39,6 +40,22 @@ def get_stylelint_cmd(args):
         '--formatter',
         'json',
     ] + args.files
+
+
+def get_env(args):
+    pm_utils.init_nots_path(build_root=args.build_root, local_cli=False)
+    build_dir = os.path.join(args.build_root, args.project_path)
+    bindir_node_modules_path = os.path.join(build_dir, pm_const.NODE_MODULES_DIRNAME)
+    node_path = [
+        os.path.join(pm_utils.build_vs_store_path(args.project_path), pm_const.NODE_MODULES_DIRNAME),
+        # TODO: remove - no longer needed
+        os.path.join(bindir_node_modules_path, pnpm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+        bindir_node_modules_path,
+    ]
+    env = os.environ.copy()
+    env.update({"NODE_PATH": os.pathsep.join(node_path)})
+
+    return env
 
 
 def format_error(records: list[dict]):
@@ -117,7 +134,7 @@ def main():
         ],
     )
 
-    exec_result = execute(get_stylelint_cmd(args), cwd=build_dir, check_exit_code=False)
+    exec_result = execute(get_stylelint_cmd(args), cwd=build_dir, env=get_env(args), check_exit_code=False)
     if exec_result.exit_code < 0:
         logger.error("stylelint was terminated by signal: %s", exec_result.exit_code)
         return 1
