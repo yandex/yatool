@@ -11,6 +11,11 @@ import logging
 import os
 from collections.abc import Callable
 
+from devtools.ya.core import config as core_config
+from devtools.ya.core import monitoring as core_monitoring
+from devtools.ya.core import report
+
+
 logger = logging.getLogger(__name__)
 
 ctypedef const char * cstr
@@ -120,15 +125,26 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
     cdef cppclass TYtTokenOption "NYa::TYtTokenOption":
         TString Token
 
+    enum ECritLevel "NYa::ECritLevel":
+        NONE "NYa::ECritLevel::NONE"
+        GET "NYa::ECritLevel::GET"
+        PUT "NYa::ECritLevel::PUT"
+
     cdef cppclass TYtStore2Options "NYa::TYtStore2Options" (TYtTokenOption):
         bool ReadOnly
         void* OnDisable
+        bool CheckSize
         TMaxCacheSize MaxCacheSize
         TDuration Ttl
         TVector[TNameReTtl] NameReTtls
         TString OperationPool
         TDuration RetryTimeLimit
         bool SyncDurability
+        TDuration InitTimeout
+        TDuration PrepareTimeout
+        bool ProbeBeforePut
+        size_t ProbeBeforePutMinSize
+        ECritLevel CritLevel
 
     cdef cppclass TDataGcOptions "NYa::TYtStore2::TDataGcOptions":
         i64 DataSizePerJob
@@ -164,6 +180,7 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
         TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options) except +raise_yt_store_error
         void WaitInitialized() except +raise_yt_store_error
         bool Disabled()
+        bool ReadOnly()
         void Strip() except +raise_yt_store_error
         void DataGc(const TDataGcOptions& options) except +raise_yt_store_error
         @staticmethod
@@ -233,33 +250,43 @@ cdef class YtStoreWrapper:
         del self.c_ytstore
 
 
-cdef class YtStoreWrapper2:
-    cdef TYtStore2* store_ptr
-    _on_disable: Callable
+cdef class YtStore2Impl:
+    cdef TYtStore2* _store_ptr
+    _proxy: str
+    _data_dir: str
+    _is_heater: bool
 
     def __init__(
         self,
         proxy: str,
         data_dir: str,
         token: str | None,
-        readonly: bool = True,
-        on_disable: Callable | None = None,
-        max_cache_size: int | str | None = None,
-        ttl_hours: int | None = None,
-        name_re_ttls: dict[str, int] | None = None,
-        operation_pool: str | None = None,
-        retry_time_limit: float | None = None,
-        sync_durability: bool = False,
+        readonly: bool,
+        check_size: bool,
+        max_cache_size: int | str | None,
+        ttl_hours: int | None,
+        name_re_ttls: dict[str, int] | None,
+        operation_pool: str | None,
+        retry_time_limit: float | None,
+        sync_durability: bool,
+        init_timeout: float | None,
+        prepare_timeout: float | None,
+        probe_before_put: bool,
+        probe_before_put_min_size: int | None,
+        crit_level: str | None,
     ):
+        self._proxy = proxy
+        self._data_dir = data_dir
+        self._is_heater = crit_level == "put"
+
         cdef TString c_proxy = proxy.encode()
         cdef TString c_data_dir = data_dir.encode()
         cdef TYtStore2Options options
         if token:
             options.Token = token.encode()
         options.ReadOnly = readonly
-        if on_disable:
-            self._on_disable = on_disable
-            options.OnDisable = <void*> on_disable
+        options.OnDisable = <void*> self._on_disable_callback
+        options.CheckSize = check_size
         if max_cache_size:
             if isinstance(max_cache_size, int):
                 options.MaxCacheSize = TMaxCacheSize(<size_t>max_cache_size)
@@ -273,10 +300,24 @@ cdef class YtStoreWrapper2:
         if operation_pool:
             options.OperationPool = operation_pool.encode()
         if retry_time_limit:
-            options.RetryTimeLimit = TDuration.MicroSeconds(int((retry_time_limit or 0) * 1_000_000))
+            options.RetryTimeLimit = YtStore2Impl._as_duration(retry_time_limit)
         options.SyncDurability = sync_durability
+        if init_timeout:
+            options.InitTimeout = YtStore2Impl._as_duration(init_timeout)
+        if prepare_timeout:
+            options.PrepareTimeout = YtStore2Impl._as_duration(prepare_timeout)
+        options.ProbeBeforePut = probe_before_put
+        if probe_before_put_min_size:
+            options.ProbeBeforePutMinSize = probe_before_put_min_size
+        if crit_level:
+            if crit_level == "get":
+                options.CritLevel = ECritLevel.GET
+            elif crit_level == "put":
+                options.CritLevel = ECritLevel.PUT
+            else:
+                raise ValueError(f"Unknown crit_level value: {crit_level}")
         with nogil:
-            self.store_ptr = new TYtStore2(
+            self._store_ptr = new TYtStore2(
                 c_proxy,
                 c_data_dir,
                 options
@@ -284,14 +325,17 @@ cdef class YtStoreWrapper2:
 
     def wait_initialized(self):
         with nogil:
-            self.store_ptr.WaitInitialized()
+            self._store_ptr.WaitInitialized()
 
     def disabled(self) -> bool:
-        return self.store_ptr.Disabled()
+        return self._store_ptr.Disabled()
+
+    def readonly(self) -> bool:
+        return self._store_ptr.ReadOnly()
 
     def strip(self):
         with nogil:
-            self.store_ptr.Strip()
+            self._store_ptr.Strip()
 
     def data_gc(
         self,
@@ -304,12 +348,12 @@ cdef class YtStoreWrapper2:
         if data_size_per_key_range:
             options.DataSizePerKeyRange = data_size_per_key_range
         with nogil:
-            self.store_ptr.DataGc(options)
+            self._store_ptr.DataGc(options)
 
     def __dealloc__(self):
         # nogil is required to allow YtStore internal threads write log messages during termination
         with nogil:
-            del self.store_ptr
+            del self._store_ptr
 
     @staticmethod
     def validate_regexp(re_str: str) -> None:
@@ -320,7 +364,7 @@ cdef class YtStoreWrapper2:
         proxy: str,
         data_dir: str,
         version: int,
-        token: str | None,
+        token: str | None = None,
         replicated: bool = False,
         tracked: bool = False,
         in_memory: bool = False,
@@ -364,12 +408,12 @@ cdef class YtStoreWrapper2:
         TYtStore2.ModifyTablesState(c_proxy, c_data_dir, options)
 
     @staticmethod
-    def mount(proxy: str, data_dir: str, token: str | None):
-        YtStoreWrapper2._change_state(proxy, data_dir, ModifyTablesStateAction.MOUNT, token)
+    def mount(proxy: str, data_dir: str, token: str | None = None):
+        YtStore2Impl._change_state(proxy, data_dir, ModifyTablesStateAction.MOUNT, token)
 
     @staticmethod
-    def unmount(proxy: str, data_dir: str, token: str | None):
-        YtStoreWrapper2._change_state(proxy, data_dir, ModifyTablesStateAction.UNMOUNT, token)
+    def unmount(proxy: str, data_dir: str, token: str | None = None):
+        YtStore2Impl._change_state(proxy, data_dir, ModifyTablesStateAction.UNMOUNT, token)
 
     @staticmethod
     def setup_replica(
@@ -418,3 +462,36 @@ cdef class YtStoreWrapper2:
             options.Token = token.encode()
         options.Action = ModifyReplicaAction.REMOVE
         TYtStore2.ModifyReplica(c_proxy, c_data_dir, c_replica_proxy, c_replica_data_dir, options)
+
+    @staticmethod
+    cdef TDuration _as_duration(float seconds):
+        return TDuration.MicroSeconds(int(seconds * 1_000_000))
+
+    def _on_disable_callback(self, err_type, msg):
+        labels = {
+            "error_type": err_type,
+            "yt_proxy": self._proxy,
+            "yt_dir": self._data_dir,
+            "is_heater": self._is_heater,
+        }
+
+        try:
+            import app_ctx
+
+            if hasattr(app_ctx, 'metrics_reporter'):
+                app_ctx.metrics_reporter.report_metric(
+                    core_monitoring.MetricNames.YT_CACHE_ERROR,
+                    labels=labels,
+                    urgent=True,
+                    report_type=report.ReportTypes.YT_CACHE_METRICS,
+                )
+        except Exception:
+            logger.debug('Failed to report yt cache error metric to snowden', exc_info=True)
+
+        labels['error'] = msg
+        labels['user'] = core_config.get_user()
+
+        report.telemetry.report(
+            report.ReportTypes.YT_CACHE_ERROR,
+            labels,
+        )

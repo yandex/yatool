@@ -1,4 +1,3 @@
-import enum
 import json
 import logging
 import os
@@ -658,17 +657,14 @@ class YndexerYtStore(YtStore):
         )
 
 
-class YtStore2(DistStore):
-    class CritLevel(enum.StrEnum):
-        GET = enum.auto()
-        PUT = enum.auto()
-
+class YtStore2(DistStore, xx_client.YtStore2Impl):
     def __init__(
         self,
         proxy: str,
         data_dir: str,
         token: str | None = None,
         readonly=True,
+        check_size=False,
         max_cache_size: str | int | None = None,
         ttl: int | None = None,
         name_re_ttls: dict[str, int] | None = None,
@@ -682,9 +678,11 @@ class YtStore2(DistStore):
         init_timeout: float | None = None,
         prepare_timeout: float | None = None,
         crit_level: str | None = None,
+        stager: tp.Any | None = None,
         **kwargs
     ):
-        super().__init__(
+        DistStore.__init__(
+            self,
             name='yt-store',
             stats_name='yt_store_stats',
             tag='YT',
@@ -692,163 +690,28 @@ class YtStore2(DistStore):
             max_file_size=max_file_size,
             fits_filter=fits_filter,
         )
-        self._proxy = proxy
-        self._ttl = ttl
-        self._probe_before_put = probe_before_put
-        self._probe_before_put_min_size = probe_before_put_min_size
-        self._data_dir = data_dir
-        self._time_to_first_recv_meta = None
-        self._time_to_first_call_has = None
-        self._crit_level = self.CritLevel(crit_level.upper()) if crit_level is not None else None
-
-        self._client = xx_client.YtStoreWrapper2(
+        xx_client.YtStore2Impl.__init__(
+            self,
             proxy,
             data_dir,
             token=token,
-            on_disable=self._on_disable_callback,
             readonly=readonly,
+            check_size=check_size,
             max_cache_size=max_cache_size,
             ttl_hours=ttl if ttl else None,
             name_re_ttls=name_re_ttls,
             operation_pool=operation_pool,
             retry_time_limit=retry_time_limit,
             sync_durability=sync_durability,
-            # TODO (YA-2800)
-            # init_timeout=init_timeout,
-            # prepare_timeout=prepare_timeout
+            init_timeout=init_timeout,
+            prepare_timeout=prepare_timeout,
+            probe_before_put=probe_before_put,
+            probe_before_put_min_size=probe_before_put_min_size,
+            crit_level=crit_level,
         )
-
-        if self._crit_level is not None:
-            self._client.wait_initialized()
-
-        self._stager = kwargs.get("stager", utils.DummyStager())
-
-    @property
-    def is_disabled(self):
-        return self._client.disabled()
-
-    def _on_disable_callback(self, err_type, msg):
-        if self._crit_level is not None or len(msg) <= 100:
-            logger.warning("Disabling dist cache. Last caught error: %s", msg)
-        else:
-            logger.warning(
-                "Disabling dist cache. Last caught error: %s...<Truncated. Complete message will be available in debug logs>",
-                msg[:100],
-            )
-            logger.debug("Disabling dist cache. Last caught error: %s", msg)
-
-        labels = {
-            "error_type": err_type,
-            "yt_proxy": self._proxy,
-            "yt_dir": self._data_dir,
-            "is_heater": self._crit_level == self.CritLevel.PUT,
-        }
-
-        try:
-            import app_ctx
-
-            if hasattr(app_ctx, 'metrics_reporter'):
-                app_ctx.metrics_reporter.report_metric(
-                    core_monitoring.MetricNames.YT_CACHE_ERROR,
-                    labels=labels,
-                    urgent=True,
-                    report_type=report.ReportTypes.YT_CACHE_METRICS,
-                )
-        except Exception:
-            logger.debug('Failed to report yt cache error metric to snowden', exc_info=True)
-            pass
-
-        labels['error'] = msg
-        labels['user'] = core_config.get_user()
-
-        report.telemetry.report(
-            report.ReportTypes.YT_CACHE_ERROR,
-            labels,
-        )
-
-    def strip(self):
-        self._client.strip()
-
-    def data_gc(
-        self,
-        data_size_per_job: int | None = None,
-        data_size_per_key_range: int | None = None,
-    ) -> None:
-        self._client.data_gc(data_size_per_job, data_size_per_key_range)
-
-    @staticmethod
-    def validate_regexp(re_str: str) -> None:
-        """Check C++ regexp syntax (it may differ from the python one)"""
-        xx_client.YtStoreWrapper2.validate_regexp(re_str)
-
-    @staticmethod
-    def create_tables(
-        proxy: str,
-        data_dir: str,
-        version: int,
-        token: str | None = None,
-        replicated: bool = False,
-        tracked: bool = False,
-        in_memory: bool = False,
-        mount: bool = False,
-        ignore_existing: bool = False,
-        metadata_tablet_count: int | None = None,
-        data_tablet_count: int | None = None,
-    ):
-        xx_client.YtStoreWrapper2.create_tables(
-            proxy,
-            data_dir,
-            version,
-            token=token,
-            replicated=replicated,
-            tracked=tracked,
-            in_memory=in_memory,
-            mount=mount,
-            ignore_existing=ignore_existing,
-            metadata_tablet_count=metadata_tablet_count,
-            data_tablet_count=data_tablet_count,
-        )
-
-    @staticmethod
-    def mount(proxy: str, data_dir: str, token: str | None = None):
-        xx_client.YtStoreWrapper2.mount(proxy, data_dir, token=token)
-
-    @staticmethod
-    def unmount(proxy: str, data_dir: str, token: str | None = None):
-        xx_client.YtStoreWrapper2.unmount(proxy, data_dir, token=token)
-
-    @staticmethod
-    def setup_replica(
-        proxy: str,
-        data_dir: str,
-        replica_proxy: str,
-        replica_data_dir: str,
-        token: str | None = None,
-        replica_sync_mode: bool | None = None,
-        enable: bool | None = None,
-    ):
-        xx_client.YtStoreWrapper2.setup_replica(
-            proxy,
-            data_dir,
-            replica_proxy,
-            replica_data_dir,
-            token=token,
-            replica_sync_mode=replica_sync_mode,
-            enable=enable,
-        )
-
-    @staticmethod
-    def remove_replica(
-        proxy: str,
-        data_dir: str,
-        replica_proxy: str,
-        replica_data_dir: str,
-        token: str | None = None,
-    ):
-        xx_client.YtStoreWrapper2.remove_replica(
-            proxy,
-            data_dir,
-            replica_proxy,
-            replica_data_dir,
-            token=token,
-        )
+        self._proxy = proxy
+        self._data_dir = data_dir
+        self._time_to_first_recv_meta = None
+        self._time_to_first_call_has = None
+        self._is_heater = crit_level == "put"
+        self._stager = stager or utils.DummyStager()

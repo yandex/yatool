@@ -49,18 +49,30 @@ namespace NYa {
         TString Token{};
     };
 
+    enum class ECritLevel {
+        NONE,
+        GET,
+        PUT
+    };
+
     using TMaxCacheSize = std::variant<size_t, double>;
     struct TYtStore2Options : public TYtTokenOption {
         TYtStore2Options() = default;
 
         bool ReadOnly{true};
         void* OnDisable{};
+        bool CheckSize{};
         TMaxCacheSize MaxCacheSize{0u};
         TDuration Ttl{};
         TVector<TNameReTtl> NameReTtls{};
         TString OperationPool{};
         TDuration RetryTimeLimit{};
         bool SyncDurability{};
+        TDuration InitTimeout{};
+        TDuration PrepareTimeout{};
+        bool ProbeBeforePut{};
+        size_t ProbeBeforePutMinSize{};
+        ECritLevel CritLevel{ECritLevel::NONE};
     };
 
     struct TYtStoreError : public yexception {
@@ -120,6 +132,7 @@ namespace NYa {
 
         void WaitInitialized();
         bool Disabled() const;
+        bool ReadOnly() const;
         void Strip();
         void DataGc(const TDataGcOptions& options);
 

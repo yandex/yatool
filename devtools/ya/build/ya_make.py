@@ -422,6 +422,7 @@ class CacheFactory:
                 init_timeout=self._opts.yt_store_init_timeout,
                 prepare_timeout=self._opts.yt_store_prepare_timeout,
                 crit_level=self._opts.yt_store_crit,
+                check_size=not self._opts.yt_readonly and bool(self._opts.yt_max_cache_size),
             )
         else:
             # These options will be deleted after migration to YtStore2

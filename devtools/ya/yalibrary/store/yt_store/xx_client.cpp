@@ -675,13 +675,17 @@ namespace NYa {
     public:
         TImpl(const TString& proxy, const TString& dataDir, const TYtStore2Options& options)
             : Token_{options.Token}
-            , ReadOnly_(options.ReadOnly)
+            , ReadOnly_{options.ReadOnly}
             , OnDisable_{options.OnDisable}
+            , CheckSize_{options.CheckSize}
             , MaxCacheSize_{options.MaxCacheSize}
-            , Ttl_(options.Ttl)
+            , Ttl_{options.Ttl}
             , NameReTtls_{options.NameReTtls}
             , OperationPool_{options.OperationPool}
             , Durability_{options.SyncDurability ? NYT::EDurability::Sync : NYT::EDurability::Async}
+            , ProbeBeforePut_{options.ProbeBeforePut}
+            , ProbeBeforePutMinSize_{options.ProbeBeforePutMinSize}
+            , CritLevel_{options.CritLevel}
         {
             InitializeLogger();
             MainCluster_ = {.Proxy = proxy, .DataDir = dataDir, .Client = ConnectToCluster(proxy)};
@@ -693,6 +697,7 @@ namespace NYa {
                 ValidateRegexp(item.NameRe);
             }
 
+            TDuration initTimeout{};
             if (options.RetryTimeLimit) {
                 RetryPolicy_ = TRetryPolicy::GetExponentialBackoffPolicy(
                     [](const yexception&) {return ERetryErrorClass::ShortRetry;},
@@ -703,6 +708,9 @@ namespace NYa {
                     options.RetryTimeLimit,
                     RETRY_SCALE_FACTOR
                 );
+                TDuration defaultTimeout = options.RetryTimeLimit + TDuration::Seconds(1);
+                initTimeout = options.InitTimeout ? options.InitTimeout : defaultTimeout;
+                PrepareTimeout_ = options.PrepareTimeout ? options.PrepareTimeout : defaultTimeout;
             } else {
                 RetryPolicy_ = TRetryPolicy::GetExponentialBackoffPolicy(
                     [](const yexception&) {return ERetryErrorClass::ShortRetry;},
@@ -713,24 +721,39 @@ namespace NYa {
                     TDuration::Max(),
                     RETRY_SCALE_FACTOR
                 );
+                initTimeout = options.InitTimeout ? options.InitTimeout : DEFAULT_INIT_TIMEOUT;
+                PrepareTimeout_ = options.PrepareTimeout ? options.PrepareTimeout : DEFAULT_PREPARE_TIMEOUT;
             }
+
             auto initializePromise = NThreading::NewPromise<void>();
             InitializeFuture_ = initializePromise.GetFuture();
+            InitializeDeadline_ = TInstant::Now() + initTimeout;
             ThreadPool_.SafeAddFunc([this, initializePromise] {
                 TThread::SetCurrentThreadName("YtStore::Initialize");
                 Initialize(initializePromise);
             });
+            if (CritLevel_ != ECritLevel::NONE) {
+                WaitInitialized();
+            }
         }
 
         ~TImpl() = default;
 
         void WaitInitialized() {
+            if (!InitializeFuture_.Wait(InitializeDeadline_)) {
+                ythrow TYtStoreError() << "Initialization timed out";
+            }
             InitializeFuture_.GetValueSync();
         }
 
-        // NOTE: Called with GIL.
+        // NOTE: Called with GIL
         bool Disabled() const noexcept {
             return Disabled_.load(std::memory_order::relaxed);
+        }
+
+        // NOTE: Called with GIL
+        bool ReadOnly() const noexcept {
+            return ReadOnly_.load(std::memory_order::relaxed);
         }
 
         void Strip() {
@@ -1180,9 +1203,9 @@ namespace NYa {
                     ythrow TYtStoreError::Muted() << "Table '" << mainTable << "' must be a replicated table";
                 }
 
-                for(const auto& [id, info] : mainAttrs.ChildAsMap("replicas")) {
-                    if (info.ChildAsString("cluster_name") == replicaProxy && info.ChildAsString("replica_path") == replicaTable) {
-                        existingReplicas[mainTable] = GetGuid(id);
+                for (const TRawReplicaInfo& info : ParseReplicasAttr(mainAttrs.At("replicas"))) {
+                    if (info.ClusterName == replicaProxy && info.ReplicaPath == replicaTable) {
+                        existingReplicas[mainTable] = info.Id;
                         break;
                     }
                 }
@@ -1248,6 +1271,8 @@ namespace NYa {
         static constexpr TDuration DATA_GC_MIN_AGE = TDuration::Hours(2);
         static constexpr ui64 DEFAULT_METADATA_TABLET_COUNT = 128;
         static constexpr ui64 DEFAULT_DATA_TABLET_COUNT = 256;
+        static constexpr TDuration DEFAULT_INIT_TIMEOUT = TDuration::Seconds(2);
+        static constexpr TDuration DEFAULT_PREPARE_TIMEOUT = TDuration::Seconds(5);
 
         using TRetryPolicy = IRetryPolicy<const yexception&>;
         using TRetryPolicyPtr = TRetryPolicy::TPtr;
@@ -1278,6 +1303,27 @@ namespace NYa {
 
             NYT::TReadRange AsReadRange() const {
                 return NYT::TReadRange::FromKeys(NYT::TNode(Begin), NYT::TNode(End));
+            }
+        };
+
+        struct TRawReplicaInfo {
+            TGUID Id;
+            TString ClusterName{};
+            NYT::TYPath ReplicaPath{};
+            TString State{};
+            TString Mode{};
+            TDuration Lag{};
+
+            TYPath GetDataDir() const {
+                return TYPath{TStringBuf{ReplicaPath}.RSplitOff('/')};
+            }
+
+            bool Enabled() const {
+                return State == "enabled";
+            }
+
+            bool Sync() const {
+                return Mode == "sync";
             }
         };
 
@@ -1324,6 +1370,21 @@ namespace NYa {
             return CreateClient(proxy, options);
         }
 
+        static inline TVector<TRawReplicaInfo> ParseReplicasAttr(const NYT::TNode& replicasAttr) {
+            TVector<TRawReplicaInfo> replicas{};
+            for (const auto& [id, replicaAttr] : replicasAttr.AsMap()) {
+                TRawReplicaInfo replica;
+                replica.Id = GetGuid(id);
+                replica.ClusterName = replicaAttr.ChildAsString("cluster_name");
+                replica.ReplicaPath = replicaAttr.ChildAsString("replica_path");
+                replica.State = replicaAttr.ChildAsString("state");
+                replica.Mode = replicaAttr.ChildAsString("mode");
+                replica.Lag = TDuration::MilliSeconds(replicaAttr.ChildAsInt64("replication_lag_time"));
+                replicas.push_back(std::move(replica));
+            }
+            return replicas;
+        }
+
         template <class TOpts>
         requires (std::is_base_of_v<TTabletTransactionOptions<TOpts>, TOpts>)
         TOpts MakeTransactionOpts() {
@@ -1339,56 +1400,92 @@ namespace NYa {
 
         void Disable(const yexception& err) {
             bool oldVal = Disabled_.exchange(true, std::memory_order::relaxed);
-            if (!oldVal && OnDisable_) {
-                YaYtStoreDisableHook(OnDisable_, TypeName(err), err.what());
+            if (!oldVal) {
+                if (OnDisable_) {
+                    YaYtStoreDisableHook(OnDisable_, TypeName(err), err.what());
+                }
+                // For any other CritLevel value, the exception is escalated and results in program termination, so the log message is redundant
+                if (CritLevel_ == ECritLevel::NONE) {
+                    TStringBuf message{err.what()};
+                    TString messagePrefix{"Disabling dist cache. Last caught error: "};
+                    if (message.size() > 100) {
+                        WARNING_LOG << messagePrefix << message.SubString(0, 100) << "...<Truncated. Complete message will be available in debug logs>";
+                        DEBUG_LOG << messagePrefix << message;
+                    } else {
+                        WARNING_LOG << messagePrefix << message;
+                    }
+                }
             }
         }
 
         void Configure() {
-            NYT::TNode attrs = RetryUntilDisabled([&]() {
+            NYT::TNode metadataAttrs = RetryUntilDisabled([&]() {
                 auto getOpts = NYT::TGetOptions()
                     .AttributeFilter(TAttributeFilter().Attributes({"type", "schema", "atomicity", "replicas"}))
                     .ReadFrom(EMasterReadKind::Cache);
                 return MainCluster_.Client->Get(NYT::JoinYPaths(MainCluster_.DataDir, METADATA_TABLE, "@"), getOpts);
             });
-            MetadataSchema_ = attrs.At("schema");
-            if (attrs.At("atomicity") == "none") {
+            MetadataSchema_ = metadataAttrs.At("schema");
+            if (metadataAttrs.At("atomicity") == "none") {
                 Atomicity_ = NYT::EAtomicity::None;
             } else {
                 // The async durability is not allowed for the full atomicity
                 Durability_ = NYT::EDurability::Sync;
             }
-            if (attrs.At("type") == "replicated_table") {
+            if (metadataAttrs.At("type") == "replicated_table") {
                 MainCluster_.Replicated = true;
-                for (const auto& [_, replicaInfo] : attrs.At("replicas").AsMap()) {
-                    const TString& clusterName = replicaInfo.ChildAsString("cluster_name");
-                    const TString& tablePath = replicaInfo.ChildAsString("replica_path");
-                    const TString& stateStr = replicaInfo.ChildAsString("state");
-                    const TString& modeStr = replicaInfo.ChildAsString("mode");
-                    const TDuration lag = TDuration::MilliSeconds(replicaInfo.ChildAsInt64("replication_lag_time"));
-                    const TStringBuf dataDir = TStringBuf{tablePath}.RSplitOff('/');
 
-                    bool isGood = stateStr == "enabled";
-                    bool syncReplica = modeStr == "sync";
+                // Read data table replicas
+                NYT::TNode dataRawReplicas = RetryUntilDisabled([&]() {
+                    auto getOpts = NYT::TGetOptions()
+                        .ReadFrom(EMasterReadKind::Cache);
+                    return MainCluster_.Client->Get(NYT::JoinYPaths(MainCluster_.DataDir, DATA_TABLE, "@replicas"), getOpts);
+                });
+                THashMap<std::pair<TString, NYT::TYPath>, TRawReplicaInfo> dataReplicas;
+                for (const TRawReplicaInfo& replicaInfo : ParseReplicasAttr(dataRawReplicas)) {
+                    dataReplicas[std::make_pair(replicaInfo.ClusterName, replicaInfo.GetDataDir())] = replicaInfo;
+                }
 
-                    if (syncReplica) {
+                for (const TRawReplicaInfo& metadataReplicaInfo : ParseReplicasAttr(metadataAttrs.At("replicas"))) {
+                    const TRawReplicaInfo* dataReplicaInfoPtr = dataReplicas.FindPtr(std::make_pair(metadataReplicaInfo.ClusterName, metadataReplicaInfo.GetDataDir()));
+                    if (!dataReplicaInfoPtr) {
+                        TString error = "Inconsistent cache configuration: data table replica not found for "
+                            + metadataReplicaInfo.ClusterName + ":" + metadataReplicaInfo.GetDataDir();
+                        if (ReadOnly()) {
+                            WARNING_LOG << error;
+                            continue;
+                        } else {
+                            ythrow TYtStoreError() << error;
+                        }
+                    }
+
+                    // In the readonly mode we use the lag to get best replica so sync/async mode is not so important as for writers
+                    if (!ReadOnly() && metadataReplicaInfo.Sync() != dataReplicaInfoPtr->Sync()) {
+                        ythrow TYtStoreError() << "Inconsistent cache configuration: metadata and data tables have a different replication mode for "
+                            << metadataReplicaInfo.ClusterName << ":" << metadataReplicaInfo.GetDataDir();
+                    }
+
+                    bool isGood = metadataReplicaInfo.Enabled() && dataReplicaInfoPtr->Enabled();
+                    TDuration lag = Max(metadataReplicaInfo.Lag, dataReplicaInfoPtr->Lag);
+
+                    if (metadataReplicaInfo.Sync()) {
                         // if we have at least one sync replica force to use it
                         RequireSyncReplica_ = true;
                     }
 
                     DEBUG_LOG << (isGood ? "Use" : "Ignore disabled") << " replica: " <<
-                        "proxy=" << clusterName <<
-                        ", dir=" << dataDir <<
-                        ", state=" << stateStr <<
-                        ", mode=" <<  modeStr <<
-                        ", lag=" << lag.SecondsFloat();
+                        "proxy=" << metadataReplicaInfo.ClusterName <<
+                        ", dir=" << metadataReplicaInfo.GetDataDir() <<
+                        ", state=" << metadataReplicaInfo.State <<
+                        ", mode=" <<  metadataReplicaInfo.Mode <<
+                        ", lag=" << lag;
 
                     if (isGood) {
                         Replicas_.push_back({
-                            .Proxy = clusterName,
-                            .DataDir = NYT::TYPath{dataDir},
-                            .Client = ConnectToCluster(clusterName),
-                            .Sync = syncReplica,
+                            .Proxy = metadataReplicaInfo.ClusterName,
+                            .DataDir = metadataReplicaInfo.GetDataDir(),
+                            .Client = ConnectToCluster(metadataReplicaInfo.ClusterName),
+                            .Sync = metadataReplicaInfo.Sync(),
                             .Lag = lag
                         });
                     }
@@ -1400,7 +1497,38 @@ namespace NYa {
         }
 
         void Check() {
-            // TODO Check cache availability to fail early
+            if (!MainCluster_.Replicated || RequireSyncReplica_ && !ReadOnly()) {
+                // Check important tables availability
+                for (const NYT::TYPath& table : {METADATA_TABLE, DATA_TABLE}) {
+                    TString query = "1 from [" + NYT::JoinYPaths(MainCluster_.DataDir, table) + "] limit 1";
+                    RetryUntilDisabled([&] {
+                        MainCluster_.Client->SelectRows(query);
+                    });
+                }
+            }
+            if (!ReadOnly() && CheckSize_) {
+                NYT::IClientPtr client{};
+                NYT::TYPath dataDir{};
+                if (MainCluster_.Replicated) {
+                    TReplica& bestReplica = GetBestReplica();
+                    client = bestReplica.Client;
+                    dataDir = bestReplica.DataDir;
+                } else {
+                    client = MainCluster_.Client;
+                    dataDir = MainCluster_.DataDir;
+                }
+                if (size_t maxSize = GetMaxCacheSize(client, dataDir)) {
+                    size_t currentSize = GetTablesSize(client, dataDir);
+                    if (maxSize < currentSize) {
+                        if (CritLevel_ == ECritLevel::PUT) {
+                            ythrow TYtStoreError() << "Cache size (" << currentSize << ") exceeds limit of " << maxSize;
+                        } else {
+                            WARNING_LOG << "Cache size (" << currentSize << ") exceeds limit of " << maxSize << " bytes, switch to readonly mode";
+                            ReadOnly_ = true;
+                        }
+                    }
+                }
+            }
         }
 
         void Initialize(NThreading::TPromise<void> promise) {
@@ -1414,23 +1542,28 @@ namespace NYa {
             }
         }
 
+        TReplica& GetBestReplica() {
+            Y_ENSURE(MainCluster_.Replicated);
+            TDuration minLag = TDuration::Max();
+            TReplica* bestReplica{};
+            for (TReplica& r : Replicas_) {
+                if (r.Sync) {
+                    return r;
+                }
+                if (r.Lag < minLag) {
+                    minLag = r.Lag;
+                    bestReplica = &r;
+                }
+            }
+            return *bestReplica;
+        }
+
         std::pair<IClientPtr, TYPath> GetOpCluster() {
             if (MainCluster_.Replicated) {
-                TDuration minLag = TDuration::Max();
-                const TReplica* bestReplica{};
-                for (const TReplica& r : Replicas_) {
-                    if (r.Sync) {
-                        bestReplica = &r;
-                        break;
-                    }
-                    if (r.Lag < minLag) {
-                        minLag = r.Lag;
-                        bestReplica = &r;
-                    }
-                }
-                DEBUG_LOG << "Operation replica: " << bestReplica->Proxy << ":" << bestReplica->DataDir;
+                const TReplica& bestReplica = GetBestReplica();
+                DEBUG_LOG << "Operation replica: " << bestReplica.Proxy << ":" << bestReplica.DataDir;
                 // Note: for operations we use separate client with default retry policy
-                return std::make_pair(ConnectToCluster(bestReplica->Proxy, true), bestReplica->DataDir);
+                return std::make_pair(ConnectToCluster(bestReplica.Proxy, true), bestReplica.DataDir);
             } else {
                 // Note: for operations we use separate client with default retry policy
                 return std::make_pair(ConnectToCluster(MainCluster_.Proxy, true), MainCluster_.DataDir);
@@ -1456,13 +1589,13 @@ namespace NYa {
         }
 
         size_t GetMaxCacheSize(IClientPtr client, const TYPath& dataDir) {
-            if (std::holds_alternative<size_t>(MaxCacheSize_)) {
-                return std::get<size_t>(MaxCacheSize_);
+            if (std::holds_alternative<double>(MaxCacheSize_)) {
+                auto perc = std::get<double>(MaxCacheSize_);
+                Y_ENSURE(perc > 0 && perc <= 100, "Wrong max cache size value");
+                size_t quotaSize = GetQuotaSize(client, dataDir);
+                MaxCacheSize_ = static_cast<size_t>(quotaSize * perc / 100);
             }
-            auto perc = std::get<double>(MaxCacheSize_);
-            Y_ENSURE(perc > 0 && perc <= 100, "Wrong max cache size value");
-            size_t quotaSize = GetQuotaSize(client, dataDir);
-            return quotaSize * perc / 100;
+            return std::get<size_t>(MaxCacheSize_);
         }
 
         size_t GetTablesSize(IClientPtr client, const TYPath& dataDir) {
@@ -1597,19 +1730,26 @@ namespace NYa {
         TMainCluster MainCluster_{};
         TVector<TReplica> Replicas_{};
         TString Token_;
-        bool ReadOnly_;
+        std::atomic_bool ReadOnly_;
         void* OnDisable_;
+        bool CheckSize_;
         TMaxCacheSize MaxCacheSize_;
         TDuration Ttl_;
         TVector<TNameReTtl> NameReTtls_;
         TString OperationPool_;
         NYT::EDurability Durability_;
+        TDuration PrepareTimeout_;
+        // TODO (YA-2800) remove maybe_unused later
+        [[maybe_unused]] bool ProbeBeforePut_;
+        [[maybe_unused]] size_t ProbeBeforePutMinSize_;
+        ECritLevel CritLevel_;
         NYT::EAtomicity Atomicity_{NYT::EAtomicity::Full};
         bool RequireSyncReplica_{false};
 
         std::atomic_bool Disabled_{};
         TAdaptiveThreadPool ThreadPool_{};
         NThreading::TFuture<void> InitializeFuture_{};
+        TInstant InitializeDeadline_{};
         TRetryPolicyPtr RetryPolicy_;
         NYT::TNode MetadataSchema_{};
     };
@@ -1626,6 +1766,10 @@ namespace NYa {
 
     bool TYtStore2::Disabled() const {
         return Impl_->Disabled();
+    }
+
+    bool TYtStore2::ReadOnly() const {
+        return Impl_->ReadOnly();
     }
 
     void TYtStore2::Strip() {
