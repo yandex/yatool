@@ -68,6 +68,7 @@ def create_package(
     target,
     docker_secret,
     docker_use_buildx,
+    docker_pull,
     labels=None,
 ):
     package_name = package_context.package_name
@@ -82,6 +83,9 @@ def create_package(
 
     if docker_no_cache:
         build_command += ['--no-cache']
+
+    if docker_pull:
+        build_command += ['--pull']
 
     if add_host:
         build_command += ["--add-host={}".format(x) for x in add_host]

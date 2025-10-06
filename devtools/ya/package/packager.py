@@ -960,6 +960,7 @@ def create_package(package_context, output_root, builds):
                     params.docker_target,
                     params.docker_secrets,
                     params.docker_use_buildx,
+                    params.docker_pull,
                     package_context.context,
                 )
                 package_context.set_context("docker_image", info.image_tag)

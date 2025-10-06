@@ -33,6 +33,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.debian_upload_token = None  # please, do not remove, we really need it in opensource nebius ya
         self.debian_force_bad_version = False
         self.docker_no_cache = False
+        self.docker_pull = False
         self.docker_push_image = False
         self.docker_remote_image_version = None
         self.docker_use_remote_cache = False
@@ -255,6 +256,14 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 subgroup=DOCKER_SUBGROUP,
             ),
             devtools.ya.core.yarg.ConfigConsumer("docker_no_cache"),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-pull'],
+                help='Always attempt to pull all referenced Docker images',
+                hook=devtools.ya.core.yarg.SetConstValueHook('docker_pull', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer("docker_pull"),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--dump-build-targets'],
                 hook=devtools.ya.core.yarg.SetValueHook('dump_build_targets'),
