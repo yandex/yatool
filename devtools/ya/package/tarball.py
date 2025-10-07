@@ -17,6 +17,7 @@ def create_tarball_package(
     threads=None,
     compression_filter=None,
     compression_level=None,
+    stable_archive=False,
 ):
     archive_file = package_filename
 
@@ -40,7 +41,13 @@ def create_tarball_package(
                 )
         else:
             compression_filter, compression_level = None, None
-        exts.archive.create_tar(package_dir, tar_archive, compression_filter, compression_level, fixed_mtime=None)
+        exts.archive.create_tar(
+            package_dir,
+            tar_archive,
+            compression_filter,
+            compression_level,
+            fixed_mtime=0 if stable_archive else None,
+        )
 
         if codec:
             uc_archive_path = archive_file + ".uc." + codec

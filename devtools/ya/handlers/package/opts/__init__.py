@@ -378,6 +378,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.compress_archive = True
         self.compression_filter = None
         self.compression_level = None
+        self.stable_archive = False
         self.create_dbg = False
         self.custom_version = None
         self.debian_arch = None
@@ -485,6 +486,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 ["--compression-filter"],
                 help="Specifies compression filter (gzip/zstd)",
                 hook=devtools.ya.core.yarg.SetValueHook('compression_filter'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=TAR_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--stable-archive'],
+                help='Make a stable archive (fix mtime, perform sorting)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('stable_archive', True),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=TAR_SUBGROUP,
             ),

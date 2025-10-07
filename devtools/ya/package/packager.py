@@ -758,6 +758,7 @@ def create_package(package_context, output_root, builds):
                         threads=params.build_threads,
                         compression_filter=params.compression_filter,
                         compression_level=params.compression_level,
+                        stable_archive=params.stable_archive,
                     )
                     stage_finished("create_tarball_package")
 
@@ -776,6 +777,7 @@ def create_package(package_context, output_root, builds):
                         threads=params.build_threads,
                         compression_filter=params.compression_filter,
                         compression_level=params.compression_level,
+                        stable_archive=params.stable_archive,
                     )
                     stage_finished("create_tarball_package-dbg")
 
