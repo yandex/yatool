@@ -95,7 +95,7 @@
 #endif
 //
 // If we have the SD6 macros (check for C++11's __cpp_rvalue_references), and we don't have __cpp_noexcept_function_type
-// set, then don't treat noexcept functions as seperate types.  This is a fix for msvc with the /Zc:noexceptTypes- flag set.
+// set, then don't treat noexcept functions as separate types.  This is a fix for msvc with the /Zc:noexceptTypes- flag set.
 //
 #if defined(__cpp_rvalue_references) && !defined(__cpp_noexcept_function_type) && !defined(BOOST_TT_NO_NOEXCEPT_SEPARATE_TYPE)
 #  define BOOST_TT_NO_NOEXCEPT_SEPARATE_TYPE
