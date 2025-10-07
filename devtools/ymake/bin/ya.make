@@ -1,11 +1,7 @@
 PROGRAM(ymake)
 
-IF (OS_CYGWIN)
-    ALLOCATOR(SYSTEM)
-# FIXME: disable for now since it has unclear stability and performance impact
-# -------------------
-# ELSEIF (OS_LINUX)
-#    ALLOCATOR(TCMALLOC_256K)
+IF (OS_LINUX)
+    ALLOCATOR(TCMALLOC_TC)
 ELSEIF (NOT OS_DARWIN)
     ALLOCATOR(GOOGLE)
 ENDIF()

@@ -3,6 +3,7 @@ LIBRARY()
 USE_PYTHON3()
 
 PEERDIR(
+    library/cpp/yt/mlock
     contrib/libs/asio
     contrib/libs/yaml-cpp
     contrib/libs/fmt

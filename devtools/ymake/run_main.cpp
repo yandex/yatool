@@ -16,6 +16,7 @@
 #include <library/cpp/getopt/small/last_getopt.h>
 #include <library/cpp/iterator/enumerate.h>
 #include <library/cpp/sighandler/async_signals_handler.h>
+#include <library/cpp/yt/mlock/mlock.h>
 
 #include <util/generic/algorithm.h>
 #include <util/generic/queue.h>
@@ -282,9 +283,7 @@ int YMakeMain(int argc, char** argv) {
         threads = configs.size() + 1;
     }
 
-    try {
-        LockAllMemory(LockCurrentMemory);
-    } catch (const yexception&) {
+    if (!NYT::MlockFileMappings()) {
         MLOCK_FAILED = true;
     }
 
