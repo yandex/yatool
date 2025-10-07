@@ -284,8 +284,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         convertNamedArgs && blockData && blockData->CmdProps ? blockData->CmdProps.get() : nullptr,
         argNames,
         tempArgs,
-        ownVars,
-        *Conf->GetStringPool()
+        ownVars
     ).or_else([&](const TMapMacroVarsErr& err) -> std::expected<void, TMapMacroVarsErr> {
         err.Report(macroName, prepArgs);
         throw yexception() << "MapMacroVars failed" << Endl;

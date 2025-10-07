@@ -134,6 +134,128 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
     return {};
 }
 
+TStringBuf GetVararg(const TCmdProperty& props) noexcept {
+    // TODO(YMAKE-1656): props.GetNumUsrArgs() != 0 should be used here after fixing the bug inside GetNumUsrArgs.
+    const bool hasPositionalArgs = !props.ArgNames().empty() && props.ArgNames().size() != props.GetKeyArgsNum();
+    if (!hasPositionalArgs || !props.ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX))
+        return {};
+
+    TStringBuf res{props.ArgNames().back()};
+    res.remove_suffix(3);
+    return res;
+}
+
+template<std::convertible_to<TStringBuf> TStr>
+TStringBuf TakeArg(std::span<const TStr>& args) noexcept {
+    if (args.empty())
+        return  {};
+    TStringBuf res = args.front();
+    args = args.subspan(1);
+    return res;
+}
+
+void VarAppend(TYVar& var, TStringBuf val) {
+    var.push_back(TVarStr(val, false, false));
+    if (IsPropertyVarName(var.back().Name)) {
+        var.back().IsMacro = true;
+    }
+}
+
+void VarAppend(TYVar& var, std::span<const TStringBuf> vals) {
+    for (auto val: vals)
+        VarAppend(var, val);
+}
+
+void VarAppend(TYVar& var, std::span<const TString> vals) {
+    for (auto val: vals)
+        VarAppend(var, val);
+}
+
+class TKWArgs {
+public:
+    static std::pair<std::span<const TStringBuf>, TKWArgs> Find(const TCmdProperty &props, std::span<const TStringBuf> args) {
+        TKWArgs tail{props, args};
+        const auto nonKw = tail.TakeUntilKeyword();
+        return {nonKw, tail};
+    }
+
+    struct TKeywordVals {
+        const TKeyword& Kw;
+        std::span<const TStringBuf> Args;
+    };
+    std::optional<TKeywordVals> TakeNext() {
+        if (!NextKW_)
+            return std::nullopt;
+        auto* lastKw = NextKW_;
+        return TKeywordVals{*lastKw, TakeUntilKeyword()};
+    }
+
+    TStringBuf KeywordName(const TKeyword& kw) const {
+        return Props_->GetKeyword(kw.Pos);
+    }
+
+private:
+    TKWArgs(const TCmdProperty& props, std::span<const TStringBuf> args)
+        : RemainingArgs_{args}
+        , Props_{&props}
+    {}
+
+    std::span<const TStringBuf> TakeUntilKeyword() {
+        for (size_t i = 0; i < RemainingArgs_.size(); ++i) {
+            if (NextKW_ = Props_->GetKeywordData(RemainingArgs_[i])) {
+                const auto res = RemainingArgs_.subspan(0, i);
+                RemainingArgs_ = RemainingArgs_.subspan(i + 1);
+                return res;
+            }
+        }
+        NextKW_ = nullptr;
+        return std::exchange(RemainingArgs_, {});
+    }
+
+private:
+    std::span<const TStringBuf> RemainingArgs_;
+    const TKeyword* NextKW_ = nullptr;
+    const TCmdProperty* Props_ = nullptr;
+};
+
+TMapMacroVarsResult ConsumePositionals(
+    std::span<const TStringBuf> args,
+    std::span<const TString>& unsetScalars,
+    TStringBuf vararg,
+    TVars& locals
+) {
+    while (!unsetScalars.empty()) {
+        if (args.empty())
+            return {};
+
+        const auto scalar = TakeArg(unsetScalars);
+        const auto arg = TakeArg(args);
+        VarAppend(locals[scalar], arg);
+    }
+
+    if (args.empty())
+        return {};
+    if (vararg.empty()) {
+        return std::unexpected(TMapMacroVarsErr{
+            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
+            .Message = fmt::format("More positional arguments passed then expected. Can't handle args '{}'", fmt::join(args, ", "))
+        });
+    }
+    VarAppend(locals[vararg], args);
+    return {};
+}
+
+void SetDefaultsForMissingKw(const TCmdProperty& props, TVars& locals) {
+    for (const auto& [key, kw]: props.GetKeywords()) {
+        if (!locals.Contains(key)) {
+            if (!kw.OnKwMissing.empty())
+                VarAppend(locals[key], kw.OnKwMissing);
+            else
+                VarAppend(locals[key], std::span<const TStringBuf>{});
+        }
+    }
+}
+
 }
 
 void TMapMacroVarsErr::Report(TStringBuf macroName, TStringBuf argsStr) const {
@@ -142,27 +264,90 @@ void TMapMacroVarsErr::Report(TStringBuf macroName, TStringBuf argsStr) const {
     YConfErr(Syntax) << what << Endl;
 }
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty* prop, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals, IMemoryPool& memPool) {
-    if (prop && prop->IsNonPositional()) {
-        ConvertArgsToPositionalArrays(*prop, args, memPool);
+TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty& props, TArrayRef<const TStringBuf> args, TVars& locals) {
+    TMapMacroVarsResult res;
+
+    const TStringBuf vararg = GetVararg(props);
+    auto positionalScalars = std::span{props.ArgNames()}.subspan(props.GetKeyArgsNum());
+    if (!vararg.empty())
+        positionalScalars = positionalScalars.subspan(0, positionalScalars.size() - 1);
+
+    auto [frontPosArgs, kwArgs] = TKWArgs::Find(props, args);
+    res = ConsumePositionals(frontPosArgs, positionalScalars, vararg, locals);
+    if (!res)
+        return res;
+    TStringBuf lastArr = {};
+    while (auto kwVal = kwArgs.TakeNext()) {
+        if (kwVal->Args.size() < kwVal->Kw.From) {
+            return std::unexpected(TMapMacroVarsErr{
+                .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
+                .Message = fmt::format(
+                    "Keyword {} requires from {} to {} arguments but got '{}'",
+                    kwArgs.KeywordName(kwVal->Kw),
+                    kwVal->Kw.From,
+                    kwVal->Kw.To,
+                    fmt::join(kwVal->Args, ", ")
+                )
+            });
+        }
+
+        const bool isArr = kwVal->Kw.To > 1;
+
+        // TODO(svidyuk) better deduplication please!!!
+        if (!isArr && locals.contains(kwArgs.KeywordName(kwVal->Kw))) {
+            return std::unexpected(TMapMacroVarsErr{
+                .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
+                .Message = fmt::format(
+                    "Keyword {} appears more than once and is not an array",
+                    kwArgs.KeywordName(kwVal->Kw)
+                )
+            });
+        }
+        if (isArr)
+            lastArr = kwArgs.KeywordName(kwVal->Kw);
+
+        if (kwVal->Args.size() > kwVal->Kw.To) {
+            const auto posArgs = kwVal->Args.subspan(kwVal->Kw.To);
+            if (!lastArr.empty()) {
+                return std::unexpected(TMapMacroVarsErr{
+                    .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
+                    .Message = fmt::format(
+                        "Mixing positional arguments with named arrays is error prone and forbidden.\n"
+                        "Got positional args '{}' after named array {} have been started",
+                        fmt::join(posArgs, ", "),
+                        lastArr
+                    )
+                });
+            }
+            res = ConsumePositionals(posArgs, positionalScalars, vararg, locals);
+            if (!res)
+                return res;
+            kwVal->Args = kwVal->Args.subspan(0, kwVal->Kw.To);
+        }
+
+        if (kwVal->Args.empty() && !kwVal->Kw.OnKwPresent.empty()) {
+            VarAppend(locals[kwArgs.KeywordName(kwVal->Kw)], kwVal->Kw.OnKwPresent);
+        } else
+            VarAppend(locals[kwArgs.KeywordName(kwVal->Kw)], kwVal->Args);
     }
-    return MapMacroVars(args, argNames, locals);
+
+    if (!positionalScalars.empty()) {
+        return std::unexpected(TMapMacroVarsErr{
+            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
+            .Message = fmt::format("Value for '{}' argument is missing", positionalScalars.front())
+        });
+    }
+
+    SetDefaultsForMissingKw(props, locals);
+    if (!vararg.empty() && !locals.contains(vararg))
+        locals[vararg] = {};
+
+    return res;
 }
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty& macroProps, TArrayRef<const TStringBuf> args, TVars& locals, IMemoryPool& memPool) {
-    // Patch incoming args to handle named macro arguments
-    auto pArgs = args;
-    TVector<TStringBuf> tempArgs;
-    if (macroProps.IsNonPositional()) {
-        tempArgs.insert(tempArgs.end(), args.begin(), args.end());
-        ConvertArgsToPositionalArrays(macroProps, tempArgs, memPool);
-        pArgs = tempArgs;
+TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty* prop, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals) {
+    if (prop && prop->IsNonPositional()) {
+        return AddMacroArgsToLocals(*prop, args, locals);
     }
-
-    // Map arguments to local call vars using macro signature
-    if (macroProps.ArgNames().size()) {
-        const TVector<TStringBuf> argNames{macroProps.ArgNames().begin(), macroProps.ArgNames().end()};
-        return MapMacroVars(pArgs, argNames, locals);
-    }
-    return {};
+    return MapMacroVars(args, argNames, locals);
 }
