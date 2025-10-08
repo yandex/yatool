@@ -721,8 +721,23 @@ namespace NYa {
                     TDuration::Max(),
                     RETRY_SCALE_FACTOR
                 );
-                initTimeout = options.InitTimeout ? options.InitTimeout : DEFAULT_INIT_TIMEOUT;
-                PrepareTimeout_ = options.PrepareTimeout ? options.PrepareTimeout : DEFAULT_PREPARE_TIMEOUT;
+
+                // If YtStore is not critical and is used in read-only mode we apply small "interactive" timeouts
+
+                if (options.InitTimeout) {
+                    initTimeout = options.InitTimeout;
+                } else if (ReadOnly() && CritLevel_ == ECritLevel::NONE) {
+                    initTimeout = DEFAULT_INTERACTIVE_INIT_TIMEOUT;
+                } else {
+                    initTimeout = DEFAULT_BG_INIT_TIMEOUT;
+                }
+                if (options.PrepareTimeout) {
+                    PrepareTimeout_ = options.PrepareTimeout;
+                } else if (ReadOnly() && CritLevel_ == ECritLevel::NONE) {
+                    PrepareTimeout_ = DEFAULT_INTERACTIVE_PREPARE_TIMEOUT;
+                } else {
+                    PrepareTimeout_ = DEFAULT_BG_PREPARE_TIMEOUT;
+                }
             }
 
             auto initializePromise = NThreading::NewPromise<void>();
@@ -1271,8 +1286,10 @@ namespace NYa {
         static constexpr TDuration DATA_GC_MIN_AGE = TDuration::Hours(2);
         static constexpr ui64 DEFAULT_METADATA_TABLET_COUNT = 128;
         static constexpr ui64 DEFAULT_DATA_TABLET_COUNT = 256;
-        static constexpr TDuration DEFAULT_INIT_TIMEOUT = TDuration::Seconds(2);
-        static constexpr TDuration DEFAULT_PREPARE_TIMEOUT = TDuration::Seconds(5);
+        static constexpr TDuration DEFAULT_INTERACTIVE_INIT_TIMEOUT = TDuration::Seconds(3);
+        static constexpr TDuration DEFAULT_INTERACTIVE_PREPARE_TIMEOUT = TDuration::Seconds(5);
+        static constexpr TDuration DEFAULT_BG_INIT_TIMEOUT = TDuration::Seconds(30);
+        static constexpr TDuration DEFAULT_BG_PREPARE_TIMEOUT = TDuration::Seconds(30);
 
         using TRetryPolicy = IRetryPolicy<const yexception&>;
         using TRetryPolicyPtr = TRetryPolicy::TPtr;
