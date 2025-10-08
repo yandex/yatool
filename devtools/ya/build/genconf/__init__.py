@@ -30,6 +30,7 @@ class BadCompilerException(Exception):
 
 class FailedGenerationScript(Exception):
     mute = True
+    retriable = False
 
 
 @exts.func.memoize()
