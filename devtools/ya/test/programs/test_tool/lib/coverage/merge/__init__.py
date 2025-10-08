@@ -6,3 +6,4 @@ from .functions import *
 from .mcdc import *
 from .sancov import *
 from .segments import *
+from .shared import dedup_and_sort, compare_records

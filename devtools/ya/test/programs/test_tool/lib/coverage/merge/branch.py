@@ -2,6 +2,7 @@ import collections
 import typing as tp
 
 from .consts import COUNTER_LIMIT
+from .shared import dedup_and_sort, compare_records
 
 
 class ClangBranch(tp.NamedTuple):
@@ -22,28 +23,8 @@ class ClangBranch(tp.NamedTuple):
     expanded_file_id: int  # same as above BUT with macro handling
     region_kind: int  # Could be: 4 BranchRegion, 6 MC/DC branch region, 5 MC/DC decision region, 0 CodeRegion
 
-    def compare_branch_with(self, other) -> tp.Literal[-1, 0, 1]:
-        """
-        returns
-        0  - same branch (=)
-        -1 - earlier branch (<)
-        1  - later branch (>)
-        """
-        if self.local_branch_descriptor == other.local_branch_descriptor:
-            if self.region_descriptor != other.region_descriptor:
-                raise AssertionError(
-                    f"Branch mismatch left={self}, right={other}. Please contact DEVTOOLSSUPPORT with reproducer."
-                )
-
-            return 0
-
-        if self.local_branch_descriptor < other.local_branch_descriptor:
-            return -1
-
-        return 1
-
-    def __add__(self, other):
-        if self.branch_descriptor != other.branch_descriptor:
+    def __add__(self, other) -> tp.Self:
+        if self.full_descriptor != other.full_descriptor:
             raise AssertionError(
                 f"Branch mismatch left={self}, right={other}. Please contact DEVTOOLSSUPPORT with reproducer."
             )
@@ -59,15 +40,15 @@ class ClangBranch(tp.NamedTuple):
         return new_branch
 
     @property
-    def branch_descriptor(self) -> tuple[int, ...]:
-        return self.local_branch_descriptor + self.region_descriptor
+    def full_descriptor(self) -> tuple[int, ...]:
+        return self.local_descriptor + self.file_id_descriptor
 
     @property
-    def local_branch_descriptor(self) -> tuple[int, ...]:
+    def local_descriptor(self) -> tuple[int, ...]:
         return self.line_start, self.column_start, self.line_end, self.column_end
 
     @property
-    def region_descriptor(self) -> tuple[int, ...]:
+    def file_id_descriptor(self) -> tuple[int, ...]:
         return self.file_id, self.expanded_file_id, self.region_kind
 
     def is_covered(self):
@@ -84,7 +65,7 @@ def merge_clang_branches_generator(
         lb = left[l_idx]
         rb = right[r_idx]
 
-        compare_stat = lb.compare_branch_with(rb)
+        compare_stat = compare_records(lb, rb)
 
         if compare_stat == 0:
             yield lb + rb
@@ -111,7 +92,7 @@ def merge_clang_branches(branches: tp.Sequence[list[int]]) -> list[ClangBranch]:
     branches must be size of 2
     each of them is supposed to be sorted https://llvm.org/docs/CoverageMappingFormat.html#sub-array-of-regions
     """
-    left = [ClangBranch(*branch) for branch in branches[0]]
-    right = [ClangBranch(*branch) for branch in branches[1]]
+    left = dedup_and_sort([ClangBranch(*branch) for branch in branches[0]])
+    right = dedup_and_sort([ClangBranch(*branch) for branch in branches[1]])
 
     return list(merge_clang_branches_generator(left, right))

@@ -4,6 +4,7 @@ import itertools
 from collections.abc import Sequence, Generator
 
 from .consts import MCDC_EXECUTED_TEST_VECTORS_IDX
+from .shared import dedup_and_sort, compare_records
 
 type Condition = bool | None  # true, false, null (null when it's been short circuited)
 
@@ -71,26 +72,6 @@ class MCDCRecord(tp.NamedTuple):
             executed_test_vectors=executed_test_vectors,
         )
 
-    def compare_record_with(self, other) -> tp.Literal[-1, 0, 1]:
-        """
-        returns
-        0  - same record (=)
-        -1 - earlier record (<)
-        1  - later record (>)
-        """
-        if self.local_descriptor == other.local_descriptor:
-            if self.region_descriptor != other.region_descriptor:
-                raise AssertionError(
-                    f"MC/DC Record mismatch left={self}, right={other}. Please contact DEVTOOLSSUPPORT with reproducer."
-                )
-
-            return 0
-
-        if self.full_descriptor < other.full_descriptor:
-            return -1
-
-        return 1
-
     def __add__(self, other):
         if self.full_descriptor != other.full_descriptor:
             raise AssertionError(
@@ -98,7 +79,10 @@ class MCDCRecord(tp.NamedTuple):
             )
 
         merged_test_vectors = self.executed_test_vectors | other.executed_test_vectors
-        new_instance = self._replace(executed_test_vectors=merged_test_vectors)
+
+        new_instance = self._replace(
+            executed_test_vectors=merged_test_vectors,
+        )
 
         new_instance._recalc_conditions()
 
@@ -159,15 +143,24 @@ class MCDCRecord(tp.NamedTuple):
 
     @property
     def local_descriptor(self) -> tuple[int, ...]:
-        return self.line_start, self.column_start, self.line_end, self.column_end
+        return (
+            self.line_start,
+            self.column_start,
+            self.line_end,
+            self.column_end,
+        )
 
     @property
-    def region_descriptor(self) -> tuple[int, ...]:
+    def file_id_descriptor(self) -> tuple[int, ...]:
         return self.expanded_file_id, self.region_kind
 
     @property
     def full_descriptor(self) -> tuple[int, ...]:
-        return self.local_descriptor + self.region_descriptor
+        """
+        Some macros are dynamic... For example: util/system/compiler.h:L92-93
+        We have to keep that in mind -> add len(conditions) to descriptor
+        """
+        return self.local_descriptor + self.file_id_descriptor + (len(self.conditions),)
 
     def dump(self) -> list:
         return [
@@ -192,7 +185,7 @@ def merge_clang_mcdc_records_generator(
         left_record = left[l_idx]
         right_record = right[r_idx]
 
-        compare_stat = left_record.compare_record_with(right_record)
+        compare_stat = compare_records(left_record, right_record)
 
         if compare_stat == 0:
             yield left_record + right_record
@@ -219,7 +212,7 @@ def merge_clang_mcdc_records(mcdc_records: Sequence) -> list[MCDCRecord]:
     mcdc_records must be size of 2
     each of them is supposed to be sorted https://llvm.org/docs/CoverageMappingFormat.html#sub-array-of-regions
     """
-    left = [MCDCRecord.from_raw(record) for record in mcdc_records[0]]
-    right = [MCDCRecord.from_raw(record) for record in mcdc_records[1]]
+    left = dedup_and_sort([MCDCRecord.from_raw(record) for record in mcdc_records[0]])
+    right = dedup_and_sort([MCDCRecord.from_raw(record) for record in mcdc_records[1]])
 
     return list(merge_clang_mcdc_records_generator(left, right))

@@ -8,6 +8,7 @@ PY_SRCS(
     mcdc.py
     sancov.py
     segments.py
+    shared.py
 )
 
 END()
