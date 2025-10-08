@@ -37,6 +37,14 @@ class BaseFrontendSuite(common_types.AbstractTestSuite):
     def supports_clean_environment(self):
         return False
 
+    @property
+    def target_path(self):
+        return self.meta.ts_test_for_path if self.meta and self.meta.ts_test_for_path else self.project_path
+
+    @property
+    def test_for_path(self):
+        return os.path.join(yalibrary.graph.const.BUILD_ROOT, self.target_path)
+
     def setup_dependencies(self, graph):
         super(BaseFrontendSuite, self).setup_dependencies(graph)
         seen = set()
@@ -86,10 +94,6 @@ class BaseFrontendRegularSuite(BaseFrontendSuite):
     def support_retries(self):
         return True
 
-    @property
-    def test_for_path(self):
-        return os.path.join(yalibrary.graph.const.BUILD_ROOT, self.meta.ts_test_for_path)
-
     def _get_run_cmd_opts(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
             yalibrary.graph.const.BUILD_ROOT,
@@ -135,6 +139,14 @@ class BaseFrontendRegularSuite(BaseFrontendSuite):
             opts += ["--test-data-dirs-rename", test_data_dirs_rename]
 
         return opts
+
+    def get_test_dependencies(self):
+        base_deps = super().get_test_dependencies()
+        return sorted(set([os.path.join(self.target_path, "pre.pnpm-lock.yaml")] + base_deps))
+
+    def get_run_cmd_inputs(self, opts):
+        base_deps = super().get_run_cmd_inputs(opts)
+        return sorted(set([os.path.join(self.target_path, "pre.pnpm-lock.yaml")] + base_deps))
 
 
 class JestTestSuite(BaseFrontendRegularSuite):
