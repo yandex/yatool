@@ -71,26 +71,9 @@ def prepare_install_cmd(publish_to):
 
 
 def publish_package(path_to_package, publish_to, key_user):
+    package.process.run_process(UPLOAD_COMMAND, [path_to_package, key_user + "@" + publish_to])
     if publish_to.startswith("paysys-rhel.dist.yandex"):
-
-        remote_host, remote_path = publish_to.split(':', 1)
-
-        pkg_dir = os.path.dirname(path_to_package)
-        pkg_file = os.path.basename(path_to_package)
-
-        tar_cmd = ['tar', 'cf', '-', '-C', pkg_dir, pkg_file]
-
-        remote_cmd = f"tar xf - -C '{remote_path}'"
-        install_cmd = prepare_install_cmd(publish_to)
-        remote_cmd += f" && {' '.join(install_cmd)}"
-
-        # Combine commands into single SSH session
-        package.process.run_process(
-            'bash', ['-c', f"{' '.join(tar_cmd)} | {SSH} {key_user}@{remote_host} '{remote_cmd}'"]
-        )
-    else:
-        # For non-paysys hosts, use original SCP method
-        package.process.run_process(UPLOAD_COMMAND, [path_to_package, key_user + "@" + publish_to])
+        package.process.run_process(SSH, [key_user + "@" + publish_to.split(':')[0]] + prepare_install_cmd(publish_to))
 
 
 def create_rpm_package(temp_dir, package_context, rpmbuild_dir, publish_to_list, key_user):
