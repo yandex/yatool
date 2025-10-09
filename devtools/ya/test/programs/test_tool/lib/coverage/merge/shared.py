@@ -37,13 +37,12 @@ def compare_records(left: MergeableRecord, right: MergeableRecord) -> Literal[-1
 def dedup_and_sort(records: Sequence[MergeableRecord]) -> list[MergeableRecord]:
     """
     Generic function to deduplicate and sort a sequence of MergeableRecord objects.
-    - Sorts based on local_descriptor.
-    - Merges duplicates (where compare_with == 0) using __add__.
+    - Sorts based on full_descriptor.
+    - Merges duplicates (where compare_records == 0) using __add__.
 
     Important note:
     In some cases llvm could return result with duplicates (for branches and mcdc)
     It happens due to macros like util/system/compiler.h:L92-93
-    Seems like llvm is not ideal and we have to cover such cases.
 
     In order to reproduce it check this target out:
     1) run tests with coverage here devtools/executor/tests/fat
