@@ -80,11 +80,7 @@ def publish_package(path_to_package, publish_to, key_user):
 
         tar_cmd = ['tar', 'cf', '-', '-C', pkg_dir, pkg_file]
 
-        # Extract directory path from remote_path
-        remote_dir = os.path.dirname(remote_path)
-
-        # Remote command to extract tar and install
-        remote_cmd = f"tar xf - -C '{remote_dir}'"
+        remote_cmd = f"tar xf - -C '{remote_path}'"
         install_cmd = prepare_install_cmd(publish_to)
         remote_cmd += f" && {' '.join(install_cmd)}"
 
