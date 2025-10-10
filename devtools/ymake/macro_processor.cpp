@@ -400,9 +400,16 @@ bool TCommandInfo::GetCommandInfoFromPluginCmd(const TMacroCmd& cmd, const TVars
         GetToolsInternal().Push(std::move(file));
     }
 
-    Cmd.SetSingleVal("PLUGIN", cmd.ToString(), mod.GetId(), vars.Id);
-    InitCmdNode(Cmd);
-    FillAddCtx(Cmd, vars);
+    TSpecFileList* knownInputs = {};
+    TSpecFileList* knownOutputs = {};
+    if (auto specFiles = std::get_if<0>(&SpecFiles)) {
+        knownInputs = &specFiles->Input;
+        knownOutputs = &specFiles->Output;
+    }
+    auto compiled = CommandSink->Compile(cmd.ToString(), *Conf, vars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
+    const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
+    GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled, false, vars);
+    Y_UNUSED(mod);
 
     return true;
 }

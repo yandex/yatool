@@ -277,6 +277,7 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
 
 void TModuleBuilder::AddPluginCustomCmd(TMacroCmd& macroCmd) {
     TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
+    cmdInfo->SetCommandSink(&Commands);
     cmdInfo->GetCommandInfoFromPluginCmd(macroCmd, Vars, Module);
     CmdAddQueue.push_back(std::move(cmdInfo));
 }
