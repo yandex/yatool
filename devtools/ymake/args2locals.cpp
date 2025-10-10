@@ -135,9 +135,7 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
 }
 
 TStringBuf GetVararg(const TCmdProperty& props) noexcept {
-    // TODO(YMAKE-1656): props.GetNumUsrArgs() != 0 should be used here after fixing the bug inside GetNumUsrArgs.
-    const bool hasPositionalArgs = !props.ArgNames().empty() && props.ArgNames().size() != props.GetKeyArgsNum();
-    if (!hasPositionalArgs || !props.ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX))
+    if (props.GetNumUsrArgs() == 0 || !props.ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX))
         return {};
 
     TStringBuf res{props.ArgNames().back()};
