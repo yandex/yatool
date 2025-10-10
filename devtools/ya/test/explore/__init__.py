@@ -51,6 +51,7 @@ SUITE_MAP: dict[str, type[types_common.AbstractTestSuite]] = {
     'jest': ts_test.JestTestSuite,
     'junit.test': junit.JavaTestSuite,
     'junit5.test': junit.Junit5TestSuite,
+    'junit6.test': junit.Junit6TestSuite,
     'ktlint': java_style.KtlintTestSuite,
     'playwright': ts_test.PlaywrightTestSuite,
     'playwright_large': ts_test.PlaywrightLargeTestSuite,
