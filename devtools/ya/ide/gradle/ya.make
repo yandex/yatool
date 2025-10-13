@@ -10,6 +10,7 @@ PY_SRCS(
     remove.py
     stat.py
     symlinks.py
+    wrapper_patcher.py
     ya_settings.py
 )
 

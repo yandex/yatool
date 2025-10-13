@@ -377,6 +377,7 @@ class GradleOptions(yarg.Options):
     OPT_GRADLE_DAEMON_JVMARGS = '--gradle-daemon-jvmargs'
     OPT_KOTLIN_DAEMON_JVMARGS = '--kotlin-daemon-jvmargs'
     OPT_SETTINGS_ROOT_AS_HASH_BASE = '--settings-root-as-hash-base'
+    OPT_JDK11_COMPATIBILITY_MODE = '--jdk11-compatibility-mode'
 
     # Advanced options
     ADVOPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
@@ -403,6 +404,7 @@ class GradleOptions(yarg.Options):
         self.gradle_daemon_jvmargs: str = None
         self.kotlin_daemon_jvmargs: str = None
         self.settings_root_as_hash_base: bool = False
+        self.jdk11_compatibility_mode = False
 
         self.collect_contribs: bool = True
         self.build_foreign: bool = True
@@ -480,6 +482,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_SETTINGS_ROOT_AS_HASH_BASE],
                 help='Use settings root as base for hashed export directory name (ignore export targets for hashed directory name)',
                 hook=yarg.SetConstValueHook('settings_root_as_hash_base', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_JDK11_COMPATIBILITY_MODE],
+                help='JDK11 compatibility mode',
+                hook=yarg.SetConstValueHook('jdk11_compatibility_mode', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
