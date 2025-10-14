@@ -17,6 +17,49 @@ using namespace NYMake::NPlugins;
 namespace {
     const static char BuildConfigurationName[] = "BuildConfiguration";
 
+    bool RegisterParsersFromModule(TBuildConfiguration& conf, PyObject* mod) {
+        if (!PyObject_HasAttrString(mod, "register_parsers"))
+            return true;
+
+        if (TScopedPyObjectPtr initFunc = PyObject_GetAttrString(mod, "register_parsers"); PyCallable_Check(initFunc)) {
+            TScopedPyObjectPtr confPtr = PyCapsule_New(&conf, BuildConfigurationName, NULL);
+            PyObject_CallOneArg(initFunc, confPtr);
+            if (PyErr_Occurred()) {
+                PyErr_Print();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void RegisterMacrosFromModule(TBuildConfiguration& conf, PyObject* mod) {
+        TScopedPyObjectPtr attrs = PyObject_Dir(mod);
+        if (attrs == nullptr) {
+            return;
+        }
+
+        Py_ssize_t size = PyList_Size(attrs);
+        for (Py_ssize_t i = 0; i < size; i++) {
+            TScopedPyObjectPtr attr = PyList_GetItem(attrs, i);
+            if (!PyUnicode_Check(attr)) {
+                continue;
+            }
+            TScopedPyObjectPtr asciiAttrName = PyUnicode_AsASCIIString(attr);
+            if (!PyBytes_Check(asciiAttrName)) {
+                continue;
+            }
+            TStringBuf attrName = PyBytes_AsString(asciiAttrName);
+            if (attrName.StartsWith("on"sv)) {
+                TScopedPyObjectPtr func = PyObject_GetAttr(mod, attr);
+                if (!PyFunction_Check(func)) {
+                    continue;
+                }
+                auto macroName = ToUpperUTF8(attrName.SubStr(2));
+                RegisterMacro(conf, macroName.c_str(), func);
+            }
+        }
+    }
+
     void LoadPluginsFromDirRecursively(TBuildConfiguration& conf, const TFsPath path, bool firstLevel) {
         TVector<TFsPath> dirs;
         TVector<TFsPath> files;
@@ -57,42 +100,9 @@ namespace {
                 continue;
             }
 
-            if (PyObject_HasAttrString(mod, "register_parsers")) {
-                if (TScopedPyObjectPtr initFunc = PyObject_GetAttrString(mod, "register_parsers"); PyCallable_Check(initFunc)) {
-                    TScopedPyObjectPtr confPtr = PyCapsule_New(&conf, BuildConfigurationName, NULL);
-                    PyObject_CallOneArg(initFunc, confPtr);
-                    if (PyErr_Occurred()) {
-                        PyErr_Print();
-                        continue;
-                    }
-                }
-            }
-
-            TScopedPyObjectPtr attrs = PyObject_Dir(mod);
-            if (attrs == nullptr) {
+            if (!RegisterParsersFromModule(conf, mod))
                 continue;
-            }
-
-            Py_ssize_t size = PyList_Size(attrs);
-            for (Py_ssize_t i = 0; i < size; i++) {
-                TScopedPyObjectPtr attr = PyList_GetItem(attrs, i);
-                if (!PyUnicode_Check(attr)) {
-                    continue;
-                }
-                TScopedPyObjectPtr asciiAttrName = PyUnicode_AsASCIIString(attr);
-                if (!PyBytes_Check(asciiAttrName)) {
-                    continue;
-                }
-                TStringBuf attrName = PyBytes_AsString(asciiAttrName);
-                if (attrName.StartsWith("on"sv)) {
-                    TScopedPyObjectPtr func = PyObject_GetAttr(mod, attr);
-                    if (!PyFunction_Check(func)) {
-                        continue;
-                    }
-                    auto macroName = ToUpperUTF8(attrName.SubStr(2));
-                    RegisterMacro(conf, macroName.c_str(), func);
-                }
-            }
+            RegisterMacrosFromModule(conf, mod);
         }
 
         Sort(dirs, [](const auto& lhs, const auto& rhs) { return lhs.Basename() < rhs.Basename(); });
