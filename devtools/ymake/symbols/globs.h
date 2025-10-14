@@ -52,6 +52,13 @@ struct TGlobStat {
     }
 
     bool operator==(const TGlobStat&) const = default;
+
+    Y_SAVELOAD_DEFINE(
+        MatchedFilesCount,
+        SkippedFilesCount,
+        WatchedDirsCount,
+        PatternsCount
+    );
 };
 
 struct TGlobRestrictions {
@@ -66,6 +73,31 @@ struct TGlobRestrictions {
     bool Check(const TStringBuf& name, const TGlobStat& globStat, ui8 globSkippedErrorPercent) const;
 
     bool operator==(const TGlobRestrictions&) const = default;
+
+    Y_SAVELOAD_DEFINE(
+        MaxMatches,
+        MaxWatchDirs
+    );
+};
+
+struct TModuleGlobVar {
+    TVector<ui32> PatternElemIds;
+    TGlobRestrictions GlobRestrictions;
+
+    Y_SAVELOAD_DEFINE(
+        PatternElemIds,
+        GlobRestrictions
+    );
+};
+
+struct TModuleGlobsData {
+    THashMap<ui32, TModuleGlobVar> GlobVars;
+    THashMap<ui32, TGlobStat> GlobPatternStats;
+
+    Y_SAVELOAD_DEFINE(
+        GlobVars,
+        GlobPatternStats
+    );
 };
 
 // Short-live object with 2 scenarios of usage:

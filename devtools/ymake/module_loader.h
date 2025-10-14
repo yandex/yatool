@@ -259,4 +259,8 @@ public:
     }
 
     TDepsCacheId Commit();
+
+    TModuleGlobsData& GetModuleGlobsData() {
+        return Module.ModuleGlobsData;
+    }
 };

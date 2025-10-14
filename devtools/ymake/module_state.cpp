@@ -130,6 +130,7 @@ TModuleSavedState::TModuleSavedState(const TModule& mod) {
 TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
     : IncDirs(context.SymbolsTable)
     , Transition(saved.Transition)
+    , ModuleGlobsData(saved.ModuleGlobsData)
     , NodeType(saved.NodeType)
     , Id(saved.Id)
     , GlobalLibId(saved.GlobalLibId)
@@ -211,6 +212,7 @@ void TModule::Save(TModuleSavedState& saved) const {
     saved.SelfPeers = SelfPeers;
     saved.ExtraOuts = ExtraOuts;
     saved.Transition = Transition;
+    saved.ModuleGlobsData = ModuleGlobsData;
 
     saved.Attrs.AllBits = Attrs.AllBits;
 
@@ -230,45 +232,6 @@ void TModule::Save(TModuleSavedState& saved) const {
             saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
         }
     }
-    const auto globVarElemIdsVal = Get(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS);
-    THashSet<TStringBuf> strGlobPatternElemIds;
-    if (globVarElemIdsVal.IsInited() && !globVarElemIdsVal.empty()) {
-        TVector<TStringBuf> strGlobVarElemIds;
-        Split(globVarElemIdsVal, " ", strGlobVarElemIds);
-        for (const auto& strGlobVarElemId: strGlobVarElemIds) {
-            TVector<TString> globVarFields{
-                TGlobHelper::GlobPatternElemIdsVar(strGlobVarElemId),
-                TGlobHelper::MaxMatchesVar(strGlobVarElemId),
-                TGlobHelper::MaxWatchDirsVar(strGlobVarElemId),
-            };
-            for (const auto& globVarField: globVarFields) {
-                const auto value = Get(globVarField);
-                if (value.IsInited() && !value.empty()) {
-                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globVarField, value)));
-                }
-            }
-            const auto patternStrElemIds = TGlobHelper::LoadStrGlobPatternElemIds(Vars, globVarFields[0]);
-            for (auto& patternStrElemId: patternStrElemIds) {
-                strGlobPatternElemIds.emplace(std::move(patternStrElemId));
-            }
-        }
-    }
-    if (!strGlobPatternElemIds.empty()) {
-        for (auto& strGlobPatternElemId: strGlobPatternElemIds) {
-            TVector<TString> globPatternFields{
-                TGlobHelper::MatchedVar(strGlobPatternElemId),
-                TGlobHelper::SkippedVar(strGlobPatternElemId),
-                TGlobHelper::DirsVar(strGlobPatternElemId),
-            };
-            for (const auto& globPatternField: globPatternFields) {
-                const auto value = Get(globPatternField);
-                if (value.IsInited() && !value.empty()) {
-                    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(globPatternField, value)));
-                }
-            }
-        }
-    }
-
     for (auto item: TRANSITIVE_CHECK_REGISTRY) {
         for (auto name: item.ConfVars) {
             const auto value = Get(name);

@@ -36,11 +36,7 @@ namespace NArgs {
 
 constexpr TStringBuf EXCLUDE = "EXCLUDE";
 constexpr TStringBuf RESTRICTIONS = "RESTRICTIONS";
-constexpr TStringBuf GLOBVAR_PATTERN_ELEM_IDS = "GLOBVAR_PATTERNS";
 constexpr TStringBuf MAX_MATCHES = "MAX_MATCHES";
 constexpr TStringBuf MAX_WATCH_DIRS = "MAX_WATCH_DIRS";
 
-constexpr TStringBuf MATCHED = "MATCHED";
-constexpr TStringBuf SKIPPED = "SKIPPED";
-constexpr TStringBuf DIRS = "DIRS";
 }

@@ -46,8 +46,8 @@ namespace {
                 entryStats.SetReassemble(true);
                 PopulateGlobNode(globNode, globInfo);
             }
-            for (const auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
-                TGlobHelper::SaveGlobPatternElemIds(module->GetVars(), globVarElemId, globPatternElemIds);
+            for (auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
+                TGlobHelper::SaveGlobPatternElemIds(module->GetModuleGlobsData(), globVarElemId, std::move(globPatternElemIds));
             }
         }
     }

@@ -1,11 +1,15 @@
 #include "glob_helper.h"
 #include "builtin_macro_consts.h"
-#include "vardefs.h"
+#include "module_state.h"
 
 #include <devtools/ymake/diag/manager.h>
 
 #include <util/generic/vector.h>
 #include <util/generic/string.h>
+
+static const TVector<ui32> EmptyElemIds;
+static const TGlobRestrictions DefaultGlobRestrictions;
+static const TGlobStat EmptyGlobStat;
 
 TGlobRestrictions TGlobHelper::ParseGlobRestrictions(const TArrayRef<const TStringBuf>& restrictions, const TStringBuf& macro) {
     const auto rend = restrictions.cend();
@@ -48,134 +52,39 @@ TGlobRestrictions TGlobHelper::ParseGlobRestrictions(const TArrayRef<const TStri
     return globRestrictions;
 }
 
-template<typename V>
-static void GetVal(const TString& var, const TStringBuf& val, V&value) {
-    V v;
-    if (!TryFromString(val, v)) {
-        YConfWarn(Syntax) << "Invalid value '" << val << "' in " << var << Endl;
-    } else {
-        value = v;
+void TGlobHelper::SaveGlobPatternElemIds(TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId, TVector<ui32>&& globPatternElemIds) {
+    moduleGlobsData.GlobVars[globVarElemId].PatternElemIds = std::move(globPatternElemIds);
+}
+
+const TVector<ui32>& TGlobHelper::GetGlobPatternElemIds(const TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId) {
+    if (auto it = moduleGlobsData.GlobVars.find(globVarElemId); it != moduleGlobsData.GlobVars.end()) {
+        return it->second.PatternElemIds;
     }
+    return EmptyElemIds;
 }
 
-TString TGlobHelper::StringElemId(ui32 elemId) {
-    return ToString(elemId);
+void TGlobHelper::SaveGlobRestrictions(TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId, TGlobRestrictions&& globRestrictions) {
+    moduleGlobsData.GlobVars[globVarElemId].GlobRestrictions = std::move(globRestrictions);
 }
 
-TString TGlobHelper::GlobPatternElemIdsVar(const TStringBuf& strGlobVarElemId) {
-    return TStringBuilder() << NArgs::GLOBVAR_PATTERN_ELEM_IDS << "-" << strGlobVarElemId;
-}
-
-static void SaveGlobVarElemId(TVars& vars, const TStringBuf& strGlobVarElemId) {
-    const auto& strGlobVarElemIds = GetCmdValue(vars.Get1(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS));
-    if (strGlobVarElemIds.IsInited() && strGlobVarElemIds.size() >= strGlobVarElemId.size()) {
-        TVector<TStringBuf> strElemIds;
-        Split(strGlobVarElemIds, " ", strElemIds);
-        if (Find(strElemIds, strGlobVarElemId) != strElemIds.end()) {
-            return; // already appended
-        }
+const TGlobRestrictions& TGlobHelper::GetGlobRestrictions(const TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId) {
+    if (auto it = moduleGlobsData.GlobVars.find(globVarElemId); it != moduleGlobsData.GlobVars.end()) {
+        return it->second.GlobRestrictions;
     }
-    vars.SetAppend(NVariableDefs::VAR_GLOB_VAR_ELEM_IDS, strGlobVarElemId);
+    return DefaultGlobRestrictions;
 }
 
-void TGlobHelper::SaveGlobPatternElemIds(TVars& vars, const ui32 globVarElemId, const TVector<ui32>& globPatternElemIds) {
-    auto strGlobVarElemId = StringElemId(globVarElemId);
-    SaveGlobVarElemId(vars, strGlobVarElemId);
-    vars.SetValue(GlobPatternElemIdsVar(strGlobVarElemId), JoinVectorIntoString(globPatternElemIds, " "));
+void TGlobHelper::SaveGlobPatternStat(TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId, TGlobStat&& globPatternStat) {
+    moduleGlobsData.GlobPatternStats[globPatternElemId] = std::move(globPatternStat);
 }
 
-static TVector<TStringBuf> LoadStrElemIds(const TVars& vars, const TString& varStrElemIds) {
-    const auto strElemIdsVal = GetCmdValue(vars.Get1(varStrElemIds));
-    TVector<TStringBuf> strElemIds;
-    if (!strElemIdsVal.empty()) {
-        Split(strElemIdsVal, " ", strElemIds);
+const TGlobStat& TGlobHelper::GetGlobPatternStat(const TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId) {
+    if (auto it = moduleGlobsData.GlobPatternStats.find(globPatternElemId); it != moduleGlobsData.GlobPatternStats.end()) {
+        return it->second;
     }
-    return strElemIds;
+    return EmptyGlobStat;
 }
 
-TVector<TStringBuf> TGlobHelper::LoadStrGlobPatternElemIds(const TVars& vars, const TString& strGlobVarElemId) {
-    return LoadStrElemIds(vars, GlobPatternElemIdsVar(strGlobVarElemId));
-}
-
-TVector<ui32> TGlobHelper::LoadGlobPatternElemIds(const TVars& vars, const ui32 globVarElemId) {
-    const auto globPatternElemIdsVar = GlobPatternElemIdsVar(StringElemId(globVarElemId));
-    const auto strGlobPatternElemIds = LoadStrElemIds(vars, globPatternElemIdsVar);
-    TVector<ui32> globPatternElemIds;
-    for (const auto& strGlobPatternElemId: strGlobPatternElemIds) {
-        ui32 globPatternElemId;
-        GetVal(globPatternElemIdsVar, strGlobPatternElemId, globPatternElemId);
-        globPatternElemIds.push_back(globPatternElemId);
-    }
-    return globPatternElemIds;
-}
-
-TString TGlobHelper::MaxMatchesVar(const TStringBuf& strGlobVarElemId) {
-    return TStringBuilder() << NArgs::MAX_MATCHES << "-" << strGlobVarElemId;
-}
-
-TString TGlobHelper::MaxWatchDirsVar(const TStringBuf& strGlobVarElemId) {
-    return TStringBuilder() << NArgs::MAX_WATCH_DIRS << "-" << strGlobVarElemId;
-}
-
-void TGlobHelper::SaveGlobRestrictions(TVars& vars, const ui32 globVarElemId, const TGlobRestrictions& globRestrictions) {
-    auto strGlobVarElemId = StringElemId(globVarElemId);
-    SaveGlobVarElemId(vars, strGlobVarElemId);
-    vars.SetValue(MaxMatchesVar(strGlobVarElemId), ToString(globRestrictions.MaxMatches));
-    vars.SetValue(MaxWatchDirsVar(strGlobVarElemId), ToString(globRestrictions.MaxWatchDirs));
-}
-
-TGlobRestrictions TGlobHelper::LoadGlobRestrictions(const TVars& vars, const ui32 globVarElemId) {
-    TGlobRestrictions globRestrictions;
-    auto strGlobVarElemId = StringElemId(globVarElemId);
-    const auto maxMatchesVar = MaxMatchesVar(strGlobVarElemId);
-    const auto maxMatchesVal = GetCmdValue(vars.Get1(maxMatchesVar));
-    if (!maxMatchesVal.empty()) {
-        GetVal(maxMatchesVar, maxMatchesVal, globRestrictions.MaxMatches);
-    }
-    const auto maxWatchDirsVar = MaxWatchDirsVar(strGlobVarElemId);
-    const auto maxWatchDirsVal = GetCmdValue(vars.Get1(maxWatchDirsVar));
-    if (!maxWatchDirsVal.empty()) {
-        GetVal(maxWatchDirsVar, maxWatchDirsVal, globRestrictions.MaxWatchDirs);
-    }
-    return globRestrictions;
-}
-
-TString TGlobHelper::MatchedVar(const TStringBuf& strGlobPatternElemId) {
-    return TStringBuilder() << NArgs::MATCHED << "-" << strGlobPatternElemId;
-}
-
-TString TGlobHelper::SkippedVar(const TStringBuf& strGlobPatternElemId) {
-    return TStringBuilder() << NArgs::SKIPPED << "-" << strGlobPatternElemId;
-}
-
-TString TGlobHelper::DirsVar(const TStringBuf& strGlobPatternElemId) {
-    return TStringBuilder() << NArgs::DIRS << "-" << strGlobPatternElemId;
-}
-
-void TGlobHelper::SaveGlobPatternStat(TVars& vars, const ui32 globPatternElemId, const TGlobStat& globPatternStat) {
-    auto strGlobPatternElemId = StringElemId(globPatternElemId);
-    vars.SetValue(MatchedVar(strGlobPatternElemId), ToString(globPatternStat.MatchedFilesCount));
-    vars.SetValue(SkippedVar(strGlobPatternElemId), ToString(globPatternStat.SkippedFilesCount));
-    vars.SetValue(DirsVar(strGlobPatternElemId), ToString(globPatternStat.WatchedDirsCount));
-}
-
-TGlobStat TGlobHelper::LoadGlobPatternStat(const TVars& vars, const ui32 globPatternElemId) {
-    auto strGlobPatternElemId = StringElemId(globPatternElemId);
-    TGlobStat globPatternStat;
-    const auto matchedVar = MatchedVar(strGlobPatternElemId);
-    const auto matchedVal = GetCmdValue(vars.Get1(matchedVar));
-    if (!matchedVal.empty()) {
-        GetVal(matchedVar, matchedVal, globPatternStat.MatchedFilesCount);
-    }
-    const auto skipperVar = SkippedVar(strGlobPatternElemId);
-    const auto skippedVal = GetCmdValue(vars.Get1(skipperVar));
-    if (!skippedVal.empty()) {
-        GetVal(skipperVar, skippedVal, globPatternStat.SkippedFilesCount);
-    }
-    const auto dirsVar = DirsVar(strGlobPatternElemId);
-    const auto dirsVal = GetCmdValue(vars.Get1(dirsVar));
-    if (!dirsVal.empty()) {
-        GetVal(dirsVar, dirsVal, globPatternStat.WatchedDirsCount);
-    }
-    return globPatternStat;
+TGlobStat TGlobHelper::LoadGlobPatternStat(const TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId) {
+    return GetGlobPatternStat(moduleGlobsData, globPatternElemId);
 }

@@ -175,6 +175,8 @@ private:
 
     ETransition Transition;
 
+    TModuleGlobsData ModuleGlobsData;
+
 public:
     TModuleSavedState(const TModule& mod);
 
@@ -202,8 +204,9 @@ public:
         SelfPeers,
         ExtraOuts,
         PeersRules,
-        Transition
-        );
+        Transition,
+        ModuleGlobsData
+    );
 };
 
 /// @brief class representing module state including vars, dirs and vital properties
@@ -224,6 +227,7 @@ public:
     TVector<ui32> SelfPeers;
     TVector<ui32> ExtraOuts;
     ETransition Transition;
+    TModuleGlobsData ModuleGlobsData;
 
     explicit TModule() = delete; // Must initialize IncDirs.
 

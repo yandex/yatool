@@ -290,7 +290,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             }
             const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
             const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);
-            TGlobHelper::SaveGlobPatternStat(Vars, globPatternId, globPatternStat);
+            TGlobHelper::SaveGlobPatternStat(GetModuleGlobsData(), globPatternId, std::move(globPatternStat));
             ModuleGlobs.push_back(
                 TModuleGlobInfo {
                     .GlobPatternId = globPatternId,
@@ -306,11 +306,11 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
-    if (globVarElemId) {
-        TGlobHelper::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
-    }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat, Conf.GlobSkippedErrorPercent);
+    }
+    if (globVarElemId) {
+        TGlobHelper::SaveGlobRestrictions(GetModuleGlobsData(), globVarElemId, std::move(globRestrictions));
     }
 
     auto&& range = MakeMappedRange(values, [](auto x) {

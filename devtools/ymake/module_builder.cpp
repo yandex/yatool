@@ -1013,7 +1013,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
             const TString globCmd = FormatCmd(moduleElemId, NProps::LATE_GLOB, globStr);
             const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
             globPatternElemIds.push_back(globPatternElemId);
-            TGlobHelper::SaveGlobPatternStat(Vars, globPatternElemId, globStat);
+            TGlobHelper::SaveGlobPatternStat(Module.ModuleGlobsData, globPatternElemId, std::move(globPatternStat));
             TModuleGlobInfo globInfo = {
                 .GlobPatternId = globPatternElemId,
                 .GlobPatternHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())),
@@ -1028,11 +1028,11 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         }
     }
 
-    if (globVarElemId) {
-        TGlobHelper::SaveGlobRestrictions(Vars, globVarElemId, globRestrictions);
-    }
     if (Conf.CheckGlobRestrictions) {
         globRestrictions.Check(name, globStat, Conf.GlobSkippedErrorPercent);
+    }
+    if (globVarElemId) {
+        TGlobHelper::SaveGlobRestrictions(Module.ModuleGlobsData, globVarElemId, std::move(globRestrictions));
     }
 
     if (globs.empty()) {
@@ -1056,7 +1056,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
 
     if (globVarElemId) {
-        TGlobHelper::SaveGlobPatternElemIds(Vars, globVarElemId, globPatternElemIds);
+        TGlobHelper::SaveGlobPatternElemIds(Module.ModuleGlobsData, globVarElemId, std::move(globPatternElemIds));
     }
     return true;
 }
