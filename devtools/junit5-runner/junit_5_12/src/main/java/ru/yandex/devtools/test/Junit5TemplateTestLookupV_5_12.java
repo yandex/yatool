@@ -1,6 +1,10 @@
 package ru.yandex.devtools.test;
 
 import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -13,6 +17,7 @@ import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.UniqueId;
+import org.junit.platform.engine.reporting.OutputDirectoryProvider;
 import org.junit.platform.engine.reporting.ReportEntry;
 import org.junit.platform.engine.support.descriptor.MethodSource;
 import org.junit.platform.engine.support.hierarchical.Node;
@@ -24,17 +29,28 @@ import ru.yandex.devtools.log.Logger;
 /**
  * Класс выполняет дополнительный анализ тестовых методов, собирая список параметризованных вызовов.
  */
-public class Junit5TemplateTestLookup {
+public class Junit5TemplateTestLookupV_5_12 implements Junit5TemplateTestLookup {
 
     private static final Logger logger = Logger.getLogger(Junit5TemplateTestLookup.class);
 
-    private final YaTestName testName;
+    private final CachedTestNames<String, TestIdentifier> testName;
     private final JupiterConfiguration configuration;
     private final JupiterEngineExecutionContext executionContext;
 
-    private Junit5TemplateTestLookup(YaTestName testName, LauncherDiscoveryRequest request) {
+    private Junit5TemplateTestLookupV_5_12(CachedTestNames<String, TestIdentifier> testName, LauncherDiscoveryRequest request, Path outputRoot) {
         this.testName = testName;
-        this.configuration = new DefaultJupiterConfiguration(request.getConfigurationParameters());
+        this.configuration = new DefaultJupiterConfiguration(request.getConfigurationParameters(),
+                new OutputDirectoryProvider() {
+                    @Override
+                    public Path getRootDirectory() {
+                        return outputRoot;
+                    }
+
+                    @Override
+                    public Path createOutputDirectory(TestDescriptor testDescriptor) {
+                        return outputRoot;
+                    }
+                });
 
         JupiterEngineExecutionContext context = new JupiterEngineExecutionContext(
                 new EmptyEngineExecutionListener(), configuration);
@@ -45,8 +61,9 @@ public class Junit5TemplateTestLookup {
         this.executionContext = engineDescriptor.prepare(context);
     }
 
-    void discoverTemplateInvocation(TestIdentifier test, MethodSource methodSource,
-                                    Consumer<TestIdentifier> newIdentifierListener) {
+    @Override
+    public void discoverTemplateInvocation(TestIdentifier test, MethodSource methodSource,
+            Consumer<TestIdentifier> newIdentifierListener) {
         try {
             // Ищем подходящий тестовый метод по его описанию
             Class<?> clazz = testName.forName(methodSource.getClassName());
@@ -61,12 +78,19 @@ public class Junit5TemplateTestLookup {
             }
             if (method != null) {
                 TestTemplateTestDescriptor descriptor = new TestTemplateTestDescriptor(
-                        UniqueId.parse(test.getUniqueId()), clazz, method, configuration);
+                        UniqueId.parse(test.getUniqueId()), clazz, method, List::of, configuration);
                 JupiterEngineExecutionContext context = descriptor.prepare(executionContext);
                 descriptor.execute(context, new Node.DynamicTestExecutor() {
                     @Override
                     public void execute(TestDescriptor testDescriptor) {
                         newIdentifierListener.accept(TestIdentifier.from(testDescriptor));
+                    }
+
+                    @Override
+                    public Future<?> execute(TestDescriptor testDescriptor, EngineExecutionListener executionListener) {
+                        // in fact, does not support async execution
+                        execute(testDescriptor);
+                        return CompletableFuture.completedFuture(null);
                     }
 
                     @Override
@@ -84,13 +108,14 @@ public class Junit5TemplateTestLookup {
 
     // Возвращает лениво инициализируемый lookup - не инициализируется, если не встречаются
     // parameterized или repeated тесты
-    static Supplier<Junit5TemplateTestLookup> lazyLookup(YaTestName testName, LauncherDiscoveryRequest request) {
+    static Supplier<Junit5TemplateTestLookup> lazyLookup(CachedTestNames<String, TestIdentifier> testName, LauncherDiscoveryRequest request,
+            Path outputRoot) {
         return new Supplier<Junit5TemplateTestLookup>() {
             private Junit5TemplateTestLookup lookup;
             @Override
             public Junit5TemplateTestLookup get() {
                 if (lookup == null) {
-                    lookup = new Junit5TemplateTestLookup(testName, request);
+                    lookup = new Junit5TemplateTestLookupV_5_12(testName, request, outputRoot);
                 }
                 return lookup;
             }
