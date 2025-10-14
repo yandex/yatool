@@ -70,6 +70,12 @@ def merge_branches(b1, b2):
 
 
 @shared.timeit
+def merge_mcdc_records(r1, r2):
+    mcdc_records = lib_coverage.merge.merge_clang_mcdc_records([r1, r2])
+    return list(record.dump() for record in mcdc_records)
+
+
+@shared.timeit
 def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches=False):
     if covtype == 'files':
         filename = covdata['filename']
@@ -92,6 +98,9 @@ def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches
         if branches:
             cache[relfilename]['branches'] = []
 
+        if mcdc:
+            cache[relfilename]['mcdc'] = []
+
     cache_entry = cache[relfilename]
 
     if covtype == 'files':
@@ -102,10 +111,11 @@ def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches
                 )
             cache_entry['summary'] = covdata['summary']
 
-        if mcdc and 'mcdc_records' in covdata:
-            if 'mcdc' in cache_entry:
-                raise AssertionError("Found MC/DC coverage duplicate")
-            cache_entry['mcdc'] = covdata['mcdc_records']
+        if mcdc:
+            if not cache_entry['mcdc']:
+                cache_entry['mcdc'] = covdata['mcdc_records']
+            else:
+                cache_entry['mcdc'] = merge_mcdc_records(cache_entry['mcdc'], covdata['mcdc_records'])
 
         if branches:
             if not cache_entry['branches']:
