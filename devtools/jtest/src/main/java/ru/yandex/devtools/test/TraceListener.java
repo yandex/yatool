@@ -134,7 +134,7 @@ public class TraceListener<K, V> {
 
             Map<String, Object> data = new HashMap<>(4);
             data.put("class", className);
-            data.put("subtest", methodName == null ? "unknown" : getMethodName(test));
+            data.put("subtest", methodName == null ? "unknown" : methodName);
 
             trace("subtest-started", data);
         }
@@ -215,7 +215,7 @@ public class TraceListener<K, V> {
             String methodName = getMethodName(test);
 
             data.put("class", className);
-            data.put("subtest", methodName == null ? "unknown" : getMethodName(test));
+            data.put("subtest", methodName == null ? "unknown" : methodName);
             data.put("status", status.name());
 
             trace("subtest-finished", data);
