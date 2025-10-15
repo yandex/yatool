@@ -21,7 +21,6 @@ from build.plugins.lib.nots.package_manager.base.constants import (
 )
 from build.plugins.lib.nots.package_manager.base.utils import (
     build_vs_store_path,
-    init_nots_path,
 )
 from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME, VIRTUAL_STORE_DIRNAME
 
@@ -115,11 +114,10 @@ def run_tests(opts):
         ts_config_path=opts.ts_config_path,
     )
 
-    init_nots_path(build_root=opts.build_root, local_cli=False)
     bindir_node_modules_path = os.path.join(opts.build_root, test_for_project_path, NODE_MODULES_DIRNAME)
     os.environ["NODE_PATH"] = os.pathsep.join(
         [
-            os.path.join(build_vs_store_path(test_for_project_path), NODE_MODULES_DIRNAME),
+            os.path.join(build_vs_store_path(opts.build_root, test_for_project_path), NODE_MODULES_DIRNAME),
             os.path.join(bindir_node_modules_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
             bindir_node_modules_path,
         ]
