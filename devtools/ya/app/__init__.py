@@ -6,6 +6,7 @@ import re
 import six
 import sys
 import time
+import typing  # noqa: F401
 
 import app_config
 import devtools.ya.core.error as core_error
@@ -19,6 +20,7 @@ import devtools.ya.core.monitoring as monitoring
 import devtools.ya.core.sec as sec
 import devtools.ya.core.user as user
 import devtools.ya.core.yarg
+import exts.asyncthread
 import exts.os2
 import exts.strings
 import exts.windows
@@ -27,6 +29,7 @@ import yalibrary.find_root
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
+from yalibrary.vcs import vcsversion
 
 from .modules import evlog
 from .modules import params
@@ -169,6 +172,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             modules.append(('evlog', evlog.configure(ctx)))
 
         modules.append(('dump_debug', configure_debug(ctx)))
+        modules.append(('fast_vcs_info_json_callback', configure_fast_vcs_info_json(ctx)))
 
         with ctx.configure(modules, modules_stager):
             el = getattr(ctx, "evlog", None)
@@ -632,6 +636,30 @@ def configure_vcs_info():
     yield revision
 
 
+def configure_fast_vcs_info_json(ctx):
+    # type: (devtools.ya.yalibrary.app_ctx.AppCtx) -> typing.Generator[typing.Callable[[], dict], None, None]
+    arc_root = getattr(ctx.params, 'arc_root', None)
+    if not arc_root:
+        arc_root = yalibrary.find_root.detect_root(os.getcwd())
+    if not arc_root:
+        arc_root = os.getcwd()
+        logger.error('Enable to get vcs root for %s', os.getcwd())
+
+    result = exts.asyncthread.future(lambda: _load_fast_vcs_info(arc_root))
+
+    yield result
+
+
+def _load_fast_vcs_info(arc_root):
+    # type: (str) -> dict
+    from devtools.ya.core.report import telemetry, ReportTypes
+
+    result = vcsversion.get_fast_version_info(arc_root, timeout=5)
+    telemetry.report(ReportTypes.FAST_VCS_INFO_JSON, result)
+
+    return result
+
+
 def configure_vcs_type(ctx=None):
     if ctx is None:
         cwd = os.getcwd()
@@ -813,6 +841,8 @@ def configure_report_interceptor(ctx, report_events):
                 ReportTypes.TIMEIT,
                 ReportTypes.BUILD_ERRORS,
                 ReportTypes.PROFILE_BY_TYPE,
+                ReportTypes.VCS_INFO,
+                ReportTypes.FAST_VCS_INFO_JSON,
             ),
         )
 

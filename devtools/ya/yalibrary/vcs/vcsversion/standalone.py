@@ -3,6 +3,7 @@ import datetime
 import os
 import subprocess
 import sys
+import time
 
 
 try:
@@ -36,6 +37,10 @@ except ImportError:
             elif not isinstance(s, (cls.text_type, cls.binary_type)):
                 raise TypeError("not expecting type '%s'" % type(s))
             return s
+
+
+class TimeoutException(Exception):
+    pass
 
 
 # logging.getLogger(__name__)
@@ -122,16 +127,37 @@ def get_svn_path_from_url(url):
 
 
 # yalibrary.svn.run_svn_tool
-def svn_run_svn_tool(tool_binary, tool_args, cwd=None, env=None):
+def svn_run_svn_tool(tool_binary, tool_args, cwd=None, env=None, timeout=0):
     import tempfile
 
     cmd = [tool_binary] + list(tool_args)
     logger.debug('Run svn %s in directory %s with env %s', cmd, cwd, env)
 
+    if timeout:
+        deadline = time.time() + timeout
+    else:
+        deadline = None
+
     with tempfile.NamedTemporaryFile(prefix='svn_stdout_') as stdout_file, tempfile.NamedTemporaryFile(
         prefix='svn_stderr_'
     ) as stderr_file:
-        rc = subprocess.call(cmd, stdout=stdout_file, stderr=stderr_file, cwd=cwd, env=env)
+        proc = subprocess.Popen(cmd, stdout=stdout_file, stderr=stderr_file, cwd=cwd, env=env)
+
+        if deadline:
+            timeout_remaining = deadline - time.time()
+            if timeout_remaining <= 0:
+                proc.kill()
+                raise TimeoutException()
+
+            try:
+                proc.wait(timeout=timeout_remaining)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                raise TimeoutException()
+        else:
+            proc.wait()
+
+        rc = proc.returncode
 
         stdout_file.file.seek(0, os.SEEK_SET)
         out = stdout_file.read()

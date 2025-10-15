@@ -35,6 +35,8 @@ class ReportTypes(object):
     PROFILE_BY_TYPE = 'profile_by_type'
     PLATFORMS = 'platforms'
     VCS_INFO = 'vcs_info'
+    FAST_VCS_INFO_JSON = 'fast_vcs_info_json'
+    FULL_VCS_INFO_JSON = 'full_vcs_info_json'
     PARAMETERS = 'parameters'
     YT_CACHE_ERROR = 'yt_cache_error'
     GRAPH_STATISTICS = 'graph_statistics'

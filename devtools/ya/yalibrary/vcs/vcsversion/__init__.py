@@ -1,5 +1,6 @@
 # coding: utf-8
 import calendar
+import dataclasses
 import datetime
 import json
 import locale
@@ -9,6 +10,10 @@ import socket
 import subprocess
 import sys
 import time
+
+
+DEFAULT_VCS_REVISION = -1
+DEFAULT_VCS_PATCH_NUMBER = 0
 
 
 try:
@@ -94,6 +99,37 @@ except ImportError:
 INDENT = " " * 4
 
 
+class VcsDetectError(Exception):
+    pass
+
+
+@dataclasses.dataclass
+class ArcInfo:
+    info_output_string: str
+    revision: int
+    patch_number: int
+    dirty: bool
+
+    @classmethod
+    def from_revision_info(cls, arc_info_string: str, revision_info: 'RevisionInfo') -> 'ArcInfo':
+        return cls(
+            info_output_string=arc_info_string,
+            revision=int(revision_info.revision),
+            patch_number=int(revision_info.patch_number),
+            dirty=revision_info.dirty,
+        )
+
+    def as_array(self) -> tuple[str]:
+        return (self.info_output_string, str(self.revision), str(self.patch_number), 'dirty' if self.dirty else '')
+
+
+@dataclasses.dataclass
+class RevisionInfo:
+    revision: str
+    patch_number: str
+    dirty: bool
+
+
 def _dump_json(
     arc_root,
     info,
@@ -112,11 +148,11 @@ def _dump_json(
     j['SCM_DATA'] = info['scm_text']
     j['ARCADIA_SOURCE_PATH'] = _SystemInfo._to_text(arc_root)
     j['ARCADIA_SOURCE_URL'] = info.get('url', info.get('svn_url', ''))
-    j['ARCADIA_SOURCE_REVISION'] = info.get('revision', -1)
+    j['ARCADIA_SOURCE_REVISION'] = info.get('revision', DEFAULT_VCS_REVISION)
     j['ARCADIA_SOURCE_HG_HASH'] = info.get('hash', '')
     j['ARCADIA_SOURCE_LAST_CHANGE'] = info.get('commit_revision', info.get('svn_commit_revision', -1))
     j['ARCADIA_SOURCE_LAST_AUTHOR'] = info.get('commit_author', '')
-    j['ARCADIA_PATCH_NUMBER'] = info.get('patch_number', 0)
+    j['ARCADIA_PATCH_NUMBER'] = info.get('patch_number', DEFAULT_VCS_PATCH_NUMBER)
     j['BUILD_USER'] = _SystemInfo._to_text(build_user)
     j['BUILD_HOST'] = _SystemInfo._to_text(build_host)
     j['VCS'] = info.get('vcs', '')
@@ -126,7 +162,7 @@ def _dump_json(
     j['DIRTY'] = info.get('dirty', '')
 
     if 'url' in info or 'svn_url' in info:
-        j['SVN_REVISION'] = info.get('svn_commit_revision', info.get('revision', -1))
+        j['SVN_REVISION'] = info.get('svn_commit_revision', info.get('revision', DEFAULT_VCS_REVISION))
         j['SVN_ARCROOT'] = info.get('url', info.get('svn_url', ''))
         j['SVN_TIME'] = info.get('commit_date', info.get('svn_commit_date', ''))
 
@@ -243,7 +279,7 @@ class _SystemInfo:
         if not host_info:
             return ""
 
-        host_info_ = six_.ensure_str(host_info)  # type: str
+        host_info_: str = six_.ensure_str(host_info)
 
         return "{}{}{}\n".format(INDENT, INDENT, host_info_.strip())
 
@@ -295,6 +331,8 @@ class _CommonUtils:
 
 
 class _ArcVersion(_CommonUtils):
+    _arc_info_cache: dict[str, str | int] = {}
+
     @classmethod
     def parse(cls, json_text, revision, patch_number, dirty):
         """Parses output of
@@ -336,20 +374,55 @@ class _ArcVersion(_CommonUtils):
         return scm_data
 
     @staticmethod
-    def external_data(arc_root):
-        env = os.environ.copy()
-        env['TZ'] = ''
-
-        arc_json_args = ['info', '--json']
-        arc_json_out = svn_run_svn_tool('arc', arc_json_args, env=env, cwd=arc_root)
-        revision, patch_number, dirty = _ArcVersion._get_last_svn_revision(arc_root)
+    def external_data(arc_root: str) -> ArcInfo:
+        arc_json_out = _ArcVersion._get_arc_info(arc_root)
+        revision_info = _ArcVersion._get_last_svn_revision(arc_root)
         logger.debug(
-            'Arc info:{}, last svn:{}, patch_number:{}, dirty:{}'.format(arc_json_out, revision, patch_number, dirty)
+            'Arc info:{}, last svn:{}, patch_number:{}, dirty:{}'.format(
+                arc_json_out,
+                revision_info.revision,
+                revision_info.patch_number,
+                revision_info.dirty,
+            )
         )
-        return [arc_json_out, revision, patch_number, dirty]
+
+        return ArcInfo.from_revision_info(
+            arc_info_string=arc_json_out,
+            revision_info=revision_info,
+        )
 
     @staticmethod
-    def _get_last_svn_revision(arc_root):
+    def external_data_fast(arc_root: str, timeout: int | None = None) -> ArcInfo:
+        arc_json_out = _ArcVersion._get_arc_info(arc_root, timeout=timeout)
+
+        return ArcInfo(
+            info_output_string=arc_json_out,
+            revision=DEFAULT_VCS_REVISION,
+            patch_number=DEFAULT_VCS_PATCH_NUMBER,
+            dirty=False,
+        )
+
+    @classmethod
+    def _get_arc_info(cls, arc_root: str, *, timeout: int = None) -> str:
+        key = arc_root
+        if key in cls._arc_info_cache:
+            return cls._arc_info_cache[key]
+
+        env = os.environ.copy()
+        env['TZ'] = ''
+        arc_json_args = ['info', '--json']
+        try:
+            arc_json_out = svn_run_svn_tool('arc', arc_json_args, env=env, cwd=arc_root, timeout=timeout)
+        except Exception:
+            raise
+
+        logger.debug('Arc info: %s', arc_json_out)
+        cls._arc_info_cache[key] = arc_json_out
+
+        return arc_json_out
+
+    @staticmethod
+    def _get_last_svn_revision(arc_root) -> RevisionInfo:
         env = os.environ.copy()
         env['TZ'] = ''
 
@@ -358,14 +431,16 @@ class _ArcVersion(_CommonUtils):
         ).strip()
 
         info = describe.split('-')
-        revision = info[0].replace('r', '') if len(info) > 0 else str(-1)
-        patch_number = info[1] if len(info) > 1 and info[1].isdigit() else str(0)
-        dirty = 'dirty' if info[-1] == 'dirty' else ''
+        revision = info[0].replace('r', '') if info else str(DEFAULT_VCS_REVISION)
+        patch_number = info[1] if info and info[1].isdigit() else str(DEFAULT_VCS_PATCH_NUMBER)
+        dirty = info[-1] == 'dirty'
         try:
-            patch_number = str(int(patch_number) + int(revision)) if revision != '-1' else patch_number
+            patch_number = (
+                str(int(patch_number) + int(revision)) if revision != str(DEFAULT_VCS_REVISION) else patch_number
+            )
         except ValueError:
             pass
-        return revision.encode('utf-8'), patch_number.encode('utf-8'), dirty.encode('utf-8')
+        return RevisionInfo(revision=revision.encode('utf-8'), patch_number=patch_number.encode('utf-8'), dirty=dirty)
 
 
 class _SvnVersion(_CommonUtils):
@@ -664,7 +739,7 @@ class _TarVersion(_ArcVersion, _SvnVersion, _HgVersion):
             'commit_revision': int(info.get('last_revision')),
             'url': url,
             'commit_date': str(info.get('date')),
-            'patch_number': info.get('patch_number', 0),
+            'patch_number': info.get('patch_number', DEFAULT_VCS_PATCH_NUMBER),
         }
         if branch is not None:
             out['branch'] = branch
@@ -689,7 +764,23 @@ def _get_raw_data(vcs_type, vcs_root):
     if vcs_type == 'svn':
         lines = _SvnVersion.external_data(vcs_root)
     elif vcs_type == 'arc':
-        lines = _ArcVersion.external_data(vcs_root)
+        lines = _ArcVersion.external_data(vcs_root).as_array()
+    elif vcs_type == 'hg':
+        lines = _HgVersion.external_data(vcs_root)
+    elif vcs_type == 'git':
+        lines = _GitVersion.external_data(vcs_root)
+    elif vcs_type == 'tar':
+        lines = _TarVersion.external_data(vcs_root)
+
+    return [six_.ensure_str(line) for line in lines]
+
+
+def _get_fast_raw_data(vcs_type: str, vcs_root: str, timeout: int | None = None) -> list[str]:
+    lines = []
+    if vcs_type == 'svn':
+        lines = _SvnVersion.external_data(vcs_root)
+    elif vcs_type == 'arc':
+        lines = _ArcVersion.external_data_fast(vcs_root, timeout=timeout).as_array()
     elif vcs_type == 'hg':
         lines = _HgVersion.external_data(vcs_root)
     elif vcs_type == 'git':
@@ -728,8 +819,8 @@ def _get_default_dictionary():
         "author":"ordinal",
         "patch_number": 0
     }''',
-            -1,
-            0,
+            DEFAULT_VCS_REVISION,
+            DEFAULT_VCS_PATCH_NUMBER,
             '',
         ]
     )
@@ -746,12 +837,11 @@ def _get_json(arc_root):
         if vcs_root:
             vcs_root = arc_root
         else:
-            raise Exception("Arcadia root '{}' is not subdir of vcs root {}".format(arc_root, vcs_root))
+            raise VcsDetectError("Arcadia root '{}' is not subdir of vcs root {}".format(arc_root, vcs_root))
         info = _get_vcs_dictionary(vcs_type[0], *_get_raw_data(vcs_type[0], vcs_root))
         return info, vcs_root
-    except Exception as e:
-        if not getattr(e, 'tame', False):
-            logger.debug('Cannot get vcs information {} [{}]: \n'.format(format_exc(), str(e)))
+    except Exception:
+        logger.exception('Cannot get vcs information')
         return _get_default_json()
 
 
@@ -765,6 +855,21 @@ def repo_config(arc_root):
 def get_raw_version_info(arc_root, bld_root=None):
     info, _ = _get_json(arc_root)
     return info
+
+
+def get_fast_version_info(arc_root: str, timeout: int | None = None) -> dict[str, str | int]:
+    arc_root = detect_root(arc_root)
+    try:
+        vcs_type, vcs_root, _ = detect([arc_root], check_tar=True)
+        if vcs_root:
+            vcs_root = arc_root
+        else:
+            raise VcsDetectError("Arcadia root '{}' is not subdir of vcs root {}".format(arc_root, vcs_root))
+        info = _get_vcs_dictionary(vcs_type[0], *_get_fast_raw_data(vcs_type[0], vcs_root, timeout))
+        return info
+    except Exception:
+        logger.exception('Cannot get vcs information')
+        return _get_default_json()[0]
 
 
 def get_version_info(arc_root, bld_root, fake_data=False, fake_build_info=False, custom_version="", release_version=""):
