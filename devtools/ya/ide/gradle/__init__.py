@@ -53,7 +53,7 @@ def do_gradle(params):
 
             with tracer.scope('make symlinks'):
                 new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
-                new_symlinks.collect(sem_graph.generated_symlinks)
+                new_symlinks.collect()
 
                 remove_symlinks.remove()
                 new_symlinks.create()

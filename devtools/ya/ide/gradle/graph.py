@@ -81,7 +81,6 @@ class _JavaSemGraph(SemGraph):
             self.gradle_jdk_version = int(self.config.params.force_jdk_version)
         self.dont_symlink_jdk: bool = False  # Don't create symlinks to JDK (for tests)
         self.str_export_root = str(self.config.export_root)
-        self.generated_symlinks: dict[Path, Path] = {}  # symlinks: build directory -> arcadia directory
 
     def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
@@ -174,8 +173,6 @@ class _JavaSemGraph(SemGraph):
         self._get_graph_data()
         self._patch_annotation_processors()
         self._patch_jdk()
-        if not self.config.params.disable_generated_symlinks:
-            self._patch_generated_path()
         self._patch_exclude_targets()
         if self._graph_patched:
             self._update_graph()
@@ -417,70 +414,6 @@ class _JavaSemGraph(SemGraph):
         m = re.search('(?:JDK|jdk)(\\d+)', s)
         return int(m.group(1)) if m else 0
 
-    def _patch_generated_path(self) -> None:
-        """Find node with generated sources/resources and patch they"""
-        mains = self._get_mains()
-        for node in self._graph_data:
-            if not isinstance(node, SemNode) or not node.has_semantics():
-                continue
-            rel_node_path = Path(node.name.replace(self._BUILD_ROOT, '')).parent
-            if not self.config.in_rel_targets(rel_node_path):
-                continue
-            if node.semantics[0].sems[0] == self.JAR_PROTO_SEM:
-                self._on_proto_module(rel_node_path)
-                continue
-            is_main_module = node.semantics[0].sems[0] == self.JAR_SEM
-            export_node_path = str(self.config.export_root / rel_node_path)
-            src_path = None
-            for semantic in node.semantics:
-                if not self._is_some_set(semantic, generated=True):
-                    continue
-                # Some generated sources/resources semantic
-                self._graph_patched = True
-                for isem in range(1, len(semantic.sems)):
-                    parts = semantic.sems[isem].split(':', 2)
-                    glob = ':' + parts[1] if len(parts) == 2 else ''
-                    generated_tail = parts[0].replace(export_node_path, "")
-                    if is_main_module:
-                        if src_path is None:
-                            src_path = self._get_main_src_path(node)
-                        rel_generated = src_path + self._GENERATED
-                        semantic.sems[isem] = rel_generated + generated_tail + glob  # Symlinked relative path in module
-                        rel_arcadia_dir = rel_node_path / rel_generated
-                        self.generated_symlinks[
-                            self.config.export_root / _JavaSemConfig.GRADLE_BUILD_DIR / rel_node_path
-                        ] = (self.config.arcadia_root / rel_arcadia_dir)
-                    else:
-                        str_rel_node_path = str(rel_node_path)
-                        rel_module_path = rel_node_path
-                        in_module_path = ""  # by default no main module
-                        module_node = None
-                        tlen = len(str_rel_node_path)
-                        for main_path, main_node in mains:
-                            if len(main_path) < tlen and str_rel_node_path.startswith(main_path + "/"):
-                                # Test in main module
-                                rel_module_path = Path(main_path)
-                                in_module_path = str_rel_node_path.replace(main_path + "/", "")
-                                module_node = main_node
-                                break
-                        if src_path is None:
-                            src_path = self._get_test_src_path(node, in_module_path)
-                            main_src_path = self._get_main_src_path(module_node) if module_node else None
-                            if main_src_path and not src_path:
-                                src_path = self._SRC + "/"
-                        rel_generated = src_path + self._GENERATED
-                        semantic.sems[isem] = (
-                            '../' * len(in_module_path.split('/'))
-                            + rel_generated
-                            + ("/" + in_module_path if in_module_path else "")
-                            + generated_tail
-                            + glob
-                        )  # Symlinked relative path in module
-                        rel_arcadia_dir = rel_module_path / rel_generated
-                        self.generated_symlinks[
-                            self.config.export_root / _JavaSemConfig.GRADLE_BUILD_DIR / rel_module_path
-                        ] = (self.config.arcadia_root / rel_arcadia_dir)
-
     def _get_mains(self) -> list[tuple[str, SemNode]]:
         """Collect all relative paths of main modules and they nodes"""
         mains: list[tuple[str, SemNode]] = []  # relative in arcadia for all main modules
@@ -492,13 +425,6 @@ class _JavaSemGraph(SemGraph):
             mains.append((str(Path(node.name.replace(self._BUILD_ROOT, '')).parent), node))
         mains.sort(key=lambda i: i[0], reverse=True)  # Long paths firstly
         return mains
-
-    def _on_proto_module(self, rel_node_path: Path) -> None:
-        """For proto modules make symlinks, but patch graph don't required"""
-        rel_arcadia_dir = rel_node_path / self._GENERATED
-        self.generated_symlinks[
-            self.config.export_root / _JavaSemConfig.GRADLE_BUILD_DIR / rel_node_path / self._GENERATED
-        ] = (self.config.arcadia_root / rel_arcadia_dir)
 
     def _is_some_set(self, semantic: Semantic, generated: bool) -> bool:
         """Check this semantic contains generated source/resource set"""

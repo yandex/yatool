@@ -22,9 +22,7 @@ class _Exporter:
         self.config: _JavaSemConfig = java_sem_config
         self.sem_graph: _JavaSemGraph = java_sem_graph
         self.project_name: str = None
-        self.attrs_for_all_templates: list[str] = [
-            "symlinks_to_generated = " + ("false" if self.config.params.disable_generated_symlinks else "true")
-        ]
+        self.attrs_for_all_templates: list[str] = ["symlinks_to_generated = false"]
         self.attrs_for_all_templates += self.config.params.yexport_toml
         if self.config.output_root != self.config.arcadia_root:
             self.attrs_for_all_templates += [f"output_root = '{self.config.output_root}'"]

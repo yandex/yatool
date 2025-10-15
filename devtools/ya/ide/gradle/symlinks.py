@@ -224,13 +224,8 @@ class _NewSymlinkCollector(_SymlinkCollector):
         self.symlinks: dict[Path, Path] = {}
         self.has_errors: bool = False
 
-    def collect(self, generated_symlinks: dict[Path, Path] = None) -> None:
+    def collect(self) -> None:
         """Collect new symlinks for creating, skip already exists symlinks"""
-        if generated_symlinks:
-            for build_dir, arcadia_dir in generated_symlinks.items():
-                if not build_dir.exists():
-                    self.mkdir(build_dir)
-                self._collect_symlink(build_dir, arcadia_dir)
         for export_file, arcadia_file in self.collect_symlinks():
             self._collect_symlink(export_file, arcadia_file)
 
