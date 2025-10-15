@@ -132,6 +132,7 @@ class _Exporter:
                         f'build_contribs = {'true' if self.config.params.collect_contribs else 'false'}',
                         f'disable_errorprone = {'true' if self.config.params.disable_errorprone else 'false'}',
                         f'disable_lombok_plugin = {'true' if self.config.params.disable_lombok_plugin else 'false'}',
+                        f'jdk11_compatibility_mode = {'true' if self.config.params.jdk11_compatibility_mode else 'false'}',
                         '',
                         '[add_attrs.target]',
                         *self.attrs_for_all_templates,
