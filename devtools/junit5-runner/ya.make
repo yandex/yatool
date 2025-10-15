@@ -31,6 +31,7 @@ PEERDIR(
     # Multiple implementations
     devtools/junit5-runner/junit_common
     devtools/junit5-runner/junit_5_12
+    devtools/junit5-runner/junit_5_13
 )
 
 LINT(base)
@@ -39,6 +40,7 @@ END()
 RECURSE(
     junit_common
     junit_5_12
+    junit_5_13
 )
 
 RECURSE_FOR_TESTS(
@@ -52,6 +54,12 @@ RECURSE_FOR_TESTS(
     test-pack_5_12/logs-log4j
     test-pack_5_12/logs-log4j2
     test-pack_5_12/logs-logback
+    test-pack_5_13/test
+    test-pack_5_13/logs-jul
+    test-pack_5_13/logs-log4j
+    test-pack_5_13/logs-log4j2
+    test-pack_5_13/logs-logback
     src/test
     src/test_5_12
+    src/test_5_13
 )
