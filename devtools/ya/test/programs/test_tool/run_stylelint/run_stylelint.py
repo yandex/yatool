@@ -43,11 +43,10 @@ def get_stylelint_cmd(args):
 
 
 def get_env(args):
-    pm_utils.init_nots_path(build_root=args.build_root, local_cli=False)
     build_dir = os.path.join(args.build_root, args.project_path)
     bindir_node_modules_path = os.path.join(build_dir, pm_const.NODE_MODULES_DIRNAME)
     node_path = [
-        os.path.join(pm_utils.build_vs_store_path(args.project_path), pm_const.NODE_MODULES_DIRNAME),
+        os.path.join(pm_utils.build_vs_store_path(args.build_root, args.project_path), pm_const.NODE_MODULES_DIRNAME),
         # TODO: remove - no longer needed
         os.path.join(bindir_node_modules_path, pnpm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
         bindir_node_modules_path,
