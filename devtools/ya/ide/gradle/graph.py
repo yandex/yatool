@@ -409,7 +409,7 @@ class _JavaSemGraph(SemGraph):
     @staticmethod
     def _get_jdk_version(s: str) -> int:
         """Extract JDK version from resource var name"""
-        if re.match('^d+$', s):  # prepare int version number in value
+        if re.match('^\\d+$', s):  # prepare int version number in value
             return int(s)
         m = re.search('(?:JDK|jdk)(\\d+)', s)
         return int(m.group(1)) if m else 0
