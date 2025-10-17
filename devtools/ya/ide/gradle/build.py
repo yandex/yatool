@@ -68,12 +68,10 @@ class _Builder:
         junk_ya_make = None
         try:
             if build_all_langs:
-                ya_make_opts = yarg.merge_opts(
-                    build_opts.ya_make_options(free_build_targets=True, build_type='release')
-                )
+                ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release'))
                 opts = yarg.merge_params(ya_make_opts.initialize([]))
             else:
-                ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True, build_type='debug'))
+                ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release'))
                 opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
                 opts.dump_sources = True
                 if proto_rel_targets:
@@ -108,6 +106,12 @@ class _Builder:
             opts.arc_root = str(self.config.arcadia_root)
             opts.bld_root = self.config.params.bld_root
             opts.ignore_recurses = True
+            opts.ymake_tool_servermode = True
+            opts.ymake_pic_servermode = True
+            opts.ymake_multiconfig = True
+            opts.ymake_parallel_rendering = True
+            opts.ymake_internal_servermode = True
+            opts.ymake_use_subinterpreters = True
 
             opts.rel_targets = []
             opts.abs_targets = []
