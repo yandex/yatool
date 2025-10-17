@@ -872,7 +872,11 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
 
     result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake, exec), asio::use_awaitable);
     if (result.Defined()) {
-        co_return result.GetRef();
+        auto r = result.GetRef();
+        if (BR_OK == r) {
+            yMake->CommitCaches();
+        }
+        co_return r;
     }
 
     DumpDarts(conf, yMake);
