@@ -23,16 +23,20 @@ class _SymlinkCollector:
     SETTINGS_DIRS: tuple[str] = list(SETTINGS_MKDIRS) + ["gradle"]  # Folders for symlink to settings root
 
     BUILD_SKIP_ROOT_DIRS: tuple[str] = list(SETTINGS_DIRS) + [
-        _JavaSemConfig.YMAKE_DIR
+        _JavaSemConfig.YMAKE_DIR,
+        _JavaSemConfig.GRADLE_BUILD_DIR,
     ]  # Skipped for build directories in export root
     BUILD_FILE: str = "build.gradle.kts"  # Filename for create build symlinks
 
     def __init__(self, java_sem_config: _JavaSemConfig):
         self.config: _JavaSemConfig = java_sem_config
 
-    def collect_symlinks(self) -> Iterable[tuple[Path]]:
+    def _remove_exported_message(self, path: Path) -> None:
+        self.logger.warning("Remove early exported, but not used now '%s'", path)
+
+    def collect_symlinks(self, collect_exists: bool) -> Iterable[tuple[Path]]:
         yield from self._collect_settings_symlinks()
-        yield from self._collect_build_symlinks()
+        yield from self._collect_build_symlinks(collect_exists)
 
     def _collect_settings_symlinks(self) -> Iterable[tuple[Path]]:
         """Collect symlinks for each settings files/dirs"""
@@ -46,17 +50,28 @@ class _SymlinkCollector:
                 arcadia_file = self.config.settings_root / basename
                 yield export_file, arcadia_file
 
-    def _collect_build_symlinks(self) -> Iterable[tuple[Path]]:
+    def _collect_build_symlinks(self, collect_exists: bool) -> Iterable[tuple[Path]]:
         """Collect symlinks for each build files/dirs from arcadia to export"""
         for export_file in self.config.export_root.iterdir():
             basename = export_file.name
             if basename not in _SymlinkCollector.BUILD_SKIP_ROOT_DIRS and export_file.is_dir():
                 export_dir = export_file
                 for walk_root, _, files in export_dir.walk():
+                    is_rel_target = collect_exists and self.config.in_rel_targets(
+                        walk_root.relative_to(self.config.export_root)
+                    )
                     for file in files:
                         if file == _SymlinkCollector.BUILD_FILE:
                             export_file = walk_root / file
                             arcadia_file = self.config.arcadia_root / export_file.relative_to(self.config.export_root)
+                            if collect_exists:
+                                exists_in_arcadia = arcadia_file.exists()
+                                if not exists_in_arcadia or not is_rel_target:
+                                    self._remove_exported_message(export_file.relative_to(self.config.export_root))
+                                    if exists_in_arcadia:
+                                        arcadia_file.unlink()  # remove symlink in arcadia
+                                    export_file.unlink()  # and exported file
+                                    continue
                             yield export_file, arcadia_file
             elif basename == _SymlinkCollector.BUILD_FILE and export_file.is_file():
                 arcadia_file = self.config.arcadia_root / basename
@@ -106,12 +121,13 @@ class _ExistsSymlinkCollector(_SymlinkCollector):
             return
 
         try:
-            if self._load():
-                return
+            if self._load():  # always check symlinks from saved for remove invalid symlinks
+                if not self.config.new_sign:  # if config sign changed - must recollect exported from disk below
+                    return
         except Exception as e:
             self.logger.error("Can't load symlinks from file %s: %s", self._symlinks_path, e)
 
-        for export_file, arcadia_file in self.collect_symlinks():
+        for export_file, arcadia_file in self.collect_symlinks(True):
             if self._check_symlink(arcadia_file, export_file):
                 self.add_symlink(arcadia_file, export_file)
 
@@ -141,6 +157,10 @@ class _ExistsSymlinkCollector(_SymlinkCollector):
         for arcadia_file, export_file in symlinks.items():
             arcadia_file = Path(arcadia_file)
             export_file = Path(export_file)
+            if not arcadia_file.exists():
+                self._remove_exported_message(export_file.relative_to(self.config.export_root))
+                export_file.unlink()
+                continue
             if self._check_symlink(arcadia_file, export_file):
                 self.add_symlink(arcadia_file, export_file)
         return True
@@ -226,7 +246,7 @@ class _NewSymlinkCollector(_SymlinkCollector):
 
     def collect(self) -> None:
         """Collect new symlinks for creating, skip already exists symlinks"""
-        for export_file, arcadia_file in self.collect_symlinks():
+        for export_file, arcadia_file in self.collect_symlinks(False):
             self._collect_symlink(export_file, arcadia_file)
 
     def _collect_symlink(self, export_file: Path, arcadia_file: Path) -> None:

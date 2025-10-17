@@ -32,6 +32,7 @@ def do_gradle(params):
                     remover.remove()
                 if not config.params.reexport:
                     return
+                config.sign()
                 with tracer.scope('recollect symlinks'):
                     exists_symlinks, remove_symlinks = _collect_symlinks(config, 'recollect symlinks')
 

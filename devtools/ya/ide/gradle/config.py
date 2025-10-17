@@ -24,6 +24,7 @@ class _JavaSemConfig(SemConfig):
         'systemProp.gradle.wrapperPassword',
     )
     GRADLE_BUILD_DIR = "gradle.build"
+    CONFIG_SIGN = "config.sign"
 
     EXPORT_ROOT_BASE: Path = Path(core_config.misc_root()) / 'gradle'  # Base folder of all export roots
 
@@ -46,6 +47,7 @@ class _JavaSemConfig(SemConfig):
         self._check_exclude_targets()
         if not self.yexport_toml_checked:
             self._check_yexport_toml()
+        self.sign()
 
     def _prepare_targets(self) -> None:
         super()._prepare_targets()
@@ -168,6 +170,12 @@ class _JavaSemConfig(SemConfig):
                 return True
         return False
 
+    def is_rel_parent_of_targets(self, rel_target: Path) -> bool:
+        for conf_rel_target in self.params.rel_targets:
+            if Path(conf_rel_target).is_relative_to(rel_target):
+                return True
+        return False
+
     def get_project_gradle_props(self) -> dict[str, str]:
         return self._get_section(self.GRADLE_PROPS)
 
@@ -232,3 +240,27 @@ class _JavaSemConfig(SemConfig):
             self.ya_gradle_config_files = self.ya_gradle_config.read(ya_gradle_config_files, 'UTF-8')
         except Exception as e:
             raise YaIdeGradleException(f"Can't read config files {ya_gradle_config_files}: {e}") from e
+
+    def _get_sign(self) -> str:
+        return hashing.fast_hash(':'.join(sorted(self.params.abs_targets)) + '|' + ':'.join(self.rel_exclude_targets))
+
+    def _sign_filename(self) -> Path:
+        return self.export_root / self.CONFIG_SIGN
+
+    def _save_sign(self, sign: str) -> None:
+        sign_filename = self._sign_filename()
+        sign_filename.parent.mkdir(0o755, parents=True, exist_ok=True)
+        with sign_filename.open('w') as f:
+            f.write(sign)
+
+    def _load_sign(self) -> str:
+        sign_filename = self._sign_filename()
+        if not sign_filename.exists():
+            return ""
+        with sign_filename.open('r') as f:
+            return f.read()
+
+    def sign(self) -> None:
+        sign = self._get_sign()
+        self.new_sign: bool = self._load_sign() != sign
+        self._save_sign(sign)
