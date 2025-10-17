@@ -77,7 +77,7 @@ class _JavaSemGraph(SemGraph):
         self._cached_jdk_paths = {}
         self.jdk_paths: dict[int, str] = {}
         self.foreign_targets: list[str] = []
-        self.gradle_jdk_version: int = 11  # by default use JDK 11 for Gradle
+        self.gradle_jdk_version: int = 21  # by default use JDK 21 for Gradle
         if self.config.params.force_jdk_version and int(self.config.params.force_jdk_version) > self.gradle_jdk_version:
             self.gradle_jdk_version = int(self.config.params.force_jdk_version)
         self.dont_symlink_jdk: bool = False  # Don't create symlinks to JDK (for tests)
@@ -369,7 +369,7 @@ class _JavaSemGraph(SemGraph):
                         semantic.sems = [sem0, str(jdk_version)]
                     self._graph_patched = True
 
-    def get_jdk_path(self, jdk_version: int) -> str:
+    def get_jdk_path(self, jdk_version: int, is_toolchain: bool = True) -> str:
         if self.config.params.force_jdk_version:
             jdk_version = int(self.config.params.force_jdk_version)
         if jdk_version in self._cached_jdk_paths:
@@ -399,11 +399,9 @@ class _JavaSemGraph(SemGraph):
 
         jdk_path = str(jdk_path)
         self._cached_jdk_paths[jdk_version] = jdk_path
-        if jdk_path != self.JDK_PATH_NOT_FOUND:
+        if is_toolchain and jdk_path != self.JDK_PATH_NOT_FOUND:
             self.jdk_paths[jdk_version] = jdk_path  # Public only valid jdk paths
 
-            if jdk_version > self.gradle_jdk_version:
-                self.gradle_jdk_version = jdk_version  # Use for Gradle max JDK version in graph
         return jdk_path
 
     @staticmethod

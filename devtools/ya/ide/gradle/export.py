@@ -59,7 +59,7 @@ class _Exporter:
             project_gradle_properties = self._apply_gradle_property(
                 project_gradle_properties, self._KOTLIN_DAEMON_JVMARGS, self.config.params.kotlin_daemon_jvmargs
             )
-        gradle_jdk_path = self.sem_graph.get_jdk_path(self.sem_graph.gradle_jdk_version)
+        gradle_jdk_path = self.sem_graph.get_jdk_path(self.sem_graph.gradle_jdk_version, is_toolchain=False)
         if gradle_jdk_path != self.sem_graph.JDK_PATH_NOT_FOUND:
             self.attrs_for_all_templates += [
                 f"gradle_jdk_version = '{self.sem_graph.gradle_jdk_version}'",
