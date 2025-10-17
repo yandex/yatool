@@ -39,6 +39,7 @@ class _JavaSemGraph(SemGraph):
 
     JDK_PATH_SEM = 'jdk_path'
     JDK_VERSION_SEM = 'jdk_version'
+    REQUIRED_JDK_SEM = 'required_jdk'
 
     JDK_PATH_NOT_FOUND = 'NOT_FOUND'  # Magic const for not found JDK path
 
@@ -358,15 +359,14 @@ class _JavaSemGraph(SemGraph):
             in_rel_targets = self.config.in_rel_targets(rel_target)
             for semantic in node.semantics:
                 sem0 = semantic.sems[0]
-                if sem0 == self.JDK_VERSION_SEM and len(semantic.sems) > 1:
-                    jdk_version = _JavaSemGraph._get_jdk_version(semantic.sems[1])
-                    semantic.sems = [self.JDK_VERSION_SEM, str(jdk_version)]
-                    self._graph_patched = True
-                elif sem0 == self.JDK_PATH_SEM and len(semantic.sems) > 1:
+                if sem0 in (self.JDK_VERSION_SEM, self.JDK_PATH_SEM, self.REQUIRED_JDK_SEM) and len(semantic.sems) > 1:
                     jdk_version = _JavaSemGraph._get_jdk_version(semantic.sems[1])
                     # don't load JDK for non-targets, fill by dummy string
                     jdk_path = self.get_jdk_path(jdk_version) if in_rel_targets else f"JDK_PATH_{jdk_version}"
-                    semantic.sems = [self.JDK_PATH_SEM, jdk_path]
+                    if sem0 == self.JDK_PATH_SEM:
+                        semantic.sems = [self.JDK_PATH_SEM, jdk_path]
+                    else:
+                        semantic.sems = [sem0, str(jdk_version)]
                     self._graph_patched = True
 
     def get_jdk_path(self, jdk_version: int) -> str:
