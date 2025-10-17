@@ -193,6 +193,10 @@ class _JavaSemConfig(SemConfig):
         default_true_params = ['collect_contribs', 'build_foreign']
         for prop, value in props:
             param = self._prop2param(prop)
+            default_value = True
+            if param.startswith('no_'):
+                param = param[3:]
+                default_value = False
             if not hasattr(self.params, param):
                 raise YaIdeGradleException(f"Unknown ya ide gradle param {param}")
             if param in merge_params:  # Merge lists, and config values prepend command line values
@@ -208,7 +212,7 @@ class _JavaSemConfig(SemConfig):
                 if isinstance(getattr(self.params, param), list):  # this param must be list
                     value = re.split(r'[\s\t\n,]+', value)
                 elif value is None:  # prop without value, some flag, for example, disable-lombok-plugin
-                    value = True
+                    value = default_value
                 setattr(self.params, param, value)
             if not printedSetFrom:
                 self.logger.info(
