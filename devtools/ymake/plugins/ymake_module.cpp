@@ -30,39 +30,39 @@ namespace {
         return path;
     }
 
-    typedef struct {
+    struct Context {
         PyObject_HEAD
         TPluginUnit* Unit;
-    } Context;
+    };
 
-    static PyObject* ContextTypeGetAttrFunc(PyObject* self, char* attrname) {
+    PyObject* ContextTypeGetAttrFunc(PyObject* self, char* attrname) {
         Context* context = reinterpret_cast<Context*>(self);
         PyObject* obj = CreateCmdContextObject(context->Unit, attrname);
         CheckForError();
         return obj;
     }
 
-    static PyType_Slot YMakeContextTypeSlots[] = {
+    PyType_Slot YMakeContextTypeSlots[] = {
          {Py_tp_doc, (void*)"Context type"},
          {Py_tp_getattr, (void*)ContextTypeGetAttrFunc},
          {Py_tp_new, (void*)PyType_GenericNew},
          {0, 0}
     };
 
-    static PyType_Spec ContextTypeSpec = {
+    PyType_Spec ContextTypeSpec = {
         .name = "ymake.Context",
         .basicsize = sizeof(Context),
         .flags = Py_TPFLAGS_DEFAULT,
         .slots = YMakeContextTypeSlots,
     };
 
-    typedef struct {
+    struct CmdContext {
         PyObject_HEAD
         std::string Name;
         TPluginUnit* Unit;
-    } CmdContext;
+    };
 
-    static PyObject* CmdContextCall(PyObject* self, PyObject* args, PyObject* /*kwargs*/) {
+    PyObject* CmdContextCall(PyObject* self, PyObject* args, PyObject* /*kwargs*/) {
         CmdContext* cmdContext = reinterpret_cast<CmdContext*>(self);
 
         TVector<TStringBuf> methodArgs;
@@ -150,7 +150,7 @@ namespace {
         return nullptr;
     }
 
-    static int CmdContextInit(CmdContext* self, PyObject* args, PyObject* kwds) {
+    int CmdContextInit(CmdContext* self, PyObject* args, PyObject* kwds) {
         const char* str;
 
         static char* kwlist[] = {const_cast<char*>("name"), nullptr};
@@ -162,7 +162,7 @@ namespace {
         return 0;
     }
 
-    static PyType_Slot YMakeCmdContextTypeSlots[] = {
+    PyType_Slot YMakeCmdContextTypeSlots[] = {
         {Py_tp_doc, (void*)"CmdContext type"},
         {Py_tp_init, (void*)CmdContextInit},
         {Py_tp_call, (void*)CmdContextCall},
@@ -170,7 +170,7 @@ namespace {
         {0, 0}
     };
 
-    static PyType_Spec CmdContextTypeSpec = {
+    PyType_Spec CmdContextTypeSpec = {
         .name = "ymake.Context",
         .basicsize = sizeof(CmdContext),
         .flags = Py_TPFLAGS_DEFAULT,
@@ -181,7 +181,7 @@ namespace {
         const char* ext;
         PyObject* confObj;
         PyObject* callableObj;
-        PyObject* inducedDepsObj = NULL;
+        PyObject* inducedDepsObj = nullptr;
         int passInducedIncludes = 0;
         const char* keys[] = {
             "",
@@ -192,7 +192,7 @@ namespace {
             nullptr
         };
         if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OsO|$Op:ymake.add_parser", (char**)keys, &confObj, &ext, &callableObj, &inducedDepsObj, &passInducedIncludes) || PyErr_Occurred()) {
-            return NULL;
+            return nullptr;
         }
         TBuildConfiguration* conf = nullptr;
         if (PyCapsule_CheckExact(confObj)) {
@@ -200,34 +200,34 @@ namespace {
         }
         if (conf == nullptr) {
             PyErr_SetString(PyExc_TypeError, "first argument of ymake.add_parser is expected to be a PyCapsule object containing a pointer to TBuildConfiguration");
-            return NULL;
+            return nullptr;
         }
         std::map<TString, TString> inducedDeps;
         if (inducedDepsObj) {
             if (!PyDict_Check(inducedDepsObj)) {
                 PyErr_SetString(PyExc_TypeError, "'induced' argument of ymake.add_parser is expected to be of type 'dict'");
-                return NULL;
+                return nullptr;
             }
 
             Py_ssize_t pos = 0;
-            PyObject* keyObj = NULL;
-            PyObject* valueObj = NULL;
+            PyObject* keyObj = nullptr;
+            PyObject* valueObj = nullptr;
             while (PyDict_Next(inducedDepsObj, &pos, &keyObj, &valueObj)) {
                 if (!PyUnicode_Check(keyObj)) {
                     PyErr_SetString(PyExc_TypeError, "key of dict (of 'induced' argument) must be a string");
-                    return NULL;
+                    return nullptr;
                 }
-                const char* key = PyUnicode_AsUTF8AndSize(keyObj, NULL);
+                const char* key = PyUnicode_AsUTF8AndSize(keyObj, nullptr);
                 if (!key || PyErr_Occurred()) {
-                    return NULL;
+                    return nullptr;
                 }
                 if (!PyUnicode_Check(valueObj)) {
                     PyErr_SetString(PyExc_TypeError, "value of dict (of 'induced' argument) must be a string");
-                    return NULL;
+                    return nullptr;
                 }
-                const char* value = PyUnicode_AsUTF8AndSize(valueObj, NULL);
+                const char* value = PyUnicode_AsUTF8AndSize(valueObj, nullptr);
                 if (!value || PyErr_Occurred()) {
-                    return NULL;
+                    return nullptr;
                 }
                 inducedDeps.emplace(key, value);
             }
@@ -245,7 +245,7 @@ namespace {
             nullptr
         };
         if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|$s:ymake.report_configure_error", (char**)keys, &errorMessage, &missingDir) || PyErr_Occurred()) {
-            return NULL;
+            return nullptr;
         }
         if (missingDir) {
             // It seems that we can get rid of the second argument for report_configure_error,
@@ -254,14 +254,14 @@ namespace {
             TScopedPyObjectPtr formatObj = Py_BuildValue("s", "format");
             TScopedPyObjectPtr errorMessageObj = Py_BuildValue("s", errorMessage);
             TScopedPyObjectPtr missingDirObj = Py_BuildValue("s", missingDir);
-            TScopedPyObjectPtr result = PyObject_CallMethodObjArgs(errorMessageObj, formatObj.Get(), missingDirObj.Get(), NULL);
+            TScopedPyObjectPtr result = PyObject_CallMethodObjArgs(errorMessageObj, formatObj.Get(), missingDirObj.Get(), nullptr);
             if (!result || PyErr_Occurred()) {
-                return NULL;
+                return nullptr;
             }
 
-            const char* message = PyUnicode_AsUTF8AndSize(result, NULL);
+            const char* message = PyUnicode_AsUTF8AndSize(result, nullptr);
             if (!message || PyErr_Occurred()) {
-                return NULL;
+                return nullptr;
             }
 
             OnBadDirError(message, missingDir);
@@ -274,7 +274,7 @@ namespace {
     PyObject* MethodParseCythonIncludes(PyObject* /*self*/, PyObject* args) {
         const char* data;
         if (!PyArg_ParseTuple(args, "y:ymake.parse_cython_includes", &data) || PyErr_Occurred()) {
-            return NULL;
+            return nullptr;
         }
         TVector<TString> includes;
         ParseCythonIncludes(data, includes);
@@ -282,7 +282,7 @@ namespace {
         TScopedPyObjectPtr list = PyList_New(size);
         for (Py_ssize_t index = 0; index < size; ++index) {
             if (PyList_SetItem(list, index, Py_BuildValue("y", includes[index].data())) < 0 || PyErr_Occurred()) {
-                return NULL;
+                return nullptr;
             }
         }
         return list.Release();
@@ -304,7 +304,7 @@ namespace {
                 return nullptr;
             }
         } else if (PyBytes_Check(xmlDocObject) || PyByteArray_Check(xmlDocObject)) {
-            asUnicode.Reset(PyUnicode_FromEncodedObject(xmlDocObject, "utf-8", NULL));
+            asUnicode.Reset(PyUnicode_FromEncodedObject(xmlDocObject, "utf-8", nullptr));
             if (asUnicode == nullptr) {
                 return nullptr;
             }
@@ -350,7 +350,7 @@ namespace {
                 return nullptr;
             }
         } else if (PyBytes_Check(xmlDocObject) || PyByteArray_Check(xmlDocObject)) {
-            dataAsUnicode.Reset(PyUnicode_FromEncodedObject(xmlDocObject, "utf-8", NULL));
+            dataAsUnicode.Reset(PyUnicode_FromEncodedObject(xmlDocObject, "utf-8", nullptr));
             if (dataAsUnicode == nullptr) {
                 return nullptr;
             }
@@ -437,16 +437,16 @@ namespace {
     int YMakeExec(PyObject* mod) {
         YMakeState* state = GetYMakeState(mod);
 
-        state->ContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &ContextTypeSpec, NULL);
-        if (state->ContextType == NULL) {
+        state->ContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &ContextTypeSpec, nullptr);
+        if (state->ContextType == nullptr) {
             return -1;
         }
         if (PyModule_AddType(mod, state->ContextType)) {
             return -1;
         }
 
-        state->CmdContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &CmdContextTypeSpec, NULL);
-        if (state->CmdContextType == NULL) {
+        state->CmdContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &CmdContextTypeSpec, nullptr);
+        if (state->CmdContextType == nullptr) {
             return -1;
         }
         if (PyModule_AddType(mod, state->CmdContextType)) {
@@ -480,28 +480,28 @@ namespace {
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},
         {"get_artifact_id_from_pom_xml", (PyCFunction)MethodGetArtifactIdFromPomXml, METH_FASTCALL, PyDoc_STR("Get artifactId from pom.xml")},
         {"parse_ssqls_from_string", (PyCFunction)MethodParseSsqlsFromString, METH_FASTCALL, PyDoc_STR("Parse SSQLS")},
-        {NULL, NULL, 0, NULL}};
+        {nullptr, nullptr, 0, nullptr}};
 
     PyModuleDef_Slot YMakeSlots[] = {
         {Py_mod_exec, (void*)YMakeExec},
         {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
-        {0, NULL}};
+        {0, nullptr}};
 
-    struct PyModuleDef ymakemodule = {
-        PyModuleDef_HEAD_INIT,           // m_base
-        "ymake",                         // m_name
-        PyDoc_STR("Interface to YMake"), // m_doc
-        sizeof(YMakeState),              // m_size
-        YMakeMethods,                    // m_methods
-        YMakeSlots,                      // m_slots
-        YMakeTraverse,                   // m_traverse
-        YMakeClear,                      // m_clear
-        YMakeFree,                       // m_free
+    PyModuleDef ymakemodule = {
+        .m_base = PyModuleDef_HEAD_INIT,
+        .m_name = "ymake",
+        .m_doc = PyDoc_STR("Interface to YMake"),
+        .m_size = sizeof(YMakeState),
+        .m_methods = YMakeMethods,
+        .m_slots = YMakeSlots,
+        .m_traverse = YMakeTraverse,
+        .m_clear = YMakeClear,
+        .m_free = YMakeFree,
     };
 } // anonymous namespace
 
 namespace NYMake::NPlugins {
-    PyMODINIT_FUNC PyInit_ymake(void) {
+    PyMODINIT_FUNC PyInit_ymake() {
         return PyModuleDef_Init(&ymakemodule);
     }
 
