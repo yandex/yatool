@@ -422,7 +422,7 @@ class _ArcVersion(_CommonUtils):
         return arc_json_out
 
     @staticmethod
-    def _get_last_svn_revision(arc_root) -> RevisionInfo:
+    def _get_last_svn_revision(arc_root: str) -> RevisionInfo:
         env = os.environ.copy()
         env['TZ'] = ''
 
@@ -432,7 +432,7 @@ class _ArcVersion(_CommonUtils):
 
         info = describe.split('-')
         revision = info[0].replace('r', '') if info else str(DEFAULT_VCS_REVISION)
-        patch_number = info[1] if info and info[1].isdigit() else str(DEFAULT_VCS_PATCH_NUMBER)
+        patch_number = info[1] if len(info) > 1 and info[1].isdigit() else str(DEFAULT_VCS_PATCH_NUMBER)
         dirty = info[-1] == 'dirty'
         try:
             patch_number = (
