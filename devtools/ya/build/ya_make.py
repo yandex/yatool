@@ -409,15 +409,11 @@ class CacheFactory:
         from yalibrary.store.yt_store import yt_store
 
         token = self._get_yt_token()
-        if self._opts.yt_replace_result_yt_upload_only:
-            yt_store_class = yt_store.YndexerYtStore
-        elif self._opts.yt_store2:
-            yt_store_class = yt_store.YtStore2
-        else:
-            yt_store_class = yt_store.YtStore
-
-        kwargs = {}
-        if yt_store_class == yt_store.YtStore2:
+        if self._opts.yt_store2:
+            if self._opts.yt_replace_result_yt_upload_only:
+                yt_store_class = yt_store.YndexerYtStore2
+            else:
+                yt_store_class = yt_store.YtStore2
             kwargs = dict(
                 init_timeout=self._opts.yt_store_init_timeout,
                 prepare_timeout=self._opts.yt_store_prepare_timeout,
@@ -425,6 +421,10 @@ class CacheFactory:
                 check_size=not self._opts.yt_readonly and bool(self._opts.yt_max_cache_size),
             )
         else:
+            if self._opts.yt_replace_result_yt_upload_only:
+                yt_store_class = yt_store.YndexerYtStore
+            else:
+                yt_store_class = yt_store.YtStore
             # These options will be deleted after migration to YtStore2
             kwargs = dict(
                 new_client=self._opts.yt_store_cpp_client,

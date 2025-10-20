@@ -2,6 +2,8 @@
 
 #include <yt/cpp/mapreduce/interface/client.h>
 
+#include <util/folder/path.h>
+
 struct YtStoreClientResponse {
     bool Success;
     bool NetworkErrors;
@@ -40,6 +42,8 @@ struct YtStore {
 };
 
 namespace NYa {
+    void AtExit();
+
     struct TNameReTtl {
         TString NameRe;
         TDuration Ttl;
@@ -59,15 +63,14 @@ namespace NYa {
     struct TYtStore2Options : public TYtTokenOption {
         TYtStore2Options() = default;
 
+        void* Owner{};
         bool ReadOnly{true};
-        void* OnDisable{};
         bool CheckSize{};
         TMaxCacheSize MaxCacheSize{0u};
         TDuration Ttl{};
         TVector<TNameReTtl> NameReTtls{};
         TString OperationPool{};
         TDuration RetryTimeLimit{};
-        bool SyncDurability{};
         TDuration InitTimeout{};
         TDuration PrepareTimeout{};
         bool ProbeBeforePut{};
@@ -90,9 +93,46 @@ namespace NYa {
 
     class TYtStore2 {
     public:
+        using TUidList = TVector<TString>;
+
+        struct TPrepareOptions : public TThrRefBase {
+            TUidList SelfUids{};
+            TUidList Uids{};
+            bool RefreshOnRead{};
+            bool ContentUidsEnabled{};
+        };
+        using TPrepareOptionsPtr = TIntrusivePtr<TPrepareOptions>;
+
+        struct TPutOptions {
+            TString SelfUid{};
+            TString Uid{};
+            TFsPath RootDir{};
+            TVector<TFsPath> Files{};
+            TString Codec{};
+            TString Cuid{};
+            size_t ForcedSize{};
+        };
+
         struct TDataGcOptions {
             i64 DataSizePerJob{};
             ui64 DataSizePerKeyRange{};
+        };
+
+        struct TMetrics {
+            THashMap<TString, TDuration> Timers{};
+            THashMap<TString, TVector<std::pair<TInstant, TInstant>>> TimerIntervals{};
+            THashMap<TString, int> Counters{};
+            THashMap<TString, int> Failures{};
+            THashMap<TString, size_t> DataSize{};
+            // Cache hit
+            int Requested{};
+            int Found{};
+            // CompressionRatio
+            size_t TotalCompressedSize{};
+            size_t TotalRawSize{};
+            // Additional metrics
+            TInstant TimeToFirstCallHas{};
+            TInstant TimeToFirstRecvMeta{};
         };
 
         struct TCreateTablesOptions : public TYtTokenOption {
@@ -130,11 +170,16 @@ namespace NYa {
         TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options);
         ~TYtStore2();
 
-        void WaitInitialized();
-        bool Disabled() const;
-        bool ReadOnly() const;
+        bool Disabled() const noexcept;
+        bool ReadOnly() const noexcept;
+        void Prepare(TPrepareOptionsPtr options);
+        bool Has(const TString& uid);
+        bool TryRestore(const TString& uid, const TString& intoDir);
+        bool Put(const TPutOptions& options);
+        TMetrics GetMetrics() const;
         void Strip();
         void DataGc(const TDataGcOptions& options);
+        void Shutdown() noexcept;
 
         static void ValidateRegexp(const TString& re);
         static void CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options);

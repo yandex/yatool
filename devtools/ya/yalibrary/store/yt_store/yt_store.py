@@ -3,10 +3,8 @@ import logging
 import os
 import time
 
-from collections.abc import Callable
-import typing as tp
-
 from contextlib2 import ExitStack
+from devtools.ya.core import stage_tracer
 from devtools.ya.core import config as core_config
 from devtools.ya.core import monitoring as core_monitoring
 from devtools.ya.core import report
@@ -657,7 +655,7 @@ class YndexerYtStore(YtStore):
         )
 
 
-class YtStore2(DistStore, xx_client.YtStore2Impl):
+class YtStore2(xx_client.YtStore2Impl, DistStore):
     def __init__(
         self,
         proxy: str,
@@ -669,27 +667,16 @@ class YtStore2(DistStore, xx_client.YtStore2Impl):
         ttl: int | None = None,
         name_re_ttls: dict[str, int] | None = None,
         max_file_size: int = 0,
-        fits_filter: Callable[[tp.Any], bool] = None,
         probe_before_put=False,
         probe_before_put_min_size=0,
         retry_time_limit: float | None = None,
-        sync_durability=False,
         operation_pool: str | None = None,
         init_timeout: float | None = None,
         prepare_timeout: float | None = None,
         crit_level: str | None = None,
-        stager: tp.Any | None = None,
+        stager: stage_tracer.StageTracer.GroupStageTracer | None = None,
         **kwargs
     ):
-        DistStore.__init__(
-            self,
-            name='yt-store',
-            stats_name='yt_store_stats',
-            tag='YT',
-            readonly=readonly,
-            max_file_size=max_file_size,
-            fits_filter=fits_filter,
-        )
         xx_client.YtStore2Impl.__init__(
             self,
             proxy,
@@ -702,16 +689,89 @@ class YtStore2(DistStore, xx_client.YtStore2Impl):
             name_re_ttls=name_re_ttls,
             operation_pool=operation_pool,
             retry_time_limit=retry_time_limit,
-            sync_durability=sync_durability,
             init_timeout=init_timeout,
             prepare_timeout=prepare_timeout,
             probe_before_put=probe_before_put,
             probe_before_put_min_size=probe_before_put_min_size,
             crit_level=crit_level,
+            stager=stager,
         )
-        self._proxy = proxy
-        self._data_dir = data_dir
-        self._time_to_first_recv_meta = None
-        self._time_to_first_call_has = None
-        self._is_heater = crit_level == "put"
-        self._stager = stager or utils.DummyStager()
+        DistStore.__init__(
+            self,
+            name='yt-store',
+            stats_name='yt_store_stats',
+            tag='YT',
+            readonly=readonly,
+            max_file_size=max_file_size,
+        )
+
+    def stats(self, execution_log, evlog_writer):
+        metrics = xx_client.YtStore2Impl.get_metrics(self)
+        for tag, val in metrics.timers.items():
+            self._timers[tag] += val
+        for tag, intervals in metrics.time_intervals.items():
+            self._time_intervals[tag].extend(intervals)
+        for tag, val in metrics.counters.items():
+            self._counters[tag] += val
+        for tag, val in metrics.failures.items():
+            self._failures[tag] += val
+        for tag, val in metrics.data_size.items():
+            self._data_size[tag] += val
+        self._cache_hit = {'requested': metrics.requested, 'found': metrics.found}
+
+        DistStore.stats(self, execution_log, evlog_writer)
+        stat = {
+            "time_to_first_recv_meta": metrics.time_to_first_recv_meta,
+            "time_to_first_call_has": metrics.time_to_first_call_has,
+            "failed_during_build": self.disabled(),
+            "failed_during_setup": bool(metrics.time_to_first_recv_meta),
+        }
+        report.telemetry.report('{}-{}'.format(self._stats_name, 'additional-info'), stat)
+
+
+class YndexerYtStore2(YtStore2):
+    YDX_PB2_EXT = '.ydx.pb2.yt'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def fits(self, node):
+        outputs = node["outputs"] if isinstance(node, dict) else node.outputs
+        return any(out.endswith(YndexerYtStore.YDX_PB2_EXT) for out in outputs)
+
+    def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
+        assert codec == consts.YT_CACHE_NO_DATA_CODEC
+        forced_node_size = None
+
+        size_file = list(filter(lambda x: x.endswith(self.YDX_PB2_EXT), files))
+        if not size_file:
+            logger.error('Sizefile not found. Real output size will be placed into dist cache.')
+        elif len(size_file) > 1:
+            logger.error('Too many sizefiles found. Real output size will be placed into dist cache.')
+        else:
+            try:
+                with open(size_file[0]) as f:
+                    stats = json.load(f)
+                    forced_node_size = stats['bytes_to_upload']
+            except Exception as e:
+                logger.error(
+                    'Can\'t read data size from sizefile: {}. Real output size will be placed into dist cache.'.format(
+                        e
+                    )
+                )
+
+        if forced_node_size is None:
+            # TODO Calculate files size without prepare_data
+            # data_path = self._prepare_data(stack, files, codec, root_dir)
+            # forced_node_size = os.path.getsize(data_path)
+            pass
+
+        return super()._do_put(
+            self_uid,
+            uid,
+            root_dir,
+            files,
+            codec=codec,
+            cuid=cuid,
+            forced_size=forced_node_size,
+        )

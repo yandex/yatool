@@ -27,6 +27,7 @@ PEERDIR(
     library/cpp/regex/pcre
     library/cpp/retry
     library/cpp/threading/cancellation
+    library/cpp/threading/future/subscription
     library/cpp/ucompress
     library/python/retry
 
