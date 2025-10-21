@@ -1,7 +1,7 @@
-import os
 import logging
 import shutil
 from pathlib import Path
+from exts import hashing
 
 from devtools.ya.core import yarg
 from devtools.ya.build import build_opts, graph as build_graph, ya_make
@@ -77,29 +77,28 @@ class _Builder:
                 if proto_rel_targets:
                     proto_rel_targets = list(set(proto_rel_targets))
                     opts.add_result.append(".jar")  # require make symlinks to all .jar files
+                    junk_ya_make_content = "\n".join(
+                        [
+                            "JAVA_PROGRAM()",
+                            "PEERDIR(",
+                            *["    " + str(proto_rel_target) for proto_rel_target in proto_rel_targets],
+                            ")",
+                            "END()",
+                            "",
+                        ]
+                    )
                     # For build PROTO_SCHEMA to jar, require build it as PEERDIR
                     # Make one temporary ya.make with JAVA_PROGRAM and PEERDIR to all proto targets
                     junk_ya_make = (
                         self.config.arcadia_root
                         / "junk"
                         / Path.home().name
-                        / ("ya_ide_gradle_" + str(os.getpid()))
+                        / ("ya_ide_gradle_" + hashing.fast_hash(junk_ya_make_content))
                         / "ya.make"
                     )
                     _SymlinkCollector.mkdir(junk_ya_make.parent)
                     with junk_ya_make.open('w') as f:
-                        f.write(
-                            "\n".join(
-                                [
-                                    "JAVA_PROGRAM()",
-                                    "PEERDIR(",
-                                    *["    " + str(proto_rel_target) for proto_rel_target in proto_rel_targets],
-                                    ")",
-                                    "END()",
-                                    "",
-                                ]
-                            )
-                        )
+                        f.write(junk_ya_make_content)
                     build_rel_targets.append(junk_ya_make.parent.relative_to(self.config.arcadia_root))
 
             opts.bld_dir = self.config.params.bld_dir
