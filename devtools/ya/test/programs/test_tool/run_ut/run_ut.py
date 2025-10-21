@@ -828,18 +828,22 @@ def launch_tests(
     # to correctly display test status in case of timeout.
     # subtest-finished is added further, in update_trace_file.
     if is_parallel:
+        start_events = []
         with open(current_tracefile, 'r') as trace:
             for line in trace:
                 try:
                     json_line = json.loads(line)
-                    if json_line.get("name") != "subtest-started":
-                        continue
                 except json.decoder.JSONDecodeError:
                     continue
 
-                with LOCK:
-                    with open(tracefile, 'a') as tr_out:
-                        tr_out.write('\n' + line + '\n')
+                if json_line.get("name") == "subtest-started":
+                    start_events.append(line + '\n')
+
+        if start_events:
+            with LOCK:
+                with open(tracefile, 'a') as tr_out:
+                    tr_out.write('\n')
+                    tr_out.writelines(start_events)
 
     # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
     update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
