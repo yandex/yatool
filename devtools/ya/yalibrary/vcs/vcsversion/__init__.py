@@ -831,8 +831,10 @@ def _get_default_json():
 
 
 def _get_json(arc_root):
-    arc_root = detect_root(arc_root)
+    arc_root: str | None = detect_root(arc_root)
     try:
+        if arc_root is None:
+            raise VcsDetectError("VCS root is None, can't proceed")
         vcs_type, vcs_root, _ = detect([arc_root], check_tar=True)
         if vcs_root:
             vcs_root = arc_root
@@ -841,7 +843,7 @@ def _get_json(arc_root):
         info = _get_vcs_dictionary(vcs_type[0], *_get_raw_data(vcs_type[0], vcs_root))
         return info, vcs_root
     except Exception:
-        logger.exception('Cannot get vcs information')
+        logger.debug('Cannot get vcs information', exc_info=True)
         return _get_default_json()
 
 
@@ -858,8 +860,10 @@ def get_raw_version_info(arc_root, bld_root=None):
 
 
 def get_fast_version_info(arc_root: str, timeout: int | None = None) -> dict[str, str | int]:
-    arc_root = detect_root(arc_root)
+    arc_root: str | None = detect_root(arc_root)
     try:
+        if arc_root is None:
+            raise VcsDetectError("VCS root is None, can't proceed")
         vcs_type, vcs_root, _ = detect([arc_root], check_tar=True)
         if vcs_root:
             vcs_root = arc_root
@@ -868,7 +872,7 @@ def get_fast_version_info(arc_root: str, timeout: int | None = None) -> dict[str
         info = _get_vcs_dictionary(vcs_type[0], *_get_fast_raw_data(vcs_type[0], vcs_root, timeout))
         return info
     except Exception:
-        logger.exception('Cannot get vcs information')
+        logger.debug('Cannot get vcs information', exc_info=True)
         return _get_default_json()[0]
 
 

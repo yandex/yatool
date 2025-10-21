@@ -640,10 +640,10 @@ def configure_fast_vcs_info_json(ctx):
     # type: (devtools.ya.yalibrary.app_ctx.AppCtx) -> typing.Generator[typing.Callable[[], dict], None, None]
     arc_root = getattr(ctx.params, 'arc_root', None)
     if not arc_root:
-        arc_root = yalibrary.find_root.detect_root(os.getcwd())
+        arc_root = devtools.ya.core.config.find_root(fail_on_error=False)
     if not arc_root:
         arc_root = os.getcwd()
-        logger.error('Enable to get vcs root for %s', os.getcwd())
+        logger.debug('Unable to get vcs root for %s', os.getcwd())
 
     result = exts.asyncthread.future(lambda: _load_fast_vcs_info(arc_root))
 
