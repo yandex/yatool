@@ -19,21 +19,16 @@ logger = logging.getLogger(__name__)
 
 def home_dir():
     # When executed in yp pods, $HOME will point to the current snapshot work dir.
-    # Temporarily delete os.environ["HOME"] to force reading current home directory from /etc/passwd
-    casa_antica = os.environ.pop("HOME", None)
+    # force reading current home directory from /etc/passwd
     try:
-        casa_moderna = os.path.expanduser("~")
-        if os.path.isabs(casa_moderna):
-            # This home dir is valid, prefer it over $HOME
-            return casa_moderna
-        else:
-            # When ya-bin is built with musl, only users from /etc/passwd will be properly resolved,
-            # as musl does not have nss module for LDAP integration.
-            return casa_antica
+        import pwd
 
-    finally:
-        if casa_antica is not None:
-            os.environ["HOME"] = casa_antica
+        pw_dir = pwd.getpwuid(os.getuid()).pw_dir
+        if os.path.isabs(pw_dir):
+            return pw_dir
+    except (ImportError, KeyError):
+        pass
+    return os.environ.get("HOME", None)
 
 
 # no caching to make testing possible
