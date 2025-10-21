@@ -824,6 +824,23 @@ def launch_tests(
 
     shared.adjust_test_status(performed_suite, res.rc, res.end_time, add_error_func=suite.add_chunk_error)
 
+    # We need to add subtest-started event to common tracefile from temporary one
+    # to correctly display test status in case of timeout.
+    # subtest-finished is added further, in update_trace_file.
+    if is_parallel:
+        with open(current_tracefile, 'r') as trace:
+            for line in trace:
+                try:
+                    json_line = json.loads(line)
+                    if json_line.get("name") != "subtest-started":
+                        continue
+                except json.decoder.JSONDecodeError:
+                    continue
+
+                with LOCK:
+                    with open(tracefile, 'a') as tr_out:
+                        tr_out.write('\n' + line + '\n')
+
     # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
     update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
 

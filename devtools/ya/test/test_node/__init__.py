@@ -688,9 +688,6 @@ def create_test_node(
     if is_for_distbuild:
         runner_cmd += ["--node-timeout", str(node_timeout or devtools.ya.test.const.DEFAULT_TEST_NODE_TIMEOUT)]
 
-    if hasattr(suite, 'temp_tracefile_dir'):
-        runner_cmd += ["--temp-tracefile-dir", suite.temp_tracefile_dir]
-
     env = sysenv.get_common_env()
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
