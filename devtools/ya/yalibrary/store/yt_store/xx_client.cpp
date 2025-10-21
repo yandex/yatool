@@ -45,14 +45,9 @@ extern void YaYtStoreFinishStage(void* owner, const TString& name);
 
 namespace {
     std::atomic_bool exiting{};
-    std::atomic<int> inHookCount{};
 
     template <class F, class... Args>
     auto CallHook(F&& func, Args&&... args) {
-        inHookCount.fetch_add(1, std::memory_order::relaxed);
-        Y_DEFER {
-            inHookCount.fetch_sub(1, std::memory_order::relaxed);
-        };
         // When the python interpreter is terminating, not only calling python code but even getting GIL can cause a segfault
         if (exiting.load(std::memory_order::relaxed)) {
             return;
@@ -64,10 +59,6 @@ namespace {
 namespace NYa {
     void AtExit() {
         exiting.store(true, std::memory_order::relaxed);
-        // Don't allow python to terminate until all callbacks have finished
-        while (inHookCount.load(std::memory_order::relaxed)) {
-            Sleep(TDuration::MilliSeconds(50));
-        }
     }
 }
 
