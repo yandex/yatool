@@ -4,7 +4,7 @@ NO_UTIL()
 
 ALLOCATOR_IMPL()
 
-NO_BUILD_IF(OS_DARWIN)
+BUILD_ONLY_IF(OS_LINUX)
 
 PEERDIR(
     library/cpp/malloc/api
