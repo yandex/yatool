@@ -205,6 +205,7 @@ class DumpReportOptions(Options):
         self.dump_raw_results = False
         self.json_line_report_file = None
         self.dump_results2_json = False
+        self.stat_only_report_file = None
 
     @staticmethod
     def consumer():
@@ -299,6 +300,15 @@ class DumpReportOptions(Options):
                 'YA_DUMP_RESULTS2_JSON',
                 help='Dump build results to results2.json',
                 hook=SetConstValueHook('dump_results2_json', True),
+            ),
+            ArgConsumer(
+                ['--stat-only'],
+                help='Predict build statistics without running the build. '
+                'Cache based on content-only dynamic uids not considered. '
+                'Output jsonl to file',
+                hook=SetValueHook('stat_only_report_file'),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
             ),
         ]
 

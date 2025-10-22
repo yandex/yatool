@@ -193,6 +193,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         # no distbuild no cry for opensource
         build_options.use_distbuild = False
 
+    build_options.stat_only_report_file = params.stat_only_report_file
     build_options.ymake_bin = params.ymake_bin
     build_options.prefetch = params.prefetch
 
@@ -1338,6 +1339,9 @@ def do_package(params):
         with open(params.dump_build_targets, "w") as f:
             json.dump(targets, f)
         return
+
+    if params.stat_only_report_file:
+        params.build_only = True
 
     if params.dump_inputs:
         do_dump_input(params, arcadia_root, params.dump_inputs)

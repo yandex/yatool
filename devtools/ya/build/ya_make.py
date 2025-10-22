@@ -744,6 +744,89 @@ def is_dist_cache_suitable(node, result, opts):
     return True
 
 
+# Configure-time cache statistics without running the build
+def compute_predictive_build_statistics(graph, dist_cache, opts, local_cache=None):
+    """
+    Compute configure-time executed/cached/avoided counts via BFS without running the build.
+
+    Algorithm:
+      - Start BFS from graph['result'] and traverse dependencies upward (deps).
+      - If a node is suitable for remote cache (fits + is_dist_cache_suitable) and
+        the artifact exists in remote cache (dist_cache.has(uid)), stop expanding
+        at this node and count it as 'cached' frontier.
+      - Otherwise count it as 'executed' and continue traversal to its dependencies.
+      - Nodes never visited by BFS are 'avoided'.
+
+    Definitions:
+      - executed: nodes that would be built (not available in remote cache or not suitable for remote cache).
+      - cached: nodes at the BFS frontier where traversal stops because remote cache has the artifact and it is suitable to use.
+      - avoided: remaining nodes in the graph that are not needed to build requested results.
+
+    Notes and limitations:
+      - Remote (YT/Bazel) and local caches are considered for the frontier; dynamic (runtime) cache is ignored.
+      - Suitability check applies to remote cache via is_dist_cache_suitable to reflect execution behavior;
+        local cache check is direct (has(uid)).
+      - The result is a plan-time estimate over graph nodes; it is conceptually aligned with print_cache_statistics().
+    """
+    nodes = graph.get('graph', []) or []
+    if not nodes:
+        return {
+            'executed_tasks': 0,
+            'cached_tasks': 0,
+            'avoided_tasks': 0,
+        }
+
+    uid_to_node = {n.get('uid'): n for n in nodes if n.get('uid')}
+    orig_results = set(graph.get('result', []) or [])
+    queue = collections.deque(u for u in orig_results if u in uid_to_node)
+    visited = set()
+    executed = set()
+    frontier_cached = set()
+
+    def is_node_cached(node_uid, node):
+        # Local cache: check presence directly
+        if local_cache and local_cache.has(node_uid):
+            return True
+
+        # Remote cache: require suitability and presence
+        if not dist_cache:
+            return False
+        if not dist_cache.fits(node):
+            return False
+        if not is_dist_cache_suitable(node, orig_results, opts):
+            return False
+        return bool(dist_cache.has(node_uid))
+
+    while queue:
+        uid = queue.popleft()
+        if uid in visited:
+            continue
+        node = uid_to_node.get(uid)
+        if not node:
+            continue
+
+        visited.add(uid)
+
+        if is_node_cached(uid, node):
+            frontier_cached.add(uid)
+            # Do not traverse into dependencies past a cached frontier node
+            continue
+
+        executed.add(uid)
+        for dep in node.get('deps', []) or []:
+            if dep in uid_to_node and dep not in visited:
+                queue.append(dep)
+
+    total_nodes = len(uid_to_node)
+    avoided_count = total_nodes - len(visited)
+
+    return {
+        'executed_tasks': len(executed),
+        'cached_tasks': len(frontier_cached),
+        'avoided_tasks': avoided_count,
+    }
+
+
 # XXX see YA-1354
 def replace_yt_results(graph, opts, dist_cache):
     assert 'result' in graph
@@ -915,6 +998,9 @@ class Context:
         sandbox_run_test_uids = set(self.get_context().get('sandbox_run_test_result_uids', []))
         logger.debug("sandbox_run_test_uids: %s", sandbox_run_test_uids)
 
+        # Save graph size before any strip operations for statistics
+        self.total_nodes_before_strip = len(self.graph.get('graph', []))
+
         # XXX see YA-1354
         if opts.bazel_remote_store and (not opts.bazel_remote_readonly or opts.dist_cache_evict_cached):
             self.graph['result'] = replace_dist_cache_results(self.graph, opts, self.dist_cache, app_ctx)
@@ -1027,12 +1113,18 @@ class Context:
                 node.clear()
                 node.update(new_node)
 
+            # Update graph size for statistics after adding nodes
+            self.total_nodes_before_strip = len(self.graph.get('graph', []))
+
             # Strip dangling test nodes (such can be appeared if FORK_*TEST or --tests-retries were specified)
             self.graph = lg.strip_graph(self.graph)
 
             timer.show_step("sandbox_run_test_processing finished")
 
         # We assume that graph won't be modified after this point. Lite graph should be same as full one -- but lite!
+
+        if self.opts.stat_only_report_file:
+            self._dump_predictive_build_statistics()
 
         if self.opts.use_distbuild:
             self._full_graph = self.graph
@@ -1237,6 +1329,32 @@ class Context:
             stdout.flush()
 
         self._timer.show_step("dump_graph finished")
+
+    def _dump_predictive_build_statistics(self):
+        logger.warning(
+            "--stat-only is an experimental configure-time statistics mode. Results are predictive; "
+            "dynamic uid-based cache is not considered; local+remote caches are. Use at your own risk."
+        )
+
+        # Compute configure-time executed/cached/avoided via remote cache frontier
+        plan_stats = compute_predictive_build_statistics(self.graph, self.dist_cache, self.opts, local_cache=self.cache)
+
+        stat_record = {
+            'targets': getattr(self.opts, 'rel_targets', None) or getattr(self.opts, 'abs_targets', None) or [],
+            'all_run_tasks': self.total_nodes_before_strip,
+            'executed_tasks': plan_stats.get('executed_tasks', 0),
+            'cached_tasks': plan_stats.get('cached_tasks', 0),
+            'avoided_tasks': plan_stats.get('avoided_tasks', 0),
+        }
+
+        stat_file_path = os.path.abspath(self.opts.stat_only_report_file)
+        with open(stat_file_path, 'a') as f:
+            f.write(json.dumps(stat_record, sort_keys=True) + '\n')
+
+        logger.info("Build plan statistics written to: {}".format(stat_file_path))
+
+        self.threads = 0
+        self._timer.show_step("dump_predictive_build_statistics finished")
 
 
 def extension(f):
