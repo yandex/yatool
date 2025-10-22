@@ -255,7 +255,12 @@ class ClangFormat:
 
     def format(self, path: PurePath, content: str) -> StylerOutput:
         if path.suffix == ".h":
-            content = self.fix_header(content)
+            p = str(path)
+            if 'yql/essentials/parser/pg_catalog' in p or 'yql/essentials/parser/pg_wrapper' in p:
+                # HACK: (DEVTOOLSSUPPORT-71462) Hardcode until introduction of custom settings in YA-2732
+                pass
+            else:
+                content = self.fix_header(content)
 
         config = self._config_finder.lookup_config(path)
         p = subprocess.Popen(
