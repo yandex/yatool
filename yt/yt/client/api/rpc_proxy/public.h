@@ -1,0 +1,51 @@
+#pragma once
+
+#include <yt/yt/client/api/public.h>
+
+namespace NYT::NApi::NRpcProxy {
+
+////////////////////////////////////////////////////////////////////////////////
+
+struct TConnectionOptions;
+
+DECLARE_REFCOUNTED_STRUCT(IRowStreamEncoder)
+DECLARE_REFCOUNTED_STRUCT(IRowStreamDecoder)
+
+DECLARE_REFCOUNTED_STRUCT(TConnectionConfig)
+
+extern const std::string ApiServiceName;
+extern const std::string DiscoveryServiceName;
+
+constexpr int CurrentWireFormatVersion = 1;
+
+////////////////////////////////////////////////////////////////////////////////
+
+// COMPAT(babenko): get rid of this in favor of NRpc::EErrorCode::PeerBanned
+YT_DEFINE_ERROR_ENUM(
+    ((ProxyBanned) (2100))
+);
+
+DEFINE_ENUM(ERpcProxyFeature,
+    ((GetInSyncWithoutKeys)(0))
+    ((WideLocks)           (1))
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+DEFINE_ENUM(EAddressType,
+    ((InternalRpc)        (0))
+    ((MonitoringHttp)     (1))
+    ((TvmOnlyInternalRpc) (2))
+    ((Http)               (3))
+    ((Https)              (4))
+    ((TvmOnlyHttp)        (5))
+    ((TvmOnlyHttps)       (6))
+    ((PublicRpc)          (7))
+    ((ChytHttp)           (8))
+    ((ChytHttps)          (9))
+
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+} // namespace NYT::NApi::NRpcProxy
