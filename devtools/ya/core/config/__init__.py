@@ -28,7 +28,7 @@ def home_dir():
             return pw_dir
     except (ImportError, KeyError):
         pass
-    return os.environ.get("HOME", None)
+    return os.environ.get("HOME", None) or os.path.expanduser("~")  # after or for windows
 
 
 # no caching to make testing possible
