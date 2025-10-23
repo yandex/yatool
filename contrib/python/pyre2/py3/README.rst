@@ -18,8 +18,8 @@
    :target: https://badge.fury.io/py/pyre2
     :alt: Pypi version
 
-.. image:: https://github.com/andreasvc/pyre2/workflows/Conda/badge.svg
-    :target: https://github.com/andreasvc/pyre2/actions?query=workflow:Conda
+.. image:: https://github.com/andreasvc/pyre2/actions/workflows/conda-dev.yml/badge.svg
+    :target: https://github.com/andreasvc/pyre2/actions/workflows/conda-dev.yml
     :alt: Conda CI Status
 
 .. image:: https://img.shields.io/github/license/andreasvc/pyre2
@@ -126,8 +126,10 @@ That being said, there are features of the ``re`` module that this module may
 never have; these will be handled through fallback to the original ``re`` module:
 
 * lookahead assertions ``(?!...)``
-* backreferences (``\\n`` in search pattern)
-* \W and \S not supported inside character classes
+* backreferences, e.g., ``\\1`` in search pattern
+* possessive quantifiers ``*+, ++, ?+, {m,n}+``
+* atomic groups ``(?>...)``
+* ``\W`` and ``\S`` not supported inside character classes
 
 On the other hand, unicode character classes are supported (e.g., ``\p{Greek}``).
 Syntax reference: https://github.com/google/re2/wiki/Syntax
@@ -145,6 +147,23 @@ function ``set_fallback_notification`` determines the behavior in these cases::
 ``set_fallback_notification`` takes three values:
 ``re.FALLBACK_QUIETLY`` (default), ``re.FALLBACK_WARNING`` (raise a warning),
 and ``re.FALLBACK_EXCEPTION`` (raise an exception).
+
+You might also change the fallback module from ``re`` (default) to something
+else, like ``regex``. You can achieve that with the function
+``set_fallback_module``::
+
+    >>> import re2
+    >>> re2.set_fallback_notification(re2.FALLBACK_WARNING)
+    >>> type(re2.compile(r"foo"))
+    <class 're2.Pattern'>
+    >>> type(re2.compile(r"foo(?!bar)"))
+    <stdin>:1: UserWarning: WARNING: Using re module. Reason: invalid perl operator: (?!
+    <class 're2.FallbackPattern'>
+    >>> import regex
+    >>> re2.set_fallback_module(regex)
+    >>> type(re2.compile(r"foo(?!bar)"))
+    <stdin>:1: UserWarning: WARNING: Using regex module. Reason: invalid perl operator: (?!
+    <class 're2.FallbackPattern'>
 
 Documentation
 =============
