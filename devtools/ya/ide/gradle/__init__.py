@@ -14,7 +14,6 @@ from devtools.ya.ide.gradle.remove import _Remover
 from devtools.ya.ide.gradle.stat import _print_stat
 from devtools.ya.ide.gradle.symlinks import _NewSymlinkCollector, _collect_symlinks
 from devtools.ya.ide.gradle.ya_settings import _YaSettings
-from devtools.ya.ide.gradle.wrapper_patcher import _WrapperPatcher
 
 
 def do_gradle(params):
@@ -46,11 +45,6 @@ def do_gradle(params):
 
             _ya_settings = _YaSettings(config)
             _ya_settings.save()
-
-            if config.params.jdk11_compatibility_mode:
-                with tracer.scope("patch wrapper"):
-                    _wrapper_patcher = _WrapperPatcher(config)
-                    _wrapper_patcher.patch_wrapper()
 
             with tracer.scope('make symlinks'):
                 new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
