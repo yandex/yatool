@@ -239,8 +239,11 @@ private:
     // Switches TSpecFiles representation from TSpecFileList to TSpecFileArr.
     void Finalize();
 
-    ui64 InitCmdNode(const TYVar& var);
-    void AddCmdNode(const TYVar& var, ui64 elemId);
+    enum class EStructCmd {No, Yes};
+    enum class EExprRole {Cmd, Var};
+
+    ui64 InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role);
+    void AddCmdNode(const TYVar& var, ui64 elemId, EStructCmd structCmd, EExprRole role);
     // TODO: move MsgPad here, too?
     TString SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor = ECF_Unset);
     void FillCoords(const TYVar* origin, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& localVars, ECmdFormat cmdFormat, bool setAddCtxFilled = true);

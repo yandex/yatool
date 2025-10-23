@@ -426,19 +426,58 @@ THashMap<TString, TString> TCommandInfo::TakeRequirements() {
     return THashMap<TString, TString>();
 }
 
-ui64 TCommandInfo::InitCmdNode(const TYVar& var) {
+ui64 TCommandInfo::InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role) {
     const ui64 elemId = Graph->Names().AddName(EMNT_BuildCommand, Get1(&var));
     // we can have duplicate command entries even within a single Makefile
     // e.g. SRCS(foo/a.cpp bar/a.cpp) may turn into `SRCScxx cpp cc=(a.cpp)' for both files
     if (var.EntryPtr) {
         return elemId;
     }
-    AddCmdNode(var, elemId);
+    AddCmdNode(var, elemId, structCmd, role);
     return elemId;
 }
 
-void TCommandInfo::AddCmdNode(const TYVar& var, ui64 elemId) {
+void TCommandInfo::AddCmdNode(const TYVar& var, ui64 elemId, EStructCmd structCmd, EExprRole role) {
     Y_ENSURE(UpdIter != nullptr);
+
+    if (Conf->ValidateCmdNodes) {
+        Y_ENSURE(var.size() == 1);
+        bool varHasPrefix = var[0].HasPrefix;
+        bool varIsStructCmd = TVersionedCmdId(elemId).IsNewFormat();
+        switch (structCmd) {
+            case EStructCmd::No: {
+                switch (role) {
+                    case EExprRole::Cmd: {
+                        Y_ENSURE(varHasPrefix && !varIsStructCmd);
+                        if (Conf->DeprecateNonStructCmdNodes)
+                            throw TNotImplemented() << "old-school commands have been deprecated";
+                        break;
+                    }
+                    case EExprRole::Var: {
+                        Y_ENSURE(varHasPrefix && !varIsStructCmd);
+                        if (Conf->DeprecateNonStructCmdNodes)
+                            throw TNotImplemented() << "old-school variables have been deprecated";
+                        break;
+                    }
+                }
+                break;
+            }
+            case EStructCmd::Yes: {
+                switch (role) {
+                    case EExprRole::Cmd: {
+                        Y_ENSURE(!varHasPrefix && varIsStructCmd);
+                        break;
+                    }
+                    case EExprRole::Var: {
+                        Y_ENSURE(varHasPrefix && !varIsStructCmd); // TODO mark it as struct-cmd, too?
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
     TModule* module = var.Id ? Module : UpdIter->ParentModule;
     TUpdEntryPtr entry = &*UpdIter->Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, elemId), &UpdIter->YMake, module);
     var.EntryPtr = entry;
@@ -516,6 +555,8 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
                 if (added) {
                     auto [cmdName, value, id] = mkCmd(exprVarName);
                     it->second.SetSingleVal(cmdName, value, id);
+                    if (TVersionedCmdId(Graph->Names().CommandConf.GetId(value)).IsNewFormat())
+                        it->second[0].StructCmdForVars = true;
                 }
             }
 
@@ -537,7 +578,8 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
 
         subBinding.SetSingleVal(exprVarName, subExprRef, 0);
-        InitCmdNode(subBinding);
+        subBinding[0].StructCmdForVars = true;
+        InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
         CollectVarsDeep(commands, subExpr, subBinding, varDefinitionSources);
 
     }
@@ -552,9 +594,9 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
     const TVars& vars
 ) {
 
-    AddCmdNode(Cmd, cmdElemId);
     Cmd.SetSingleVal(Graph->Names().CmdNameById(cmdElemId).GetStr(), false);
     Cmd[0].StructCmdForVars = true;
+    AddCmdNode(Cmd, cmdElemId, EStructCmd::Yes, EExprRole::Cmd);
 
     for (const auto& input : compiled.Inputs.Take()) {
         TVarStrEx in(input.Name);
@@ -626,19 +668,19 @@ bool TCommandInfo::GetCommandInfoFromMacro(const TStringBuf& realMacroName, EMac
         YConfErr(BadMacro) << "Trying to use undefined macro " << macroName << " in a command" << Endl;
         return false;
     }
-    const ui64 jElemId = InitCmdNode(*macroVar);
+    const ui64 jElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Cmd);
     SBDIAG << "GetCommandInfoFromMacro " << macroName << " " << pattern << "\n";
 
     if (type == EMT_Usual) {
         Cmd.SetSingleVal(macroName, TString::Join("$", macroName), id, vars.Id);
         Cmd.BaseVal = macroVar;
-        InitCmdNode(Cmd);
+        InitCmdNode(Cmd, EStructCmd::No, EExprRole::Cmd);
         SubstMacro(macroVar, pattern, ESM_DoFillCoord, vars, ECF_Unset, true);
     } else {
         Y_ASSERT(type == EMT_MacroCall);
         Cmd.SetSingleVal(macroName, GlueCmd(args), id, vars.Id);
         Cmd.BaseVal = macroVar;
-        InitCmdNode(Cmd);
+        InitCmdNode(Cmd, EStructCmd::No, EExprRole::Cmd);
         MacroCall(macroVar, GetCmdValue(pattern), &Cmd, GetCmdValue(Get1(&Cmd)), ESM_DoFillCoord, vars, ECF_Unset, false);
     }
     GetAddCtx(Cmd)->AddDep(EDT_Include, EMNT_BuildCommand, jElemId);
@@ -1269,7 +1311,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             if (storedInProperties)
                 continue;
             auto& var = LocalVars->at(name);
-            auto varElemId = InitCmdNode(var);
+            auto varElemId = InitCmdNode(var, EStructCmd::Yes, EExprRole::Var);
             actionNode.AddUniqueDep(EDT_BuildCommand, EMNT_BuildVariable, varElemId);
         }
     }
@@ -1282,7 +1324,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             Sort(names);
             for (auto name : names) {
                 auto& var = GlobalVars->at(name);
-                auto varElemId = InitCmdNode(var);
+                auto varElemId = InitCmdNode(var, EStructCmd::Yes, EExprRole::Var);
                 actionNode.AddUniqueDep(EDT_Include, EMNT_BuildCommand, varElemId);
             }
         }
@@ -1369,13 +1411,13 @@ void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId, 
         auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
         auto subBinding = TYVar();
         subBinding.SetSingleVal("CFG_VARS", subExprRef, 0);
-        auto cmdElemId = InitCmdNode(subBinding);
+        auto cmdElemId = InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
         dst.AddDep(EDT_BuildCommand, EMNT_BuildVariable, cmdElemId);
     } else {
         TVars vars(&Module->Vars); // TODO: move it to TCommandInfo?
         var.SetSingleVal("CFG_VARS", cfgVars.Str(), nsId, Module->Vars.Id);
         vars.Id = var.Id;
-        ui64 id = InitCmdNode(var);
+        ui64 id = InitCmdNode(var, EStructCmd::No, EExprRole::Var);
         dst.AddDep(EDT_Include, EMNT_BuildCommand, id);
         FillAddCtx(var, vars);
     }
@@ -1441,7 +1483,7 @@ void TCommandInfo::FillCoords(
             Y_ASSERT(macroVar->size() == 1); // not implemented yet
             if (GetAddCtx(Cmd)) { // as a flag of graph construction mode
                 Y_ASSERT(GetId(Get1(macroVar)) == macroVar->Id);
-                const ui64 macroVarElemId = InitCmdNode(*macroVar);
+                const ui64 macroVarElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Var);
                 const TYVar* addMacroDataTo = origin;
                 if (macroVar->GenFromFile || localVars.IsIdDeeper(origin->Id, macroVar->Id)) {
                     addMacroDataTo = &Cmd;
@@ -1449,7 +1491,7 @@ void TCommandInfo::FillCoords(
                         const TVars* baseVars = localVars.GetBase(origin->Id);
                         const TYVar* macroVarFromBaseVars = baseVars->Lookup(macroData.Name);
                         if (macroVarFromBaseVars && !origin->AddCtxFilled) {
-                            const ui64 macroVarFromBaseVarsElemId = InitCmdNode(*macroVarFromBaseVars);
+                            const ui64 macroVarFromBaseVarsElemId = InitCmdNode(*macroVarFromBaseVars, EStructCmd::No, EExprRole::Var);
                             GetAddCtx(*origin)->AddUniqueDep(EDT_Include, EMNT_BuildCommand, macroVarFromBaseVarsElemId);
 
                             if (!macroVarFromBaseVars->AddCtxFilled) {
@@ -1634,7 +1676,7 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
             }
         } else {
             const TStringBuf cmdStr = Get1(cmd);
-            const ui64 cmdElemId = InitCmdNode(*cmd);
+            const ui64 cmdElemId = InitCmdNode(*cmd, EStructCmd::No, EExprRole::Var);
             if (GetAddCtx(var)->AddUniqueDep(EDT_Include, EMNT_BuildCommand, cmdElemId)) {
                 SBDIAG << "Command dep: " << cmdStr << Endl;
                 if (!cmd->AddCtxFilled) {

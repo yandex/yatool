@@ -345,6 +345,8 @@ void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorSh
         Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, Conf, errorShower);
         acceptor->PostScript(Vars);
     } else {
+        if (Conf.DeprecateNonStructCmdNodes)
+            throw TNotImplemented() << "old-school command rendering has been deprecated";
         YDIAG(MkCmd) << "CS for: " << CmdString << "\n";
         CmdString = CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, ECF_ExpandSimpleVars, true);
         CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, cmdFormat, false);

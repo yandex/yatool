@@ -489,6 +489,8 @@ void TBuildConfiguration::FillMiscValues() {
         if (!_dbg_expr_diag.empty())
             ExpressionErrorDetails = ParseShowExpressionErrors(_dbg_expr_diag);
     }
+    ValidateCmdNodes = NYMake::IsTrue(CommandConf.EvalValue("_DBG_VALIDATE_CMD_NODES"));
+    DeprecateNonStructCmdNodes = NYMake::IsTrue(CommandConf.EvalValue("_DBG_DEPRECATE_NON_STRUCT_CMD_NODES"));
 }
 
 void TBuildConfiguration::InitExcludedPeerdirs() {
