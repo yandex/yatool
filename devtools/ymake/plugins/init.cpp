@@ -171,7 +171,7 @@ TPyRuntime::TPyRuntime() {
     CheckForError();
 
     // do not generate *.pyc files in source tree
-    PyRun_SimpleString("import sys; sys.dont_write_bytecode = True");
+    PySys_SetObject("dont_write_bytecode", Py_True);
 }
 
 TPyRuntime::~TPyRuntime() {
@@ -189,7 +189,7 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, bool UseSubinterpreters, 
     if (UseSubinterpreters) {
         PyInit_ymake();
 
-        PyRun_SimpleString("import sys; sys.dont_write_bytecode = True");
+        PySys_SetObject("dont_write_bytecode", Py_True);
     } else {
         InitPyRuntime();
     }
