@@ -1251,6 +1251,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.coverage_yt_token_path = None
         self.cython_coverage = False
         self.enable_contrib_coverage = False
+        self.enable_contrib_ydb_coverage = False
         self.enable_java_contrib_coverage = False
         self.fast_clang_coverage_merge = False
         self.go_coverage = False
@@ -1444,6 +1445,19 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.ADVANCED,
             ),
             TestArgConsumer(
+                ['--enable-contrib-ydb-coverage'],
+                help='Enable contrib ydb coverage',
+                hook=devtools.ya.core.yarg.SetConstValueHook('enable_contrib_ydb_coverage', True),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_ENABLE_CONTRIB_YDB_COVERAGE',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'enable_contrib_ydb_coverage', devtools.ya.core.yarg.return_true_if_enabled
+                ),
+            ),
+            TestArgConsumer(
                 ['--nlg-coverage'],
                 help='Collect Alice\'s NLG coverage information',
                 hook=devtools.ya.core.yarg.SetConstValueHook('nlg_coverage', True),
@@ -1534,6 +1548,9 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         if params.enable_contrib_coverage:
             params.enable_java_contrib_coverage = True
             params.flags['ENABLE_CONTRIB_COVERAGE'] = 'yes'
+
+        if params.enable_contrib_ydb_coverage:
+            params.flags['ENABLE_CONTRIB_YDB_COVERAGE'] = 'yes'
 
         if params.sancov_coverage:
             params.sanitize_coverage = params.sanitize_coverage or 'trace-pc-guard,no-prune'

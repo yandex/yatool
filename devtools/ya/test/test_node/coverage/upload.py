@@ -1,5 +1,4 @@
 import os
-import six
 import time
 
 import devtools.ya.yalibrary.app_ctx
@@ -132,6 +131,9 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
             input_file,
         ]
 
+        if opts.enable_contrib_ydb_coverage:
+            stool_cmd += ['--enable-contrib-ydb-coverage']
+
         cmds.append({"cmd_args": stool_cmd, "cwd": "$(BUILD_ROOT)"})
 
     node = {
@@ -169,7 +171,7 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
 def inject_coverage_upload_nodes(arc_root, graph, resolve_uids_to_suite, create_table_node_uid, opts):
     # check for input intersections
     type_to_name = {}
-    for covfilename, suite in six.itervalues(resolve_uids_to_suite):
+    for covfilename, suite in resolve_uids_to_suite.values():
         sid = suite.get_suite_id()
         if sid not in type_to_name:
             type_to_name[sid] = set()
@@ -183,7 +185,7 @@ def inject_coverage_upload_nodes(arc_root, graph, resolve_uids_to_suite, create_
 
     upload_uids = []
     coverage_nchunks = get_coverage_table_chunks_count()
-    for suite_n, (resolve_uid, (covfilename, suite)) in enumerate(six.iteritems(resolve_uids_to_suite)):
+    for suite_n, (resolve_uid, (covfilename, suite)) in enumerate(resolve_uids_to_suite.items()):
         upload_uids += [
             create_coverage_upload_node(
                 arc_root,
