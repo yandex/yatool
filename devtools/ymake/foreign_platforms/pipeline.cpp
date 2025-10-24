@@ -167,11 +167,15 @@ private:
             if (!NJson::GetInteger(json, "Platform", &platform)) {
                 return;
             }
-            auto destination = TransitionFromPlatform(static_cast<NEvent::TForeignPlatformTarget_EPlatform>(platform));
-            if (destination == ETransition::None) {
+            auto destinationKey = TransitionFromPlatform(static_cast<NEvent::TForeignPlatformTarget_EPlatform>(platform));
+            if (destinationKey == ETransition::None) {
                 return;
             }
-            Destinations_.at(destination)->try_send(ec, target);
+            if (!Destinations_.contains(destinationKey)) {
+                YDebug() << "Internal servermode: cannot find destination for event " << target << Endl;
+                return;
+            }
+            Destinations_.at(destinationKey)->try_send(ec, target);
             return;
         }
     }

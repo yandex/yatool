@@ -1463,10 +1463,12 @@ class _GraphMaker:
 
             nopic_servermode_opts = dict(
                 transition_source='nopic',
-                report_pic_nopic=True,
+                report_pic_nopic=to_build_pic,
             )
             if should_use_internal_servermode(self._opts):
-                ymake_opts_nopic.update(platform_id=platform_id, **nopic_servermode_opts)
+                # tool options are different and set in _get_tools()
+                if graph_kind == _GraphKind.TARGET:
+                    ymake_opts_nopic.update(platform_id=platform_id, **nopic_servermode_opts)
             elif to_build_pic and should_use_servermode_for_pic(self._opts):
                 pic_queue = _ToolEventsQueueServerMode()
                 no_pic_func, no_pic_queue_putter = pic_queue.add_source(
