@@ -107,6 +107,12 @@ class Environ(object):
             assert isinstance(v, six.string_types), (k, v)
         return env
 
+    def clear(self):
+        self._env = {}
+
+    def clean_mandatory(self):
+        self._mandatory = set()
+
 
 @library.python.func.lazy
 def get_common_env_names():
