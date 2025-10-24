@@ -332,7 +332,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     }
 
-    if (blockData && blockData->StructCmdForBlockData) {
+    if (blockData && blockData->StructCmdForBlockData && !DisableStructCmd && !AllVarsNeedSubst) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);
         TSpecFileList* knownInputs = {};
@@ -728,7 +728,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
 
     bool ok = false;
 
-    if (!macroName.empty()) {
+    if (!macroName.empty() && !DisableStructCmd && !AllVarsNeedSubst) {
         // this block data pattern detector's job is to handle
         // new-style commands directly embedded in macro specializations,
         // the primary use case being

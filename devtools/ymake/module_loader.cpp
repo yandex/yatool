@@ -94,7 +94,12 @@ const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& na
 }
 
 TStringBuf TModuleDef::PrepareMacroCall(const TMacroCall& macroCall, const TVars& locals, TSplitString& callArgs, const TStringBuf& name) {
-    callArgs = TCommandInfo(Conf, nullptr, nullptr).SubstMacroDeeply(nullptr, macroCall.second, locals);
+    TCommandInfo cmdInfo(Conf, nullptr, nullptr);
+    cmdInfo.DisableStructCmd =
+        macroCall.first == NMacro::SET ||
+        macroCall.first == NMacro::SET_APPEND ||
+        macroCall.first == NMacro::SET_APPEND_WITH_GLOBAL;
+    callArgs = cmdInfo.SubstMacroDeeply(nullptr, macroCall.second, locals);
     callArgs.Split(' ');
     // Take appropriate macro specialization name
     TStringBuf macroName = Conf.GetSpecMacroName(macroCall.first, callArgs);

@@ -67,6 +67,7 @@ public:
     THolder<TVector<TString>> LateOuts;
     struct TMultiCmdDescr* MkCmdAcceptor = nullptr; // for command builder only
     bool KeepTargetPlatform = false;
+    bool DisableStructCmd = false;
 
 private:
     friend class TCmdProperty;

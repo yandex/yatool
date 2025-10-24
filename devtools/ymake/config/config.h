@@ -111,7 +111,7 @@ struct TModuleConf {
     EPeerdirType PeerdirType;
     bool HasSemantics = false;
     bool HasSemanticsForGlobals = false;
-    bool StructCmdForModuleConf = false; // Marker requiring to use structured command representation DEVTOOLS-8280
+    bool StructCmdForModuleConf = true; // Marker requiring to use structured command representation DEVTOOLS-8280
     bool StructCmdSet = false;
     ETransition Transition{ETransition::None};
 
@@ -195,7 +195,7 @@ struct TBlockData {
     bool IsMultiModule = false;
     bool HasPeerdirSelf = false;
     bool HasSemantics = false;
-    bool StructCmdForBlockData = false; // Marker requiring to use structured command representation DEVTOOLS-8280
+    bool StructCmdForBlockData = true; // Marker requiring to use structured command representation DEVTOOLS-8280
     bool IsFileGroupMacro = false;
     TSimpleSharedPtr<TToolOptions> ToolOptions;
     TSimpleSharedPtr<TCmdProperty> CmdProps; // additional properties: keywords, spec conditions(?)
