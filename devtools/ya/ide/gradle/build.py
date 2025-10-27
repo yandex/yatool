@@ -76,6 +76,7 @@ class _Builder:
                 opts.dump_sources = True
                 if proto_rel_targets:
                     proto_rel_targets = list(set(proto_rel_targets))
+                    proto_rel_targets.sort()
                     opts.add_result.append(".jar")  # require make symlinks to all .jar files
                     junk_ya_make_content = "\n".join(
                         [
@@ -105,6 +106,7 @@ class _Builder:
             opts.arc_root = str(self.config.arcadia_root)
             opts.bld_root = self.config.params.bld_root
             opts.ignore_recurses = True
+
             opts.ymake_tool_servermode = True
             opts.ymake_pic_servermode = True
             opts.ymake_multiconfig = True
@@ -123,7 +125,11 @@ class _Builder:
             with tracer.scope("build>" + ("foreign" if build_all_langs else "java") + ">graph"):
                 with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
                     graph, _, _, _, _ = build_graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)
-            self.logger.info("Building all %s targets by graph...", "foreign" if build_all_langs else "java")
+            self.logger.info(
+                "Building all %i %s targets by graph...",
+                len(build_rel_targets),
+                "foreign" if build_all_langs else "java",
+            )
             with tracer.scope("build>" + ("foreign" if build_all_langs else "java") + ">build"):
                 builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
                 return_code = builder.go()
