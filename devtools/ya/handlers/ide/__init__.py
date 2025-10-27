@@ -376,7 +376,7 @@ class GradleOptions(yarg.Options):
     OPT_EXCLUDE = '--exclude'
     OPT_GRADLE_DAEMON_JVMARGS = '--gradle-daemon-jvmargs'
     OPT_KOTLIN_DAEMON_JVMARGS = '--kotlin-daemon-jvmargs'
-    OPT_SETTINGS_ROOT_AS_HASH_BASE = '--settings-root-as-hash-base'
+    OPT_SETTINGS_ROOT_AS_HASH_BASE = '--settings-root-as-hash-base'  # IGNORED IN CODE, only for backward compatibility
     OPT_JDK11_COMPATIBILITY_MODE = '--jdk11-compatibility-mode'
 
     # Advanced options
@@ -403,7 +403,7 @@ class GradleOptions(yarg.Options):
         self.exclude: list[str] = []
         self.gradle_daemon_jvmargs: str = None
         self.kotlin_daemon_jvmargs: str = None
-        self.settings_root_as_hash_base: bool = False
+        self.settings_root_as_hash_base: bool = True  # IGNORED IN CODE, only for backward compatibility
         self.jdk11_compatibility_mode = False
 
         self.collect_contribs: bool = True
@@ -444,7 +444,7 @@ class GradleOptions(yarg.Options):
             ),
             yarg.ArgConsumer(  # IGNORED IN CODE, only for backward compatibility
                 [GradleOptions.OPT_DISABLE_GENERATED_SYMLINKS],
-                help='Disable make symlinks to generated sources',
+                help='Disable make symlinks to generated sources (ENABLED BY DEFAULT - ONLY FOR BACKWARD COMPATIBILITY)',
                 hook=yarg.SetConstValueHook('disable_generated_symlinks', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
@@ -480,7 +480,7 @@ class GradleOptions(yarg.Options):
             ),
             yarg.ArgConsumer(
                 [GradleOptions.OPT_SETTINGS_ROOT_AS_HASH_BASE],
-                help='Use settings root as base for hashed export directory name (ignore export targets for hashed directory name)',
+                help='Use settings root as base for hashed export directory name (ignore export targets for hashed directory name) (ENABLED BY DEFAULT - ONLY FOR BACKWARD COMPATIBILITY)',
                 hook=yarg.SetConstValueHook('settings_root_as_hash_base', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),

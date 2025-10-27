@@ -1,6 +1,7 @@
 import os
 import logging
 import re
+import shutil
 from pathlib import Path
 from configparser import ConfigParser
 
@@ -135,14 +136,34 @@ class _JavaSemConfig(SemConfig):
     def _get_export_root(self) -> Path:
         """Create export_root path by hash of targets"""
         if self.params.settings_root_as_hash_base:
-            targets_hash = hashing.fast_hash(str(self.settings_root))
+            export_hash = hashing.fast_hash(str(self.settings_root))  # based on settings_root only
+            all_abs_targets = ':'.join(sorted(self.params.abs_targets))
+            old_export_hash0 = hashing.fast_hash(all_abs_targets)  # based on targets
+            old_export_hash1 = hashing.fast_hash(
+                str(self.settings_root) + ':' + all_abs_targets
+            )  # based on settings_root + targets
+            old_export_root0 = _JavaSemConfig.EXPORT_ROOT_BASE / old_export_hash0
+            old_export_root1 = _JavaSemConfig.EXPORT_ROOT_BASE / old_export_hash1
+            if self.params.remove:  # in remove mode use old hashes if export root exists
+                if old_export_root1.exists():
+                    export_hash = old_export_hash1
+                elif old_export_root0.exists():
+                    export_hash = old_export_hash0
+            else:  # export (or reexport) mode
+                # remove another old export roots if exists
+                if old_export_hash0 != export_hash and old_export_root0.exists():
+                    self.logger.warning("Remove old export root %s", old_export_root0)
+                    shutil.rmtree(old_export_root0)
+                if old_export_hash1 != export_hash and old_export_root1.exists():
+                    self.logger.warning("Remove old export root %s", old_export_root1)
+                    shutil.rmtree(old_export_root1)
         else:
             all_abs_targets = ':'.join(sorted(self.params.abs_targets))
-            targets_hash = hashing.fast_hash(all_abs_targets)
-            if not (_JavaSemConfig.EXPORT_ROOT_BASE / targets_hash).exists():
+            export_hash = hashing.fast_hash(all_abs_targets)
+            if not (_JavaSemConfig.EXPORT_ROOT_BASE / export_hash).exists():
                 # First time export, add settings root to hash - new improved hashing logic
-                targets_hash = hashing.fast_hash(str(self.settings_root) + ':' + all_abs_targets)
-        export_root = _JavaSemConfig.EXPORT_ROOT_BASE / targets_hash
+                export_hash = hashing.fast_hash(str(self.settings_root) + ':' + all_abs_targets)
+        export_root = _JavaSemConfig.EXPORT_ROOT_BASE / export_hash
         self.logger.info("Export root: %s", export_root)
         return export_root
 
