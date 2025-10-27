@@ -23,7 +23,6 @@
 
 #ifdef _WIN32
     #include <spdlog/details/windows_include.h>
-    #include <fileapi.h>  // for FlushFileBuffers
     #include <io.h>       // for _get_osfhandle, _isatty, _fileno
     #include <process.h>  // for _get_pid
 
@@ -265,10 +264,10 @@ SPDLOG_INLINE int utc_minutes_offset(const std::tm &tm) {
     return offset;
 #else
 
-    #if defined(sun) || defined(__sun) || defined(_AIX) || \
-        (defined(__NEWLIB__) && !defined(__TM_GMTOFF)) ||  \
+    #if defined(sun) || defined(__sun) || defined(_AIX) ||                        \
+        (defined(__NEWLIB__) && !defined(__TM_GMTOFF)) ||                         \
         (!defined(__APPLE__) && !defined(_BSD_SOURCE) && !defined(_GNU_SOURCE) && \
-            (!defined(_POSIX_VERSION) || (_POSIX_VERSION < 202405L)))
+         (!defined(_POSIX_VERSION) || (_POSIX_VERSION < 202405L)))
     // 'tm_gmtoff' field is BSD extension and it's missing on SunOS/Solaris
     struct helper {
         static long int calculate_gmt_offset(const std::tm &localtm = details::os::localtime(),
@@ -483,13 +482,12 @@ SPDLOG_INLINE void utf8_to_wstrbuf(string_view_t str, wmemory_buf_t &target) {
     }
 
     // find the size to allocate for the result buffer
-    int result_size =
-        ::MultiByteToWideChar(CP_UTF8, 0, str.data(), str_size, NULL, 0);
+    int result_size = ::MultiByteToWideChar(CP_UTF8, 0, str.data(), str_size, NULL, 0);
 
     if (result_size > 0) {
         target.resize(result_size);
-        result_size = ::MultiByteToWideChar(CP_UTF8, 0, str.data(), str_size, target.data(),
-                                            result_size);
+        result_size =
+            ::MultiByteToWideChar(CP_UTF8, 0, str.data(), str_size, target.data(), result_size);
         if (result_size > 0) {
             assert(result_size == target.size());
             return;
@@ -564,21 +562,21 @@ SPDLOG_INLINE filename_t dir_name(const filename_t &path) {
     return pos != filename_t::npos ? path.substr(0, pos) : filename_t{};
 }
 
+#ifdef _MSC_VER
+    #pragma warning(push)
+    #pragma warning(disable : 4996)
+#endif  // _MSC_VER
 std::string SPDLOG_INLINE getenv(const char *field) {
-#if defined(_MSC_VER)
-    #if defined(__cplusplus_winrt)
+#if defined(_MSC_VER) && defined(__cplusplus_winrt)
     return std::string{};  // not supported under uwp
-    #else
-    size_t len = 0;
-    char buf[128];
-    bool ok = ::getenv_s(&len, buf, sizeof(buf), field) == 0;
-    return ok ? buf : std::string{};
-    #endif
-#else  // revert to getenv
-    char *buf = ::getenv(field);
+#else
+    char *buf = std::getenv(field);
     return buf ? buf : std::string{};
 #endif
 }
+#ifdef _MSC_VER
+    #pragma warning(pop)
+#endif  // _MSC_VER
 
 // Do fsync by FILE handlerpointer
 // Return true on success
@@ -593,13 +591,13 @@ SPDLOG_INLINE bool fsync(FILE *fp) {
 // Do non-locking fwrite if possible by the os or use the regular locking fwrite
 // Return true on success.
 SPDLOG_INLINE bool fwrite_bytes(const void *ptr, const size_t n_bytes, FILE *fp) {
-    #if defined(_WIN32) && defined(SPDLOG_FWRITE_UNLOCKED)
+#if defined(_WIN32) && defined(SPDLOG_FWRITE_UNLOCKED)
     return _fwrite_nolock(ptr, 1, n_bytes, fp) == n_bytes;
-    #elif defined(SPDLOG_FWRITE_UNLOCKED)
+#elif defined(SPDLOG_FWRITE_UNLOCKED)
     return ::fwrite_unlocked(ptr, 1, n_bytes, fp) == n_bytes;
-    #else
+#else
     return std::fwrite(ptr, 1, n_bytes, fp) == n_bytes;
-    #endif
+#endif
 }
 
 }  // namespace os
