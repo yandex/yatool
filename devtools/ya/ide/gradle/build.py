@@ -120,13 +120,15 @@ class _Builder:
                 opts.abs_targets.append(str(self.config.arcadia_root / build_rel_target))
 
             self.logger.info("Making building graph for %s targets...", "foreign" if build_all_langs else "java")
-            with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
-                graph, _, _, _, _ = build_graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)
+            with tracer.scope("build>" + ("foreign" if build_all_langs else "java") + ">graph"):
+                with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
+                    graph, _, _, _, _ = build_graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)
             self.logger.info("Building all %s targets by graph...", "foreign" if build_all_langs else "java")
-            builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
-            return_code = builder.go()
-            if return_code != 0:
-                raise YaIdeGradleException('Some builds failed')
+            with tracer.scope("build>" + ("foreign" if build_all_langs else "java") + ">build"):
+                builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
+                return_code = builder.go()
+                if return_code != 0:
+                    raise YaIdeGradleException('Some builds failed')
         except Exception as e:
             raise YaIdeGradleException(f'Failed in build process: {e}') from e
         finally:
