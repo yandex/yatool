@@ -958,6 +958,8 @@ def create_package(package_context, output_root, builds):
                     params.docker_no_cache,
                     params.docker_use_remote_cache,
                     params.docker_remote_image_version,
+                    params.docker_export_cache_to_registry,
+                    params.docker_dest_remote_image_version,
                     params.docker_platform,
                     params.docker_add_host,
                     params.docker_target,
