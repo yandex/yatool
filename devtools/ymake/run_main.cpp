@@ -105,7 +105,7 @@ const char* GetOption(int& argc, char** argv, std::string_view option) noexcept 
     return result;
 }
 
-void InitGlobalOpts(int& argc, char** argv, int& threads, bool& useSubinterpreters) {
+void InitGlobalOpts(int& argc, char** argv, int& threads) {
     try {
         TVector<TString> events;
         for (const auto& name : { "--events", "-E" }) {
@@ -123,8 +123,6 @@ void InitGlobalOpts(int& argc, char** argv, int& threads, bool& useSubinterprete
                 threads = std::stoul(threadsStr);
             }
         }
-
-        useSubinterpreters = FindPtr(argv, argv + argc, TStringBuf{"--use-subinterpreters"});
 
         if (!events.empty()) {
             if (!std::all_of(events.begin(), events.end(), [&events](const TString& event) {return event == events.front();})) {
@@ -274,8 +272,7 @@ int YMakeMain(int argc, char** argv) {
 #endif // !_win_
 
     int threads = 0;
-    bool useSubinterpreters = false;
-    InitGlobalOpts(argc, argv, threads, useSubinterpreters);
+    InitGlobalOpts(argc, argv, threads);
 
     auto configs = SplitMulticonfigCmdline(argc, argv);
     TVector<std::future<int>> ret_codes(configs.size());
@@ -287,7 +284,7 @@ int YMakeMain(int argc, char** argv) {
         MLOCK_FAILED = true;
     }
 
-    NYMake::TPythonRuntimeScope pythonRuntime(useSubinterpreters, configs.size());
+    NYMake::TPythonRuntimeScope pythonRuntime(configs.size());
 
     asio::thread_pool configure_workers(threads);
     auto pipeline = CreatePipeline(configs, configure_workers.executor());

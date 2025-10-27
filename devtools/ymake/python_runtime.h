@@ -110,23 +110,15 @@ namespace NYMake {
 
     class TPythonRuntimeScope: public TPythonRuntime {
     public:
-        TPythonRuntimeScope(bool useSubinterpreters, size_t count)
-            :  UseSubinterpreters_{useSubinterpreters}
-        {
-            if (UseSubinterpreters_) {
-                Initialize(count);
-            }
+        TPythonRuntimeScope(size_t count) {
+            Initialize(count);
         }
         ~TPythonRuntimeScope() {
-            if (UseSubinterpreters_) {
-                Finalize();
-            }
+            Finalize();
         }
 
         PyInterpreterState* GetSubinterpreterState(size_t index) {
-            return UseSubinterpreters_ ? TPythonRuntime::GetSubinterpreterState(index)->interp : nullptr;
+            return TPythonRuntime::GetSubinterpreterState(index)->interp;
         }
-    private:
-        bool UseSubinterpreters_ = false;
     };
 } // namespace NYMake

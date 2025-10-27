@@ -10,7 +10,6 @@
 namespace NYMake {
     namespace NPlugins {
         void TPluginMacroImpl::Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>*) {
-            TPyThreadLock pylk{NeedPyThreadLock_};
             PyObject* tupleArgs = PyTuple_New(params.size() + 1);
 
             PyTuple_SetItem(tupleArgs, 0, CreateContextObject(&unit));
@@ -25,15 +24,13 @@ namespace NYMake {
             Py_DecRef(tupleArgs);
         }
 
-        TPluginMacroImpl::TPluginMacroImpl(PyObject* obj, bool needLock)
+        TPluginMacroImpl::TPluginMacroImpl(PyObject* obj)
             : Obj_(obj)
-            , NeedPyThreadLock_(needLock)
         {
             Py_XINCREF(Obj_);
         }
 
         TPluginMacroImpl::~TPluginMacroImpl() {
-            TPyThreadLock pylk{NeedPyThreadLock_};
             Py_XDECREF(Obj_);
         }
 
@@ -48,7 +45,7 @@ namespace NYMake {
                     docText = PyUnicode_AsUTF8(doc);
                 }
 
-                auto macro = MakeSimpleShared<TPluginMacroImpl>(func, !conf.UseSubinterpreters);
+                auto macro = MakeSimpleShared<TPluginMacroImpl>(func);
                 macro->Definition = {
                     std::move(docText),
                     path.RelativePath(conf.SourceRoot),

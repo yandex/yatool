@@ -40,6 +40,7 @@ static TString FindSourceRootByTarget(const TFsPath& path) {
 }
 
 void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
+    thread_local bool deprecatesUseSubinterpreter = false;
     TRootsOptions::AddOptions(opts);
     opts.AddLongOption('c', "config").StoreResult(&YmakeConf).Required();
     opts.AddLongOption("targets-from-evlog", "read start targets from evlog").SetFlag(&ReadStartTargetsFromEvlog).NoArgument();
@@ -52,7 +53,7 @@ void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("fd-err", "error pipe fd").StoreResult(&ErrorPipeFd);
     opts.AddLongOption("dont-check-transitive-requirements", "").StoreFalse(&CheckTransitiveRequirements);
     opts.AddLongOption("parallel-rendering", "").StoreTrue(&ParallelRendering);
-    opts.AddLongOption("use-subinterpreters", "Use subinterpreters").SetFlag(&UseSubinterpreters).NoArgument();
+    opts.AddLongOption("use-subinterpreters", "Use subinterpreters").SetFlag(&deprecatesUseSubinterpreter).NoArgument();
 }
 
 void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {

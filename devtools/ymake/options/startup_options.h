@@ -30,7 +30,6 @@ struct TStartUpOptions: public TRootsOptions {
     bool ReportPicNoPic = false;
     bool CheckTransitiveRequirements = true;
     bool ParallelRendering = false;
-    bool UseSubinterpreters = false;
 
     PIPEHANDLE InputPipeFd = -1;
     PIPEHANDLE OutputPipeFd = -1;

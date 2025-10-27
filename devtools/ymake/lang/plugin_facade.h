@@ -122,7 +122,7 @@ public:
 
 // functions below implemented outside
 
-void LoadPlugins(const TVector<TFsPath> &sourceRoot, bool UseSubinterpreters, TBuildConfiguration *conf);
+void LoadPlugins(const TVector<TFsPath> &sourceRoot, TBuildConfiguration *conf);
 
 void RegisterPluginFilename(TBuildConfiguration& conf, const char* fileName);
 

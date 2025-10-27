@@ -181,20 +181,14 @@ void InitPyRuntime() {
     Singleton<TPyRuntime>();
 }
 
-void LoadPlugins(const TVector<TFsPath> &pluginsRoots, bool UseSubinterpreters, TBuildConfiguration *conf) {
+void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf) {
     if (pluginsRoots.empty()) {
         return;
     }
 
-    if (UseSubinterpreters) {
-        PyInit_ymake();
+    PyInit_ymake();
 
-        PySys_SetObject("dont_write_bytecode", Py_True);
-    } else {
-        InitPyRuntime();
-    }
-
-    TPyThreadLock lk{!UseSubinterpreters};
+    PySys_SetObject("dont_write_bytecode", Py_True);
 
     // The order of plugin roots does really matter - 'build/plugins' should go first
     for (const auto& pluginsPath : pluginsRoots) {

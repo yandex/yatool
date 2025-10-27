@@ -11,12 +11,11 @@ namespace NYMake {
         class TPluginMacroImpl: public TMacroImpl, private TNonCopyable {
         private:
             PyObject* Obj_ = nullptr;
-            bool NeedPyThreadLock_ = true;
 
         public:
             void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) override;
 
-            TPluginMacroImpl(PyObject*, bool needLock);
+            TPluginMacroImpl(PyObject*);
 
             ~TPluginMacroImpl() override;
         };
