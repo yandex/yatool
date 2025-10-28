@@ -4,7 +4,7 @@ from pathlib import Path
 from exts import hashing
 
 from devtools.ya.core import yarg
-from devtools.ya.build import build_opts, graph as build_graph, ya_make
+from devtools.ya.build import build_opts, ya_make
 
 from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException
 from devtools.ya.ide.gradle.config import _JavaSemConfig
@@ -106,13 +106,10 @@ class _Builder:
             opts.arc_root = str(self.config.arcadia_root)
             opts.bld_root = self.config.params.bld_root
             opts.ignore_recurses = True
+            opts.build_graph_cache_force_local_cl = True
 
-            opts.ymake_tool_servermode = True
-            opts.ymake_pic_servermode = True
             opts.ymake_multiconfig = True
-            opts.ymake_parallel_rendering = True
-            opts.ymake_internal_servermode = True
-            opts.ymake_use_subinterpreters = True
+            opts.force_ymake_multiconfig = True
 
             opts.rel_targets = []
             opts.abs_targets = []
@@ -121,20 +118,13 @@ class _Builder:
                 opts.rel_targets.append(str(build_rel_target))
                 opts.abs_targets.append(str(self.config.arcadia_root / build_rel_target))
 
-            self.logger.info("Making building graph for %s targets...", "foreign" if build_all_langs else "java")
-            with tracer.scope("build>" + ("foreign" if build_all_langs else "java") + ">graph"):
-                with app_ctx.event_queue.subscription_scope(ya_make.DisplayMessageSubscriber(opts, app_ctx.display)):
-                    graph, _, _, _, _ = build_graph.build_graph_and_tests(opts, check=True, display=app_ctx.display)
             self.logger.info(
-                "Building all %i %s targets by graph...",
-                len(build_rel_targets),
-                "foreign" if build_all_langs else "java",
+                "Building %i %s targets...", len(build_rel_targets), "foreign" if build_all_langs else "java"
             )
-            with tracer.scope("build>" + ("foreign" if build_all_langs else "java") + ">build"):
-                builder = ya_make.YaMake(opts, app_ctx, graph=graph, tests=[])
-                return_code = builder.go()
-                if return_code != 0:
-                    raise YaIdeGradleException('Some builds failed')
+            builder = ya_make.YaMake(opts, app_ctx)
+            return_code = builder.go()
+            if return_code != 0:
+                raise YaIdeGradleException('Some builds failed')
         except Exception as e:
             raise YaIdeGradleException(f'Failed in build process: {e}') from e
         finally:

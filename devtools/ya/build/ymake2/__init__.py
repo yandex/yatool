@@ -177,7 +177,7 @@ def _gen_graph_params():
 
 def _sem_graph_params():
     return _build_params() + [
-        yarg.Param('dump_sem_graph', default_value=None),
+        yarg.Param('dump_sem_graph', default_value=True),
         yarg.Param('dump_raw_graph', default_value=None),
         yarg.Param('foreign_on_nosem', default_value=None),
         yarg.Param(
@@ -186,6 +186,8 @@ def _sem_graph_params():
             + consts.YmakeEvents.PROGRESS.value
             + consts.YmakeEvents.TOOLS.value,
         ),
+        yarg.Param('patch_path', default_value=None),
+        yarg.Param('changelist_generator', default_value=None),
     ]
 
 

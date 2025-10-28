@@ -12,6 +12,11 @@ from devtools.ya.yalibrary import sjson
 from devtools.ya.build import build_facade
 from devtools.ya.core import config as core_config
 
+try:
+    import yalibrary.build_graph_cache as bg_cache
+except ImportError:
+    bg_cache = None
+
 
 class SemException(Exception):
     pass
@@ -297,19 +302,47 @@ class SemGraph:
             )
             shutil.copy(conf, ymake_conf)
 
+        try:
+            import app_ctx
+
+            evlog = getattr(app_ctx, "evlog", None)
+            store = getattr(app_ctx, "changelist_store", None)
+            vcs_type = app_ctx.vcs_type
+        except ImportError:
+            evlog = None
+            store = None
+            vcs_type = None
+
+        changelist_generator = (
+            bg_cache.BuildGraphCacheCLFromArc(evlog, self.config.params, store=store)
+            if bg_cache and vcs_type == 'arc'
+            else None
+        )
+
         dump_ymake_stderr = kwargs.pop('dump_ymake_stderr', None)
         for key, value in {  # Defaults from config, if absent in kwargs
             'source_root': self.config.arcadia_root,
-            'custom_build_directory': self.config.ymake_root,
+            'custom_build_directory': getattr(self.config.params, 'custom_build_directory', None),
             'ymake_bin': self.config.ymake_bin,
+            'changelist_generator': changelist_generator,
+            'patch_path': (
+                changelist_generator.get_changelist(self.config.params.custom_build_directory)
+                if changelist_generator and getattr(self.config.params, 'custom_build_directory', None)
+                else None
+            ),
         }.items():
             if key not in kwargs:
                 kwargs[key] = value
 
+        if kwargs['patch_path']:
+            if not ('debug_options' in kwargs):
+                kwargs['debug_options'] = ['completely-trust-fs-cache']
+            elif not ('completely-trust-fs-cache' in kwargs['debug_options']):
+                kwargs['debug_options'].append('completely-trust-fs-cache')
+
         r, _ = ymake_sem_graph(
             custom_conf=ymake_conf,
             continue_on_fail=True,
-            dump_sem_graph=True,
             abs_targets=self.config.params.abs_targets,
             **kwargs,
         )

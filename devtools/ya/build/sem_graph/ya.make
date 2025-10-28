@@ -12,4 +12,10 @@ PEERDIR(
     devtools/ya/yalibrary/tools
 )
 
+IF (NOT YA_OPENSOURCE)
+    PEERDIR(
+        devtools/ya/yalibrary/build_graph_cache
+    )
+ENDIF()
+
 END()
