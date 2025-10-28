@@ -62,7 +62,7 @@ namespace {
     }
 }
 
-bool TGlobRestrictions::Check(const TStringBuf& name, const TGlobStat& globStat, ui8 globSkippedErrorPercent) const {
+bool TGlobRestrictions::Check(const TStringBuf& name, const TStringBuf& pattern, const TGlobStat& globStat, ui8 globSkippedErrorPercent) const {
     size_t tooManyMatches = 0;
     if (globStat.MatchedFilesCount >= MaxMatches) {
         tooManyMatches = globStat.MatchedFilesCount;
@@ -81,7 +81,7 @@ bool TGlobRestrictions::Check(const TStringBuf& name, const TGlobStat& globStat,
         return true;
     }
     TStringBuilder s;
-    s << "Glob restrictions violated in [[alt1]]" << name << "[[rst]]: ";
+    s << "Glob restrictions violated in [[alt1]]" << name << "[[rst]] (" << pattern << "): ";
     if (tooManyMatches) {
         s << "too many matched files - " << ToString(tooManyMatches);
         if (tooManySkipped || tooManyWatchDirs) {

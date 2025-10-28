@@ -9,6 +9,7 @@
 #include "prop_names.h"
 #include "ymake.h"
 
+#include <devtools/ymake/builtin_macro_consts.h>
 #include <devtools/ymake/module_state.h>
 #include <devtools/ymake/common/string.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
@@ -63,7 +64,7 @@ namespace {
         return res;
     }
 
-    void OnChangeGlobPatternStat(TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId, TGlobStat&& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TBuildConfiguration& conf) {
+    void OnChangeGlobPatternStat(TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId, TGlobStat&& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TStringBuf& pattern, const TBuildConfiguration& conf) {
         TGlobHelper::SaveGlobPatternStat(moduleGlobsData, globPatternElemId, std::move(globPatternStat));
         if (!conf.CheckGlobRestrictions) {
             return;
@@ -75,7 +76,7 @@ namespace {
             for (const auto globPatternElemId: globPatternElemIds) {
                 globStat += TGlobHelper::GetGlobPatternStat(moduleGlobsData, globPatternElemId);
             }
-            globRestrictions.Check(name, globStat, conf.GlobSkippedErrorPercent);
+            globRestrictions.Check(name, pattern, globStat, conf.GlobSkippedErrorPercent);
         }
     }
 
@@ -115,7 +116,7 @@ namespace {
                 st.Add->AddDep(EDT_Property, EMNT_Property, globVarElemId);
             }
             if (prevGlobPatternStat != globPatternStat) {
-                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, pattern, conf);
+                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern, conf);
             }
         } catch (const yexception&) {
             // Invalid pattern error was reported earlier
@@ -136,7 +137,7 @@ namespace {
             TGlobStat globPatternStat;
             result = glob.NeedUpdate(globInfo.ExcludesMatcher, &globPatternStat);
             if (result && globPatternStat != prevGlobPatternStat) {
-                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, pattern, conf);
+                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern, conf);
             }
         } catch (const yexception&) {
             result = false;
