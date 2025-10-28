@@ -1817,6 +1817,8 @@ class YMakeDumpGraphOptions(Options):
         self.dump_graph = None
         self.dump_graph_file = None
         self.use_json_cache = True
+        self.save_context_to = None
+        self.save_graph_to = None
 
     @staticmethod
     def consumer():
@@ -1844,6 +1846,20 @@ class YMakeDumpGraphOptions(Options):
             ),
             ConfigConsumer(
                 'use_json_cache', help='Use cache for json-graph in ymake (-xs)', group=DEVELOPERS_OPT_GROUP
+            ),
+            ArgConsumer(
+                ['--save-context-to'],
+                help='Save context and exit',
+                hook=SetValueHook('save_context_to'),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--save-graph-to'],
+                help='File to save graph from context',
+                hook=SetValueHook('save_graph_to'),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
             ),
         ]
 
