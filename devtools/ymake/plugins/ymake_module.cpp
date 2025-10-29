@@ -424,18 +424,33 @@ namespace {
     }
 
     struct YMakeState {
-        PyTypeObject* ContextType;
-        PyTypeObject* CmdContextType;
+        PyTypeObject* ContextType = nullptr;
+        PyTypeObject* CmdContextType = nullptr;
+
+        void Clear() noexcept {
+            Py_CLEAR(ContextType);
+            Py_CLEAR(CmdContextType);
+        }
+
+        ~YMakeState() noexcept {
+            Clear();
+        }
     };
 
     YMakeState* GetYMakeState(PyObject* mod) {
-        YMakeState* state = (YMakeState*)PyModule_GetState(mod);
+        YMakeState* state = static_cast<YMakeState*>(PyModule_GetState(mod));
         Y_ASSERT(state != nullptr);
         return state;
     }
 
+    YMakeState* CreateYMakeState(PyObject* mod) {
+        void* stateMem = PyModule_GetState(mod);
+        Y_ASSERT(stateMem != nullptr);
+        return new(stateMem) YMakeState{};
+    }
+
     int YMakeExec(PyObject* mod) {
-        YMakeState* state = GetYMakeState(mod);
+        YMakeState* state = CreateYMakeState(mod);
 
         state->ContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &ContextTypeSpec, nullptr);
         if (state->ContextType == nullptr) {
@@ -464,14 +479,12 @@ namespace {
     }
 
     int YMakeClear(PyObject* mod) {
-        YMakeState* state = GetYMakeState(mod);
-        Py_CLEAR(state->ContextType);
-        Py_CLEAR(state->CmdContextType);
+        GetYMakeState(mod)->Clear();
         return 0;
     }
 
     void YMakeFree(void* mod) {
-        YMakeClear((PyObject*)mod);
+        GetYMakeState(static_cast<PyObject*>(mod))->~YMakeState();
     }
 
     PyMethodDef YMakeMethods[] = {
