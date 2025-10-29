@@ -291,7 +291,7 @@ class _JavaSemGraph(SemGraph):
                                 ap_path,
                                 node.name,
                                 node.id,
-                                [self.dep_paths[dep_id] for dep_id in self.node2dep_ids[node.id]],
+                                [str(self.dep_paths[dep_id]) for dep_id in self.node2dep_ids[node.id]],
                             )
                             # Skip usage unknown AP path
                     else:
@@ -316,7 +316,7 @@ class _JavaSemGraph(SemGraph):
                             kapt_classpath,
                             node.name,
                             node.id,
-                            [self.dep_paths[dep_id] for dep_id in self.node2dep_ids[node.id]],
+                            [str(self.dep_paths[dep_id]) for dep_id in self.node2dep_ids[node.id]],
                         )
                         kapt_paths.append(kapt_classpath)  # use classpath as path
                     self._on_patch_kapt(kapt_classpath, kapt_paths[-1])
