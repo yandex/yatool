@@ -181,14 +181,20 @@ void InitPyRuntime() {
     Singleton<TPyRuntime>();
 }
 
-void LoadPlugins(const TVector<TFsPath> &pluginsRoots, TBuildConfiguration *conf) {
+void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TFsPath& pycache, TBuildConfiguration *conf) {
     if (pluginsRoots.empty()) {
         return;
     }
 
     PyInit_ymake();
 
-    PySys_SetObject("dont_write_bytecode", Py_True);
+    if (pycache.Exists()) {
+        PySys_SetObject("dont_write_bytecode", Py_False);
+        NYMake::NPlugins::TScopedPyObjectPtr cachePath{PyUnicode_FromString(pycache.c_str())};
+        PySys_SetObject("pycache_prefix", cachePath.Get());
+    } else {
+        PySys_SetObject("dont_write_bytecode", Py_True);
+    }
 
     // The order of plugin roots does really matter - 'build/plugins' should go first
     for (const auto& pluginsPath : pluginsRoots) {

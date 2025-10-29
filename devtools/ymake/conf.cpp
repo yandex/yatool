@@ -288,7 +288,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     if (!DontUsePlugins) {
         if (!PluginsRoots.empty()) {
             TTraceStage stage("Load plugins");
-            LoadPlugins(PluginsRoots, this);
+            LoadPlugins(PluginsRoots, WriteConfCache ? BuildRoot : TFsPath{}, this);
             for (const auto& it : Plugins) {
                 TBlob pluginContent = TBlob::FromFile(it);
                 confData.Update((const char*)pluginContent.Data(), pluginContent.Size());

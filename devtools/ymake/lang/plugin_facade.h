@@ -122,7 +122,7 @@ public:
 
 // functions below implemented outside
 
-void LoadPlugins(const TVector<TFsPath> &sourceRoot, TBuildConfiguration *conf);
+void LoadPlugins(const TVector<TFsPath> &pluginsRoot, const TFsPath& pycache, TBuildConfiguration *conf);
 
 void RegisterPluginFilename(TBuildConfiguration& conf, const char* fileName);
 
