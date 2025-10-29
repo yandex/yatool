@@ -60,7 +60,6 @@ CFLAGS(
     -D__libc_free=free
 )
 
-LD_PLUGIN(musl.py)
 LDFLAGS(-static)
 
 EXTRALIBS(

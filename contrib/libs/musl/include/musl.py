@@ -6,7 +6,7 @@ import sys
 import json
 
 
-MUSL_LIBS = '-lc', '-lcrypt', '-ldl', '-lm', '-lpthread', '-lrt', '-lutil'
+MUSL_LIBS = ['-lc', '-lcrypt', '-ldl', '-lm', '-lpthread', '-lrt', '-lutil', '-lresolv']
 
 
 def fix_cmd_for_musl(cmd):
