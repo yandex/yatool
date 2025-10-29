@@ -1080,6 +1080,13 @@ class ExecutorOptions(Options):
                 visible=HelpLevel.EXPERT,
             ),
             EnvConsumer('YA_LOCAL_EXECUTOR', hook=SetValueHook('local_executor', return_true_if_enabled)),
+            ArgConsumer(
+                ['--eager-execution'],
+                help='Run tasks on the fly as soon as possible (mainly used in cache heaters)',
+                hook=SetConstValueHook('eager_execution', True),
+                group=FEATURES_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
             EnvConsumer('YA_EAGER_EXECUTION', hook=SetValueHook('eager_execution', return_true_if_enabled)),
             ConfigConsumer('local_executor'),
             ConfigConsumer('eager_execution'),
