@@ -452,7 +452,10 @@ class YtStore(DistStore):
         except Exception as e:
             # it is possible for xx_client module to not exist in common case (py2)
             if e.__class__.__name__ == 'NetworkException':
-                self._client.retry_policy.on_error(e)
+                # xx_client may return NetworkException in case of temporary issues with YT.
+                # We don't want to disable the cache in this case, so we just log a warning.
+                # It will be implemented in YA-2800
+                logger.debug('NetworkException during restore %s from YT', uid)
             logger.debug('Try restore %s from YT failed', uid, exc_info=True)
             self._count_failure('get')
             return False
