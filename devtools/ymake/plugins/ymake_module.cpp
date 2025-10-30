@@ -21,7 +21,7 @@
 using namespace NYMake::NPlugins;
 
 namespace {
-    TStringBuf CutLastExtension(const TStringBuf path) {
+    TStringBuf CutLastExtension(const TStringBuf path) noexcept {
         TStringBuf left;
         TStringBuf right;
         if (path.TryRSplit('.', left, right) && !left.empty() && right.find_first_of("\\/") == right.npos) {
@@ -437,7 +437,7 @@ namespace {
         }
     };
 
-    YMakeState* GetYMakeState(PyObject* mod) {
+    YMakeState* GetYMakeState(PyObject* mod) noexcept {
         YMakeState* state = static_cast<YMakeState*>(PyModule_GetState(mod));
         Y_ASSERT(state != nullptr);
         return state;
@@ -471,19 +471,19 @@ namespace {
         return 0;
     }
 
-    int YMakeTraverse(PyObject* mod, visitproc visit, void* arg) {
+    int YMakeTraverse(PyObject* mod, visitproc visit, void* arg) noexcept {
         YMakeState* state = GetYMakeState(mod);
         Py_VISIT(state->ContextType);
         Py_VISIT(state->CmdContextType);
         return 0;
     }
 
-    int YMakeClear(PyObject* mod) {
+    int YMakeClear(PyObject* mod) noexcept {
         GetYMakeState(mod)->Clear();
         return 0;
     }
 
-    void YMakeFree(void* mod) {
+    void YMakeFree(void* mod) noexcept {
         GetYMakeState(static_cast<PyObject*>(mod))->~YMakeState();
     }
 
