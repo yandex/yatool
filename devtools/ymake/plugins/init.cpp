@@ -120,65 +120,6 @@ namespace {
         LoadPluginsFromDirRecursively(conf, path, /* firstLevel */ true);
     }
 
-    PyGILState_STATE py_gstate;
-    thread_local int py_lock_depth = 0;
-}
-
-TPyThreadLock::TPyThreadLock(bool needLock) noexcept
-    : NeedPyThreadLock_{needLock}
-{
-    if (NeedPyThreadLock_) {
-        if (py_lock_depth == 0) {
-            py_gstate = PyGILState_Ensure();
-        }
-        py_lock_depth++;
-    }
-}
-
-TPyThreadLock::~TPyThreadLock() noexcept {
-    if (NeedPyThreadLock_) {
-        --py_lock_depth;
-        if (py_lock_depth == 0) {
-            PyGILState_Release(py_gstate);
-        }
-    }
-}
-
-TPyRuntime::TPyRuntime() {
-    // Enable UTF-8 mode by default
-    PyStatus status;
-
-    PyPreConfig preconfig;
-    PyPreConfig_InitPythonConfig(&preconfig);
-    // Enable UTF-8 mode for all (DEVTOOLSSUPPORT-46624)
-    preconfig.utf8_mode = 1;
-#ifdef MS_WINDOWS
-    preconfig.legacy_windows_fs_encoding = 0;
-#endif
-
-    status = Py_PreInitialize(&preconfig);
-    if (PyStatus_Exception(status)) {
-        Py_ExitStatusException(status);
-    }
-
-    Py_Initialize();
-    PyEval_SaveThread();
-
-    TPyThreadLock lk;
-
-    PyInit_ymake();
-
-    CheckForError();
-
-    // do not generate *.pyc files in source tree
-    PySys_SetObject("dont_write_bytecode", Py_True);
-}
-
-TPyRuntime::~TPyRuntime() {
-}
-
-void InitPyRuntime() {
-    Singleton<TPyRuntime>();
 }
 
 void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TFsPath& pycache, TBuildConfiguration *conf) {

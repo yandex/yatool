@@ -130,16 +130,3 @@ void OnPluginLoadFail(const char* fileName, const char* msg);
 
 void OnConfigureError(const char* msg);
 void OnBadDirError(const char* msg, const char* dir);
-
-class TPyThreadLock {
-public:
-    TPyThreadLock(bool needLock = true) noexcept;
-    ~TPyThreadLock() noexcept;
-private:
-    bool NeedPyThreadLock_ = true;
-};
-
-struct TPyRuntime {
-    TPyRuntime();
-    ~TPyRuntime();
-};
