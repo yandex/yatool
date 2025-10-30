@@ -43,6 +43,7 @@ struct YtStore {
 
 namespace NYa {
     void AtExit();
+    void InitializeLogger();
 
     struct TNameReTtl {
         TString NameRe;
@@ -89,6 +90,10 @@ namespace NYa {
         }
 
         bool Mute{};
+    };
+
+    // This exception reports about an incorrect YtStore usage or internal error.
+    struct TYtStoreFatalError : public yexception {
     };
 
     class TYtStore2 {
@@ -185,6 +190,12 @@ namespace NYa {
         static void CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options);
         static void ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options);
         static void ModifyReplica(const TString& proxy, const TString& dataDir, const TString& replicaProxy, const TString& replicaDataDir, const TModifyReplicaOptions& options);
+
+    public:
+        // For test purpose only
+        struct TInternalState;
+        std::unique_ptr<TInternalState> GetInternalState();
+
     private:
         class TImpl;
         std::unique_ptr<TImpl> Impl_;

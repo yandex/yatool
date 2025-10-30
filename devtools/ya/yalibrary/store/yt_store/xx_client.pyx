@@ -140,6 +140,7 @@ cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
 
 cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace "NYa":
     cdef void AtExit()
+    cdef void InitializeLogger()
 
     cdef cppclass TNameReTtl:
         TNameReTtl(TString nameRe, TDuration ttl)
@@ -279,6 +280,9 @@ def on_exit():
     AtExit()
 
 
+InitializeLogger()
+
+
 class NetworkException(Exception):
     pass
 
@@ -381,7 +385,6 @@ cdef class YtStore2Impl:
         self._is_heater = crit_level == "put"
         self._stager = stager
         self._exiting = False
-        atexit.register(self._at_exit)
 
         cdef TString c_proxy = proxy.encode()
         cdef TString c_data_dir = data_dir.encode()
@@ -425,12 +428,14 @@ cdef class YtStore2Impl:
                 c_data_dir,
                 options
             )
+        atexit.register(self._at_exit)
 
     def __dealloc__(self):
         if self._exiting:
             # Let OS destroy everything
             self._store_ptr = NULL
         else:
+            atexit.unregister(self._at_exit)
             # nogil is required to allow YtStore internal threads write log messages during termination
             with nogil:
                 del self._store_ptr
@@ -701,6 +706,8 @@ cdef class YtStore2Impl:
 
     @staticmethod
     cdef TDuration _as_duration(float seconds) noexcept:
+        if seconds > 0 and int(seconds * 1_000_000) == 0:
+            raise ValueError(f"Too small duration: {seconds}")
         return TDuration.MicroSeconds(int(seconds * 1_000_000))
 
     def _on_disable_callback(self, err_type, msg):

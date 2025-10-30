@@ -1,8 +1,20 @@
 #include "xx_client.hpp"
 #include "table_defs.h"
 
+#define XX_CLIENT_INT_H_
+#include "xx_client_int.h"
+#undef XX_CLIENT_INT_H_
+
 #include <contrib/libs/libarchive/libarchive/archive.h>
 #include <contrib/libs/libarchive/libarchive/archive_entry.h>
+
+#include <yt/cpp/mapreduce/client/client.h>
+#include <yt/cpp/mapreduce/common/retry_lib.h>
+#include <yt/cpp/mapreduce/http_client/raw_client.h>
+#include <yt/cpp/mapreduce/interface/error_codes.h>
+#include <yt/cpp/mapreduce/interface/logging/logger.h>
+#include <yt/cpp/mapreduce/util/wait_for_tablets_state.h>
+#include <yt/cpp/mapreduce/util/ypath_join.h>
 
 #include <library/cpp/blockcodecs/core/codecs.h>
 #include <library/cpp/logger/global/global.h>
@@ -13,13 +25,6 @@
 #include <library/cpp/ucompress/reader.h>
 #include <library/cpp/ucompress/writer.h>
 #include <library/cpp/yson/node/node_io.h>
-#include <yt/cpp/mapreduce/client/client.h>
-#include <yt/cpp/mapreduce/common/retry_lib.h>
-#include <yt/cpp/mapreduce/http_client/raw_client.h>
-#include <yt/cpp/mapreduce/interface/error_codes.h>
-#include <yt/cpp/mapreduce/interface/logging/logger.h>
-#include <yt/cpp/mapreduce/util/wait_for_tablets_state.h>
-#include <yt/cpp/mapreduce/util/ypath_join.h>
 
 #include <util/digest/city_streaming.h>
 #include <util/folder/path.h>
@@ -113,21 +118,6 @@ namespace {
         };
     };
 
-    void InitializeLogger() {
-        static bool already = false;
-        if (!already) {
-            // intrusive ptr will try to dealloc pointer so we need to malloc
-            NYT::SetLogger(new LogBridge());
-
-            // Woudnt be here if logLevelStr invalid
-            TryFromString(to_lower(TConfig::Get()->LogLevel), LogBridge::CutLevel_);
-
-            DoInitGlobalLog(MakeHolder<TLogBridgeBackend>(), MakeHolder<TLogBridgeFormatter>());
-
-            already = true;
-        }
-    }
-
     class TRetryConfigProvider: public IRetryConfigProvider {
     public:
         TRetryConfigProvider(TDuration retryTimeLimit) {
@@ -145,7 +135,6 @@ namespace {
 
 YtStore::YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token, TDuration retry_time_limit) {
     constexpr auto RETRY_INTERVAL = TDuration::MilliSeconds(500);
-    InitializeLogger();
     auto config = NYT::TConfig::Get();
     config->ConnectTimeout = TDuration::Seconds(5);
     config->SocketTimeout = TDuration::Seconds(5);
@@ -429,6 +418,8 @@ void YtStore::PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDa
     }
 }
 
+#define Y_ENSURE_FATAL(condition, message) Y_ENSURE_EX(condition, TWithBackTrace<NYa::TYtStoreFatalError>() << message)
+
 namespace NYa {
     // Note: overrides week functions declared in devtools/ya/cpp/entry/entry.cpp
     void InitYt(int argc, char** argv) {
@@ -455,6 +446,23 @@ namespace NYa {
         NYT::SetLogger(nullptr);
         NYT::TConfig::Get()->LogLevel = oldLogLevel;
     }
+
+    void InitializeLogger() {
+        static bool already = false;
+        if (!already) {
+            // intrusive ptr will try to dealloc pointer so we need to malloc
+            NYT::SetLogger(new LogBridge());
+
+            // Woudnt be here if logLevelStr invalid
+            TryFromString(to_lower(TConfig::Get()->LogLevel), LogBridge::CutLevel_);
+
+            DoInitGlobalLog(MakeHolder<TLogBridgeBackend>(), MakeHolder<TLogBridgeFormatter>());
+
+            already = true;
+        }
+    }
+
+    IYtClusterConnectorPtr YtClusterConnectorPtr{};
 
     // TODO: Move to devtools/lib?
     namespace NStreamingUntar {
@@ -897,7 +905,6 @@ namespace NYa {
             , ProbeBeforePutMinSize_{options.ProbeBeforePutMinSize}
             , CritLevel_{options.CritLevel}
         {
-            InitializeLogger();
             ThreadPool_.Start();
             ThreadPool_.SetMaxIdleTime(TDuration::Seconds(2));
 
@@ -947,10 +954,10 @@ namespace NYa {
                 initTimeout = DEFAULT_BG_INIT_TIMEOUT;
             }
 
-            InitializeControl_.Init(initTimeout);
-            ThreadPool_.SafeAddFunc([this, proxy, dataDir] {
+            auto promise = InitializeControl_.Init(initTimeout);
+            ThreadPool_.SafeAddFunc([this, promise=std::move(promise), proxy, dataDir]() mutable {
                 TThread::SetCurrentThreadName("YtStore::Initialize");
-                Initialize(proxy, dataDir);
+                Initialize(std::move(promise), proxy, dataDir);
             });
             if (CritLevel_ != ECritLevel::NONE) {
                 // Wait for the initialization to complete
@@ -981,17 +988,16 @@ namespace NYa {
                     prepareTimeout = DEFAULT_BG_PREPARE_TIMEOUT;
                 }
                 auto deadLine = prepareTimeout.ToDeadLine();
-
-                PrepareControl_.Init();
+                auto promise = PrepareControl_.Init();
 
                 if (options->RefreshOnRead) {
                     // To support refresh metadata only mode (--yt-store-refresh-on-read --threads=0)
                     // we must call DoPrepare synchronously
-                    DoPrepare(options, deadLine);
+                    DoPrepare(std::move(promise), options, deadLine);
                 } else {
-                    ThreadPool_.SafeAddFunc([this, options, deadLine] {
+                    ThreadPool_.SafeAddFunc([this, promise=std::move(promise), options, deadLine]() mutable {
                         TThread::SetCurrentThreadName("YtStore::Prepare");
-                        DoPrepare(options, deadLine);
+                        DoPrepare(std::move(promise), options, deadLine);
                     });
                 }
             });
@@ -1418,7 +1424,6 @@ namespace NYa {
         }
 
         static inline void CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options) {
-            InitializeLogger();
             NYT::TYPath metadataTable = NYT::JoinYPaths(dataDir, METADATA_TABLE);
             NYT::TYPath dataTable = NYT::JoinYPaths(dataDir, DATA_TABLE);
             NYT::TYPath statTable = NYT::JoinYPaths(dataDir, STAT_TABLE);
@@ -1468,7 +1473,7 @@ namespace NYa {
                 options.Tracked,
                 NYT::TNode()
                     ("tablet_balancer_config", NYT::TNode()
-                        // Prevent balancer from creating too many tablets
+                        // Don't let the balancer create too many tablets
                         ("enable_auto_reshard", false)
                         ("enable_auto_tablet_move", true)
                     )
@@ -1499,7 +1504,6 @@ namespace NYa {
         }
 
         static inline void ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) {
-            InitializeLogger();
             using EAction = TModifyTablesStateOptions::EAction;
 
             auto ytc = ConnectToCluster(proxy, options.Token);
@@ -1526,7 +1530,6 @@ namespace NYa {
             const TString& replicaDataDir,
             const TModifyReplicaOptions& options
         ) {
-            InitializeLogger();
             auto ytc_main = ConnectToCluster(proxy, options.Token);
             auto ytc_replica = ConnectToCluster(replicaProxy, options.Token);
 
@@ -1567,7 +1570,7 @@ namespace NYa {
                 return;
             }
 
-            Y_ENSURE(options.Action == TModifyReplicaOptions::EAction::CREATE);
+            Y_ENSURE_FATAL(options.Action == TModifyReplicaOptions::EAction::CREATE, "Unexpected action: " + ToString(int(options.Action)));
 
             bool alterReplica = false;
             TAlterTableReplicaOptions alterTableReplicaOptions{};
@@ -1600,6 +1603,28 @@ namespace NYa {
             }
         }
 
+        std::unique_ptr<TInternalState> GetInternalState() {
+            auto config = InitializeControl_.GetValue();
+
+            auto state = std::make_unique<TInternalState>();
+            state->Atomicity = config->Atomicity;
+            state->Version = config->Version;
+            for (const auto& replica : config->Replicas) {
+                state->GoodReplicas.push_back({
+                    .Proxy = replica.Proxy,
+                    .DataDir = replica.DataDir,
+                    .Lag = replica.Lag,
+                });
+            }
+            if (PrepareControl_.Future.Initialized()) {
+                const auto& prepareResult = PrepareControl_.GetValue();
+                state->PreparedReplica.Proxy = prepareResult->Task->Proxy;
+                state->PreparedReplica.DataDir = prepareResult->Task->DataDir;
+                state->PreparedReplica.Lag = prepareResult->Task->Lag;
+            }
+            return std::move(state);
+        }
+
     private:
         static inline const NYT::TYPath TMP_DIR = "//tmp";
         static inline const NYT::TYPath METADATA_TABLE = "metadata";
@@ -1619,7 +1644,7 @@ namespace NYa {
         static constexpr TDuration DEFAULT_INTERACTIVE_PREPARE_TIMEOUT = TDuration::Seconds(5);
         static constexpr TDuration DEFAULT_BG_INIT_TIMEOUT = TDuration::Seconds(30);
         static constexpr TDuration DEFAULT_BG_PREPARE_TIMEOUT = TDuration::Seconds(30);
-        static constexpr TDuration MAX_GOOD_ENOUGH_REPLICA_LAG = TDuration::Seconds(60);
+        static constexpr TDuration MAX_APPROPRIATE_REPLICA_LAG = TDuration::Seconds(60);
         static inline const THashSet<TString> NOT_LOADED_META_COLUMNS = {"tablet_hash", "hostname", "GSID", "create_time"};
         static constexpr TDuration METADATA_REFRESH_AGE_THRESHOLD_SEC = TDuration::Seconds(300);
         static constexpr size_t INSERT_ROWS_LIMIT = 5000;  // Too high value increases transaction conflicts
@@ -1686,27 +1711,29 @@ namespace NYa {
             TVector<TString> MetadataColumns{};
             TVector<TString> MetadataKeyColumns{};
             unsigned Version{};
+            NYT::EAtomicity Atomicity{NYT::EAtomicity::Full};
+            bool RequireSyncReplica{};
         };
         using TConfigureResultPtr = TIntrusivePtr<TConfigureResult>;
 
         struct TInitializeControl {
-            void Init(TDuration timeout) {
-                Y_ENSURE(!Promise.Initialized(), "Initialization has already started");
-                Promise = NThreading::NewPromise<TConfigureResultPtr>();
-                DeadLine = timeout.ToDeadLine();
+            NThreading::TPromise<TConfigureResultPtr> Init(TDuration timeout) {
+                Y_ENSURE_FATAL(!Future.Initialized(), "Initialization has already started");
                 auto promise = NThreading::NewPromise<TConfigureResultPtr>();
+                Future = promise.GetFuture();
+                DeadLine = timeout.ToDeadLine();
+                return promise;
             }
 
             TConfigureResultPtr GetValue() {
-                Y_ENSURE(Promise.Initialized(), "Initialization not started");
-                auto future = Promise.GetFuture();
-                if (!future.Wait(DeadLine)) {
+                Y_ENSURE_FATAL(Future.Initialized(), "Initialization should start before getting value");
+                if (!Future.Wait(DeadLine)) {
                     ythrow TYtStoreError() << "Initialization timed out";
                 }
-                return future.GetValueSync();
+                return Future.GetValueSync();
             }
 
-            NThreading::TPromise<TConfigureResultPtr> Promise{};
+            NThreading::TFuture<TConfigureResultPtr> Future{};
             TInstant DeadLine{};
         };
 
@@ -1745,19 +1772,20 @@ namespace NYa {
         using TPrepareResultPtr = TIntrusivePtr<TPrepareResult>;
 
         struct TPrepareControl {
-            void Init() {
-                Y_ENSURE(!Promise.Initialized(), "PrepareControl is already initialized");
-                Promise = NThreading::NewPromise<TPrepareResultPtr>();
+            NThreading::TPromise<TPrepareResultPtr> Init() {
+                Y_ENSURE_FATAL(!Future.Initialized(), "PrepareControl is already initialized");
+                auto promise = NThreading::NewPromise<TPrepareResultPtr>();
+                Future = promise.GetFuture();
+                return promise;
             }
 
             TPrepareResultPtr GetValue() {
-                Y_ENSURE(Promise.Initialized(), "PrepareControl is not initialized");
-                auto future = Promise.GetFuture();
+                Y_ENSURE_FATAL(Future.Initialized(), "PrepareControl is not initialized");
                 NeedResult.Cancel();
-                return future.GetValueSync();
+                return Future.GetValueSync();
             }
 
-            NThreading::TPromise<TPrepareResultPtr> Promise{};
+            NThreading::TFuture<TPrepareResultPtr> Future{};
             NThreading::TCancellationTokenSource NeedResult{};
         };
 
@@ -1855,6 +1883,8 @@ namespace NYa {
             if (!Disabled()) {
                 try {
                     return func();
+                } catch (const TYtStoreFatalError&) {
+                    throw;
                 } catch (...) {
                     Disable(CritLevel_ != ECritLevel::NONE);
                 }
@@ -1867,6 +1897,8 @@ namespace NYa {
             if (!Disabled()) {
                 try {
                     func();
+                } catch (const TYtStoreFatalError&) {
+                    throw;
                 } catch (...) {
                     Disable(CritLevel_ != ECritLevel::NONE);
                 }
@@ -1885,7 +1917,10 @@ namespace NYa {
             return ConnectToCluster(proxy, Token_, options);
         }
 
-        static inline NYT::IClientPtr ConnectToCluster(const TString& proxy, const TString& token, TCreateClientOptions options = {}) {
+        static inline NYT::IClientPtr ConnectToCluster(const TString& proxy, const TString& token, NYT::TCreateClientOptions options = {}) {
+            if (YtClusterConnectorPtr) {
+                return (*YtClusterConnectorPtr)(proxy, token, options);
+            }
             if (token) {
                 options.Token(token);
             }
@@ -1909,8 +1944,8 @@ namespace NYa {
 
         template <class TOpts>
         requires (std::is_base_of_v<TTabletTransactionOptions<TOpts>, TOpts>)
-        TOpts MakeTransactionOpts() {
-            return TOpts().Atomicity(Atomicity_).RequireSyncReplica(RequireSyncReplica_);
+        TOpts MakeTransactionOpts(TConfigureResultPtr config) {
+            return TOpts().Atomicity(config->Atomicity).RequireSyncReplica(config->RequireSyncReplica);
         }
 
         template <class TSpec>
@@ -1968,9 +2003,7 @@ namespace NYa {
                 return config->MainCluster.Client->Get(NYT::JoinYPaths(config->MainCluster.DataDir, METADATA_TABLE, "@"), getOpts);
             });
             auto metadataSchema = metadataAttrs.At("schema");
-            if (metadataAttrs.At("atomicity") == "none") {
-                Atomicity_ = NYT::EAtomicity::None;
-            }
+            config->Atomicity = metadataAttrs.At("atomicity") == "none" ? NYT::EAtomicity::None : NYT::EAtomicity::Full;
 
             for (const NYT::TNode& column : metadataSchema.AsList()) {
                 if (!column.HasKey("expression")) {
@@ -1987,6 +2020,7 @@ namespace NYa {
             } else {
                 ythrow TYtStoreError() << "Unsupported metadata table schema";
             }
+            DEBUG_LOG << "Cache version = " << config->Version;
 
             if (metadataAttrs.At("type") == "replicated_table") {
                 config->Replicated = true;
@@ -2026,7 +2060,7 @@ namespace NYa {
 
                     if (metadataReplicaInfo.Sync()) {
                         // if we have at least one sync replica force to use it
-                        RequireSyncReplica_ = true;
+                        config->RequireSyncReplica = true;
                     }
 
                     DEBUG_LOG << (isGood ? "Use" : "Ignore disabled") << " replica: " <<
@@ -2047,14 +2081,14 @@ namespace NYa {
                     }
                 }
                 if (config->Replicas.empty()) {
-                    ythrow yexception() << "No enabled replica is found";
+                    ythrow TYtStoreError() << "No enabled replica is found";
                 }
             }
             return config;
         }
 
         void Check(TConfigureResultPtr config) {
-            if (!config->Replicated || RequireSyncReplica_ && !ReadOnly_) {
+            if (!config->Replicated || config->RequireSyncReplica && !ReadOnly_) {
                 // Check important tables availability
                 for (const NYT::TYPath& table : {METADATA_TABLE, DATA_TABLE}) {
                     TString query = "1 from [" + NYT::JoinYPaths(config->MainCluster.DataDir, table) + "] limit 1";
@@ -2063,6 +2097,9 @@ namespace NYa {
                     });
                 }
             }
+
+            // Check that the cache is not full.
+            // For replicated cache tables size is got from the most fresh (best) replica
             if (!ReadOnly_ && CheckSize_) {
                 NYT::IClientPtr client{};
                 NYT::TYPath dataDir{};
@@ -2088,7 +2125,7 @@ namespace NYa {
             }
         }
 
-        void Initialize(const TString& proxy, const TYPath& dataDir) {
+        void Initialize(NThreading::TPromise<TConfigureResultPtr>&& promise, const TString& proxy, const TYPath& dataDir) {
             StartStage("init-yt-store");
             Y_DEFER {
                 StopStage("init-yt-store");
@@ -2096,14 +2133,14 @@ namespace NYa {
             try {
                 TConfigureResultPtr config = Configure(proxy, dataDir);
                 Check(config);
-                InitializeControl_.Promise.SetValue(config);
+                promise.SetValue(config);
             } catch (...) {
-                InitializeControl_.Promise.SetException(Disable());
+                promise.SetException(Disable());
             }
         }
 
         TReplica& GetBestReplica(TConfigureResultPtr config) {
-            Y_ENSURE(config->Replicated);
+            Y_ENSURE_FATAL(config->Replicated, "Not a replicated cache");
             TDuration minLag = TDuration::Max();
             TReplica* bestReplica{};
             for (TReplica& r : config->Replicas) {
@@ -2184,7 +2221,7 @@ namespace NYa {
             }
         }
 
-        void DoPrepare(TPrepareOptionsPtr options, TInstant deadLine) {
+        void DoPrepare(NThreading::TPromise<TPrepareResultPtr>&& promise, TPrepareOptionsPtr options, TInstant deadLine) {
             try {
                 auto config = InitializeControl_.GetValue();
 
@@ -2201,7 +2238,7 @@ namespace NYa {
                 };
                 TVector<TLoadMetaTaskPtr> tasks;
                 if (config->Replicated) {
-                    bool syncReplicaOnly = !ReadOnly_ && CritLevel_ == ECritLevel::PUT && RequireSyncReplica_;
+                    bool syncReplicaOnly = !ReadOnly_ && CritLevel_ == ECritLevel::PUT && config->RequireSyncReplica;
                     for (TReplica& replica : config->Replicas) {
                         if (syncReplicaOnly && !replica.Sync) {
                             continue;
@@ -2217,20 +2254,20 @@ namespace NYa {
                 auto metaCancellationToken = loadMetaCancellation.Token();
                 for (auto task : tasks) {
                     auto loadMetaPromise = NThreading::NewPromise<TPrepareResultPtr>();
-                    ThreadPool_.SafeAddFunc([this, config, loadMetaPromise, task, options, metaCancellationToken]() mutable {
+                    futures.push_back(loadMetaPromise.GetFuture());
+                    ThreadPool_.SafeAddFunc([this, config, promise=std::move(loadMetaPromise), task, options, metaCancellationToken]() mutable {
                         TThread::SetCurrentThreadName("YtStore::LoadMeta");
                         try {
                             DEBUG_LOG << "Start load meta from " << task->Proxy << ":" << task->DataDir;
                             auto meta = LoadMetadata(config, task, options, metaCancellationToken);
-                            loadMetaPromise.SetValue(MakeIntrusive<TPrepareResult>(std::move(meta), task));
+                            promise.SetValue(MakeIntrusive<TPrepareResult>(std::move(meta), task));
                         } catch (const NThreading::TOperationCancelledException&) {
                             DEBUG_LOG << "Cancel load meta from " << task->Proxy << ":" << task->DataDir;
                         } catch (...) {
                             DEBUG_LOG << "Load metadata from " << task->Proxy << ":" << task->DataDir << " failed with error: " << CurrentExceptionMessage();
-                            loadMetaPromise.SetException(std::current_exception());
+                            promise.SetException(std::current_exception());
                         }
                     });
-                    futures.push_back(loadMetaPromise.GetFuture());
                 }
 
                 TPrepareResultPtr currentResult{};
@@ -2240,7 +2277,7 @@ namespace NYa {
                 // NOTE:
                 // If there are good replicas, we will wait until we get a result from any of them or the preparation timeout expires.
                 // If there is no good replica, we treat the first result as an appropriate one.
-                bool goodReplicaExists = AnyOf(tasks, [](const auto& t) {return t->Lag < MAX_GOOD_ENOUGH_REPLICA_LAG;});
+                bool goodReplicaExists = AnyOf(tasks, [](const auto& t) {return t->Lag < MAX_APPROPRIATE_REPLICA_LAG;});
                 bool appropriateResultReceived = false;
                 while (!futures.empty()) {
                     auto payloadFuture = NThreading::NWait::WaitAny(futures);
@@ -2251,13 +2288,13 @@ namespace NYa {
                         }
                         break;
                     }
-                    if (payloadFuture.HasValue()) {
+                    if (payloadFuture.HasValue() || payloadFuture.HasException()) {
                         for (auto it = futures.begin(); it != futures.end();) {
                             if (it->HasValue()) {
                                 auto newResult = it->ExtractValueSync();
                                 if (newResult && (!currentResult || currentResult->Task->Lag > newResult->Task->Lag)) {
                                     currentResult = newResult;
-                                    appropriateResultReceived = !goodReplicaExists || newResult->Task->Lag < MAX_GOOD_ENOUGH_REPLICA_LAG;
+                                    appropriateResultReceived = !goodReplicaExists || newResult->Task->Lag < MAX_APPROPRIATE_REPLICA_LAG;
                                 }
                                 it = futures.erase(it);
                             } else if (it->HasException()) {
@@ -2298,9 +2335,9 @@ namespace NYa {
                 }
                 Metrics_.SetTimeToFirstRecvMeta();
 
-                PrepareControl_.Promise.SetValue(currentResult);
+                promise.SetValue(currentResult);
             } catch (...) {
-                PrepareControl_.Promise.SetException(Disable());
+                promise.SetException(Disable());
             }
         }
 
@@ -2313,7 +2350,7 @@ namespace NYa {
             }
             NYT::TNode::TListType rows{};
             if (config->Version >= 3 && options->ContentUidsEnabled) {
-                Y_ENSURE(!options->SelfUids.empty());
+                Y_ENSURE_FATAL(!options->SelfUids.empty(), "SelfUids list must not be empty");
                 TString query{};
                 TStringOutput queryOut{query};
                 queryOut << JoinSeq(",", loadedColumns) << " from [" << NYT::JoinYPaths(task->DataDir, METADATA_TABLE) << "]";
@@ -2330,7 +2367,7 @@ namespace NYa {
                     return task->Client->SelectRows(query);
                 });
             } else {
-                Y_ENSURE(options->SelfUids.size() == options->Uids.size());
+                Y_ENSURE_FATAL(options->SelfUids.size() == options->Uids.size(), "SelfUids and Uids lists must be the same size");
                 NYT::TNode::TListType keys{};
                 if (config->Version >= 3) {
                     for (size_t i = 0; i < options->SelfUids.size(); ++i) {
@@ -2387,7 +2424,7 @@ namespace NYa {
             size_t conflictCount = 0;
 
             NYT::TYPath metadataTablePath = NYT::JoinYPaths(config->MainCluster.DataDir, METADATA_TABLE);
-            auto insertOpts = MakeTransactionOpts<NYT::TInsertRowsOptions>().Update(true);
+            auto insertOpts = MakeTransactionOpts<NYT::TInsertRowsOptions>(config).Update(true);
             TVector<TString> columns{config->MetadataKeyColumns.begin(), config->MetadataKeyColumns.end()};
             columns.push_back("access_time");
             auto lookupOpts = NYT::TLookupRowsOptions().Columns(columns);
@@ -2400,14 +2437,13 @@ namespace NYa {
                 batch_start = batch_end;
 
                 while (!batch.empty()) {
-                    bool transactionConflict = false;
-                    RetryUntilDisabled([&] {
+                    bool transactionConflict = RetryUntilDisabled([&] {
                         try {
                             config->MainCluster.Client->InsertRows(metadataTablePath, batch, insertOpts);
+                            return false;
                         } catch (const NYT::TErrorResponse& e) {
                             if (e.GetError().ContainsErrorCode(NYT::NClusterErrorCodes::NTabletClient::TransactionLockConflict)) {
-                                transactionConflict = true;
-                                return;
+                                return true;
                             }
                             throw;
                         }
@@ -2448,7 +2484,7 @@ namespace NYa {
 
         void DeleteRows(TConfigureResultPtr config, const NYT::TNode::TListType& deleteMetadataKeys, const NYT::TNode::TListType& deleteDataKeys) {
             Y_ENSURE(!ReadOnly_);
-            auto opts = MakeTransactionOpts<TDeleteRowsOptions>();
+            auto opts = MakeTransactionOpts<TDeleteRowsOptions>(config);
             if (!deleteMetadataKeys.empty()) {
                 RetryUntilDisabled([&] {
                     config->MainCluster.Client->DeleteRows(NYT::JoinYPaths(config->MainCluster.DataDir, METADATA_TABLE), deleteMetadataKeys, opts);
@@ -2473,7 +2509,7 @@ namespace NYa {
             if (dynamic) {
                 row["salt"] = RandomNumber<ui64>();
                 RetryUntilDisabled([&] {
-                    config->MainCluster.Client->InsertRows(statTable, {row}, MakeTransactionOpts<TInsertRowsOptions>());
+                    config->MainCluster.Client->InsertRows(statTable, {row}, MakeTransactionOpts<TInsertRowsOptions>(config));
                 });
             } else {
                 NYT::TRichYPath richPath = NYT::TRichYPath(statTable).Append(true);
@@ -2573,8 +2609,6 @@ namespace NYa {
         [[maybe_unused]] bool ProbeBeforePut_;
         [[maybe_unused]] size_t ProbeBeforePutMinSize_;
         ECritLevel CritLevel_;
-        NYT::EAtomicity Atomicity_{NYT::EAtomicity::Full};
-        bool RequireSyncReplica_{false};
 
         std::atomic_bool Disabled_{};
         TAdaptiveThreadPool ThreadPool_{};
@@ -2652,5 +2686,9 @@ namespace NYa {
         const TModifyReplicaOptions& options
     ) {
         TImpl::ModifyReplica(proxy, dataDir, replicaProxy, replicaDataDir, options);
+    }
+
+    std::unique_ptr<TYtStore2::TInternalState> TYtStore2::GetInternalState() {
+        return Impl_->GetInternalState();
     }
 }

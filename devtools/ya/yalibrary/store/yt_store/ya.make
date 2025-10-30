@@ -78,4 +78,5 @@ RECURSE(opts_helper)
 
 RECURSE_FOR_TESTS(
     tests
+    ut
 )
