@@ -37,7 +37,6 @@ ATTRS_TO_STATE_HASH = [
     'global_resources',
     'recipes',
     'requirements',
-    'timeout',
     'test_size',
     'name',
 ]
