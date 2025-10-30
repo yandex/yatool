@@ -59,6 +59,7 @@ RECURSE_FOR_TESTS(
     test-pack_5_13/logs-log4j
     test-pack_5_13/logs-log4j2
     test-pack_5_13/logs-logback
+    test-example/test
     src/test
     src/test_5_12
     src/test_5_13

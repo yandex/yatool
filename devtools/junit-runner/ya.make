@@ -22,5 +22,6 @@ END()
 
 RECURSE_FOR_TESTS(
     test-pack/test
+    test-example/test
     src/test
 )
