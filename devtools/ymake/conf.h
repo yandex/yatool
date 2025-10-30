@@ -69,6 +69,7 @@ public:
     THashSet<TStringBuf> GlobRestrictionExtends{};
     bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
     bool CheckGlobRestrictions{false}; // check glob restrictions in create and update modes
+    ui32 GlobSkippedMinWatched{2000}; // minimal files in glob, when enabled checking skipped files in glob
     ui8 GlobSkippedErrorPercent{95}; // percent of skipped files for configure error, 0 - don't check skipped
 
     void* SubState = nullptr;

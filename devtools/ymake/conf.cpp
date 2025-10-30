@@ -109,6 +109,10 @@ namespace {
         if (TryFromString(conf.CommandConf.EvalValue("GLOB_SKIPPED_ERROR_PERCENT"), globSkippedErrorPercent)) {
             conf.GlobSkippedErrorPercent = globSkippedErrorPercent;
         }
+        decltype(conf.GlobSkippedMinWatched) globSkippedMinWatched;
+        if (TryFromString(conf.CommandConf.EvalValue("GLOB_SKIPPED_MIN_WATCHED"), globSkippedMinWatched)) {
+            conf.GlobSkippedMinWatched = globSkippedMinWatched;
+        }
     }
 }
 

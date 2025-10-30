@@ -1034,7 +1034,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
             if (!patterns.empty()) patterns << ", ";
             patterns << pattern;
         }
-        globRestrictions.Check(name, patterns, globStat, Conf.GlobSkippedErrorPercent);
+        globRestrictions.Check(name, patterns, globStat, Conf.GlobSkippedErrorPercent, Conf.GlobSkippedMinWatched);
     }
     if (globVarElemId) {
         TGlobHelper::SaveGlobRestrictions(Module.ModuleGlobsData, globVarElemId, std::move(globRestrictions));
