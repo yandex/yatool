@@ -5,6 +5,7 @@ import os
 import fnmatch
 import logging
 import inspect
+from typing import Callable
 
 import devtools.ya.test.const
 import exts.func
@@ -253,8 +254,12 @@ def fixed_test_names(filters, opts):
         return lambda x: True
 
 
-def filter_suites(suites, opts, tc):
-    def apply_filter(suites, callback, filter_description):
+def filter_suites(suites: list[common_suites.AbstractTestSuite], opts, tc) -> list[common_suites.AbstractTestSuite]:
+    def apply_filter(
+        suites: list[common_suites.AbstractTestSuite],
+        callback: Callable[[common_suites.AbstractTestSuite], bool],
+        filter_description,
+    ) -> list[common_suites.AbstractTestSuite]:
         logger.debug("Going to apply filter '%s' on %s suites", filter_description, len(suites))
         skipped = []
         filtered = []

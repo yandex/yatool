@@ -482,10 +482,13 @@ class AbstractTestSuite(facility.Suite):
         """
         This is used to pinpoint exactly the same tests between different runs
         """
-        res = ''
+        res = []  # for better debugging
+        # TODO: We calculate here timeout, which will be changed in preparing test nodes
         for attr in ATTRS_TO_STATE_HASH:
-            res += str(getattr(self, attr, ''))
-        return hashing.md5_value(res)
+            res.append(attr)
+            res.append(str(getattr(self, attr, '')))
+
+        return hashing.md5_value(' '.join(res))
 
     def stdout_path(self):
         return os.path.join(self.output_dir(), "run.stdout")
@@ -519,7 +522,11 @@ class AbstractTestSuite(facility.Suite):
         raise NotImplementedError()
 
     def __str__(self):
-        return "Test [project=%s, name=%s]" % (self.project_path, self.name)
+        return "Test [type={}, project={}, name={}]".format(
+            self.get_type(),
+            self.project_path,
+            self.name,
+        )
 
     def __repr__(self):
         return str(self)
@@ -1254,3 +1261,9 @@ class SkippedTestSuite(object):
     def requirements(self):
         # distbuild fails if finds some requirements, e.g. ram_disk:8, even for skipped tests, TODO: DEVTOOLS-5005 - stop sending skipped tests to distbs
         return {}
+
+    def __str__(self):
+        return "SkippedTestSuite[of {}]".format(object.__getattribute__(self, "_original_suite"))
+
+    def __repr__(self):
+        return str(self)

@@ -623,16 +623,22 @@ def configure_active_state(app_ctx):
 
 
 def configure_vcs_info():
-    import logging
-
     revision = None
+
     try:
         from library.python import svn_version
 
         revision = svn_version.svn_revision()
-        logging.debug('Release revision: %s', revision)
+        logger.debug('Release revision: %s', revision)
+        if revision == -1:
+            logger.debug("Release branch: %s", svn_version.svn_branch())
+            logger.debug("Release hash: %s", svn_version.hash())
+            logger.debug("Release commit_id: %s", svn_version.commit_id())
+            logger.debug("Release timestamp: %s", svn_version.svn_timestamp())
+
     except ImportError:
         pass
+
     yield revision
 
 

@@ -8,7 +8,7 @@ import exts.yjson as json
 
 from yalibrary.store import new_store
 from yalibrary.runner import uid_store
-
+from devtools.ya.test.test_types.common import AbstractTestSuite
 
 logger = logging.getLogger(__name__)
 STATUS_STORE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -83,23 +83,51 @@ def get_tests_restart_cache_dir(garbage_dir: str) -> str:
     return os.path.join(garbage_dir, 'cache', 'trc')
 
 
+# TODO (v-korovin): Use Status from test_const
+
+RERUN_FULL_CHUNK_STATUSES = (
+    'crashed',
+    'fail',
+    'internal',
+)
+
+
 def _get_tests_statuses(trace_path: str, suite_hash: str) -> TestsStatuses:
     res = {}
     with open(trace_path) as read_file:
         for test_info in read_file:
             test_info = json.loads(test_info)
-            if 'value' in test_info:
-                test_info_value = test_info['value']
 
-                if test_info['name'] == 'chunk-event' and test_info_value.get('errors'):
-                    # If a chunk fails we mark the whole suite as failed. We can't reliably rerun chunks
-                    # because the set of tests in a chunk can change between runs moving test files
-                    # that trigger the chunk failure to other chunks.
-                    return {suite_hash: 'fail'}
+            if test_info_value := test_info.get('value'):
+                if test_info['name'] == 'chunk-event':
+                    # For full status list look into build/plugins/lib/test_const/__init__.py::Status
+                    test_statuses = [error[0] for error in test_info_value.get('errors', tuple())]
+
+                    if not test_statuses:
+                        # No errors in chunk-event means all ok
+                        pass
+                    elif failed_statuses := set(
+                        status for status in test_statuses if status in RERUN_FULL_CHUNK_STATUSES
+                    ):
+                        # If a chunk fails we mark the whole suite as failed. We can't reliably rerun chunks
+                        # because the set of tests in a chunk can change between runs moving test files
+                        # that trigger the chunk failure to other chunks.
+                        logger.debug(
+                            "Mark FULL CHUNK %s as failed because of chunk-event error statuses %s",
+                            suite_hash,
+                            failed_statuses,
+                        )
+                        # TODO: Use Status from test_const and merge_statuses_info?
+                        return {suite_hash: ','.join(failed_statuses)}
+                    else:
+                        # We want rerun tests in chunks granullary if `timeout`, `not_launched` and other chunk-event statuses happens
+                        pass
 
                 if all([key in test_info_value for key in ['status', 'subtest', 'class']]):
                     test_name = test_info_value['class'] + '::' + test_info_value['subtest']
                     res[test_name] = test_info_value['status']
+
+    # TODO: if res is empty, why?
     return res
 
 
@@ -109,19 +137,28 @@ def _get_trace_path(res_list) -> str | None:
             return res_elem['trace_file']
 
 
+TEST_GOOD_STATUSES = {
+    'good',
+    'xfail',
+    'skipped',
+    'xfaildiff',
+    'xpass',
+}
+
+
 def _merge_statuses_info(old_info: TestsStatuses | None, new_info: TestsStatuses) -> TestsStatuses:
     if old_info is None:
         old_info = {}
     result_info = old_info.copy()
     for test_name, status in new_info.items():
-        if test_name in old_info and status in ['good', 'xfail', 'skipped']:
+        if test_name in old_info and status in TEST_GOOD_STATUSES:
             result_info.pop(test_name)
-        if test_name not in old_info and status not in ['good', 'xfail', 'skipped']:
+        if test_name not in old_info and status not in TEST_GOOD_STATUSES:
             result_info[test_name] = status
     return result_info
 
 
-def _get_suite_statuses(res, suite, suite_hash: str) -> TestsStatuses:
+def _get_suite_statuses(res, suite: AbstractTestSuite, suite_hash: str) -> TestsStatuses:
     statuses_info = {}
     for uid in suite.result_uids:
         if uid not in res:
@@ -134,7 +171,7 @@ def _get_suite_statuses(res, suite, suite_hash: str) -> TestsStatuses:
     return statuses_info
 
 
-def cache_test_statuses(res, tests, garbage_dir: str, last_failed_tests: bool) -> None:
+def cache_test_statuses(res, tests: list[AbstractTestSuite], garbage_dir: str, last_failed_tests: bool) -> None:
     status_storage = StatusStore(get_tests_restart_cache_dir(garbage_dir))
     status_storage.compact(STATUS_STORE_SIZE, STATUS_STORE_TTL)
     all_suite_res: list[tuple[str, TestsStatuses]] = []
@@ -143,7 +180,7 @@ def cache_test_statuses(res, tests, garbage_dir: str, last_failed_tests: bool) -
         suite_hash: str = suite.get_state_hash()
         new_statuses_info = _get_suite_statuses(res, suite, suite_hash)
         if new_statuses_info:
-            logger.debug("{} status info: {}".format(suite, new_statuses_info))
+            logger.debug("%s status info: %s", suite, new_statuses_info)
         all_suite_res.append(
             (
                 suite_hash,

@@ -38,6 +38,7 @@ import exts.windows
 
 import devtools.ya.test.canon.data as canon_data
 import devtools.ya.test.common as test_common
+from devtools.ya.test.test_types.common import AbstractTestSuite
 import devtools.ya.test.common.ytest_common_tools as ytest_common_tools
 import devtools.ya.test.const
 import devtools.ya.test.filter as test_filter
@@ -1742,7 +1743,8 @@ def make_test_merge_chunks(tests):
     return chunks.values()
 
 
-def filter_last_failed(tests, opts):
+def filter_last_failed(tests: list[AbstractTestSuite], opts) -> list[AbstractTestSuite]:
+    logger.debug("Going to apply `last_failed` filter from last run for %d suites", len(tests))
     store_path = last_failed.get_tests_restart_cache_dir(opts.bld_dir)
     status_storage = last_failed.StatusStore(store_path)
     is_all_empty = True
@@ -1750,12 +1752,21 @@ def filter_last_failed(tests, opts):
     for suite in tests:
         suite_hash = suite.get_state_hash()
         failed_tests = status_storage.get(suite_hash)
+
         if failed_tests:
             is_all_empty = False
             suites_to_rerun.append(suite)
             if suite_hash not in failed_tests:
                 # if a suite is not marked as failed we add filters to run only failed tests
                 suite.insert_additional_filters([ytest_common_tools.to_utf8(k) for k in failed_tests.keys()])
+                logger.debug("Found %d failed tests for suite %s (%s)", len(failed_tests), suite, suite_hash)
+            else:
+                logger.debug(
+                    "Full suite will be restarted due status `%s`: %s (%s)", failed_tests[suite_hash], suite, suite_hash
+                )
+        else:
+            logger.debug("Removing suite %s (%s)", suite, suite_hash)
+
     status_storage.flush()
     if is_all_empty or opts.tests_filters:
         return tests
