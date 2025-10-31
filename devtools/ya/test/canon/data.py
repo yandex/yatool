@@ -26,10 +26,7 @@ from yalibrary.display import strip_markup
 from yatest_lib import external
 from devtools.ya.test import const
 
-try:
-    from yalibrary.vcs import detect
-except ImportError:
-    from standalone import detect
+from yalibrary.vcs import detect
 
 import app_config
 
