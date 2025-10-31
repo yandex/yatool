@@ -38,11 +38,6 @@ enum ESubstMode {
 };
 
 struct TCommandInfo {
-    enum ECmdType : ui8 {
-        Macro = 0,
-        MacroImplInp = 1, // when EMT_Usual macro type is used instead of EMT_MacroCall
-    };
-
     enum ECmdInfoState {
         OK = 0,
         FAILED = 1,
@@ -112,7 +107,6 @@ private:
     ui32 MainInputCandidateIdx = Max<ui32>();
 
     mutable ui8 MsgDepth = 0; // for debug messages
-    ECmdType CmdType = Macro;
     bool AllVarsNeedSubst = false;
     bool HasGlobalInput = false;
 
@@ -195,8 +189,6 @@ public:
         ECmdFormat formatFor = ECF_Unset,
         const TSubstObserver& substObserver = {});
 
-    ECmdType GetCmdType() const { return CmdType; }
-    void SetCmdType(ECmdType type) { CmdType = type; }
     void SetAllVarsNeedSubst(bool need) { AllVarsNeedSubst = need; }
 
     void WriteRequirements(TStringBuf reqs);

@@ -148,7 +148,7 @@ private:
     enum class EModuleCmdKind {
         // change this enum with caution
         Default = 0,
-        Fail,
+        Fail, // TODO? drop it
         Global
     };
 

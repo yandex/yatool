@@ -395,77 +395,31 @@ void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node, bool structCmd) {
 void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind) {
     YDIAG(Dev) << "Add LinkDep for: " << name << node.NodeType << Endl;
 
-    if (GetModuleConf().StructCmdForModuleConf && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
-        auto mainOutputFile = Graph.GetFileName(node.ElemId);
-        auto mainOutputName = mainOutputFile.Basename();
-        auto compiled = [&]() {
+    auto mainOutputFile = Graph.GetFileName(node.ElemId);
+    auto mainOutputName = mainOutputFile.Basename();
+    auto compiled = [&]() {
+        if (cmdKind != EModuleCmdKind::Fail) {
             try {
                 return Commands.Compile(command, Conf, Vars, true, {.MainOutput = mainOutputName});
             } catch (const std::exception& e) {
                 YConfErr(Details) << "Command processing error (module " << Module.GetUserType() << "): " << e.what() << Endl;
-                return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {.MainOutput = mainOutputName});
-            }
-        }();
-        const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
-
-        TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
-        cmdInfo->InitFromModule(Module);
-
-        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled, true, Vars);
-
-        if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
-            AddGlobalVarDeps(node, true);
-            node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
-        } else {
-            YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
-            if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {
-                YDIAG(Dev) << "... will try to add FAIL_MODULE_CMD" << Endl;
-                AddLinkDep(name, command, node, EModuleCmdKind::Fail);
             }
         }
-
-        return;
-    }
-
-    if (cmdKind == EModuleCmdKind::Default) {
-        AddGlobalVarDeps(node, false);
-    }
-
-    TStringBuf cmdName;
-    TVector<TStringBuf> modArgs;
-    bool isMacroCall = false;
-
-    if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {
-        isMacroCall = ParseMacroCall(command, cmdName, modArgs);
-        TStringBuf cmd = Vars.Get1(cmdName);
-        if (cmd.empty()) {
-            if (!Conf.RenderSemantics || !Module.IsSemIgnore()) {
-                if (cmdKind == EModuleCmdKind::Global) {
-                    YConfErr(NoCmd) << "No valid command to link global srcs " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
-                } else {
-                    YConfErr(NoCmd) << "No valid command to link " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
-                }
-            }
-            cmdKind = EModuleCmdKind::Fail;
-        }
-    }
-    if (cmdKind == EModuleCmdKind::Fail) {
-        // Add fake command instead of bad one (it will fail at link time)
-        isMacroCall = ParseMacroCall(TStringBuf("FAIL_MODULE_CMD"), cmdName, modArgs);
-    }
+        return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {.MainOutput = mainOutputName});
+    }();
+    const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
     TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->InitFromModule(Module);
 
-    // can not fail, we've checked `cmd' already
-    cmdInfo->GetCommandInfoFromMacro(cmdName, isMacroCall ? EMT_MacroCall : EMT_Usual, modArgs, Vars, Module.GetId());
-    cmdInfo->SetCmdType(TCommandInfo::MacroImplInp);
+    cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled, true, Vars);
 
     if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
+        AddGlobalVarDeps(node, true);
         node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
     } else {
         YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
-        if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {
+        if (cmdKind != EModuleCmdKind::Fail) {
             YDIAG(Dev) << "... will try to add FAIL_MODULE_CMD" << Endl;
             AddLinkDep(name, command, node, EModuleCmdKind::Fail);
         }

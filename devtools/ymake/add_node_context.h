@@ -114,7 +114,6 @@ public:
 
     void RemoveIncludeDeps(ui64 startFrom);
 
-    bool CheckInputsChange() const;
     TCreateParsedInclsResult CreateParsedIncls(TStringBuf type, const TVector<TResolveFile>& files);
     static TCreateParsedInclsResult CreateParsedIncls(
         TModule* module, TDepGraph& graph, TUpdIter& updIter, TYMake& yMake,

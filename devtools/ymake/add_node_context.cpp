@@ -115,55 +115,6 @@ void TNodeAddCtx::AddInputs() {
         NodeType = Module->GetNodeType();
         return;
     }
-
-    //Y_ASSERT(Deps.empty() || ModuleData.CmdInfo || Deps[0].DepType == EDT_OutTogether);
-    const auto& modData = GetModuleData();
-    if (modData.CmdInfo != nullptr) {
-        TCommandInfo& cmdInfo = *modData.CmdInfo;
-        Y_ASSERT(UseFileId(NodeType));
-        bool cmdChanged = false;
-        if (UpdNode != TNodeId::Invalid) {
-            for (const auto& edge : Graph.Get(UpdNode).Edges()) {
-                if (*edge == EDT_BuildCommand) {
-                    const TDepTreeNode nodeDep = edge.To().Value();
-                    const ui32 cmdElemId = ::ElemId(cmdInfo.Cmd.EntryPtr->first);
-                    if (nodeDep.ElemId != cmdElemId)
-                        cmdChanged = true;
-                    break; // there can be only one BuildCommand
-                }
-                if (cmdChanged)
-                    YDIAG(Dev) << "cmdChanged: " << Graph.GetFileName(NodeType, ElemId) << Endl;
-            }
-            if (cmdInfo.GetCmdType() == TCommandInfo::MacroImplInp) {
-                cmdChanged |= CheckInputsChange();
-            }
-        }
-    }
-}
-
-bool TNodeAddCtx::CheckInputsChange() const {
-    Y_ASSERT(UpdNode != TNodeId::Invalid);
-    YDIAG(Dev) << "MacroImplInp, check " << Graph.GetFileName(NodeType, ElemId) << Endl;
-    // compare inputs (BuildFrom), too
-    TDeps::const_iterator i = Deps.begin(), e = Deps.end();
-    for (const auto& edge : Graph.Get(UpdNode).Edges()) {
-        if (*edge == EDT_BuildFrom) {
-            const TDepTreeNode nodeDep = edge.To().Value();
-            while (i != e && i->DepType != EDT_BuildFrom)
-                ++i;
-            if (i == e || nodeDep.ElemId != i++->ElemId) {
-                YDIAG(Dev) << "cmdChanged2: " << Graph.GetFileName(NodeType, ElemId) << Endl;
-                return true;
-            }
-        }
-    }
-    while (i != e && i->DepType != EDT_BuildFrom)
-        ++i;
-    if (i != e) {
-        YDIAG(Dev) << "cmdChanged3: " << Graph.GetFileName(NodeType, ElemId) << Endl;
-        return true;
-    }
-    return false;
 }
 
 TCreateParsedInclsResult TNodeAddCtx::CreateParsedIncls(TStringBuf type, const TVector<TResolveFile>& files) {
