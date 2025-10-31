@@ -112,10 +112,8 @@ namespace {
     }
 
     void LoadPluginsFromDir(TBuildConfiguration& conf, const TFsPath& path) {
-        TScopedPyObjectPtr sys = PyImport_ImportModule("sys");
-        TScopedPyObjectPtr sysPath = PyObject_GetAttrString(sys, "path");
         TScopedPyObjectPtr pluginsPath = PyUnicode_FromString(path.c_str());
-        PyList_Insert(sysPath, 0, pluginsPath);
+        PyList_Insert(PySys_GetObject("path"), 0, pluginsPath);
 
         LoadPluginsFromDirRecursively(conf, path, /* firstLevel */ true);
     }
