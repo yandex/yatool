@@ -1082,6 +1082,9 @@ namespace NYa {
                     if (decoder) {
                         Metrics_.UpdateCompressionRatio(dataSize, decoder->DecodedSize());
                     }
+                    if (meta->HasKey("cuid") && SafeChildAs<TString>(*meta, "cuid") == uid && meta->ChildAsString("uid") != uid) {
+                        Metrics_.IncCounter("get-by-cuid");
+                    }
                 } catch (const std::exception& e) {
                     DEBUG_LOG << "Try restore " << uid <<" from YT failed: " << e.what();
                     Metrics_.CountFailures("get");
@@ -1797,6 +1800,12 @@ namespace NYa {
                     Data_.TimerIntervals[tag].emplace_back(start, stop);
                     ++Data_.Counters[tag];
                 };
+            }
+
+            void IncCounter(const TString tag) {
+                with_lock (Lock_) {
+                    ++Data_.Counters[tag];
+                }
             }
 
             void CountFailures(const TString& tag) {

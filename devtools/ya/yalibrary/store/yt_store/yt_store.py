@@ -460,6 +460,8 @@ class YtStore(DistStore):
             self._count_failure('get')
             return False
 
+        if meta.get('cuid') == uid and meta['uid'] != uid:
+            self._counters['get-by-cuid'] += 1
         logger.debug('Try restore %s from YT completed. Successfully restored %s', uid, meta.get('name', ''))
         return True
 

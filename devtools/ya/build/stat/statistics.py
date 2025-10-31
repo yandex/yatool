@@ -515,6 +515,8 @@ def print_dist_cache_statistics(graph, filename, display):
     # cache hit if all (really all) nodes will be requested from dist cache
     cache_fullness = 100.0 * cache_found / cache_requested if cache_requested > 0 else 0.0
 
+    get_by_cuid = log_json.get('$({}-store-get-by-cuid)'.format(prefix), {})
+
     display.emit_message(
         'Dist cache download: count={}, size={}, speed={}/s'.format(
             get_count, format_size(get_data_size, binary=True), format_size(get_real_speed, binary=True)
@@ -525,6 +527,7 @@ def print_dist_cache_statistics(graph, filename, display):
         'cache_fullness': cache_fullness,
         'get_data_size': get_data_size,
         'get_count': get_count,
+        'get_by_cuid_count': get_by_cuid.get('count', 0),
         'get_speed': get_speed,
         'get_real_speed': get_real_speed,
         'put_data_size': put_data_size,

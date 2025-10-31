@@ -32,7 +32,7 @@ class DistStore(object):
         metrics = ['has', 'put', 'get', 'get-meta', 'probe-meta-before-put']
         self._timers = {m: 0 for m in metrics}
         self._time_intervals = {m: [] for m in metrics}
-        self._counters = {m: 0 for m in metrics + ['skip-put']}
+        self._counters = {m: 0 for m in metrics + ['skip-put', 'get-by-cuid']}
         self._failures = {m: 0 for m in metrics}
         self._data_size = {'put': 0, 'get': 0, 'skip-put': 0}
         self._cache_hit = {'requested': 0, 'found': 0}
@@ -136,6 +136,7 @@ class DistStore(object):
             report.telemetry.report('{}-{}-data-size'.format(self._stats_name, k), stat_dict)
             execution_log['$({}-{}-data-size)'.format(self._name, k)] = stat_dict
         execution_log['$({}-cache-hit)'.format(self._name)] = self._cache_hit
+        execution_log['$({}-get-by-cuid)'.format(self._name)] = {'count': self._counters['get-by-cuid']}
 
         real_times = {}
         for k, v in six.iteritems(self._timers):
