@@ -127,8 +127,6 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TFsPath& pycache, T
         return;
     }
 
-    PyInit_ymake();
-
     if (pycache.Exists()) {
         PySys_SetObject("dont_write_bytecode", Py_False);
         NYMake::NPlugins::TScopedPyObjectPtr cachePath{PyUnicode_FromString(pycache.c_str())};

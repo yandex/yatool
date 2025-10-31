@@ -1,5 +1,7 @@
 #pragma once
 
+#include <devtools/ymake/plugins/ymake_module.h>
+
 #include <util/generic/noncopyable.h>
 #include <util/generic/vector.h>
 #include <util/system/yassert.h>
@@ -37,6 +39,7 @@ namespace NYMake {
         void Initialize(size_t count) {
             Y_ASSERT(!Initialized_);
 
+            PyImport_AppendInittab("ymake", NPlugins::PyInit_ymake);
             // Enable UTF-8 mode by default
             PyStatus status;
 
