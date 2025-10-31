@@ -138,13 +138,14 @@ YtStore::YtStore(const char* yt_proxy, const char* yt_dir, const char* yt_token,
     auto config = NYT::TConfig::Get();
     config->ConnectTimeout = TDuration::Seconds(5);
     config->SocketTimeout = TDuration::Seconds(5);
-    config->RetryInterval = RETRY_INTERVAL;
-    config->RetryCount = 5;
     NYT::TCreateClientOptions clientOpts = NYT::TCreateClientOptions().Token(yt_token);
     if (retry_time_limit) {
-        config->RetryCount = retry_time_limit / RETRY_INTERVAL + 1;
+        config->RetryCount = Max<int>();
         // Limit total retry time because each attempt consumes non-zero time
         clientOpts.RetryConfigProvider(MakeIntrusive<TRetryConfigProvider>(retry_time_limit));
+    } else {
+        config->RetryInterval = RETRY_INTERVAL;
+        config->RetryCount = 5;
     }
     this->Client = NYT::CreateClient(yt_proxy, clientOpts);
     this->YtDir = yt_dir;
