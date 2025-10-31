@@ -1,3 +1,4 @@
+import os
 import logging
 import shutil
 from pathlib import Path
@@ -97,6 +98,8 @@ class _Builder:
                         / ("ya_ide_gradle_" + hashing.fast_hash(junk_ya_make_content))
                         / "ya.make"
                     )
+                    if junk_ya_make.parent.exists():  # concurrent usage same temp directory
+                        junk_ya_make = Path(str(junk_ya_make.parent) + "." + str(os.getpid())) / junk_ya_make.name
                     _SymlinkCollector.mkdir(junk_ya_make.parent)
                     with junk_ya_make.open('w') as f:
                         f.write(junk_ya_make_content)
