@@ -73,7 +73,9 @@ class _Builder:
                 opts = yarg.merge_params(ya_make_opts.initialize([]))
             else:
                 ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release'))
-                opts = yarg.merge_params(ya_make_opts.initialize(self.config.params.ya_make_extra))
+                opts = yarg.merge_params(
+                    ya_make_opts.initialize(self.config.params.ya_make_extra + ['-DSOURCES_JAR=yes'])
+                )
                 opts.dump_sources = True
                 if proto_rel_targets:
                     proto_rel_targets = list(set(proto_rel_targets))
