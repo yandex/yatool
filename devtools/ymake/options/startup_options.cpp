@@ -98,6 +98,7 @@ void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {
     YmakeUidsCache = BuildRoot / "ymake.uids.cache";
     YmakeJsonCache = BuildRoot / "ymake.json.cache";
     ConfDir = SourceRoot / "build";
+    YmakeDartsCacheDir = BuildRoot;
 }
 
 void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<char*>& optPos) {

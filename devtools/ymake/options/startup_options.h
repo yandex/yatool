@@ -19,6 +19,7 @@ struct TStartUpOptions: public TRootsOptions {
     TFsPath YmakeUidsCache;
     TFsPath YmakeJsonCache;
     TFsPath ConfDir;
+    TFsPath YmakeDartsCacheDir;
 
     TVector<TFsPath> StartDirs;
     TVector<TFsPath> Targets;

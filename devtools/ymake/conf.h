@@ -222,6 +222,14 @@ public:
         return LoadGraph_;
     }
 
+    bool ShouldLoadDartCaches() const noexcept {
+        return LoadDartCaches_;
+    }
+
+    bool ShouldSaveDartCaches() const noexcept {
+        return SaveDartCaches_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
     IMemoryPool* GetStringPool() const { return StrPool.Get(); }
@@ -259,6 +267,8 @@ private:
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
     bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
     bool YmakeSaveAllCachesWhenBadLoops_ = false;
+    bool LoadDartCaches_ = true;
+    bool SaveDartCaches_ = true;
 
     bool UseOnlyYmakeCache_ = false;
     bool LoadGraph_ = false;

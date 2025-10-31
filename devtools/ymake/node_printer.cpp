@@ -48,6 +48,7 @@
 #include <util/system/types.h>
 
 #include <algorithm>
+#include <fmt/format.h>
 #include <utility>
 
 namespace {
@@ -2405,4 +2406,60 @@ TString DumpNodeFlags(ui32 elemId, EMakeNodeType nodeType, const TSymbols& names
             result = "KTP";
     }
     return result;
+}
+
+template <>
+void Out<TDartManager::EDartType>(IOutputStream& out, TDartManager::EDartType dartType) {
+    switch (dartType) {
+    case TDartManager::EDartType::None:
+        out << "NoneDart";
+        break;
+    case TDartManager::EDartType::Test:
+        out << "TestDart";
+        break;
+    case TDartManager::EDartType::Java:
+        out << "JavaDart";
+        break;
+    case TDartManager::EDartType::Makefiles:
+        out << "MakefilesDart";
+        break;
+    default:
+        out << "UnknownDart";
+        break;
+    }
+}
+
+void TDartManager::Dump(EDartType dartType, const TString& dartName) {
+    TFsPath dartPath{dartName};
+    TFsPath cachePath = YMake_.Conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache");
+    TString dartTypeStr = ToString(dartType);
+    Y_ASSERT(cachePath != dartPath);
+    if (YMake_.Conf.ShouldLoadDartCaches() && YMake_.CanBypassConfigure() && cachePath.Exists()) {
+        NYMake::TTraceStage trace{fmt::format("Load {} from cache", dartTypeStr)};
+        cachePath.CopyTo(dartName, true);
+        return;
+    } else {
+        NYMake::TTraceStage trace{fmt::format("Render {}", dartTypeStr)};
+        THolder<IOutputStream> dartOut;
+        dartOut.Reset(new TFileOutput(dartName));
+        switch (dartType) {
+        case EDartType::Test:
+            YMake_.DumpTestDart(*dartOut);
+            break;
+        case EDartType::Java:
+            YMake_.DumpJavaDart(*dartOut);
+            break;
+        case EDartType::Makefiles:
+            YMake_.DumpMakeFilesDart(*dartOut);
+            break;
+        default:
+            // Unreachable code
+            Y_ASSERT(0);
+        }
+        dartOut->Finish();
+    }
+    if (YMake_.Conf.ShouldSaveDartCaches()) {
+        NYMake::TTraceStage trace{fmt::format("Save {} to cache", dartTypeStr)};
+        TFsPath{dartName}.CopyTo(cachePath, true);
+    }
 }

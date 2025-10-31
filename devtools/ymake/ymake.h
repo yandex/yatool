@@ -186,6 +186,13 @@ public:
         // --xcompletely-trust-fs-cache can't be passed without --patch-path
         return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_;
     }
+    // This function should only be used for testing purposes
+    void ForceBypassConfigure() {
+        Conf.EnableGrandBypass();
+        Conf.CompletelyTrustFSCache = true;
+        HasGraphStructuralChanges_ = false;
+        Y_ASSERT(CanBypassConfigure());
+    }
     void UpdateExternalFilesChanges();
     void UpdateUnreachableExternalFileChanges();
 

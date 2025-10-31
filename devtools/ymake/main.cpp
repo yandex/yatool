@@ -807,26 +807,21 @@ void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
 
     yMake->Conf.SourceRoot = "$(SOURCE_ROOT)";
     yMake->Conf.BuildRoot = "$(BUILD_ROOT)";
+
+    TDartManager dartManager(*yMake);
+
     if (!conf.WriteTestDart.empty()) {
-        THolder<IOutputStream> dartOut;
-        dartOut.Reset(new TFileOutput(conf.WriteTestDart));
-        yMake->DumpTestDart(*dartOut);
-        dartOut->Finish();
+        dartManager.Dump(TDartManager::EDartType::Test, conf.WriteTestDart);
     }
 
     if (!conf.WriteJavaDart.empty()) {
-        THolder<IOutputStream> dartOut;
-        dartOut.Reset(new TFileOutput(conf.WriteJavaDart));
-        yMake->DumpJavaDart(*dartOut);
-        dartOut->Finish();
+        dartManager.Dump(TDartManager::EDartType::Java, conf.WriteJavaDart);
     }
 
     if (!conf.WriteMakeFilesDart.empty()) {
-        THolder<IOutputStream> dartOut;
-        dartOut.Reset(new TFileOutput(conf.WriteMakeFilesDart));
-        yMake->DumpMakeFilesDart(*dartOut);
-        dartOut->Finish();
+        dartManager.Dump(TDartManager::EDartType::Makefiles, conf.WriteMakeFilesDart);
     }
+
     yMake->Modules.ResetTransitiveInfo();
 
     yMake->DumpMetaData();

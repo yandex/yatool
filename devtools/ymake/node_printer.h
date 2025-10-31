@@ -213,3 +213,24 @@ public:
 
 void DumpModulesInfo(IOutputStream& out, const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TString& filter);
 TString DumpNodeFlags(ui32 elemId, EMakeNodeType nodeType, const TSymbols& names);
+
+class TDartManager {
+public:
+    enum class EDartType {
+        None,
+        Test,
+        Java,
+        Makefiles
+    };
+
+    TDartManager(TYMake& ymake)
+        : YMake_(ymake)
+    {
+    }
+
+    ~TDartManager() = default;
+
+    void Dump(EDartType dartType, const TString& dartName);
+private:
+    TYMake& YMake_;
+};
