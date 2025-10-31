@@ -140,7 +140,7 @@ namespace {
         TSemFormatter formatter{};
         TMakeCommand mkcmd{modulesStatesCache, restoreContext, commands, nullptr, &restoreContext.Conf.CommandConf};
         mkcmd.CmdInfo.MkCmdAcceptor = formatter.GetAcceptor();
-        mkcmd.GetFromGraph(nodeId, modId, ECmdFormat::ECF_Json, &semInfoProvider);
+        mkcmd.GetFromGraph(nodeId, modId, &semInfoProvider);
         return std::move(formatter).TakeCommands();
     }
 

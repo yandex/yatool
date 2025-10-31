@@ -762,7 +762,7 @@ static void DumpGraphInternal(TYMake& yMake) {
             TMakeCommand mkCmd(modulesStatesCache, yMake);
             mkCmd.CmdInfo.MkCmdAcceptor = &cmdImage;
             try {
-                mkCmd.GetFromGraph(i.second, printer.Node2Module[i.second], ECF_Make);
+                mkCmd.GetFromGraph(i.second, printer.Node2Module[i.second]);
                 cmdImage.PrintAsLine(yMake.Conf.Cmsg()) << Endl;
             } catch (yexception& e) {
                 yMake.Conf.Cmsg() << "#Error: " << yMake.Graph.ToString(yMake.Graph.Get(i.second)) << ": " << e.what() << "\n";

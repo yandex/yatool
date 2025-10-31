@@ -115,13 +115,13 @@ namespace {
         void RenderNodeDelayed() {
             PrepareNodeForRendering();
             Y_ASSERT(NodeId != TNodeId::Invalid);
-            MakeCommand.GetFromGraph(NodeId, ModuleId, ECF_Json, &DumpInfo, true, IsGlobalNode);
+            MakeCommand.GetFromGraph(NodeId, ModuleId, &DumpInfo, true, IsGlobalNode);
             RenderedWithoutSubst = true;
         }
 
         void CompleteRendering() {
             Y_ASSERT(RenderedWithoutSubst);
-            MakeCommand.RenderCmdStr(ECF_Json, &CmdBuilder.ErrorShower);
+            MakeCommand.RenderCmdStr(&CmdBuilder.ErrorShower);
             RenderedWithoutSubst = false;
         }
 

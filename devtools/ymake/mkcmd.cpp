@@ -125,7 +125,7 @@ TString TMakeCommand::RealPathEx(const TConstDepNodeRef& node) const {
     return Conf.RealPathEx(resolvedNode);
 }
 
-void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFormat, TDumpInfoEx* addInfo, bool skipRender, bool isGlobalNode) {
+void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, TDumpInfoEx* addInfo, bool skipRender, bool isGlobalNode) {
     InitModuleEnv(modId);
     RequirePeers = (nodeId == modId) && Modules.Get(Graph[modId]->ElemId)->GetAttrs().UsePeers;
     if (isGlobalNode) {
@@ -140,7 +140,7 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFor
         }
         if (!skipRender) {
             auto ignoreErrors = TErrorShowerState(TDebugOptions::EShowExpressionErrors::None);
-            RenderCmdStr(cmdFormat, &ignoreErrors);
+            RenderCmdStr(&ignoreErrors);
         }
     }
 }
@@ -331,34 +331,18 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
     addInfo->LateOuts.insert(addInfo->LateOuts.end(), lateOuts.begin(), lateOuts.end());
 }
 
-void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorShower) {
-    //recursively add command parts!
-    if (Graph.Names().CmdNameById(Graph[CmdNode]->ElemId).IsNewFormat()) {
-        auto expr = Commands->GetByElemId(Graph[CmdNode]->ElemId);
-        YDIAG(MkCmd) << "CS for: " << Commands->PrintCmd(*expr) << "\n";
-        if (!CmdInfo.MkCmdAcceptor) {
-            // TBD: we can get here, e.g., from the MSVS generator; what's the goal?
-            return;
-        }
-        auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
-        Y_ABORT_UNLESS(acceptor);
-        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, Conf, errorShower);
-        acceptor->PostScript(Vars);
-    } else {
-        if (Conf.DeprecateNonStructCmdNodes)
-            throw TNotImplemented() << "old-school command rendering has been deprecated";
-        YDIAG(MkCmd) << "CS for: " << CmdString << "\n";
-        CmdString = CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, ECF_ExpandSimpleVars, true);
-        CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, cmdFormat, false);
-        const auto& cmdInfo = CmdInfo;
-
-        TYVar& toolVar = Vars[NVariableDefs::VAR_TOOLS];
-        if (cmdInfo.ToolPaths) {
-            for (const auto& tool : *cmdInfo.ToolPaths) {
-                toolVar.push_back(TVarStr(tool.second, true, false));
-            }
-        }
+void TMakeCommand::RenderCmdStr(TErrorShowerState* errorShower) {
+    Y_ABORT_UNLESS (Graph.Names().CmdNameById(Graph[CmdNode]->ElemId).IsNewFormat());
+    auto expr = Commands->GetByElemId(Graph[CmdNode]->ElemId);
+    YDIAG(MkCmd) << "CS for: " << Commands->PrintCmd(*expr) << "\n";
+    if (!CmdInfo.MkCmdAcceptor) {
+        // TBD: we can get here, e.g., from the MSVS generator; what's the goal?
+        return;
     }
+    auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
+    Y_ABORT_UNLESS(acceptor);
+    Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, Conf, errorShower);
+    acceptor->PostScript(Vars);
 }
 
 void TMakeCommand::ReportStats() {
