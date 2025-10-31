@@ -212,7 +212,18 @@ class YtStoreClient(object):
     def get_data_replication_factor(self):
         return self._client.get('{}/@replication_factor'.format(self._data_table))
 
-    def put(self, self_uid, uid, path, codec=None, forced_node_size=None, forced_hash='', cuid=None, name=None):
+    def put(
+        self,
+        self_uid,
+        uid,
+        path,
+        codec=None,
+        forced_node_size=None,
+        forced_hash='',
+        forced_chunks_count=None,
+        cuid=None,
+        name=None,
+    ):
         chunks_count = 0
         data_size = 0
         _hash = hashing.fast_filehash(path) if path else forced_hash  # TODO: streaming hash
@@ -239,6 +250,7 @@ class YtStoreClient(object):
                     self._safe_insert_rows(self._data_table, rows, ['hash', 'chunk_i'])
         else:
             data_size = forced_node_size or 0
+            chunks_count = forced_chunks_count or 0
 
         key_columns = ['uid']
         meta = {

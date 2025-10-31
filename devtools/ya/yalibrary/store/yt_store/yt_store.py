@@ -279,10 +279,11 @@ class YtStore(DistStore):
                 self_uid,
                 uid,
                 None,
-                name=name,
+                name=meta["name"],
                 codec=meta["codec"],
                 forced_node_size=meta["data_size"],
                 forced_hash=meta["hash"],
+                forced_chunks_count=meta["chunks_count"],
                 cuid=cuid,
             )
         data_path = self._prepare_data(stack, files, codec, root_dir)
