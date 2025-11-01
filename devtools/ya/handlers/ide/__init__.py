@@ -369,6 +369,7 @@ class GradleOptions(yarg.Options):
     OPT_GRADLE_NAME = '--gradle-name'
     OPT_SETTINGS_ROOT = '--settings-root'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
+    OPT_DISABLE_TEST_ERRORPRONE = '--disable-test-errorprone'
     OPT_DISABLE_LOMBOK_PLUGIN = '--disable-lombok-plugin'
     OPT_DISABLE_GENERATED_SYMLINKS = '--disable-generated-symlinks'  # IGNORED IN CODE, only for backward compatibility
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
@@ -396,6 +397,7 @@ class GradleOptions(yarg.Options):
         self.gradle_name: str = None
         self.settings_root: str = None
         self.disable_errorprone: bool = False
+        self.disable_test_errorprone: bool = False
         self.disable_lombok_plugin: bool = False
         self.disable_generated_symlinks: bool = False  # IGNORED IN CODE, only for backward compatibility
         self.force_jdk_version: str = None
@@ -434,6 +436,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_DISABLE_ERRORPRONE],
                 help='Disable errorprone in Gradle project',
                 hook=yarg.SetConstValueHook('disable_errorprone', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_DISABLE_TEST_ERRORPRONE],
+                help='Disable errorprone only in tests in Gradle project',
+                hook=yarg.SetConstValueHook('disable_test_errorprone', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
