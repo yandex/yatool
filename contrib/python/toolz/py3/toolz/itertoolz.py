@@ -148,8 +148,7 @@ def _merge_sorted_binary(seqs):
     try:
         val2 = next(seq2)
     except StopIteration:
-        for val1 in seq1:
-            yield val1
+        yield from seq1
         return
 
     for val1 in seq1:
@@ -167,12 +166,10 @@ def _merge_sorted_binary(seqs):
             yield val1
     else:
         yield val2
-        for val2 in seq2:
-            yield val2
+        yield from seq2
         return
     yield val1
-    for val1 in seq1:
-        yield val1
+    yield from seq1
 
 
 def _merge_sorted_binary_key(seqs, key):
@@ -191,8 +188,7 @@ def _merge_sorted_binary_key(seqs, key):
     try:
         val2 = next(seq2)
     except StopIteration:
-        for val1 in seq1:
-            yield val1
+        yield from seq1
         return
     key2 = key(val2)
 
@@ -213,12 +209,10 @@ def _merge_sorted_binary_key(seqs, key):
             yield val1
     else:
         yield val2
-        for val2 in seq2:
-            yield val2
+        yield from seq2
         return
     yield val1
-    for val1 in seq1:
-        yield val1
+    yield from seq1
 
 
 def interleave(seqs):
@@ -732,7 +726,12 @@ def partition_all(n, seq):
         try:
             # If seq defines __len__, then
             # we can quickly calculate where no_pad starts
-            yield prev[:len(seq) % n]
+            end = len(seq) % n
+            if prev[end - 1] is no_pad or prev[end] is not no_pad:
+                raise LookupError(
+                    'The sequence passed to `parition_all` has invalid length'
+                )
+            yield prev[:end]
         except TypeError:
             # Get first index of no_pad without using .index()
             # https://github.com/pytoolz/toolz/issues/387
