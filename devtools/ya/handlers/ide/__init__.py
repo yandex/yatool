@@ -373,6 +373,7 @@ class GradleOptions(yarg.Options):
     OPT_DISABLE_LOMBOK_PLUGIN = '--disable-lombok-plugin'
     OPT_DISABLE_GENERATED_SYMLINKS = '--disable-generated-symlinks'  # IGNORED IN CODE, only for backward compatibility
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
+    OPT_GRADLE_JDK_VERSION = '--gradle-jdk-version'
     OPT_REMOVE = '--remove'
     OPT_EXCLUDE = '--exclude'
     OPT_GRADLE_DAEMON_JVMARGS = '--gradle-daemon-jvmargs'
@@ -401,6 +402,7 @@ class GradleOptions(yarg.Options):
         self.disable_lombok_plugin: bool = False
         self.disable_generated_symlinks: bool = False  # IGNORED IN CODE, only for backward compatibility
         self.force_jdk_version: str = None
+        self.gradle_jdk_version: str = None
         self.remove: bool = False
         self.exclude: list[str] = []
         self.gradle_daemon_jvmargs: str = None
@@ -460,6 +462,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_FORCE_JDK_VERSION],
                 help=f"Force JDK version in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
                 hook=yarg.SetValueHook('force_jdk_version'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_GRADLE_JDK_VERSION],
+                help=f"Force JDK version for Gradle only in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
+                hook=yarg.SetValueHook('gradle_jdk_version'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
@@ -562,6 +570,11 @@ class GradleOptions(yarg.Options):
             if self.force_jdk_version not in GradleOptions.AVAILABLE_JDK_VERSIONS:
                 raise yarg.ArgsValidatingException(
                     f"Invalid JDK version {self.force_jdk_version} in {GradleOptions.OPT_FORCE_JDK_VERSION}, must be one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}."
+                )
+        if self.gradle_jdk_version is not None:
+            if self.gradle_jdk_version not in GradleOptions.AVAILABLE_JDK_VERSIONS:
+                raise yarg.ArgsValidatingException(
+                    f"Invalid JDK version {self.gradle_jdk_version} in {GradleOptions.OPT_GRADLE_JDK_VERSION}, must be one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}."
                 )
 
 
