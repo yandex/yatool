@@ -21,6 +21,15 @@
 using namespace NYMake::NPlugins;
 
 namespace {
+    struct TPyDestroyer {
+        static void Destroy(PyTypeObject* obj) noexcept {
+            Py_DECREF(obj);
+        }
+    };
+
+    template<typename TPythonObject>
+    using TPyHolder = THolder<TPythonObject, TPyDestroyer>;
+
     TStringBuf CutLastExtension(const TStringBuf path) noexcept {
         TStringBuf left;
         TStringBuf right;
@@ -424,16 +433,19 @@ namespace {
     }
 
     struct YMakeState {
-        PyTypeObject* ContextType = nullptr;
-        PyTypeObject* CmdContextType = nullptr;
+        TPyHolder<PyTypeObject> ContextType;
+        TPyHolder<PyTypeObject> CmdContextType;
 
-        void Clear() noexcept {
-            Py_CLEAR(ContextType);
-            Py_CLEAR(CmdContextType);
+        int Clear() noexcept {
+            ContextType.Reset();
+            CmdContextType.Reset();
+            return 0;
         }
 
-        ~YMakeState() noexcept {
-            Clear();
+        int Traverse(visitproc visit, void* arg) noexcept {
+            Py_VISIT(ContextType.Get());
+            Py_VISIT(CmdContextType.Get());
+            return 0;
         }
     };
 
@@ -452,19 +464,23 @@ namespace {
     int YMakeExec(PyObject* mod) {
         YMakeState* state = CreateYMakeState(mod);
 
-        state->ContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &ContextTypeSpec, nullptr);
+        state->ContextType.Reset(reinterpret_cast<PyTypeObject*>(
+            PyType_FromModuleAndSpec(mod, &ContextTypeSpec, nullptr)
+        ));
         if (state->ContextType == nullptr) {
             return -1;
         }
-        if (PyModule_AddType(mod, state->ContextType)) {
+        if (PyModule_AddType(mod, state->ContextType.Get())) {
             return -1;
         }
 
-        state->CmdContextType = (PyTypeObject*)PyType_FromModuleAndSpec(mod, &CmdContextTypeSpec, nullptr);
+        state->CmdContextType.Reset(reinterpret_cast<PyTypeObject*>(
+            PyType_FromModuleAndSpec(mod, &CmdContextTypeSpec, nullptr)
+        ));
         if (state->CmdContextType == nullptr) {
             return -1;
         }
-        if (PyModule_AddType(mod, state->CmdContextType)) {
+        if (PyModule_AddType(mod, state->CmdContextType.Get())) {
             return -1;
         }
 
@@ -472,15 +488,11 @@ namespace {
     }
 
     int YMakeTraverse(PyObject* mod, visitproc visit, void* arg) noexcept {
-        YMakeState* state = GetYMakeState(mod);
-        Py_VISIT(state->ContextType);
-        Py_VISIT(state->CmdContextType);
-        return 0;
+        return GetYMakeState(mod)->Traverse(visit,arg);
     }
 
     int YMakeClear(PyObject* mod) noexcept {
-        GetYMakeState(mod)->Clear();
-        return 0;
+        return GetYMakeState(mod)->Clear();
     }
 
     void YMakeFree(void* mod) noexcept {
@@ -523,7 +535,7 @@ namespace NYMake::NPlugins {
         TScopedPyObjectPtr ymakeModule = PyImport_ImportModule("ymake");
         CheckForError();
         YMakeState* state = GetYMakeState(ymakeModule);
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->ContextType), args);
+        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->ContextType.Get()), args);
         if (obj) {
             Context* context = reinterpret_cast<Context*>(obj);
             context->Unit = unit;
@@ -536,7 +548,7 @@ namespace NYMake::NPlugins {
         TScopedPyObjectPtr ymakeModule = PyImport_ImportModule("ymake");
         CheckForError();
         YMakeState* state = GetYMakeState(ymakeModule);
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->CmdContextType), args);
+        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->CmdContextType.Get()), args);
         if (obj) {
             CmdContext* cmdContext = reinterpret_cast<CmdContext*>(obj);
             cmdContext->Unit = unit;
