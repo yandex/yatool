@@ -1003,28 +1003,6 @@ namespace {
             } else if (name == NProperties::PROXY) {
                 SetProxyProp();
                 return;
-            } else if (name == NProperties::STRUCT_CMD) {
-                if (Conf.RenderSemantics)
-                    return;
-                if (value == "yes") {
-                    BlockStack.back().BlockData().StructCmdForBlockData = true;
-                } else if (value == "no") {
-                    BlockStack.back().BlockData().StructCmdForBlockData = false;
-                } else {
-                    ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
-                }
-                return;
-            } else if (name == NProperties::STRUCT_SEM) {
-                if (!Conf.RenderSemantics)
-                    return;
-                if (value == "yes") {
-                    BlockStack.back().BlockData().StructCmdForBlockData = true;
-                } else if (value == "no") {
-                    BlockStack.back().BlockData().StructCmdForBlockData = false;
-                } else {
-                    ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
-                }
-                return;
             } else if (name == NProperties::FILE_GROUP) {
                 if (value == "yes") {
                     BlockStack.back().BlockData().IsFileGroupMacro = true;
@@ -1088,8 +1066,6 @@ namespace {
                        name == NProperties::INCLUDE_TAG ||
                        name == NProperties::PROXY ||
                        name == NProperties::VERSION_PROXY ||
-                       name == NProperties::STRUCT_CMD ||
-                       name == NProperties::STRUCT_SEM ||
                        name == NProperties::USE_PEERS_LATE_OUTS)
             {
                 if (value == "yes") {

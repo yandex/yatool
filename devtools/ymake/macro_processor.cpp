@@ -332,7 +332,6 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     }
 
-    Y_ABORT_IF(blockData && !blockData->StructCmdForBlockData);
     if (blockData && !DisableStructCmd && !AllVarsNeedSubst) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);

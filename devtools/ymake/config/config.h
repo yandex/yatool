@@ -111,8 +111,6 @@ struct TModuleConf {
     EPeerdirType PeerdirType;
     bool HasSemantics = false;
     bool HasSemanticsForGlobals = false;
-    bool StructCmdForModuleConf = true; // Marker requiring to use structured command representation DEVTOOLS-8280
-    bool StructCmdSet = false;
     ETransition Transition{ETransition::None};
 
     THashSet<TString> Restricted;
@@ -195,7 +193,6 @@ struct TBlockData {
     bool IsMultiModule = false;
     bool HasPeerdirSelf = false;
     bool HasSemantics = false;
-    bool StructCmdForBlockData = true; // Marker requiring to use structured command representation DEVTOOLS-8280
     bool IsFileGroupMacro = false;
     TSimpleSharedPtr<TToolOptions> ToolOptions;
     TSimpleSharedPtr<TCmdProperty> CmdProps; // additional properties: keywords, spec conditions(?)
@@ -229,7 +226,6 @@ struct TBlockData {
         ::Load(input, IsMultiModule);
         ::Load(input, HasPeerdirSelf);
         ::Load(input, HasSemantics);
-        ::Load(input, StructCmdForBlockData);
         ::Load(input, IsFileGroupMacro);
 
         auto loadPointer = [](IInputStream* input, auto& item) {
@@ -259,7 +255,6 @@ struct TBlockData {
         ::Save(output, IsMultiModule);
         ::Save(output, HasPeerdirSelf);
         ::Save(output, HasSemantics);
-        ::Save(output, StructCmdForBlockData);
         ::Save(output, IsFileGroupMacro);
 
         auto savePointer = [](IOutputStream* output, auto& item) {

@@ -38,8 +38,6 @@ PROPERTY(ARGS_PARSER, "Choose argument parser for macro opening curent module de
 "           argument parser. Remaining positional parameters are treated as components of DLL so-version and are stored in a `MODULE_VERSION` variable in a joined by `.` string\n"
 " * `Raw` - Do not perform any parsing or validation. Stores all arguments in a variable `MODULE_ARGS_RAW` which can be analyzed by macros invoked in the module body.\n")
 PROPERTY(CMD, "Macro or module build command")
-PROPERTY(STRUCT_CMD, "Enables or disables new command template interpreter for this macro or module")
-PROPERTY(STRUCT_SEM, "Enables or disables new semantics template interpreter for this macro or module")
 PROPERTY(DEFAULT_NAME_GENERATOR, "Name of embedded output filename generator, one of: UseDirNameOrSetGoPackage, TwoDirNames, ThreeDirNames, FullPath")
 PROPERTY(EPILOGUE, "")
 PROPERTY(EXTS, "@usage: `.EXTS=.o .obj` specify a list of extensions which are automatically captured as module AUTO_INPUT for all `output`s generated in the current module without the `noauto` modifier.")
@@ -76,8 +74,6 @@ constexpr TProperty _PROPERTIES[]{
     ALLOWED_IN_LINTERS_MAKE,
     ARGS_PARSER,
     CMD,
-    STRUCT_CMD,
-    STRUCT_SEM,
     DEFAULT_NAME_GENERATOR,
     EPILOGUE,
     EXTS,
