@@ -17,7 +17,7 @@ class TMultiBlobBuilder;
 
 namespace NDetail {
 
-    class TConfigureTraceDecuplicator {
+    class TConfigureTraceDeduplicator {
     public:
         bool CanTrace(ui32 fileElemId, ETraceEvent what) {
             return Traced.insert({fileElemId, what}).second;
@@ -131,7 +131,7 @@ private:
     TConfValuesMap<TConfigureEvent> Events;
     THashMap<ui32, TSet<ui32>> DupSrcMap;
     THashSet<ui32> VisitedModules;
-    NDetail::TConfigureTraceDecuplicator TracesDeduplicator;
+    NDetail::TConfigureTraceDeduplicator TracesDeduplicator;
 };
 
 TConfMsgManager* ConfMsgManager();
