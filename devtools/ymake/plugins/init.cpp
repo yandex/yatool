@@ -133,6 +133,8 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TFsPath& pycache, T
         PySys_SetObject("dont_write_bytecode", Py_True);
     }
 
+    NYMake::NPlugins::BindYmakeConf(*conf);
+
     // The order of plugin roots does really matter - 'build/plugins' should go first
     for (const auto& pluginsPath : pluginsRoots) {
         if (pluginsPath.Exists()) {

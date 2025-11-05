@@ -2,6 +2,7 @@
 
 #include "convert.h"
 #include "error.h"
+#include "plugin_macro_impl.h"
 #include "scoped_py_object_ptr.h"
 #include "ymake_module_adapter.h"
 
@@ -29,6 +30,32 @@ namespace {
 
     template<typename TPythonObject>
     using TPyHolder = THolder<TPythonObject, TPyDestroyer>;
+
+    template<typename T>
+    struct TMemberTraits {
+        constexpr static  bool IsMember = false;
+        constexpr static  bool IsMemberFunction = false;
+    };
+
+    template<typename C, typename M>
+    struct TMemberTraits<M C::*> {
+        constexpr static  bool IsMember = true;
+        constexpr static  bool IsMemberFunction = std::is_function_v<M>;
+
+        using TClass = C;
+        using TType = M;
+    };
+
+    template<typename T>
+    concept MemberFunction = TMemberTraits<T>::IsMemberFunction;
+
+    template<MemberFunction auto Member>
+    PyObject* WrapMember(PyObject* self, PyObject* const* args, Py_ssize_t nargs) noexcept {
+        Y_ASSERT(self);
+        Y_ASSERT(PyModule_Check(self));
+        auto* obj = static_cast<TMemberTraits<decltype(Member)>::TClass*>(PyModule_GetState(self));
+        return (obj->*Member)(std::span{args, static_cast<size_t>(nargs)});
+    }
 
     TStringBuf CutLastExtension(const TStringBuf path) noexcept {
         TStringBuf left;
@@ -435,8 +462,10 @@ namespace {
     struct YMakeState {
         TPyHolder<PyTypeObject> ContextType;
         TPyHolder<PyTypeObject> CmdContextType;
+        TBuildConfiguration* Conf = nullptr;
 
         int Clear() noexcept {
+            Conf = nullptr;
             ContextType.Reset();
             CmdContextType.Reset();
             return 0;
@@ -446,6 +475,29 @@ namespace {
             Py_VISIT(ContextType.Get());
             Py_VISIT(CmdContextType.Get());
             return 0;
+        }
+
+        PyObject* MacroDecorator(std::span<PyObject* const> args) {
+            Y_ASSERT(Conf);
+
+            if (args.size() != 1 || !PyFunction_Check(args[0])) {
+                PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single function to register as a macro");
+                return nullptr;
+            }
+
+            TString macroName;
+            {
+                TScopedPyObjectPtr name{PyObject_GetAttrString(args[0], "__name__")};
+                Y_ASSERT(PyUnicode_Check(name.Get()));
+                Py_ssize_t size;
+                const char *data = PyUnicode_AsUTF8AndSize(name.Get(), &size);
+                macroName = ToUpperUTF8(TStringBuf{data, static_cast<size_t>(size)});
+            }
+
+            NYMake::NPlugins::RegisterMacro(*Conf, macroName.c_str(), args[0]);
+
+            Py_INCREF(args[0]);
+            return args[0];
         }
     };
 
@@ -501,6 +553,7 @@ namespace {
 
     PyMethodDef YMakeMethods[] = {
         {"add_parser", (PyCFunction)MethodAddParser, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Add a parser for files with the given extension")},
+        {"macro", (PyCFunction)WrapMember<&YMakeState::MacroDecorator>, METH_FASTCALL, PyDoc_STR("Register function as ya.make macro")},
         {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Report configure error")},
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},
         {"get_artifact_id_from_pom_xml", (PyCFunction)MethodGetArtifactIdFromPomXml, METH_FASTCALL, PyDoc_STR("Get artifactId from pom.xml")},
@@ -528,6 +581,12 @@ namespace {
 namespace NYMake::NPlugins {
     PyMODINIT_FUNC PyInit_ymake() {
         return PyModuleDef_Init(&ymakemodule);
+    }
+
+    void BindYmakeConf(TBuildConfiguration& conf) {
+        TScopedPyObjectPtr mod{PyImport_ImportModule("ymake")};
+        Y_ASSERT(GetYMakeState(mod.Get())->Conf == nullptr);
+        GetYMakeState(mod.Get())->Conf = &conf;
     }
 
     PyObject* CreateContextObject(TPluginUnit* unit) {
