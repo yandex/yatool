@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: python-rapidjson
-Version: 1.21
+Version: 1.22
 Summary: Python wrapper around rapidjson
 Home-page: https://github.com/python-rapidjson/python-rapidjson
 Author: Ken Robbins
@@ -8,7 +8,7 @@ Author-email: ken@kenrobbins.com
 Maintainer: Lele Gaifax
 Maintainer-email: lele@metapensiero.it
 License: MIT License
-Keywords: json rapidjson
+Keywords: json jsonc rapidjson
 Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
 Classifier: Programming Language :: C++
@@ -19,6 +19,7 @@ Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
 Classifier: Programming Language :: Python
 Requires-Python: >=3.6
 Description-Content-Type: text/x-rst
@@ -42,7 +43,7 @@ Dynamic: summary
 .. :Author:    Ken Robbins <ken@kenrobbins.com>
 .. :License:   MIT License
 .. :Copyright: © 2015 Ken Robbins
-.. :Copyright: © 2016, 2017, 2018, 2020, 2022, 2024 Lele Gaifax
+.. :Copyright: © 2016, 2017, 2018, 2020, 2022, 2024, 2025 Lele Gaifax
 ..
 
 ==================
@@ -114,6 +115,26 @@ Basic usage looks like this:
     Chunk: b'":"ba'
     Chunk: b'z"}'
 
+Most functionalities are exposed both as *functions* and as *classes*.
+
+The following uses a *relaxed syntax* ``Decoder`` instance, that handles JSONC__ and
+*trailing commas*:
+
+__ https://jsonc.org/
+
+.. code-block:: python
+
+    >>> from rapidjson import Decoder
+    >>> from rapidjson import PM_COMMENTS, PM_TRAILING_COMMAS
+    >>> decoder = Decoder(parse_mode=PM_COMMENTS | PM_TRAILING_COMMAS)
+    >>> decoder('''
+    ... {
+    ...     "bar": /* Block comment */ "baz",
+    ...     "foo":100, // Trailing comma and comment
+    ... }
+    ... ''')
+    {'bar': 'baz', 'foo': 100}
+
 
 Development
 -----------
@@ -166,6 +187,14 @@ __ https://python-rapidjson.readthedocs.io/en/latest/quickstart.html#incompatibi
 
 Changes
 -------
+
+1.22 (2025-10-21)
+~~~~~~~~~~~~~~~~~
+
+* Generate wheels on PyPI using Python 3.14 final release, thanks to cibuildwheel `3.2.1`__
+
+  __ https://cibuildwheel.pypa.io/en/stable/changelog/#v321
+
 
 1.21 (2025-07-10)
 ~~~~~~~~~~~~~~~~~
