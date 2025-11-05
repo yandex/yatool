@@ -12,7 +12,7 @@
 #include <util/generic/string.h>
 
 namespace {
-    const TStringBuf TouchCmdPrefix = "${YMAKE_PYTHON} ${ARCADIA_ROOT}/build/scripts/touch.py ";
+    const TStringBuf TouchCmdPrefix = "${YMAKE_PYTHON3} ${ARCADIA_ROOT}/build/scripts/touch.py ";
     const TString FakeMacroName = "GO_FAKE_OUTPUT";
 
     class TFakeOutputCmd: public TMacroCmd {
