@@ -71,7 +71,7 @@ def create_package(
     docker_secret,
     docker_use_buildx,
     docker_pull,
-    labels=None,
+    labels,
 ):
     package_name = package_context.package_name
     package_version = package_context.version
@@ -125,9 +125,10 @@ def create_package(
             else:
                 build_command += ["--build-arg", "{}={}".format(k, v)]
 
-    if labels:
-        for k, v in labels.items():
-            build_command += ["--label", "{}={}".format(k, v)]
+    for label in labels:
+        build_command += ["--label", label]
+    for k, v in package_context.context.items():
+        build_command += ["--label", "{}={}".format(k, v)]
 
     if buildx_required or docker_use_buildx:
         build_command = ["buildx"] + build_command

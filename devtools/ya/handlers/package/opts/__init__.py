@@ -407,6 +407,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.docker_add_host = []
         self.docker_build_arg = {}
         self.docker_build_network = None
+        self.docker_labels = []
         self.docker_platform = None
         self.docker_registry = "registry.yandex.net"
         self.docker_repository = ""
@@ -628,6 +629,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 names=['--docker-network'],
                 help='--network parameter for `docker build` command',
                 hook=devtools.ya.core.yarg.SetValueHook('docker_build_network'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-label'],
+                help='Same as Docker --label. You can pass multiple labels',
+                hook=devtools.ya.core.yarg.SetAppendHook('docker_labels'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DOCKER_SUBGROUP,
             ),
