@@ -1740,7 +1740,7 @@ The wrapper loads the real library on the first call to any of its functions
 
 @example:
 
-    PEERDIR(build/platform/cuda)
+    PEERDIR(build/internal/platform/cuda)
 
     GENERATE_IMPLIB(cuda $CUDA_TARGET_ROOT/lib64/stubs/libcuda.so SONAME libcuda.so.1)
 
