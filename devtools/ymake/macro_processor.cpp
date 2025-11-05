@@ -332,7 +332,8 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     }
 
-    if (blockData && blockData->StructCmdForBlockData && !DisableStructCmd && !AllVarsNeedSubst) {
+    Y_ABORT_IF(blockData && !blockData->StructCmdForBlockData);
+    if (blockData && !DisableStructCmd && !AllVarsNeedSubst) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);
         TSpecFileList* knownInputs = {};
@@ -729,54 +730,23 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
     bool ok = false;
 
     if (!macroName.empty() && !DisableStructCmd && !AllVarsNeedSubst) {
-        // this block data pattern detector's job is to handle
-        // new-style commands directly embedded in macro specializations,
-        // the primary use case being
-        // `macro _SRC("ext", SRC, SRCFLAGS...) {... .STRUCT_CMD=yes ...}`
+        if (extraVars)
+            GetOrInit(ExtraVars) = std::move(*extraVars);
+        // pass the torch to the `CommandSink->Compile()` section in `MacroCall()`
+        Cmd.SetSingleVal(macroName, GlueCmd(*args), mod.GetId(), mod.Vars.Id);
         auto macroVar = mod.Vars.Lookup(macroName);
+        Cmd.BaseVal = macroVar;
+        // TBD: the `convertNamedArgs` argument policy; by the old macro processing logic,
+        // when we use `SRCS(name.ext)`, the `_SRC____ext` specialization macro is expanded via
+        //     GetCommandInfoFromMacro -> MacroCall -> ... -> ApplyMods -> *MacroCall*,
+        // and `convertNamedArgs` is true;
+        // when we use `SRC(name.ext)`, the same macro is expanded via
+        //     GetCommandInfoFromMacro -> *MacroCall*,
+        // and `convertNamedArgs` is false
         auto macroVal = Get1(macroVar);
         auto pattern = GetCmdValue(macroVal);
-        bool structCmd = false;
-
-        if (auto it = Conf->BlockData.find(macroName); it != Conf->BlockData.end()) {
-            // the `SRC(...)` case (plus `SRC_C_PIC` and other similar variations);
-            // causes one round of `MacroCall()` to expand `_SRC____ext`
-            if (it->second.StructCmdForBlockData)
-                structCmd = true;
-        }
-        else {
-            // the `SRCS(...)` case;
-            // causes two rounds of `MacroCall()` to expand `SRCSext` then `_SRC____ext`
-            TVector<TMacroData> macros;
-            GetMacrosFromPattern(pattern, macros, false);
-            for (auto&& m : macros) {
-                if (!m.HasArgs)
-                    continue;
-                auto it = Conf->BlockData.find(m.Name);
-                if (it == Conf->BlockData.end())
-                    continue;
-                if (!it->second.StructCmdForBlockData)
-                    continue;
-                structCmd = true;
-                break;
-            }
-        }
-        if (structCmd) {
-            if (extraVars)
-                GetOrInit(ExtraVars) = std::move(*extraVars);
-            // pass the torch to the `if (...StructCmdForBlockData...)` section in `MacroCall()`
-            Cmd.SetSingleVal(macroName, GlueCmd(*args), mod.GetId(), mod.Vars.Id);
-            Cmd.BaseVal = macroVar;
-            // TBD: the `convertNamedArgs` argument policy; by the old macro processing logic,
-            // when we use `SRCS(name.ext)`, the `_SRC____ext` specialization macro is expanded via
-            //     GetCommandInfoFromMacro -> MacroCall -> ... -> ApplyMods -> *MacroCall*,
-            // and `convertNamedArgs` is true;
-            // when we use `SRC(name.ext)`, the same macro is expanded via
-            //     GetCommandInfoFromMacro -> *MacroCall*,
-            // and `convertNamedArgs` is false
-            auto ignored = MacroCall(macroVar, pattern, &Cmd, GetCmdValue(Get1(&Cmd)), ESM_DoSubst, mod.Vars, ECF_ExpandVars, false);
-            ok = true;
-        }
+        auto ignored = MacroCall(macroVar, pattern, &Cmd, GetCmdValue(Get1(&Cmd)), ESM_DoSubst, mod.Vars, ECF_ExpandVars, false);
+        ok = true;
     }
 
     if (!ok) {
