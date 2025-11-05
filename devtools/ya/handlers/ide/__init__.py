@@ -393,6 +393,8 @@ class GradleOptions(yarg.Options):
     EXPOPT_YEXPORT_DEBUG_MODE = '--yexport-debug-mode'
 
     AVAILABLE_JDK_VERSIONS = ('11', '17', '21', '22', '23', '24', '25')
+    # Gradle >= 9 require JDK17 or above
+    GRADLE_JDK_VERSIONS = list(filter(lambda v: int(v) >= 17, AVAILABLE_JDK_VERSIONS))
 
     def __init__(self):
         self.gradle_name: str = None
@@ -460,13 +462,13 @@ class GradleOptions(yarg.Options):
             ),
             yarg.ArgConsumer(
                 [GradleOptions.OPT_FORCE_JDK_VERSION],
-                help=f"Force JDK version in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
+                help=f"Force JDK version for build/test in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
                 hook=yarg.SetValueHook('force_jdk_version'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
                 [GradleOptions.OPT_GRADLE_JDK_VERSION],
-                help=f"Force JDK version for Gradle only in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
+                help=f"Force JDK version for Gradle only in exported project, one of {', '.join(GradleOptions.GRADLE_JDK_VERSIONS)}",
                 hook=yarg.SetValueHook('gradle_jdk_version'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
@@ -572,9 +574,9 @@ class GradleOptions(yarg.Options):
                     f"Invalid JDK version {self.force_jdk_version} in {GradleOptions.OPT_FORCE_JDK_VERSION}, must be one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}."
                 )
         if self.gradle_jdk_version is not None:
-            if self.gradle_jdk_version not in GradleOptions.AVAILABLE_JDK_VERSIONS:
+            if self.gradle_jdk_version not in GradleOptions.GRADLE_JDK_VERSIONS:
                 raise yarg.ArgsValidatingException(
-                    f"Invalid JDK version {self.gradle_jdk_version} in {GradleOptions.OPT_GRADLE_JDK_VERSION}, must be one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}."
+                    f"Invalid JDK version {self.gradle_jdk_version} in {GradleOptions.OPT_GRADLE_JDK_VERSION}, must be one of {', '.join(GradleOptions.GRADLE_JDK_VERSIONS)}."
                 )
 
 
