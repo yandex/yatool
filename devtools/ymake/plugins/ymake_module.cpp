@@ -491,6 +491,10 @@ namespace {
                 Y_ASSERT(PyUnicode_Check(name.Get()));
                 Py_ssize_t size;
                 const char *data = PyUnicode_AsUTF8AndSize(name.Get(), &size);
+                if (!data) {
+                    Y_ASSERT(PyErr_Occurred());
+                    return nullptr;
+                }
                 macroName = ToUpperUTF8(TStringBuf{data, static_cast<size_t>(size)});
             }
 
