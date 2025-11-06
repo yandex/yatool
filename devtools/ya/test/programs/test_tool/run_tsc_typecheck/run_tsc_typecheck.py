@@ -95,7 +95,8 @@ def fill_tests(src_dir: str, output: str, files: list[str], suite):
     src_dir += "/"
     result = {}
     for file_name in files:
-        result[file_name[len(src_dir) :]] = {
+        finally_file_name = file_name.replace(src_dir, "")
+        result[finally_file_name] = {
             'has_errors': False,
             'details': [],
         }
