@@ -1060,7 +1060,7 @@ class ExecutorOptions(Options):
         self.use_clonefile = True
         self.runner_dir_outputs = True
         self.dir_outputs_test_mode = False
-        self.schedule_strategy = schedule_strategy.strategy_name(schedule_strategy.Strategies.default_w_cache)
+        self.schedule_strategy = None
 
     @staticmethod
     def consumer():

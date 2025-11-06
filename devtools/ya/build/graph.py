@@ -2443,7 +2443,7 @@ def _build_graph_and_tests(
     bg_cache.archive_cache_dir(opts)
 
     with stager.scope('inject_stats_and_static_uids'):
-        gen_plan.inject_stats_and_static_uids(graph)
+        gen_plan.inject_stats_and_static_uids(graph, opts.schedule_strategy is not None)
 
     with stager.scope("strip-tags"):
         graph['graph'] = _strip_tags(graph['graph'])

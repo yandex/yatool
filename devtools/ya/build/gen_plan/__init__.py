@@ -633,9 +633,9 @@ def _calculate_static_uid(node):
     )
 
 
-def inject_stats_and_static_uids(graph):
+def inject_stats_and_static_uids(graph, inject_static_uids=False):
     for node in graph['graph']:
         if 'stats_uid' not in node:
             node['stats_uid'] = _calculate_stats_uid(node)
-        if 'static_uid' not in node:
+        if inject_static_uids and 'static_uid' not in node:
             node['static_uid'] = _calculate_static_uid(node)
