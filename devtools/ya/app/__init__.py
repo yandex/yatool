@@ -968,7 +968,7 @@ def configure_exit_interceptor(error_file):
                 "* remove some `~/.ya/` subdirectories\n"
             )
             if app_config.in_house:
-                sys.stderr.write("* ask  for help: {}\n".format(app_config.support_url))
+                sys.stderr.write("* ask for help: {}\n".format(app_config.support_url))
 
         if error_file:
             if not no_space_left:
