@@ -511,14 +511,10 @@ protected:
 struct TEntryStatsData {
     union {
         ui8 AllFlags;
-        struct {  // 4 bits used
+        struct {  // 3 bits used
             bool HasBuildFrom : 1;
             bool HasBuildCmd : 1;
             bool IsFile : 1;
-
-            // a (temporary) means of supporting different graph representations
-            // of variable context for old and new command styles
-            bool StructCmdDetected : 1;
         };
     };
     explicit TEntryStatsData(bool isFile = false)

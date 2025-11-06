@@ -351,26 +351,20 @@ void TModuleBuilder::AddInputVarDep(TVarStrEx& input, TAddDepAdaptor& inputNode)
     inputNode.AddDepIface(EDT_BuildFrom, nType, input.ElemId);
 }
 
-void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node, bool structCmd) {
+void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node) {
     if (Vars.Get1(varName).size() && GetCmdValue(Vars.Get1(varName)).size()) {
         ui64 id;
         TStringBuf cmdName;
         TStringBuf cmdValue;
         ParseCommandLikeVariable(Vars.Get1(varName), id, cmdName, cmdValue);
         const TString res = [&]() {
-            if (structCmd) {
-                auto compiled = Commands.Compile(cmdValue, Conf, Vars, false, {});
-                // TODO: there's no point in allocating cmdElemId for expressions
-                // that do _not_ have directly corresponding nodes
-                // (and are linked as "0:VARNAME=S:123" instead)
-                auto cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
-                auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
-                return FormatCmd(id, cmdName, value);
-            } else {
-                TCommandInfo cmd(Conf, &Graph, &UpdIter);
-                auto value = cmd.SubstVarDeeply(varName, Vars);
-                return FormatCmd(id, cmdName, value);
-            }
+            auto compiled = Commands.Compile(cmdValue, Conf, Vars, false, {});
+            // TODO: there's no point in allocating cmdElemId for expressions
+            // that do _not_ have directly corresponding nodes
+            // (and are linked as "0:VARNAME=S:123" instead)
+            auto cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
+            auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
+            return FormatCmd(id, cmdName, value);
         }();
         if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
             // duplication comes from adding locally referenced vars
@@ -382,13 +376,13 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
     }
 }
 
-void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node, bool structCmd) {
+void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node) {
     for (const auto& var : GetModuleConf().Globals) {
         const TString depName = TString::Join(var, "_GLOBAL");
-        AddGlobalVarDep(depName, node, structCmd);
+        AddGlobalVarDep(depName, node);
     }
     for (const auto& resource : Module.ExternalResources) {
-        AddGlobalVarDep(resource, node, structCmd);
+        AddGlobalVarDep(resource, node);
     }
 }
 
@@ -415,7 +409,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled, true, Vars);
 
     if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
-        AddGlobalVarDeps(node, true);
+        AddGlobalVarDeps(node);
         node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
     } else {
         YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;

@@ -44,10 +44,9 @@ namespace {
 
     class TDumpInfoSem : public TDumpInfoEx {
     public:
-        TDumpInfoSem(TRestoreContext restoreContext, TConstDepNodeRef node, bool structCmdDetected)
+        TDumpInfoSem(TRestoreContext restoreContext, TConstDepNodeRef node)
             : RestoreContext{restoreContext}
             , Node{node}
-            , StructCmdDetected(structCmdDetected)
         {}
 
         void SetExtraValues(TVars& vars) override {
@@ -76,8 +75,7 @@ namespace {
                 const TStringBuf varval = GetCmdValue(varStr);
                 auto& var = vars[varname + TString("_RAW")];
                 var.push_back(varval);
-                if (StructCmdDetected)
-                    var.back().StructCmdForVars = true;
+                var.back().StructCmdForVars = true;
             }
         }
 
@@ -113,7 +111,6 @@ namespace {
     private:
         TRestoreContext RestoreContext;
         TConstDepNodeRef Node;
-        bool StructCmdDetected;
     };
 
     class TSemFormatter: public TJsonCmdAcceptor {
@@ -234,19 +231,11 @@ namespace {
                     // Some link may has no commands, skip render semantics for it, else "No pattern for node" error
                     && (!TFileConf::IsLink(topNode->ElemId) || AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_BuildFrom || dep.To()->NodeType == EMNT_BuildCommand;}))
                 ) {
-                    bool structCmdDetected = false;
-                    for (const auto& dep : topNode.Edges()) {
-                        if (*dep == EDT_BuildCommand && dep.To()->NodeType == EMNT_BuildCommand) {
-                            structCmdDetected = TVersionedCmdId(dep.To()->ElemId).IsNewFormat();
-                            break;
-                        }
-                    }
                     Y_ASSERT(!ModulesStack.empty());
                     const auto& modinfo = ModulesStack.top();
                     TDumpInfoSem semVarsProvider{
                         RestoreContext,
-                        modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNodeId] : topNode,
-                        structCmdDetected
+                        modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNodeId] : topNode
                     };
                     static const TSingleCmd::TCmdStr CMD_IGNORED = TStringBuilder() << "[\"" << TModuleConf::SEM_IGNORED << "\"]";
                     static const TSingleCmd::TCmdStr CMD_IGNORED_NEW = TVector<TString>{TString{TModuleConf::SEM_IGNORED}};

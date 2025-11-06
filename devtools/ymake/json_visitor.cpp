@@ -417,12 +417,6 @@ bool TJSONVisitor::Enter(TState& state) {
 
     CurrData->WasVisited = true;
 
-    if (CurrType == EMNT_BuildCommand && HasParent && *Edge == EDT_BuildCommand) {
-        if (CurrState->GetCmdName().IsNewFormat()) {
-            PrntData->StructCmdDetected = true;
-        }
-    }
-
     if (fresh) {
         TNodeDebugOnly nodeDebug{Graph, CurrNode.Id()};
 
@@ -840,7 +834,11 @@ void TJSONVisitor::PrepareCurrent(TState& state) {
 void TJSONVisitor::FinishCurrent(TState& state) {
     if (CurrNode->NodeType == EMNT_BuildCommand || CurrNode->NodeType == EMNT_BuildVariable) {
         auto name = CurrState->GetCmdName();
-        if (!PrntData->StructCmdDetected) {
+        auto isCmdOrCtxVar = HasParent && (
+            *Edge == EDT_Include && CurrType == EMNT_BuildCommand || // TODO get rid of old-school context variables
+            *Edge == EDT_BuildCommand // && (CurrType == EMNT_BuildCommand || CurrType == EMNT_BuildVariable)
+        );
+        if (!isCmdOrCtxVar) {
             Y_ASSERT(!name.IsNewFormat());
             auto str = name.GetStr();
             TStringBuf val = GetCmdValue(str);

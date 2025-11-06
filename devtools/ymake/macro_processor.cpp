@@ -1264,11 +1264,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     YDIAG(DG) << "Cmd dep: " << curCmdName << " " << Cmd.Id << Endl;
     actionNode.AddDepIface(EDT_BuildCommand, EMNT_BuildCommand, cmdElemId);
 
-    // 5. Imported variables (relevant for "structured" commands only)
-
-    // note that we add all the vars _after_ the command,
-    // so that graph walkers would be able to detect the command version
-    // before getting to var processing (see TJSONEntryStats::StructCmdDetected)
+    // 5. Imported variables
     if (LocalVars) {
         TVector<TStringBuf> names;
         names.reserve(LocalVars->size());
@@ -1359,7 +1355,7 @@ bool TCommandInfo::ProcessVar(TModuleBuilder& modBuilder, TAddDepAdaptor& inputN
     return true;
 }
 
-void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId, TNodeAddCtx& dst, bool structCmd) {
+void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, TNodeAddCtx& dst) {
     TStringStream cfgVars;
     for (auto id : varLists) { // this loop is not optimized because there's hardly 1 element in varLists
         TStringBuf name = Graph->GetCmdNameByCacheId(id).GetStr();
@@ -1374,22 +1370,13 @@ void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId, 
     YDIAG(VV) << "CFG_VARS [" << Module->Vars.Id << "] -> " << cfgVars.Str() << Endl;
     TYVar var;
 
-    if (structCmd) {
-        auto compiled = UpdIter->YMake.Commands.Compile(cfgVars.Str(), *Conf, Module->Vars, false, {});
-        auto subExpr = UpdIter->YMake.Commands.Add(*Graph, std::move(compiled.Expression));
-        auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
-        auto subBinding = TYVar();
-        subBinding.SetSingleVal("CFG_VARS", subExprRef, 0);
-        auto cmdElemId = InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
-        dst.AddDep(EDT_BuildCommand, EMNT_BuildVariable, cmdElemId);
-    } else {
-        TVars vars(&Module->Vars); // TODO: move it to TCommandInfo?
-        var.SetSingleVal("CFG_VARS", cfgVars.Str(), nsId, Module->Vars.Id);
-        vars.Id = var.Id;
-        ui64 id = InitCmdNode(var, EStructCmd::No, EExprRole::Var);
-        dst.AddDep(EDT_Include, EMNT_BuildCommand, id);
-        FillAddCtx(var, vars);
-    }
+    auto compiled = UpdIter->YMake.Commands.Compile(cfgVars.Str(), *Conf, Module->Vars, false, {});
+    auto subExpr = UpdIter->YMake.Commands.Add(*Graph, std::move(compiled.Expression));
+    auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
+    auto subBinding = TYVar();
+    subBinding.SetSingleVal("CFG_VARS", subExprRef, 0);
+    auto cmdElemId = InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
+    dst.AddDep(EDT_BuildCommand, EMNT_BuildVariable, cmdElemId);
 }
 
 void TCommandInfo::FillCoords(
