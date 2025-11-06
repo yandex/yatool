@@ -494,6 +494,12 @@ namespace {
                 macroName = ToUpperUTF8(TStringBuf{data, static_cast<size_t>(size)});
             }
 
+            PyObject* signature = PyFunction_GetAnnotations(args[0]);
+            if (!signature) {
+                PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator requires type hint annotations on decorated function");
+                return nullptr;
+            }
+
             NYMake::NPlugins::RegisterMacro(*Conf, macroName.c_str(), args[0]);
 
             Py_INCREF(args[0]);
