@@ -76,7 +76,7 @@ namespace {
             for (const auto globPatternElemId: globPatternElemIds) {
                 globStat += TGlobHelper::GetGlobPatternStat(moduleGlobsData, globPatternElemId);
             }
-            globRestrictions.Check(name, pattern, globStat, conf.GlobSkippedErrorPercent, conf.GlobSkippedMinWatched);
+            globRestrictions.Check(name, pattern, globStat);
         }
     }
 

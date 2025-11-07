@@ -62,7 +62,7 @@ namespace {
     }
 }
 
-bool TGlobRestrictions::Check(const TStringBuf& name, const TStringBuf& pattern, const TGlobStat& globStat, ui8 globSkippedErrorPercent, ui32 globSkippedMinWatched) const {
+bool TGlobRestrictions::Check(const TStringBuf& name, const TStringBuf& pattern, const TGlobStat& globStat) const {
     size_t tooManyMatches = 0;
     if (globStat.MatchedFilesCount >= MaxMatches) {
         tooManyMatches = globStat.MatchedFilesCount;
@@ -70,7 +70,7 @@ bool TGlobRestrictions::Check(const TStringBuf& name, const TStringBuf& pattern,
     auto watchedFilesCount = globStat.MatchedFilesCount + globStat.SkippedFilesCount;
     size_t tooManySkipped = 0;
     ui8 globSkippedPercent = watchedFilesCount ? (globStat.SkippedFilesCount * 100 + watchedFilesCount/2)/watchedFilesCount : 0;
-    if (watchedFilesCount >= globSkippedMinWatched && globSkippedErrorPercent && globSkippedPercent >= globSkippedErrorPercent) {
+    if (watchedFilesCount >= SkippedMinMatches && SkippedErrorPercent && globSkippedPercent >= SkippedErrorPercent) {
         tooManySkipped = globStat.SkippedFilesCount;
     }
     size_t tooManyWatchDirs = 0;

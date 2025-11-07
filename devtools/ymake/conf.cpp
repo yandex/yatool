@@ -105,14 +105,6 @@ namespace {
     void ReadFeatureFlags(TBuildConfiguration& conf) {
         conf.FillModule2Nodes = NYMake::IsTrue(conf.CommandConf.EvalValue("FILL_MODULE2NODES"));
         conf.CheckGlobRestrictions = NYMake::IsTrue(conf.CommandConf.EvalValue("CHECK_GLOB_RESTRICTIONS"));
-        decltype(conf.GlobSkippedErrorPercent) globSkippedErrorPercent;
-        if (TryFromString(conf.CommandConf.EvalValue("GLOB_SKIPPED_ERROR_PERCENT"), globSkippedErrorPercent)) {
-            conf.GlobSkippedErrorPercent = globSkippedErrorPercent;
-        }
-        decltype(conf.GlobSkippedMinWatched) globSkippedMinWatched;
-        if (TryFromString(conf.CommandConf.EvalValue("GLOB_SKIPPED_MIN_WATCHED"), globSkippedMinWatched)) {
-            conf.GlobSkippedMinWatched = globSkippedMinWatched;
-        }
     }
 }
 

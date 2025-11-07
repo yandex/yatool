@@ -62,21 +62,25 @@ struct TGlobStat {
 };
 
 struct TGlobRestrictions {
-    size_t MaxMatches{10000}; // Maximum matched files for globs in module, 0 - unlimit
-    size_t MaxWatchDirs{5000}; // Maximum watched dirs for globs in module, 0 - unlimit
+    ui32 MaxMatches{10000}; // Maximum matched files for globs in module, 0 - unlimit
+    ui32 MaxWatchDirs{5000}; // Maximum watched dirs for globs in module, 0 - unlimit
+    ui32 SkippedMinMatches{2000}; // Minimal files in glob, when enabled checking skipped files in glob
+    ui8 SkippedErrorPercent{0}; // Percent of skipped files in glob with >=SkippedMinMatched files for generate configure error (0 - don't check skipped files count)
 
     void Extend() {
         MaxMatches *= 10;
         MaxWatchDirs *= 10;
     }
 
-    bool Check(const TStringBuf& name, const TStringBuf& pattern, const TGlobStat& globStat, ui8 globSkippedErrorPercent, ui32 globSkippedMinWatched) const;
+    bool Check(const TStringBuf& name, const TStringBuf& pattern, const TGlobStat& globStat) const;
 
     bool operator==(const TGlobRestrictions&) const = default;
 
     Y_SAVELOAD_DEFINE(
         MaxMatches,
-        MaxWatchDirs
+        MaxWatchDirs,
+        SkippedMinMatches,
+        SkippedErrorPercent
     );
 };
 

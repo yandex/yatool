@@ -13,7 +13,7 @@ static const TGlobStat EmptyGlobStat;
 
 TGlobRestrictions TGlobHelper::ParseGlobRestrictions(const TArrayRef<const TStringBuf>& restrictions, const TStringBuf& macro) {
     const auto rend = restrictions.cend();
-    auto parseVal = [&macro, &rend](TArrayRef<const TStringBuf>::iterator& rit, const TStringBuf& name) {
+    auto parseVal = [&macro, &rend](TArrayRef<const TStringBuf>::iterator& rit, const TStringBuf& name, int minValue = 1, int maxValue = 1000000) {
         if (*rit != name) {
             return -1;
         }
@@ -24,9 +24,9 @@ TGlobRestrictions TGlobHelper::ParseGlobRestrictions(const TArrayRef<const TStri
         rit++;
         int v;
         if (!TryFromString(*rit, v)) {
-            v = 0;
+            v = -4;
         }
-        if (v <= 0 || v > 1000000) {
+        if (v < minValue || v > maxValue) {
             YConfErr(Syntax) << "Invalid value '" << *rit << "' for " << name << " in " << macro << Endl;
             return -3;
         }
@@ -44,7 +44,15 @@ TGlobRestrictions TGlobHelper::ParseGlobRestrictions(const TArrayRef<const TStri
         if (maxWatchDirs > 0) {
             globRestrictions.MaxWatchDirs = maxWatchDirs;
         }
-        if (maxMatches == -1 && maxWatchDirs == -1) {
+        auto skippedMinMatched = parseVal(rit, NArgs::SKIPPED_MIN_MATCHES);
+        if (skippedMinMatched > 0) {
+            globRestrictions.SkippedMinMatches = skippedMinMatched;
+        }
+        auto skippedErrorPercent = parseVal(rit, NArgs::SKIPPED_ERROR_PERCENT, 0, 99);
+        if (skippedErrorPercent >= 0) {
+            globRestrictions.SkippedErrorPercent = static_cast<decltype(TGlobRestrictions::SkippedErrorPercent)>(skippedErrorPercent);
+        }
+        if (maxMatches == -1 && maxWatchDirs == -1 && skippedMinMatched == -1 && skippedErrorPercent == -1) {
             YConfErr(Syntax) << "Unknown restriction name " << *rit << " in " << macro << Endl;
         }
         rit++;

@@ -38,5 +38,7 @@ constexpr TStringBuf EXCLUDE = "EXCLUDE";
 constexpr TStringBuf RESTRICTIONS = "RESTRICTIONS";
 constexpr TStringBuf MAX_MATCHES = "MAX_MATCHES";
 constexpr TStringBuf MAX_WATCH_DIRS = "MAX_WATCH_DIRS";
+constexpr TStringBuf SKIPPED_MIN_MATCHES = "SKIPPED_MIN_MATCHES";
+constexpr TStringBuf SKIPPED_ERROR_PERCENT = "SKIPPED_ERROR_PERCENT";
 
 }
