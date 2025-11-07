@@ -15,6 +15,8 @@ from devtools.ya.test.test_types.common import PerformedTestSuite
 
 logger = logging.getLogger(__name__)
 
+report_name = 'stylelint.report.json'
+
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
@@ -39,6 +41,8 @@ def get_stylelint_cmd(args):
         args.test_config,
         '--formatter',
         'json',
+        '--output-file',
+        report_name,
     ] + args.files
 
 
@@ -138,12 +142,15 @@ def main():
         logger.error("stylelint was terminated by signal: %s", exec_result.exit_code)
         return 1
 
+    if exec_result.std_err:
+        logger.warning(exec_result.std_err)
+
+    # Parse the file specified with the --output-file option, as this is the most reliable way to read the report.
+    # https://stylelint.io/migration-guide/to-16#changed-cli-to-print-problems-to-stderr
     try:
-        # https://stylelint.io/migration-guide/to-16#changed-cli-to-print-problems-to-stderr
-        output = exec_result.std_err if exec_result.std_err else exec_result.std_out
-        report_json = json.loads(output)
-    except json.decoder.JSONDecodeError:
-        logger.error("stylelint failed with the error:\n%s", exec_result.std_out + exec_result.std_err)
+        with open(os.path.join(build_dir, report_name)) as f:
+            report_json = json.load(f)
+    except BaseException:
         return 1
 
     fill_suite(build_dir, report_json, args.trace)
