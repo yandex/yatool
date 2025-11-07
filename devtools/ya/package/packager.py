@@ -10,6 +10,7 @@ import time
 import traceback
 
 import six
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import app_config
 import devtools.ya.build.build_opts
@@ -564,7 +565,9 @@ def guess_tool_platform(filename, tool_platforms):
 
 
 @timeit
-def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False):
+def strip_binaries(params, result_dir, debug_dir, source_elements, full_strip=False):
+    files_to_strip = set()
+
     for element in source_elements:
         if element.data['source']['type'] != 'BUILD_OUTPUT':
             logger.debug('Strip binaries only from BUILD_OUTPUT section. Skip %s', element.data)
@@ -580,24 +583,57 @@ def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False):
             'Strip binaries from paths [%s] with toolchains %s', ', '.join(element.destination_paths), tool_platforms
         )
         tool_platform = guess_tool_platform(element.data['source']['path'], tool_platforms)
+
         for destination_path in element.destination_paths:
             if os.path.isdir(destination_path):
                 for root, _, files in os.walk(destination_path):
                     for f in files:
-                        try_strip_file(
-                            result_dir,
-                            debug_dir,
-                            os.path.join(root, f),
-                            tool_platform=tool_platform,
-                            full_strip=full_strip,
+                        files_to_strip.add(
+                            (
+                                result_dir,
+                                debug_dir,
+                                os.path.join(root, f),
+                                tool_platform,
+                                full_strip,
+                            ),
                         )
             else:
-                try_strip_file(
-                    result_dir, debug_dir, destination_path, tool_platform=tool_platform, full_strip=full_strip
+                files_to_strip.add(
+                    (
+                        result_dir,
+                        debug_dir,
+                        destination_path,
+                        tool_platform,
+                        full_strip,
+                    ),
                 )
 
+    if not files_to_strip:
+        logger.debug('No files to strip')
+        return
 
-def try_strip_file(result_dir, debug_dir, destination_path, tool_platform=None, full_strip=False):
+    workers = min(params.build_threads, len(files_to_strip))
+    logger.debug('Stripping %d files using %d workers', len(files_to_strip), workers)
+
+    if workers == 1 or params.disable_parallel_strip:
+        results = [_strip_file_worker(args) for args in files_to_strip]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(_strip_file_worker, args): i for i, args in enumerate(files_to_strip)}
+            results = [None] * len(files_to_strip)
+            for future in as_completed(futures):
+                i = futures[future]
+                results[i] = future.result()
+
+    for i, (success, error) in enumerate(results):
+        if not success and error:
+            file_path = files_to_strip[i][2]
+            package.display.emit_message(f'[[bad]]Strip failed for {file_path}: {error}[[rst]]')
+
+
+def _strip_file_worker(args):
+    result_dir, debug_dir, destination_path, tool_platform, full_strip = args
+
     if os.path.isfile(destination_path) and os.access(destination_path, os.X_OK) and is_application(destination_path):
         executable_name = os.path.basename(destination_path)
         executable_relative_dir = os.path.dirname(os.path.relpath(destination_path, result_dir))
@@ -610,8 +646,10 @@ def try_strip_file(result_dir, debug_dir, destination_path, tool_platform=None, 
                 strip_binary(
                     executable_name, debug_file_name=debug_file_name, tool_platform=tool_platform, full_strip=full_strip
                 )
+                return True, None
             except package.packager.YaPackageException as e:
-                package.display.emit_message('[[bad]]Strip failed: {}[[rst]]'.format(e))
+                return False, str(e)
+    return True, None
 
 
 def is_old_format(package_data):
@@ -713,7 +751,7 @@ def create_package(package_context, output_root, builds):
 
             if params.strip or params.full_strip:
                 debug_dir = exts.fs.create_dirs(os.path.join(temp_work_dir, '.debug'))
-                strip_binaries(temp_work_dir, debug_dir, source_elements, full_strip=params.full_strip)
+                strip_binaries(params, temp_work_dir, debug_dir, source_elements, full_strip=params.full_strip)
                 if params.create_dbg:
                     debug_dir = os.path.join(debug_dir, '.content')
                     create_dbg = os.path.exists(debug_dir)
