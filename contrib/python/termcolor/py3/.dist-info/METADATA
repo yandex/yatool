@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: termcolor
-Version: 3.1.0
+Version: 3.2.0
 Summary: ANSI color formatting for output in terminal
 Project-URL: Changelog, https://github.com/termcolor/termcolor/releases
 Project-URL: Homepage, https://github.com/termcolor/termcolor
@@ -16,17 +16,17 @@ Classifier: Intended Audience :: Developers
 Classifier: Operating System :: OS Independent
 Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 3 :: Only
-Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Programming Language :: Python :: 3.13
 Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: 3.15
 Classifier: Programming Language :: Python :: Implementation :: CPython
 Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Topic :: Terminals
 Classifier: Typing :: Typed
-Requires-Python: >=3.9
+Requires-Python: >=3.10
 Provides-Extra: tests
 Requires-Dist: pytest; extra == 'tests'
 Requires-Dist: pytest-cov; extra == 'tests'
