@@ -852,6 +852,7 @@ def configure_report_interceptor(ctx, report_events):
             telemetry.compose(
                 ReportTypes.TIMEIT,
                 ReportTypes.BUILD_ERRORS,
+                ReportTypes.BUILD_ERRORS_COUNT,
                 ReportTypes.PROFILE_BY_TYPE,
                 ReportTypes.VCS_INFO,
                 ReportTypes.FAST_VCS_INFO_JSON,

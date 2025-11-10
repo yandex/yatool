@@ -45,6 +45,7 @@ class ReportTypes(object):
     YT_CACHE_METRICS = 'yt_cache_metrics'
     UNIVERSAL_FETCHER = 'universal_fetcher'
     BUILD_ERRORS = 'build_errors'
+    BUILD_ERRORS_COUNT = 'build_errors_count'
     FINISH = 'finish'
 
 

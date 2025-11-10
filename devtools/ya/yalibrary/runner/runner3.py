@@ -43,6 +43,7 @@ import yalibrary.runner.sandboxing as sandboxing
 
 
 logger = logging.getLogger(__name__)
+BUILD_ERRORS_REPORT_LIMIT = 5
 
 
 if tp.TYPE_CHECKING:
@@ -385,6 +386,7 @@ class TaskContext(object):
         replay_info = list(self.runq.replay())
 
         exit_code_map: dict[GraphNodeUid, ExitCode] = {}
+        total_errors = 0
         for group in replay_info:
             for task_info in group:
                 try:
@@ -402,12 +404,34 @@ class TaskContext(object):
                     task_uid = getattr(task_info.task, 'uid', getattr(task_info.task, 'short_name', 'UnknownTask'))
                     exit_code_map[task_uid] = rc
 
+                    error_info = {
+                        "uid": task_uid,
+                        "exit_code": rc,
+                        "stderr": stderr if stderr else 'no strderr was provided',
+                        "outputs": getattr(task_info.task, 'outputs', []),
+                    }
+
+                    if total_errors < BUILD_ERRORS_REPORT_LIMIT:
+                        devtools.ya.core.report.telemetry.report(
+                            devtools.ya.core.report.ReportTypes.BUILD_ERRORS,
+                            error_info,
+                        )
+
+                    total_errors += 1
+
                 elif stderr:
                     if len(stderr) <= TRUNCATE_STDERR * 2:
                         truncated_stderr = stderr
                     else:
                         truncated_stderr = "\n".join((stderr[:TRUNCATE_STDERR], "...", stderr[-TRUNCATE_STDERR:]))
                     logger.debug("Task %s has stderr:\n%s", task_info.task, truncated_stderr)
+
+        devtools.ya.core.report.telemetry.report(
+            devtools.ya.core.report.ReportTypes.BUILD_ERRORS_COUNT,
+            {
+                "total_build_errors": total_errors,
+            },
+        )
 
         merged_exit_code = devtools.ya.core.error.merge_exit_codes([0] + list(exit_code_map.values()))
         logger.debug("Merged exit code: %d", merged_exit_code)
