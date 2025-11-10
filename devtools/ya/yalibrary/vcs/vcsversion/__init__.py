@@ -1006,7 +1006,6 @@ def get_raw_version_info(arc_root, bld_root=None):
 
 
 def get_fast_version_info(arc_root: str, timeout: int | None = None) -> dict[str, str | int]:
-    arc_root: str | None = detect_root(arc_root)
     try:
         if arc_root is None:
             raise VcsDetectError("VCS root is None, can't proceed")

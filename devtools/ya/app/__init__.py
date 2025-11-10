@@ -102,7 +102,6 @@ def execute_early(action):
                 ('handler_info', configure_handler_info()),
             ]
         )
-
         if not is_sensitive(args):
             modules.extend(
                 [
@@ -642,16 +641,22 @@ def configure_vcs_info():
     yield revision
 
 
+def _empty_vcs_info():
+    # type: () -> dict
+    return {}
+
+
 def configure_fast_vcs_info_json(ctx):
     # type: (devtools.ya.yalibrary.app_ctx.AppCtx) -> typing.Generator[typing.Callable[[], dict], None, None]
     arc_root = getattr(ctx.params, 'arc_root', None)
-    if not arc_root:
-        arc_root = devtools.ya.core.config.find_root(fail_on_error=False)
-    if not arc_root:
-        arc_root = os.getcwd()
-        logger.debug('Unable to get vcs root for %s', os.getcwd())
-
-    result = exts.asyncthread.future(lambda: _load_fast_vcs_info(arc_root))
+    if getattr(ctx.params, 'report', None) is False:
+        logger.debug('Report disabled. Snowden vcs info log skipped')
+        result = _empty_vcs_info
+    elif not arc_root:
+        logger.debug('Unable to get vcs root for %s. Snowden vcs info log skipped', os.getcwd())
+        result = _empty_vcs_info
+    else:
+        result = exts.asyncthread.future(lambda: _load_fast_vcs_info(arc_root))
 
     yield result
 
@@ -747,10 +752,11 @@ def configure_report_interceptor(ctx, report_events):
     from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args, parse_events_filter
 
     params_dict = ctx.params.__dict__ if hasattr(ctx, "params") else None
+    parsed_report_events = parse_events_filter.parse_events_filter(report_events)
 
     telemetry.init_reporter(
         suppressions=sec.mine_suppression_filter(params_dict),
-        report_events=parse_events_filter.parse_events_filter(report_events),
+        report_events=parsed_report_events,
     )
 
     telemetry.report(
@@ -779,7 +785,7 @@ def configure_report_interceptor(ctx, report_events):
     exception_name = ""
     exception_muted = False
     try:
-        yield
+        yield ReportTypes.ALL in parsed_report_events if parsed_report_events else False
     except BaseException as e:
         if isinstance(e, KeyboardInterrupt):
             exit_code = -1
