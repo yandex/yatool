@@ -32,7 +32,6 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.debian_distribution = 'unstable'
         self.debian_upload_token = None  # please, do not remove, we really need it in opensource nebius ya
         self.debian_force_bad_version = False
-        self.disable_parallel_strip = False
         self.docker_no_cache = False
         self.docker_pull = False
         self.docker_push_image = False
@@ -243,18 +242,6 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                     'debian_force_bad_version',
                     devtools.ya.core.yarg.return_true_if_enabled,
                 ),
-            ),
-            devtools.ya.core.yarg.EnvConsumer(
-                'DISABLE_PARALLEL_STRIP',
-                help='Disable parallel strip for binaries.',
-                hook=devtools.ya.core.yarg.SetConstValueHook('disable_parallel_strip', True),
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                names=['--disable-parallel-strip'],
-                help='Disable parallel strip for binaries.',
-                hook=devtools.ya.core.yarg.SetConstValueHook('disable_parallel_strip', True),
-                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--docker-push'],
