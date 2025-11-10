@@ -122,7 +122,9 @@ class _ExistsSymlinkCollector(_SymlinkCollector):
 
         try:
             if self._load():  # always check symlinks from saved for remove invalid symlinks
-                if not self.config.new_sign:  # if config sign changed - must recollect exported from disk below
+                if (
+                    self.config.params.remove or self.config.params.reexport or not self.config.new_sign
+                ):  # if config sign changed - must recollect exported from disk below
                     return
         except Exception as e:
             self.logger.error("Can't load symlinks from file %s: %s", self._symlinks_path, e)
