@@ -373,17 +373,21 @@ void TSpecBasedGenerator::SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv) {
                 }
                 if (pathsParam.isList()) { // input is list, and result list too
                     jinja2::ValuesList dirnames;
+                    jinja2::ValuesList stepDirnames;
                     const std::string error_message = "Some item of " + std::string{PATHS} + " is not string";
-                    auto onPath = [&dirnames, &error_message, &dirname](const jinja2::Value& path) {
+                    auto onPath = [&dirnames, &stepDirnames, &error_message, &dirname](const jinja2::Value& path) {
                         const auto jdirname = dirname(path, error_message);
-                        if (!jdirname.isEmpty() && std::find(dirnames.begin(), dirnames.end(), jdirname) == dirnames.end()) {
-                            dirnames.push_back(jdirname);
+                        if (!jdirname.isEmpty()
+                            && std::find(stepDirnames.begin(), stepDirnames.end(), jdirname) == stepDirnames.end()
+                            && std::find(dirnames.begin(), dirnames.end(), jdirname) == dirnames.end()
+                        ) {
+                            stepDirnames.push_back(jdirname);
                         }
                     };
 
                     jinja2::Value pathsList = pathsParam;
                     for (auto i = 0; i < 16; ++i) {
-                        const auto startDirnamesSize = dirnames.size();
+                        stepDirnames.clear();
                         const auto* pathsGenList = pathsList.getPtr<jinja2::GenericList>();
                         if (pathsGenList) {
                             for (const auto& path: *pathsGenList) {
@@ -394,10 +398,13 @@ void TSpecBasedGenerator::SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv) {
                                 onPath(path);
                             }
                         }
-                        if (!recursive || dirnames.size() == startDirnamesSize) {
+                        for (auto& d: stepDirnames) {
+                            dirnames.push_back(d);
+                        }
+                        if (!recursive || stepDirnames.empty()) {
                             break;
                         }
-                        pathsList = dirnames;
+                        pathsList = std::move(stepDirnames);
                     }
                     std::sort(dirnames.begin(), dirnames.end(), [](const jinja2::Value& a, const jinja2::Value& b) {
                         return a.asString() < b.asString();
