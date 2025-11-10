@@ -53,7 +53,7 @@ _META_MAP = [
     ('nodejs_resource', None, (_dart_get_resource_by_name, ('NODEJS-ROOT-VAR-NAME',))),
     ('nodejs_root_var_name', None, (dict.get, ('NODEJS-ROOT-VAR-NAME',))),
     ('nyc_resource', None, (_dart_get_resource_by_name, ('NYC-ROOT-VAR-NAME',))),
-    ('parallel_tests_on_yt_within_node', '', (dict.get, ('PARALLEL-TESTS-WITHIN-NODE-ON-YT',))),
+    ('parallel_tests_within_node_workers', '', (dict.get, ('PARALLEL-TESTS-WITHIN-NODE-WORKERS',))),
     ('python_paths', (), (dict.get, ('PYTHON-PATHS',))),
     ('requirements', (), (dict.get, ('REQUIREMENTS',))),
     ('sbr_uid_ext', None, (dict.get, ('SBR-UID-EXT',))),

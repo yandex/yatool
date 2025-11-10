@@ -32,7 +32,7 @@ import exts.tmp
 from devtools.ya.test.util import tools, shared
 from devtools.ya.test.common import get_test_log_file_path
 from devtools.ya.test import facility
-from devtools.ya.test.const import Status, TEST_BT_COLORS
+from devtools.ya.test.const import Status, TEST_BT_COLORS, TRACE_FILE_NAME
 from devtools.ya.test.filter import make_testname_filter
 from devtools.ya.test.test_types.common import PerformedTestSuite
 from yalibrary import display
@@ -800,7 +800,7 @@ def launch_tests(
 
     logger.debug("Single launch for %d tests", len(test_names))
     if is_parallel:
-        temp_tracefile = os.path.join(temp_tracefile_dir, uuid.uuid4().hex)
+        temp_tracefile = os.path.join(temp_tracefile_dir, uuid.uuid4().hex) + "." + TRACE_FILE_NAME
 
     cmd = [binary]
 

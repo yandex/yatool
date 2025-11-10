@@ -807,8 +807,12 @@ class AbstractTestSuite(facility.Suite):
     def get_split_params(self):
         return self._modulo, self._modulo_index, self._split_file_name
 
-    def parallel_tests_within_node_workers(self):
-        return self.meta.parallel_tests_on_yt_within_node
+    @exts.func.memoize()
+    def get_parallel_tests_within_node_workers(self):
+        if self.meta.parallel_tests_within_node_workers == "auto":
+            return self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 1)
+        else:
+            return self.meta.parallel_tests_within_node_workers
 
     def get_fork_mode(self):
         return self.meta.fork_mode

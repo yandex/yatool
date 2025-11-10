@@ -111,9 +111,9 @@ class UnitTestSuite(common_types.AbstractTestSuite):
             for additional_arg in opts.test_binary_args:
                 cmd += ["--test-binary-args={}".format(additional_arg)]
 
-        if self.parallel_tests_within_node_workers():
+        if self.get_parallel_tests_within_node_workers():
             if getattr(opts, 'run_tagged_tests_on_yt', False) and 'ya:yt' in self.tags:
-                cmd += ["--parallel-tests-within-node-workers", str(self.parallel_tests_within_node_workers())]
+                cmd += ["--parallel-tests-within-node-workers", str(self.get_parallel_tests_within_node_workers())]
                 cmd += ["--temp-tracefile-dir", self.temp_tracefile_dir]
                 cpu_count = self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu)
                 if isinstance(cpu_count, int):
