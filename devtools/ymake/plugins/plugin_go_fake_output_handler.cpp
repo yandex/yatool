@@ -102,8 +102,6 @@ namespace {
     } // end of ExecuteScanGoImports
 } // end of anonymous namespace
 
-#define __FAKE_MACRO_NAME__ "GO_FAKE_OUTPUT"
-
 namespace NYMake {
     namespace NPlugins {
         static const TSourceLocation docLink = __LOCATION__;
