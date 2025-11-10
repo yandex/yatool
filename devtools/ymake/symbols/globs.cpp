@@ -239,7 +239,7 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
                     break;
                 }
                 case TGlobPart::EGlobType::Recursive: {
-                    ApplyRecursivePart(newDirs, dir.GetElemId());
+                    ApplyRecursivePart(newDirs, dir.GetElemId(), excludeMatcher);
                     newDirs.push_back(dir);
                     for (const auto& newDir : newDirs) {
                         WatchDirs.Push(newDir.GetElemId());
@@ -319,7 +319,7 @@ bool TGlobPattern::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView
     return true;
 }
 
-void TGlobPattern::ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 startDirId) const {
+void TGlobPattern::ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 startDirId, const TExcludeMatcher& excludeMatcher) const {
     for  (TQueue<ui32> queue({startDirId}); !queue.empty(); queue.pop()) {
         auto dirId = queue.front();
         FileConf.ListDir(dirId, true);
@@ -328,9 +328,11 @@ void TGlobPattern::ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 startDir
             auto file = FileConf.GetFileById(childId);
             const auto& data = file->GetFileData();
             if (!data.NotFound && data.IsDir) {
-                TFileView name = file->GetName();
-                newDirs.push_back(name);
-                queue.push(childId);
+                TFileView dirName = file->GetName();
+                if (!excludeMatcher.IsExcluded(dirName, true)) {
+                    newDirs.push_back(dirName);
+                    queue.push(childId);
+                }
             }
         }
     }
@@ -355,8 +357,14 @@ TString PatternToRegexp(TStringBuf pattern) {
     return res;
 }
 
-bool MatchPath(const TRegExMatch& globPattern, TFileView graphPath) {
-    return globPattern.Match(TString{graphPath.CutAllTypes()}.c_str()); // TODO(svidyuk) search for regex lib which can work on TStringBuf in arcadia
+bool MatchPath(const TRegExMatch& globPattern, TFileView graphPath, bool isDir) {
+    TString path{graphPath.CutAllTypes()};
+    auto r = globPattern.Match(path.c_str()); // TODO(svidyuk) search for regex lib which can work on TStringBuf in arcadia
+    if (!r && isDir) {
+        return globPattern.Match((path + "/").c_str());
+    } else {
+        return r;
+    }
 }
 
 void TExcludeMatcher::AddExcludePattern(TFileView moddir, TStringBuf pattern) {
@@ -371,6 +379,6 @@ void TExcludeMatcher::AddExcludePattern(TFileView moddir, TStringBuf pattern) {
     Matchers.push_back(PatternToRegexp(NPath::CutAllTypes(path)));
 }
 
-bool TExcludeMatcher::IsExcluded(TFileView path) const {
-    return AnyOf(Matchers, [&](const TRegExMatch& pattern) {return MatchPath(pattern, path);});
+bool TExcludeMatcher::IsExcluded(TFileView path, bool isDir) const {
+    return AnyOf(Matchers, [&](const TRegExMatch& pattern) {return MatchPath(pattern, path, isDir);});
 }

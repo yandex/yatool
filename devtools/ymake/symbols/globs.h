@@ -15,7 +15,7 @@ class TExcludeMatcher {
 public:
     void AddExcludePattern(TFileView moddir, TStringBuf pattern);
 
-    bool IsExcluded(TFileView path) const;
+    bool IsExcluded(TFileView path, bool isDir = false) const;
 
 private:
     TVector<TRegExMatch> Matchers;
@@ -144,11 +144,11 @@ private:
     void ParseGlobPattern();
 
     bool ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
-    void ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 dirId) const;
+    void ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 dirId, const TExcludeMatcher& excludeMatcher) const;
     void ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
 };
 
 // Transforms ANT-like glob pattern to a regular expression. Usable in case of matching set of paths against
 // some pattern without searching paths matching it on filesystem or in filetables.
 TString PatternToRegexp(TStringBuf pattern);
-bool MatchPath(const TRegExMatch& globPattern, TFileView graphPath);
+bool MatchPath(const TRegExMatch& globPattern, TFileView graphPath, bool isDir = false);
