@@ -11,17 +11,6 @@ PEERDIR(
     devtools/ya/yalibrary/find_root
 )
 
-IF (PYTHON2)
-    PEERDIR(
-        vcs/svn/run
-    )
-    IF (NOT YA_OPENSOURCE)
-        PEERDIR(
-            devtools/ya/yalibrary/svn
-        )
-    ENDIF()
-ENDIF()
-
 END()
 
 RECURSE(

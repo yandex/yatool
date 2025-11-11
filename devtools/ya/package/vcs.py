@@ -8,6 +8,7 @@ import exts.func
 import exts.tmp
 
 from yalibrary.vcs import vcsversion
+from yalibrary import vcs
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ class Branch(VcsInfo):
     def calc(self, info):
         branch = info.get('branch')
         if branch:
-            vcs_type, _, _ = vcsversion.detect(cwd=self._arcadia_root)
+            vcs_type, _, _ = vcs.detect(cwd=self._arcadia_root)
             branch = branch.split('/')[-1]
             if vcs_type and vcs_type[0] == 'arc':
                 if self.revision_means_trunk and info.get('revision') and re.match(r'^[0-9a-f]{40}$', branch):
