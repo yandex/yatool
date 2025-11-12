@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import sys
 import typing as tp
@@ -38,6 +39,9 @@ class StylerKind(StrEnum):
     GO = auto()
     YQL = auto()
     LUA = auto()
+    JSON = auto()
+    YAML = auto()
+    EOL = auto()
 
     @property
     def default_enabled(self) -> bool:
@@ -85,7 +89,13 @@ def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) 
             logger.warning('skip %s (filtered by file type)', target)
             return
     else:
-        matches = {m for m in suffix_matches if m.kind.default_enabled}
+        matches = set()
+        for m in suffix_matches:
+            if m.kind.default_enabled:
+                matches.add(m)
+            elif m.kind in (StylerKind.JSON, StylerKind.YAML, StylerKind.EOL) and 'taxi/' in str(target):
+                # HACK: Hardcode until introduction of custom settings in YA-2732
+                matches.add(m)
         if not matches:
             options = ' or '.join(f'--{m.kind}' for m in suffix_matches)
             logger.warning('skip %s (require explicit %s or --all)', target, options)
@@ -460,3 +470,107 @@ class StyLua:
 
     def format(self, path: PurePath, content: str) -> StylerOutput:
         return StylerOutput(self._run_format(path, content))
+
+
+@_register
+class ClangFormatJson(ClangFormat):
+    kind: tp.ClassVar = StylerKind.JSON
+    name: tp.ClassVar = const.CustomExplicitLinterName.ClangFormatJson
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".json",)
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
+        self._config_finder = cfg.ConfigFinder(
+            (
+                styler_opts.config_loaders
+                if styler_opts.config_loaders
+                else (
+                    cfg.DefaultConfig(
+                        linter_name=const.CustomExplicitLinterName.ClangFormatJson,
+                        defaults_file=const.DefaultLinterConfig.Json,
+                        resource_name=".clang-format-json",
+                    ),
+                )
+            ),
+        )
+
+
+@_register
+class YamlFmt:
+    kind: tp.ClassVar = StylerKind.YAML
+    name: tp.ClassVar = const.CustomExplicitLinterName.Yamlfmt
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yaml", ".yml")
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("yamlfmt")  # type: ignore
+        self._config_finder = cfg.ConfigFinder(
+            (
+                styler_opts.config_loaders
+                if styler_opts.config_loaders
+                else (
+                    cfg.DefaultConfig(
+                        linter_name=const.CustomExplicitLinterName.Yamlfmt,
+                        defaults_file=const.DefaultLinterConfig.Yaml,
+                        resource_name=".yamlfmt.yml",
+                    ),
+                )
+            ),
+        )
+
+    def _run_format(self, path: PurePath, content: str) -> StylerOutput:
+        config = self._config_finder.lookup_config(path)
+        args = [self._tool, '-conf', config.path, '-']
+
+        p = subprocess.Popen(
+            args,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            text=True,
+        )
+        out, err = p.communicate(input=content)
+
+        # Abort styling on signal
+        if p.returncode < 0:
+            state_helper.stop()
+
+        if err:
+            raise StylingError('error while running yamlfmt on file "{}": {}'.format(path, err.strip()))
+
+        return StylerOutput(out, config)
+
+    def format(self, path: PurePath, content: str) -> StylerOutput:
+        return self._run_format(path, content)
+
+
+@_register
+class EOLFmt:
+    kind: tp.ClassVar = StylerKind.EOL
+    name: tp.ClassVar = 'eolfmt'
+    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (
+        '.cpp',
+        '.h',
+        '.hpp',
+        '.json',
+        '.ini',
+        '.md',
+        '.py',
+        '.sql',
+        '.txt',
+        '.xml',
+        '.yaml',
+        '.yml',
+        'Dockerfile',
+        'Makefile',
+    )
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._pattern = re.compile(r'[ \t]+$', re.MULTILINE)
+
+    def _run_format(self, path: PurePath, content: str) -> StylerOutput:
+        out = re.sub(self._pattern, '', content)
+        return StylerOutput(out)
+
+    def format(self, path: PurePath, content: str) -> StylerOutput:
+        return self._run_format(path, content)

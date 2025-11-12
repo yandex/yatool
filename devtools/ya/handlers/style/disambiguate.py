@@ -126,4 +126,4 @@ def disambiguate_targets(
     }:
         return _clang_formats(disambiguation_opts)
 
-    return f"[{target}] Can't choose between {' and '.join(m.__name__ for m in styler_classes)}."
+    raise AssertionError(f"[{target}] Can't choose between {' and '.join(m.__name__ for m in styler_classes)}.")

@@ -28,7 +28,7 @@ class Target(tp.NamedTuple):
     stdin: bool = False
 
 
-def _mine_filepath_targets(paths: tuple[Path]) -> Generator[Target]:
+def _mine_filepath_targets(paths: tuple[Path, ...]) -> Generator[Target]:
     for path in paths:
         if path.is_symlink():
             continue

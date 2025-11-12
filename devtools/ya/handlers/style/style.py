@@ -1,10 +1,12 @@
 import difflib
 import coloredlogs
 import concurrent.futures
+import itertools
 import logging
 import os
 import sys
 import typing as tp
+from collections.abc import Callable
 from pathlib import Path
 
 import exts.os2
@@ -107,6 +109,23 @@ def _style(style_opts: StyleOptions, styler: stlr.Styler, target: trgt.Target) -
     return StyleOutput(rc=0)
 
 
+def _collect_style_targets(
+    mine_opts: trgt.MineOptions,
+    disambiguation_opts: disambiguate.DisambiguationOptions,
+) -> tuple[dict[type[stlr.Styler], list[trgt.Target]], list[str]]:
+    style_targets: dict[type[stlr.Styler], list[trgt.Target]] = {}
+    disamb_errors: list[str] = []
+    key_fn: Callable[[type[stlr.Styler]], stlr.StylerKind] = lambda sc: sc.kind
+    for target, styler_classes in trgt.discover_style_targets(mine_opts):
+        for _, styler_group_by_kind in itertools.groupby(sorted(styler_classes, key=key_fn), key=key_fn):
+            res = disambiguate.disambiguate_targets(target.path, set(styler_group_by_kind), disambiguation_opts)
+            if isinstance(res, str):
+                disamb_errors.append(res)
+            else:
+                style_targets.setdefault(res, []).append(target)
+    return style_targets, disamb_errors
+
+
 def run_style(args) -> int:
     _setup_logging(args.quiet)
 
@@ -115,22 +134,13 @@ def run_style(args) -> int:
         file_types=tuple(stlr.StylerKind(t) for t in args.file_types),
         stdin_filename=args.stdin_filename,
     )
-
     disambiguation_opts = disambiguate.DisambiguationOptions(
         use_ruff=args.use_ruff,
         use_clang_format_yt=args.use_clang_format_yt,
         use_clang_format_15=args.use_clang_format_15,
         use_clang_format_18_vanilla=args.use_clang_format_18_vanilla,
     )
-
-    style_targets: dict[type[stlr.Styler], list[trgt.Target]] = {}
-    disamb_errors: list[str] = []
-    for target, styler_classes in trgt.discover_style_targets(mine_opts):
-        res = disambiguate.disambiguate_targets(target.path, styler_classes, disambiguation_opts)
-        if isinstance(res, str):
-            disamb_errors.append(res)
-        else:
-            style_targets.setdefault(res, []).append(target)
+    style_targets, disamb_errors = _collect_style_targets(mine_opts, disambiguation_opts)
 
     style_opts = StyleOptions(
         force=args.force,
