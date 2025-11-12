@@ -104,7 +104,6 @@ namespace {
 
     void ReadFeatureFlags(TBuildConfiguration& conf) {
         conf.FillModule2Nodes = NYMake::IsTrue(conf.CommandConf.EvalValue("FILL_MODULE2NODES"));
-        conf.CheckGlobRestrictions = NYMake::IsTrue(conf.CommandConf.EvalValue("CHECK_GLOB_RESTRICTIONS"));
     }
 }
 

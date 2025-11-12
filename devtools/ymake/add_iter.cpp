@@ -64,11 +64,8 @@ namespace {
         return res;
     }
 
-    void OnChangeGlobPatternStat(TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId, TGlobStat&& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TStringBuf& pattern, const TBuildConfiguration& conf) {
+    void OnChangeGlobPatternStat(TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId, TGlobStat&& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TStringBuf& pattern) {
         TGlobHelper::SaveGlobPatternStat(moduleGlobsData, globPatternElemId, std::move(globPatternStat));
-        if (!conf.CheckGlobRestrictions) {
-            return;
-        }
         for (const auto globVarElemId: globInfo.VarElemIds) {
             const auto& globRestrictions = TGlobHelper::GetGlobRestrictions(moduleGlobsData, globVarElemId);
             const auto& globPatternElemIds = TGlobHelper::GetGlobPatternElemIds(moduleGlobsData, globVarElemId);
@@ -80,7 +77,7 @@ namespace {
         }
     }
 
-    void UpdateGlobNode(TUpdIter& updIter, TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module, const TBuildConfiguration& conf) {
+    void UpdateGlobNode(TUpdIter& updIter, TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module) {
         auto globInfo = ExtractGlobInfo(st, dirName);
         if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return;
@@ -116,14 +113,14 @@ namespace {
                 st.Add->AddDep(EDT_Property, EMNT_Property, globVarElemId);
             }
             if (prevGlobPatternStat != globPatternStat) {
-                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern, conf);
+                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern);
             }
         } catch (const yexception&) {
             // Invalid pattern error was reported earlier
         }
     }
 
-    bool GlobNeedUpdate(const TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module, const TBuildConfiguration& conf) {
+    bool GlobNeedUpdate(const TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module) {
         auto globInfo = ExtractGlobInfo(st, dirName);
         if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return false;
@@ -137,7 +134,7 @@ namespace {
             TGlobStat globPatternStat;
             result = glob.NeedUpdate(globInfo.ExcludesMatcher, &globPatternStat);
             if (result && globPatternStat != prevGlobPatternStat) {
-                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern, conf);
+                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern);
             }
         } catch (const yexception&) {
             result = false;
@@ -1325,7 +1322,7 @@ inline bool TUpdIter::Enter(TState& state) {
                     if (name == NProps::LATE_GLOB && !val.empty()) {
                         auto* module = YMake.Modules.Get(prev->Node.ElemId);
                         Y_ASSERT(module);
-                        UpdateGlobNode(*this, st, val, Graph.GetFileName(module->GetDirId()), module, YMake.Conf);
+                        UpdateGlobNode(*this, st, val, Graph.GetFileName(module->GetDirId()), module);
                     }
                 }
             }
@@ -1436,7 +1433,7 @@ inline void TUpdIter::Leave(TState& state) {
                 } else if (propName == NProps::GLOB) {
                     auto* module = YMake.Modules.Get(propId);
                     Y_ASSERT(module);
-                    if (GlobNeedUpdate(st, propValue, Graph.GetFileName(pprev.Node), module, YMake.Conf)) {
+                    if (GlobNeedUpdate(st, propValue, Graph.GetFileName(pprev.Node), module)) {
                         prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
                         st.Entry().SetOnceEntered(false);
                         st.ForceReassemble();

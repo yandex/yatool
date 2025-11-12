@@ -68,7 +68,6 @@ public:
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
     THashSet<TStringBuf> GlobRestrictionExtends{};
     bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
-    bool CheckGlobRestrictions{false}; // check glob restrictions in create and update modes
 
     void* SubState = nullptr;
 

@@ -311,14 +311,12 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
-    if (Conf.CheckGlobRestrictions) {
-        TStringBuilder patterns;
-        for (auto pattern : globs) {
-            if (!patterns.empty()) patterns << ", ";
-            patterns << pattern;
-        }
-        globRestrictions.Check(name, patterns, globStat);
+    TStringBuilder patterns;
+    for (auto pattern : globs) {
+        if (!patterns.empty()) patterns << ", ";
+        patterns << pattern;
     }
+    globRestrictions.Check(name, patterns, globStat);
     if (globVarElemId) {
         TGlobHelper::SaveGlobRestrictions(GetModuleGlobsData(), globVarElemId, std::move(globRestrictions));
     }
