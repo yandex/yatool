@@ -1,3 +1,4 @@
+import os
 import functools
 import exts.timer
 
@@ -11,3 +12,16 @@ def timeit(func):
         return res
 
     return wrapper
+
+
+def list_files_from(paths):
+    if isinstance(paths, str):
+        paths = [paths]
+
+    for path in paths:
+        if os.path.isdir(path):
+            for root, _, filenames in os.walk(path):
+                for filename in filenames:
+                    yield os.path.join(root, filename)
+        else:
+            yield path

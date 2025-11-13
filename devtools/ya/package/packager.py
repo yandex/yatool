@@ -49,7 +49,7 @@ from package.package_tree import load_package, get_tree_info
 from devtools.ya.package import const
 from yalibrary import find_root
 from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
-from package.utils import timeit
+from package.utils import list_files_from, timeit
 
 if app_config.in_house:
     import package.sandbox_source
@@ -522,21 +522,38 @@ def get_tool_path(name, tool_platform=None):
 
 
 def strip_binary(executable_name, debug_file_name=None, tool_platform=None, full_strip=False):
-    # Separate debug symbols
-    if debug_file_name:
-        args = ['--only-keep-debug', executable_name, debug_file_name]
+    objcopy_tool = get_tool_path('objcopy', tool_platform)
+    strip_tool = get_tool_path('strip', tool_platform)
 
-    package.process.run_process(get_tool_path('objcopy', tool_platform), args)
+    # Detach debug symbols from file
+    if debug_file_name is not None:
+        package.process.run_process(
+            objcopy_tool,
+            [
+                '--only-keep-debug',
+                executable_name,
+                debug_file_name,
+            ],
+        )
 
-    # Strip the executable
-    strip_args = [executable_name] if full_strip else ['-g', executable_name]
-    package.process.run_process(get_tool_path('strip', tool_platform), strip_args)
+    # Do strip binary
+    if full_strip:
+        strip_args = [executable_name]
+    else:
+        strip_args = ['--strip-debug', executable_name]
+    package.process.run_process(strip_tool, strip_args)
 
-    # Add link to the debug symbols
-    if debug_file_name:
-        args = ['--remove-section=.gnu_debuglink', '--add-gnu-debuglink', debug_file_name, executable_name]
-
-        package.process.run_process(get_tool_path('objcopy', tool_platform), args)
+    # Attach debug file info to stripped binary
+    if debug_file_name is not None:
+        package.process.run_process(
+            objcopy_tool,
+            [
+                '--remove-section=.gnu_debuglink',
+                '--add-gnu-debuglink',
+                debug_file_name,
+                executable_name,
+            ],
+        )
 
 
 def get_platform_from_build_info(tool_platform):
@@ -564,7 +581,7 @@ def guess_tool_platform(filename, tool_platforms):
 
 
 @timeit
-def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False):
+def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False, create_dbg=False):
     for element in source_elements:
         if element.data['source']['type'] != 'BUILD_OUTPUT':
             logger.debug('Strip binaries only from BUILD_OUTPUT section. Skip %s', element.data)
@@ -580,32 +597,36 @@ def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False):
             'Strip binaries from paths [%s] with toolchains %s', ', '.join(element.destination_paths), tool_platforms
         )
         tool_platform = guess_tool_platform(element.data['source']['path'], tool_platforms)
-        for destination_path in element.destination_paths:
-            if os.path.isdir(destination_path):
-                for root, _, files in os.walk(destination_path):
-                    for f in files:
-                        try_strip_file(
-                            result_dir,
-                            debug_dir,
-                            os.path.join(root, f),
-                            tool_platform=tool_platform,
-                            full_strip=full_strip,
-                        )
-            else:
-                try_strip_file(
-                    result_dir, debug_dir, destination_path, tool_platform=tool_platform, full_strip=full_strip
-                )
+        for destination_path in list_files_from(element.destination_paths):
+            try_strip_file(
+                result_dir,
+                debug_dir,
+                destination_path,
+                tool_platform=tool_platform,
+                full_strip=full_strip,
+                create_dbg=create_dbg,
+            )
 
 
-def try_strip_file(result_dir, debug_dir, destination_path, tool_platform=None, full_strip=False):
+def try_strip_file(
+    result_dir,
+    debug_dir,
+    destination_path,
+    tool_platform=None,
+    full_strip=False,
+    create_dbg=False,
+):
     if os.path.isfile(destination_path) and os.access(destination_path, os.X_OK) and is_application(destination_path):
         executable_name = os.path.basename(destination_path)
         executable_relative_dir = os.path.dirname(os.path.relpath(destination_path, result_dir))
 
         with exts.os2.change_dir(os.path.dirname(destination_path)):
-            debug_file_name = os.path.join(debug_dir, executable_relative_dir, executable_name + ".debug")
+            if create_dbg:
+                debug_file_name = os.path.join(debug_dir, executable_relative_dir, executable_name + ".debug")
+                exts.fs.create_dirs(os.path.dirname(debug_file_name))
+            else:
+                debug_file_name = None
 
-            exts.fs.create_dirs(os.path.dirname(debug_file_name))
             try:
                 strip_binary(
                     executable_name, debug_file_name=debug_file_name, tool_platform=tool_platform, full_strip=full_strip
@@ -713,7 +734,13 @@ def create_package(package_context, output_root, builds):
 
             if params.strip or params.full_strip:
                 debug_dir = exts.fs.create_dirs(os.path.join(temp_work_dir, '.debug'))
-                strip_binaries(temp_work_dir, debug_dir, source_elements, full_strip=params.full_strip)
+                strip_binaries(
+                    temp_work_dir,
+                    debug_dir,
+                    source_elements,
+                    full_strip=params.full_strip,
+                    create_dbg=params.create_dbg,
+                )
                 if params.create_dbg:
                     debug_dir = os.path.join(debug_dir, '.content')
                     create_dbg = os.path.exists(debug_dir)
