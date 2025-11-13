@@ -681,26 +681,12 @@ class IdeYaHandler(yarg.CompositeHandler):
         self['gradle'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.gradle.do_gradle),
             description='Generate gradle for project with yexport',
-            opts=devtools.ya.ide.ide_common.ide_minimal_opts(targets_free=True)
+            opts=devtools.ya.build.build_opts.ya_make_options(build_type='release', free_build_targets=True)
             + [
-                devtools.ya.ide.ide_common.IdeYaMakeOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 GradleOptions(),
-                build_opts.YMakeBinOptions(),
-                build_opts.FlagsOptions(),
-                build_opts.CustomFetcherOptions(),
-                build_opts.SandboxAuthOptions(),
-                devtools.ya.core.common_opts.CrossCompilationOptions(),
-                build_opts.ToolsOptions(),
-                build_opts.BuildTypeOptions('release'),
-                build_opts.JavaSpecificOptions(),
-                build_opts.YMakeDebugOptions(),
-                build_opts.YWarnModeOptions(),
-                build_opts.BuildThreadsOptions(build_threads=None),
-                build_opts.DistCacheOptions(),
-                build_opts.OutputOptions(),
-                build_opts.CreateSymlinksOptions(),
             ],
+            unknown_args_as_free=True,
         )
         self['goland'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.goland.do_goland),

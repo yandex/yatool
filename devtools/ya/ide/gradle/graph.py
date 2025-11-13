@@ -98,7 +98,11 @@ class _JavaSemGraph(SemGraph):
 
             super().make(
                 **kwargs,
-                dump_raw_graph=self.config.ymake_root / "raw_graph",
+                dump_raw_graph=(
+                    self.config.ymake_root / "raw_graph"
+                    if (self.config.params.yexport_debug_mode or self.config.params.dump_ymake_stderr)
+                    else None
+                ),
                 foreign_on_nosem=True,
                 debug_options=self.config.params.debug_options,
                 dump_file=self.config.params.dump_file_path,
@@ -109,12 +113,6 @@ class _JavaSemGraph(SemGraph):
                 if foreign_subscriber.foreign_targets:
                     self.foreign_targets = list(set(foreign_subscriber.foreign_targets))
                     self.logger.info("Foreign targets: %s", self.foreign_targets)
-
-            # Save graph before patch for debug purposes
-            if self.sem_graph_file and self.sem_graph_file.exists():
-                with self.sem_graph_file.open('r') as fr:
-                    with (self.sem_graph_file.parent / "raw.sem.json").open('w') as fw:
-                        fw.write(fr.read())
 
         if 'dont_patch_graph' not in kwargs:
             with tracer.scope('sem-graph>patch'):
@@ -181,13 +179,20 @@ class _JavaSemGraph(SemGraph):
     def _get_graph_data(self) -> None:
         """Read sem-graph to list"""
         self._graph_data: list[SemNode | SemDep] = [item for item in self.read(all_nodes=True)]
+        if (
+            (self.config.params.yexport_debug_mode or self.config.params.dump_ymake_stderr)
+            and self._graph_data
+            and self.sem_graph_file
+        ):
+            # Save graph before patch for debug purposes
+            self._update_graph(self.sem_graph_file.parent / "raw.sem.json")
 
-    def _update_graph(self) -> None:
+    def _update_graph(self, sem_graph_file: Path = None) -> None:
         """Write patched sem-graph back to file"""
         data: list[dict] = []
         for item in self._graph_data:
             data.append(item.as_dict())
-        self.update(data)
+        self.update(data, sem_graph_file)
 
     def _patch_annotation_processors(self) -> None:
         """Patch AP semantics in graph"""

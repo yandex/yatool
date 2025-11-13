@@ -53,11 +53,11 @@ class _Builder:
             ) from e
 
         if build_rel_targets:
-            with tracer.scope('build>java'):
+            with tracer.scope('async>||build>java'):
                 self._build_rel_targets(build_rel_targets, proto_rel_targets)
 
         if self.config.params.build_foreign and self.sem_graph.foreign_targets:
-            with tracer.scope('build>foreign'):
+            with tracer.scope('async>||build>foreign'):
                 self._build_rel_targets(self.sem_graph.foreign_targets, build_all_langs=True)
 
     def _build_rel_targets(
@@ -69,14 +69,17 @@ class _Builder:
         junk_ya_make = None
         try:
             if build_all_langs:
-                ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release'))
+                ya_make_opts = yarg.merge_opts(
+                    build_opts.ya_make_options(build_type='release', free_build_targets=True)
+                )
                 opts = yarg.merge_params(ya_make_opts.initialize([]))
             else:
-                ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release'))
+                ya_make_opts = yarg.merge_opts(
+                    build_opts.ya_make_options(build_type='release', free_build_targets=True)
+                )
                 opts = yarg.merge_params(
                     ya_make_opts.initialize(self.config.params.ya_make_extra + ['-DSOURCES_JAR=yes'])
                 )
-                opts.dump_sources = True
                 if proto_rel_targets:
                     proto_rel_targets = list(set(proto_rel_targets))
                     proto_rel_targets.sort()
@@ -111,10 +114,6 @@ class _Builder:
             opts.arc_root = str(self.config.arcadia_root)
             opts.bld_root = self.config.params.bld_root
             opts.ignore_recurses = True
-            opts.build_graph_cache_force_local_cl = True
-
-            opts.ymake_multiconfig = True
-            opts.force_ymake_multiconfig = True
 
             opts.rel_targets = []
             opts.abs_targets = []
