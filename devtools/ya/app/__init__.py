@@ -165,8 +165,11 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('profile', configure_profiler_support(ctx)),
             ('mlockall', configure_mlock_info()),
             ('event_queue', configure_event_queue()),
-            ('changelist_store', configure_changelist_store(ctx)),
         ]
+
+        if getattr(parameters, 'require_changelist_store', True):
+            modules.append(('changelist_store', configure_changelist_store(ctx)))
+
         if not getattr(parameters, 'no_evlogs', None) and not strtobool(os.environ.get('YA_NO_EVLOGS', '0')):
             modules.append(('evlog', evlog.configure(ctx)))
 
