@@ -4,6 +4,7 @@ import builtins
 import calendar
 import dataclasses
 import datetime
+import functools
 import json
 import locale
 import logging
@@ -16,7 +17,10 @@ import sys
 import time
 import typing
 
+import exts.process
+
 import yalibrary.find_root
+import yalibrary.tools
 import yalibrary.vcs
 
 
@@ -73,6 +77,8 @@ class SvnRevisionInfo:
 
 @dataclasses.dataclass
 class VCSData:
+    VCS_TOOL_NAME: typing.ClassVar[str | None] = None
+
     @abc.abstractmethod
     def parse(self) -> ParsedVcsInfo:
         pass
@@ -84,6 +90,27 @@ class VCSData:
     def from_repository_root_fast(self, vcs_root: str, timeout: int | None = None) -> typing.Self:
         return self.from_repository_root(vcs_root)
 
+    @classmethod
+    @functools.cache
+    def _vcs_tool_path(cls):
+        return yalibrary.tools.tool(cls.VCS_TOOL_NAME) if cls.VCS_TOOL_NAME else None
+
+    @classmethod
+    def _execute_command(cls, *args: typing.Any, timeout: int | None = None, **kwargs: typing.Any) -> typing.Any:
+        logger.debug(
+            'Run %s %s in directory %s with env %s',
+            cls.VCS_TOOL_NAME,
+            kwargs.get('cmd', ''),
+            kwargs.get('cwd', ''),
+            kwargs.get('env', ''),
+        )
+        if cls._vcs_tool_path is None:
+            logger.warning('%s does not have a command module configured', cls.__name__)
+            return '{}'
+
+        proc = exts.process.popen(cls._command_tool, *args, **kwargs)
+        return exts.process.wait_for_proc(proc, timeout=timeout)
+
 
 @dataclasses.dataclass
 class ArcInfo(VCSData):
@@ -93,6 +120,7 @@ class ArcInfo(VCSData):
     revision: int = DEFAULT_VCS_REVISION
     patch_number: int = DEFAULT_VCS_PATCH_NUMBER
     dirty: bool = False
+    command_module_name: str = 'arc'
 
     @classmethod
     def from_repository_root(cls, vcs_root: str) -> typing.Self:
@@ -172,23 +200,19 @@ class ArcInfo(VCSData):
         env = os.environ.copy()
         env['TZ'] = ''
         arc_json_args = ['info', '--json']
-        try:
-            arc_json_out = yalibrary.svn.run_svn_tool('arc', arc_json_args, env=env, cwd=arc_root, timeout=timeout)
-        except Exception:
-            raise
+        arc_json_out = cls._execute_command(arc_json_args, env=env, cwd=arc_root, timeout=timeout)
 
         logger.debug('Arc info: %s', arc_json_out)
         cls._arc_info_cache[key] = arc_json_out
 
         return arc_json_out
 
-    @staticmethod
-    def _get_last_svn_revision(arc_root: str) -> ArcRevisionInfo:
+    @classmethod
+    def _get_last_svn_revision(cls, arc_root: str) -> ArcRevisionInfo:
         env = os.environ.copy()
         env['TZ'] = ''
-
-        describe = yalibrary.svn.run_svn_tool(
-            'arc', ['describe', '--svn', '--dirty', '--first-parent'], env=env, cwd=arc_root
+        describe = cls._execute_command(
+            ['describe', '--svn', '--dirty', '--first-parent'], env=env, cwd=arc_root
         ).strip()
 
         info = describe.split('-')
@@ -212,11 +236,12 @@ class ArcInfo(VCSData):
 @dataclasses.dataclass
 class SvnInfo(VCSData):
     xml: str
+    command_module_name: str = 'svn'
 
     @classmethod
     def from_repository_root(cls, vcs_root: str) -> typing.Self:
         svn_info_args = ['info', '--xml']
-        xml = yalibrary.svn.run_svn_tool('svn', svn_info_args, cwd=vcs_root)
+        xml = cls._execute_command(svn_info_args, cwd=vcs_root)
         logger.debug('Svn xml: %s', xml)
         return cls(xml=xml)
 
@@ -284,6 +309,7 @@ class SvnInfo(VCSData):
 @dataclasses.dataclass
 class HgInfo(VCSData):
     output: str
+    command_module_name: str = 'hg'
 
     @classmethod
     def from_repository_root(cls, vcs_root: str) -> typing.Self:
@@ -291,7 +317,7 @@ class HgInfo(VCSData):
         env['TZ'] = ''
 
         hg_args = ['--config', 'alias.log=log', '--config', 'defaults.log=', 'log', '-r', '.']
-        output = yalibrary.svn.run_svn_tool('hg', hg_args, env=env, cwd=vcs_root)
+        output = cls._execute_command(hg_args, env=env, cwd=vcs_root)
         logger.debug('Hg log: %s', output)
 
         return cls(output=output)

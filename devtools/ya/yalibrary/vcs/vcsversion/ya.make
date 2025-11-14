@@ -8,6 +8,7 @@ PY_SRCS(
 PEERDIR(
     contrib/python/six
     devtools/ya/yalibrary/find_root
+    devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
 )
 
