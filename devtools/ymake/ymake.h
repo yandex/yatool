@@ -10,6 +10,7 @@
 #include "module_resolver.h"  // for TModuleResolveContext
 #include "saveload.h"
 
+#include <devtools/ymake/make_plan_cache.h>
 #include <devtools/ymake/symbols/time_store.h>
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
@@ -25,6 +26,7 @@
 #include <util/stream/format.h>
 
 #include <asio/awaitable.hpp>
+#include <asio/experimental/concurrent_channel.hpp>
 #include <asio/thread_pool.hpp>
 #include <asio/strand.hpp>
 
@@ -77,6 +79,8 @@ public:
     TModules Modules;
     TCommands Commands;
 
+    TAtomicSharedPtr<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TMakePlanCache>)>> JSONCacheLoadingCompletedPtr;
+
 private:
     TFsPath DepCacheTempFile;      // Name of temporary file with delayed save data
     TFsPath DMCacheTempFile;      // Name of temporary file with delayed save data
@@ -120,6 +124,7 @@ public:
     void GetDependsToModulesClosure();
     asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) override;
     asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) override;
+    void LoadJsonCacheAsync(asio::any_io_executor exec);
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();

@@ -227,6 +227,10 @@ public:
         return SaveDartCaches_;
     }
 
+    bool ShouldLoadJsonCacheEarly() const noexcept {
+        return LoadJsonCacheEarly_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
     IMemoryPool* GetStringPool() const { return StrPool.Get(); }
@@ -266,7 +270,7 @@ private:
     bool YmakeSaveAllCachesWhenBadLoops_ = false;
     bool LoadDartCaches_ = true;
     bool SaveDartCaches_ = true;
-
+    bool LoadJsonCacheEarly_ = false;
     bool UseOnlyYmakeCache_ = false;
     bool LoadGraph_ = false;
 

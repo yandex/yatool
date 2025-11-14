@@ -440,6 +440,7 @@ void TBuildConfiguration::FillMiscValues() {
     YmakeSaveAllCachesWhenBadLoops_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_SAVE_ALL_CACHES_WHEN_BAD_LOOPS"));
     LoadDartCaches_ = !IsFalse(CommandConf.EvalValue("YMAKE_LOAD_DART_CACHES"));
     SaveDartCaches_ = !IsFalse(CommandConf.EvalValue("YMAKE_SAVE_DART_CACHES"));
+    LoadJsonCacheEarly_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_JSON_CACHE_EARLY"));
 
     auto updateFlag = [&](bool& flag, const char* variableName, bool log = false) {
         TStringBuf value = CommandConf.EvalValue(variableName);

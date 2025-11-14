@@ -848,6 +848,11 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
 
     bool hasBadLoops = PostConfigureStage(conf, yMake);
 
+    if (conf.ShouldLoadJsonCacheEarly()) {
+        // Must be started after bad loops detection
+        yMake->LoadJsonCacheAsync(exec);
+    }
+
     result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
     if (result.Defined()) {
         co_return result.GetRef();

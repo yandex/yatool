@@ -493,8 +493,14 @@ namespace {
             {
                 YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
 
-                TMakePlanCache cache(yMake.Conf);
-                yMake.JSONCacheLoaded(cache.LoadFromFile());
+                if (!conf.ShouldLoadJsonCacheEarly()) {
+                    yMake.LoadJsonCacheAsync(exec);
+                }
+                auto cachePtr = co_await yMake.JSONCacheLoadingCompletedPtr->async_receive();
+                if (!cachePtr) {
+                    cachePtr = MakeHolder<TMakePlanCache>(yMake.Conf);
+                }
+                auto& cache = *cachePtr.Get();
                 plan.WriteConf();
 
                 if (yMake.Conf.ParallelRendering) {

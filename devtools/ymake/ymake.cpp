@@ -14,6 +14,7 @@
 #include <devtools/ymake/python_runtime.h>
 
 #include <asio/co_spawn.hpp>
+#include <asio/detached.hpp>
 #include <asio/use_awaitable.hpp>
 
 namespace {
@@ -249,4 +250,18 @@ void TYMake::UpdateUnreachableExternalFileChanges() {
             }
         }
     }
+}
+
+void TYMake::LoadJsonCacheAsync(asio::any_io_executor exec) {
+    JSONCacheLoadingCompletedPtr = MakeAtomicShared<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TMakePlanCache>)>>(exec, 1u);
+    asio::co_spawn(exec, [this]() -> asio::awaitable<void> {
+        try {
+            auto JSONCache = MakeHolder<TMakePlanCache>(Conf);
+            JSONCacheLoaded(JSONCache->LoadFromFile());
+            co_await JSONCacheLoadingCompletedPtr->async_send(std::error_code{}, std::move(JSONCache));
+        } catch (const std::exception& e) {
+            YDebug() << "JSON cache failed to be loaded: " << e.what() << Endl;
+            JSONCacheLoadingCompletedPtr->try_send(std::error_code{}, nullptr);
+        }
+    }, asio::detached);
 }
