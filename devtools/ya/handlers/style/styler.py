@@ -89,13 +89,7 @@ def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) 
             logger.warning('skip %s (filtered by file type)', target)
             return
     else:
-        matches = set()
-        for m in suffix_matches:
-            if m.kind.default_enabled:
-                matches.add(m)
-            elif m.kind in (StylerKind.JSON, StylerKind.YAML, StylerKind.EOL) and 'taxi/' in str(target):
-                # HACK: Hardcode until introduction of custom settings in YA-2732
-                matches.add(m)
+        matches = {m for m in suffix_matches if m.kind.default_enabled}
         if not matches:
             options = ' or '.join(f'--{m.kind}' for m in suffix_matches)
             logger.warning('skip %s (require explicit %s or --all)', target, options)
