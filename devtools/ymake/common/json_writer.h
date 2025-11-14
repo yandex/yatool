@@ -13,7 +13,7 @@
 #include <concepts>
 
 namespace NCache {
-    struct TConversionContext;
+    class TConversionContext;
 }
 
 namespace NYMake {

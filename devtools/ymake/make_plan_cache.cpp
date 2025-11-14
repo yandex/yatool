@@ -36,33 +36,22 @@ namespace {
 }
 
 namespace NCache {
-    struct TConversionContext {
-        TNameStore& Names;
-        bool StoreInputs;
-        const TMakeNode* RefreshedMakeNode;///< MakeNode with refreshed UIDs
-
-        explicit TConversionContext(TNameStore& names, bool storeInputs)
-                : Names(names)
-                , StoreInputs(storeInputs)
-        {
-        }
-
         template <typename TStrType>
-        void Convert(const TCached& src, TStrType& dst) const {
-            TStringBuf buffer = Names.GetName<TCmdView>(src).GetStr();
+        void TConversionContext::Convert(const TCached& src, TStrType& dst) const {
+            TStringBuf buffer = Names_.GetName<TCmdView>(src).GetStr();
             dst = buffer;
         }
 
-        TStringBuf GetBuf(const TCached& src) const {
-            return Names.GetName<TCmdView>(src).GetStr();
+        TStringBuf TConversionContext::GetBuf(const TCached& src) const {
+            return Names_.GetName<TCmdView>(src).GetStr();
         }
 
         template <typename TStrType>
-        void Convert(TStrType&& src, TCached& dst) {
-            dst = Names.Add(std::forward<TStrType>(src));
+        void TConversionContext::Convert(TStrType&& src, TCached& dst) {
+            dst = IdGetter_(std::forward<TStrType>(src), Names_);
         }
 
-        void Convert(const TOriginal& src, TJoinedCached& dst) {
+        void TConversionContext::Convert(const TOriginal& src, TJoinedCached& dst) {
             TStringBuf srcFixed(src);
             srcFixed.SkipPrefix(JOINED_START);
             srcFixed.ChopSuffix(JOINED_END);
@@ -82,21 +71,21 @@ namespace NCache {
             }
         }
 
-        void Convert(const TVector<TOriginal>& src, TJoinedCached& dst) {
+        void TConversionContext::Convert(const TVector<TOriginal>& src, TJoinedCached& dst) {
             dst.resize(src.size());
             for (size_t i = 0; i < src.size(); i++) {
                 Convert(src[i], dst[i]);
             }
         }
 
-        void Convert(const TJoinedCommand& src, TJoinedCachedCommand& dst) {
+        void TConversionContext::Convert(const TJoinedCommand& src, TJoinedCachedCommand& dst) {
             std::visit(TOverloaded{
                 [&](const TOriginal& src)          { dst.Tag = 0; Convert(src, dst.Data); },
                 [&](const TVector<TOriginal>& src) { dst.Tag = 1; Convert(src, dst.Data); }
             }, src);
         }
 
-        void Convert(const TJoinedCached& src, TOriginal& dst) {
+        void TConversionContext::Convert(const TJoinedCached& src, TOriginal& dst) {
             TVector<TStringBuf> parts;
             parts.reserve(src.size());
             for (const auto& srcElem : src) {
@@ -117,7 +106,7 @@ namespace NCache {
             dst = builder;
         }
 
-        void Convert(const TJoinedCached& src, TVector<TOriginal>& dst) {
+        void TConversionContext::Convert(const TJoinedCached& src, TVector<TOriginal>& dst) {
             dst.reserve(src.size());
             for (const auto& srcElem : src) {
                 dst.emplace_back();
@@ -125,7 +114,7 @@ namespace NCache {
             }
         }
 
-        void Convert(const TJoinedCachedCommand& src, TJoinedCommand& dst) {
+        void TConversionContext::Convert(const TJoinedCachedCommand& src, TJoinedCommand& dst) {
             switch(src.Tag) {
                 case 0: {
                     dst = TOriginal();
@@ -143,7 +132,7 @@ namespace NCache {
         }
 
         template <typename TSrc, typename TDst>
-        void Convert(const TVector<TSrc>& src, TVector<TDst>& dst) {
+        void TConversionContext::Convert(const TVector<TSrc>& src, TVector<TDst>& dst) {
             dst.clear();
             dst.reserve(src.size());
 
@@ -155,7 +144,7 @@ namespace NCache {
         }
 
         template <typename TSrc, typename TDst>
-        void Convert(const TMaybe<TSrc>& src, TMaybe<TDst>& dst) {
+        void TConversionContext::Convert(const TMaybe<TSrc>& src, TMaybe<TDst>& dst) {
             if (src.Empty()) {
                 dst = {};
             } else {
@@ -166,7 +155,7 @@ namespace NCache {
         }
 
         template <typename TSrc, typename TDst>
-        void Convert(const TKeyValueMap<TSrc>& src, TKeyValueMap<TDst>& dst) {
+        void TConversionContext::Convert(const TKeyValueMap<TSrc>& src, TKeyValueMap<TDst>& dst) {
             dst.clear();
             dst.reserve(src.size());
             for (const auto& [key, value] : src) {
@@ -178,7 +167,7 @@ namespace NCache {
         }
 
         template <typename TSrc, typename TJoinedSrc, typename TDst, typename TJoinedDst>
-        void Convert(const TMakeCmdDescription<TSrc, TJoinedSrc>& src, TMakeCmdDescription<TDst, TJoinedDst>& dst) {
+        void TConversionContext::Convert(const TMakeCmdDescription<TSrc, TJoinedSrc>& src, TMakeCmdDescription<TDst, TJoinedDst>& dst) {
             Convert(src.CmdArgs, dst.CmdArgs);
             Convert(src.Env, dst.Env);
             Convert(src.Cwd, dst.Cwd);
@@ -189,7 +178,7 @@ namespace NCache {
             typename TSrc, typename TJoinedSrc, typename TJoinedCmdSrc,
             typename TDst, typename TJoinedDst, typename TJoinedCmdDst
         >
-        void Convert(
+        void TConversionContext::Convert(
             const TMakeNodeDescription<TSrc, TJoinedSrc, TJoinedCmdSrc>& src,
             TMakeNodeDescription<TDst, TJoinedDst, TJoinedCmdDst>& dst
         ) {
@@ -202,14 +191,13 @@ namespace NCache {
             Convert(src.TaredOuts, dst.TaredOuts);
             Convert(src.TargetProps, dst.TargetProps);
             Convert(src.OldEnv, dst.OldEnv);
-            if (StoreInputs) {
+            if (StoreInputs_) {
                 Convert(src.Inputs, dst.Inputs);
             }
             Convert(src.Outputs, dst.Outputs);
             Convert(src.LateOuts, dst.LateOuts);
             Convert(src.ResourceUris, dst.ResourceUris);
         }
-    };
 }
 
 namespace {
@@ -332,7 +320,7 @@ void TMakeCmdCached::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
 template<>
 void TMakeNodeCached::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     const auto* context = funcArgs.Context;
-    if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode) {
+    if (const auto* refreshedMakeNode = context->GetRefreshedMakeNode(); refreshedMakeNode) {
         funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->Uid);
     } else {
         funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, context->GetBuf(Uid));
@@ -342,7 +330,7 @@ void TMakeNodeCached::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
 template<>
 void TMakeNodeCached::WriteSelfUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     const auto* context = funcArgs.Context;
-    if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode) {
+    if (const auto* refreshedMakeNode = context->GetRefreshedMakeNode(); refreshedMakeNode) {
         funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->SelfUid);
     } else {
         funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, context->GetBuf(SelfUid));
@@ -367,7 +355,7 @@ void TMakeNodeCached::WriteCmdsArr(TJsonWriterFuncArgs&& funcArgs) const {
 template<>
 void TMakeNodeCached::WriteInputsArr(TJsonWriterFuncArgs&& funcArgs) const {
     const auto* context = funcArgs.Context;
-    if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode && !context->StoreInputs) {
+    if (const auto* refreshedMakeNode = context->GetRefreshedMakeNode(); refreshedMakeNode && !context->GetStoreInputs()) {
         funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->Inputs);
     } else {
         WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), Inputs);
@@ -381,7 +369,7 @@ void TMakeNodeCached::WriteOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
 
 template<>
 void TMakeNodeCached::WriteDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
-    if (const auto* refreshedMakeNode = funcArgs.Context->RefreshedMakeNode; refreshedMakeNode) {
+    if (const auto* refreshedMakeNode = funcArgs.Context->GetRefreshedMakeNode(); refreshedMakeNode) {
         funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->Deps);
     } else {
         WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), Deps);
@@ -395,7 +383,7 @@ void TMakeNodeCached::WriteForeignDepsArr(TJsonWriterFuncArgs&& funcArgs) const 
         const auto* context = funcArgs.Context;
         writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
         auto depsMap = writer.OpenMap();
-        if (const auto* refreshedMakeNode = context->RefreshedMakeNode; refreshedMakeNode) {
+        if (const auto* refreshedMakeNode = context->GetRefreshedMakeNode(); refreshedMakeNode) {
             writer.WriteMapKeyValue(depsMap, "tool", refreshedMakeNode->ToolDeps);
         } else {
             WriteCachedArrToMap({writer, depsMap, "tool", context}, ToolDeps);
@@ -527,8 +515,14 @@ const TMakeNodeSavedState* TMakePlanCache::GetCachedNodeByCacheUid(const TString
 }
 
 NCache::TConversionContext& TMakePlanCache::GetConversionContext(const TMakeNode* refreshedMakeNode) {
-    ConversionContext_->RefreshedMakeNode = refreshedMakeNode;
+    ConversionContext_->SetRefreshedMakeNode(refreshedMakeNode);
     return *ConversionContext_;
+}
+
+NCache::TConversionContext TMakePlanCache::GetConstConversionContext(const TMakeNode* refreshedMakeNode) {
+    auto context = NCache::TConversionContext(Names, Conf.StoreInputsInJsonCache, [](const TStringBuf& name, TNameStore& names) -> ui32 { return names.GetId(name); });
+    context.SetRefreshedMakeNode(refreshedMakeNode);
+    return context;
 }
 
 bool TMakePlanCache::RestoreByRenderId(const TStringBuf& renderId, TMakeNode* result) {
@@ -538,6 +532,9 @@ bool TMakePlanCache::RestoreByRenderId(const TStringBuf& renderId, TMakeNode* re
 const TMakeNodeSavedState* TMakePlanCache::GetCachedNode(const TStringBuf& id, bool partialMatch) {
     Stats.Inc(partialMatch ? NStats::EJsonCacheStats::PartialMatchRequests : NStats::EJsonCacheStats::FullMatchRequests);
     TMakeNodeSavedState::TCacheId cacheId;
+    if (!ConversionContext_->GetNames().Has(id)) {
+        return nullptr;
+    }
     ConversionContext_->Convert(id, cacheId.Id);
     cacheId.StrictInputs = Conf.DumpInputsInJSON;
     const auto& matchMap = partialMatch ? PartialMatchMap : FullMatchMap;

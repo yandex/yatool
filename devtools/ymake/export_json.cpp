@@ -334,12 +334,11 @@ namespace {
 
         const auto cacheUid = renderer.CalculateCacheUid();
         {
-            auto lock = cache.LockContextIfNeeded();
             const auto* cachedNode = cache.GetCachedNodeByCacheUid(cacheUid);
             BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, static_cast<bool>(cachedNode));
             if (cachedNode) {
                 cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
-                auto& context = cache.GetConversionContext(&node);
+                auto context = cache.GetConstConversionContext(&node);
                 renderer.RefreshEmptyMakeNode(node, *cachedNode, context);
                 jsonWriter.WriteArrayValue(nodesArr, *cachedNode, &context);
                 return;
@@ -527,6 +526,7 @@ namespace {
                             auto chunkEnd = std::next(moduleIt, std::min(chunkSize, size_t(std::distance(moduleIt, nodesByModuleId.end()))));
                             const auto chunk = std::ranges::subrange(moduleIt, chunkEnd);
                             // collect transitive peer info sequentially to avoid concurrent writes to module table
+                            // TODO: when restoring from cache, we should do less work here
                             for (const auto& [modId, nodeIds] : chunk) {
                                 if (nodeIds.size() > 0) {
                                     TModuleRestorer restorer({conf, graph, yMake.Modules}, graph[modId]);
