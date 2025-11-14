@@ -2,6 +2,7 @@ PY23_LIBRARY()
 
 PEERDIR(
     contrib/python/contextlib2
+    contrib/python/six
     contrib/python/toolz
     contrib/python/requests
     devtools/ya/app_config

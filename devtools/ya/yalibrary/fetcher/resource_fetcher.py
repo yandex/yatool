@@ -4,6 +4,8 @@ import os
 import sys
 import collections
 
+import six
+
 from exts import uniq_id, http_client
 from exts.hashing import md5_value
 from yalibrary import guards
@@ -107,13 +109,21 @@ def fetch_resource_if_need(
     def do_deploy(download_to, resource_info):
         deploy_tool(download_to, result_dir, post_process, resource_info, resource_uri, binname, strip_prefix)
 
-    return _do_fetch_resource_if_need(
-        result_dir,
-        downloader,
-        do_deploy,
-        target_is_tool_dir,
-        force_refetch,
-    )
+    try:
+        return _do_fetch_resource_if_need(
+            result_dir,
+            downloader,
+            do_deploy,
+            target_is_tool_dir,
+            force_refetch,
+        )
+    except Exception:
+        ei = sys.exc_info()
+        six.reraise(
+            ei[0],
+            ei[0]("{}\n{}".format(ei[1], 'Failed while fetching resource with id: ' + str(parsed_uri.resource_id))),
+            ei[2],
+        )
 
 
 def select_resource(item, platform=None):
