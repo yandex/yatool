@@ -509,6 +509,10 @@ namespace {
                         UpdateUids(yMake.Graph, cmdbuilder, nodeId);
                     }
                     TMakeModuleParallelStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
+                    auto strand = asio::make_strand(exec);
+                    using TChannel = asio::experimental::concurrent_channel<void(asio::error_code)>;
+                    TDeque<TChannel> writeChannels;
+                    TDeque<TString> jsonStrings;
                     for (const auto& [_, nodes]: cmdbuilder.GetTopoGenerations()) {
                         size_t chunkSize = 10;
                         // group nodes by module preserving order
@@ -517,8 +521,7 @@ namespace {
                             nodesByModuleId[cmdbuilder.GetModuleByNode(nodeId)].push_back(nodeId);
                         }
 
-                        using TChannel = asio::experimental::concurrent_channel<void(asio::error_code, TString)>;
-                        TVector<TAtomicSharedPtr<TChannel>> channels;
+                        TDeque<TChannel> renderChannels;
                         auto moduleIt = nodesByModuleId.begin();
                         while (moduleIt != nodesByModuleId.end()) {
                             auto chunkEnd = std::next(moduleIt, std::min(chunkSize, size_t(std::distance(moduleIt, nodesByModuleId.end()))));
@@ -533,11 +536,15 @@ namespace {
                                     restorer.MineGlobVars();
                                 }
                             }
-                            auto p = MakeAtomicShared<TChannel>(exec, 1u);
-                            channels.push_back(p);
-                            asio::co_spawn(exec, [&cmdbuilder, &cache, &modulesStatesCache, &graph, &yMake, chunk, p]() -> asio::awaitable<void> {
-                                TStringStream ss;
-                                NYMake::TJsonWriter writer(ss);
+                            renderChannels.push_back({exec, 1u});
+                            auto& renderChannel = renderChannels.back();
+                            writeChannels.push_back({exec, 1u});
+                            auto& writeChannel = writeChannels.back();
+                            jsonStrings.push_back(TString{});
+                            auto& jsonString = jsonStrings.back();
+                            asio::co_spawn(exec, [&cmdbuilder, &cache, &modulesStatesCache, &graph, &yMake, chunk, &renderChannel, &plan, strand, &writeChannel, &jsonString]() -> asio::awaitable<void> {
+                                TStringOutput ss(jsonString);
+                                NYMake::TJsonWriter writer{ss};
                                 NYMake::TJsonWriter::TOpenedArray nodesArr;
                                 for (const auto& [modId, nodeIds] : chunk) {
                                     for (const auto& nodeId : nodeIds) {
@@ -550,20 +557,27 @@ namespace {
                                         }
                                     }
                                 }
+                                co_await renderChannel.async_send(std::error_code{});
                                 writer.Flush();
-                                co_await p->async_send(std::error_code{}, ss.Str());
-                            }, [p](std::exception_ptr ptr) {
+                                asio::co_spawn(strand, [&plan, &jsonString, &writeChannel]() -> asio::awaitable<void> {
+                                    plan.Writer.WriteArrayJsonValue(plan.NodesArr, std::move(jsonString));
+                                    co_await writeChannel.async_send(std::error_code{});
+                                }, asio::detached);
+                            }, [&renderChannel, &writeChannel](std::exception_ptr ptr) {
                                 if (ptr) {
-                                    p->cancel();
+                                    renderChannel.cancel();
+                                    writeChannel.cancel();
                                     std::rethrow_exception(ptr);
                                 }
                             });
                             moduleIt = chunkEnd;
                         }
-                        for (auto& p : channels) {
-                            auto s = co_await p->async_receive();
-                            plan.Writer.WriteArrayJsonValue(plan.NodesArr, s);
+                        for (auto& renderChannel : renderChannels) {
+                            co_await renderChannel.async_receive();
                         }
+                    }
+                    for (auto& writeChannel : writeChannels) {
+                        co_await writeChannel.async_receive();
                     }
                 } else {
                     TMakeModuleSequentialStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
