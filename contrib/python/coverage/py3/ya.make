@@ -19,6 +19,10 @@ NO_CHECK_IMPORTS(
     coverage.fullcoverage.encodings
 )
 
+CFLAGS(
+    -DPy_BUILD_CORE
+)
+
 SRCS(
     coverage/ctracer/datastack.c
     coverage/ctracer/filedisp.c
