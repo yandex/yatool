@@ -46,6 +46,10 @@ public:
     using TBaseVisitor::Nodes;
 
     TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget>& startDirs);
+    TUidsData(const TUidsData&) = delete;
+    TUidsData& operator=(const TUidsData&) = delete;
+    TUidsData(TUidsData&&) noexcept = default;
+    TUidsData& operator=(TUidsData&&) noexcept = default;
     virtual ~TUidsData() = default;
 
     virtual void SaveCache(IOutputStream* output, const TDepGraph& graph) override;
@@ -95,6 +99,7 @@ private:
 
 public:
     TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
+    TJSONVisitor(TUidsData&& uidsData, const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
 
     using TBaseVisitor::Nodes;
 

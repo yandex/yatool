@@ -889,7 +889,6 @@ bool TYMake::TryLoadUids(TUidsCachable* cachable) {
         }
 
         cachable->LoadCache(&input, Graph);
-
         YDebug() << "Uids cache has been loaded..." << Endl;
         return true;
     }

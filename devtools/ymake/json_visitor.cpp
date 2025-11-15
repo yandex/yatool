@@ -114,6 +114,7 @@ TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarge
     CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
 }
 
+
 void TUidsData::SaveCache(IOutputStream* output, const TDepGraph& graph) {
     TVector<ui8> rawBuffer;
     rawBuffer.reserve(64 * 1024);
@@ -264,6 +265,33 @@ bool TUidsData::LoadLoop(TLoadBuffer* buffer, TNodeId nodeFromLoop, const TDepGr
 
 TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs)
     : TUidsData(restoreContext, startDirs)
+    , Commands(commands)
+    , CmdConf(cmdConf)
+    , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
+    , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
+    , GlobalVarsCollector(restoreContext)
+    , Edge(restoreContext.Graph.GetInvalidEdge())
+    , CurrNode(restoreContext.Graph.GetInvalidNode())
+    , Graph(restoreContext.Graph)
+    , ErrorShower(restoreContext.Conf.ExpressionErrorDetails.value_or(TDebugOptions::EShowExpressionErrors::None))
+{
+    if (JsonDepsFromMainOutputEnabled_) {
+        YDebug() << "Passing JSON dependencies from main to additional outputs enabled" << Endl;
+    }
+
+    for (TTarget target : startDirs) {
+        if (target.IsModuleTarget) {
+            StartModules.insert(target);
+        }
+    }
+
+    if (restoreContext.Conf.CheckForIncorrectLoops()) {
+        CheckLoops(restoreContext.Graph, MainOutputAsExtra, Loops);
+    }
+}
+
+TJSONVisitor::TJSONVisitor(TUidsData&& uidsData, const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs)
+    : TUidsData(std::move(uidsData))
     , Commands(commands)
     , CmdConf(cmdConf)
     , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())

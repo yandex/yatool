@@ -9,6 +9,7 @@
 #include "module_restorer.h"  // for TRestoreContext
 #include "module_resolver.h"  // for TModuleResolveContext
 #include "saveload.h"
+#include "json_visitor.h"
 
 #include <devtools/ymake/make_plan_cache.h>
 #include <devtools/ymake/symbols/time_store.h>
@@ -80,6 +81,7 @@ public:
     TCommands Commands;
 
     TAtomicSharedPtr<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TMakePlanCache>)>> JSONCacheLoadingCompletedPtr;
+    TAtomicSharedPtr<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TUidsData>)>> UidsCacheLoadingCompletedPtr;
 
 private:
     TFsPath DepCacheTempFile;      // Name of temporary file with delayed save data
@@ -125,6 +127,7 @@ public:
     asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) override;
     asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) override;
     void LoadJsonCacheAsync(asio::any_io_executor exec);
+    void LoadUidsAsync(asio::any_io_executor exec);
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();

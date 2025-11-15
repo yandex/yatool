@@ -1,5 +1,6 @@
 #include "ymake.h"
 
+#include "json_visitor.h"
 #include "mkcmd.h"
 #include "blacklist_checker.h"
 
@@ -15,7 +16,10 @@
 
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
+#include <asio/experimental/concurrent_channel.hpp>
 #include <asio/use_awaitable.hpp>
+
+#include <util/generic/ptr.h>
 
 namespace {
     enum class ESortPriority {
@@ -262,6 +266,20 @@ void TYMake::LoadJsonCacheAsync(asio::any_io_executor exec) {
         } catch (const std::exception& e) {
             YDebug() << "JSON cache failed to be loaded: " << e.what() << Endl;
             JSONCacheLoadingCompletedPtr->try_send(std::error_code{}, nullptr);
+        }
+    }, asio::detached);
+}
+
+void TYMake::LoadUidsAsync(asio::any_io_executor exec) {
+    UidsCacheLoadingCompletedPtr = MakeAtomicShared<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TUidsData>)>>(exec, 1u);
+    asio::co_spawn(exec, [this]() -> asio::awaitable<void> {
+        try {
+            auto UidsCache = MakeHolder<TUidsData>(GetRestoreContext(), StartTargets);
+            LoadUids(UidsCache.Get());
+            co_await UidsCacheLoadingCompletedPtr->async_send(std::error_code{}, std::move(UidsCache));
+        } catch (const std::exception& e) {
+            YDebug() << "Uids cache failed to be loaded: " << e.what() << Endl;
+            UidsCacheLoadingCompletedPtr->try_send(std::error_code{}, nullptr);
         }
     }, asio::detached);
 }

@@ -429,20 +429,22 @@ namespace {
 
         FORCE_TRACE(U, NEvent::TStageStarted("Visit JSON"));
         THolder<TJSONVisitor> cmdbuilderHolder;
+        THolder<TUidsData> uidsCache;
+        if (!conf.ShouldLoadUidsCacheEarly()) {
+            yMake.LoadUidsAsync(exec);
+        }
+        if (yMake.UidsCacheLoadingCompletedPtr) {
+            uidsCache = co_await yMake.UidsCacheLoadingCompletedPtr->async_receive();
+        }
         auto cmdBuilderReset = [&]() {
-            cmdbuilderHolder.Reset(new TJSONVisitor(yMake.GetRestoreContext(), yMake.Commands, graph.Names().CommandConf, startTargets));
+            if (uidsCache) {
+                cmdbuilderHolder.Reset(new TJSONVisitor(std::move(*uidsCache), yMake.GetRestoreContext(), yMake.Commands, graph.Names().CommandConf, startTargets));
+            } else {
+                cmdbuilderHolder.Reset(new TJSONVisitor(yMake.GetRestoreContext(), yMake.Commands, graph.Names().CommandConf, startTargets));
+            }
         };
 
         cmdBuilderReset();
-
-        try {
-            yMake.LoadUids(cmdbuilderHolder.Get());
-        } catch (const std::exception& e) {
-            YDebug() << "Uids cache failed to be loaded: " << e.what() << Endl;
-            // JSON visitor can be left in an incorrect state
-            // after an unsuccessful cache loading.
-            cmdBuilderReset();
-        }
 
         TJSONVisitor& cmdbuilder = *cmdbuilderHolder.Get();
 

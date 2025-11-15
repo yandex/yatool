@@ -853,6 +853,11 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         yMake->LoadJsonCacheAsync(exec);
     }
 
+    if (conf.ShouldLoadUidsCacheEarly()) {
+        // Must be started after bad loops detection
+        yMake->LoadUidsAsync(exec);
+    }
+
     result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
     if (result.Defined()) {
         co_return result.GetRef();
