@@ -1748,7 +1748,7 @@ private:
 };
 
 void TYMake::FindMissingPeerdirs() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Find missing peerdirs"));
+    NYMake::TTraceStage stage("Find missing peerdirs");
     TDirAssignPeerdirProc assignProc(GetRestoreContext());
     IterateAll(Graph, StartTargets, assignProc, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
 
@@ -1757,7 +1757,6 @@ void TYMake::FindMissingPeerdirs() {
     if (detectProc.HasMissingPeerdirs()) {
         YInfo() << "More information about missing peerdirs can be found on https://wiki.yandex-team.ru/Development/Poisk/arcadia/ymake/manual/missing_peerdirs" << Endl;
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Find missing peerdirs"));
 }
 
 

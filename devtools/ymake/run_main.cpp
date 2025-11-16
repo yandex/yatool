@@ -188,9 +188,8 @@ asio::awaitable<int> RunConfigure(TVector<const char*> value, PyInterpreterState
 
     int ret_code = BR_OK;
     try {
-        FORCE_TRACE(U, NEvent::TStageStarted("ymake main"));
+        NYMake::TTraceStage stage("ymake main");
         ret_code = co_await main_real(conf, exec);
-        FORCE_TRACE(U, NEvent::TStageFinished("ymake main"));
     } catch (const yexception& error) {
         YErr() << "Configure stage failed with error: " << error.what() << Endl;
         ret_code = BR_FATAL_ERROR;

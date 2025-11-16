@@ -570,7 +570,7 @@ void TYMake::DumpMetaData() {
 
 //TODO: move to appropriate place
 bool TYMake::DumpLoops() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Detect loops"));
+    NYMake::TTraceStage stage("Detect loops");
     const auto Loops = TGraphLoops::Find(Graph, StartTargets, false);
     if (Conf.ShowLoops) {
         Loops.DumpAllLoops(Graph, Conf.Cmsg());
@@ -594,7 +594,6 @@ bool TYMake::DumpLoops() {
 
     PropagateChangeFlags(Graph, Loops, StartTargets);
 
-    FORCE_TRACE(U, NEvent::TStageFinished("Detect loops"));
     return Loops.HasBadLoops();
 }
 

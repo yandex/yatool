@@ -302,7 +302,7 @@ struct TIncFixer: public TDirectPeerdirsVisitor<TIFixEntryStats, TIFixStData> {
 
 //XXX: move
 void TYMake::FindLostIncludes() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Find Lost Includes"));
+    NYMake::TTraceStage stage("Find Lost Includes");
     Y_ASSERT(UpdIter != nullptr);
     TIncFixer visitor(Conf, Graph, *UpdIter, Modules, IncParserManager);
     IterateAll(Graph, StartTargets, visitor, [](const TTarget& t) -> bool { return !t.IsNonDirTarget && !t.IsModuleTarget; });
@@ -310,5 +310,4 @@ void TYMake::FindLostIncludes() {
              << visitor.ResolvedToNothing << " resolved to nothing, "
              << visitor.ResolvedToExisting << " resolved to existing, "
              << visitor.ResolvedToNew << " resolved to new." << Endl;
-    FORCE_TRACE(U, NEvent::TStageFinished("Find Lost Includes"));
 }

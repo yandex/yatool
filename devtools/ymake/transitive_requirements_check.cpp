@@ -864,7 +864,7 @@ void CheckGoTestIncorrectDep(TModule* module,const TRestoreContext& restoreConte
 }
 
 void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets) {
-    FORCE_TRACE(U, NEvent::TStageStarted("Check Transitive Requirements"));
+    NYMake::TTraceStage stage("Check Transitive Requirements");
     TConstraintsChecker checker{restoreContext};
     for (TTarget target : startTargets) {
         if (!target.IsModuleTarget) {
@@ -892,7 +892,6 @@ void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TV
             checker.Check(*module, peer);
         }
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Check Transitive Requirements"));
 }
 
 const TArrayRef<const TTransitiveCheckRegistryItem> TRANSITIVE_CHECK_REGISTRY{TRANSITIVE_CHECK_REGISTRY_ARRAY};

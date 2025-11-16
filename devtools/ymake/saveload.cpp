@@ -955,7 +955,7 @@ void TYMake::Compact() {
 
 void TYMake::SaveUids(TUidsCachable* uidsCachable) {
     if (Conf.WriteUidsCache && !CurrDepsFingerprint.empty()) {
-        FORCE_TRACE(U, NEvent::TStageStarted("Save Uids cache"));
+        NYMake::TTraceStage stage("Save Uids cache");
 
         UidsCacheTempFile = MakeTempFilename(Conf.YmakeUidsCache.GetPath());
         TFileOutput uidsOutput{TFile{UidsCacheTempFile.GetPath(), CreateAlways | WrOnly}};
@@ -966,8 +966,6 @@ void TYMake::SaveUids(TUidsCachable* uidsCachable) {
 
         uidsCachable->SaveCache(&uidsOutput, Graph);
         YDebug() << "Uids cache has been saved..." << Endl;
-
-        FORCE_TRACE(U, NEvent::TStageFinished("Save Uids cache"));
     }
 }
 
