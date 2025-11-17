@@ -532,10 +532,13 @@ bool TMakePlanCache::RestoreByRenderId(const TStringBuf& renderId, TMakeNode* re
 const TMakeNodeSavedState* TMakePlanCache::GetCachedNode(const TStringBuf& id, bool partialMatch) {
     Stats.Inc(partialMatch ? NStats::EJsonCacheStats::PartialMatchRequests : NStats::EJsonCacheStats::FullMatchRequests);
     TMakeNodeSavedState::TCacheId cacheId;
-    if (!ConversionContext_->GetNames().Has(id)) {
-        return nullptr;
+    {
+        auto lock = LockContextIfNeeded();
+        if (!ConversionContext_->GetNames().Has(id)) {
+            return nullptr;
+        }
+        ConversionContext_->Convert(id, cacheId.Id);
     }
-    ConversionContext_->Convert(id, cacheId.Id);
     cacheId.StrictInputs = Conf.DumpInputsInJSON;
     const auto& matchMap = partialMatch ? PartialMatchMap : FullMatchMap;
     auto restoredIt = matchMap.find(cacheId);
