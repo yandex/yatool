@@ -53,11 +53,11 @@ class _Builder:
             ) from e
 
         if build_rel_targets:
-            with tracer.scope('async>||build>java'):
+            with tracer.scope('export & build>||build>java'):
                 self._build_rel_targets(build_rel_targets, proto_rel_targets)
 
         if self.config.params.build_foreign and self.sem_graph.foreign_targets:
-            with tracer.scope('async>||build>foreign'):
+            with tracer.scope('export & build>||build>foreign'):
                 self._build_rel_targets(self.sem_graph.foreign_targets, build_all_langs=True)
 
     def _build_rel_targets(

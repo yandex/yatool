@@ -283,7 +283,7 @@ class _NewSymlinkCollector(_SymlinkCollector):
 
 
 def _collect_symlinks(
-    config: _JavaSemConfig, parent_scope: str = 'collect symlinks'
+    config: _JavaSemConfig, parent_scope: str
 ) -> tuple[_ExistsSymlinkCollector, _RemoveSymlinkCollector]:
     """Collect exists and invalid symlinks, remove invalid symlinks"""
     with tracer.scope(parent_scope + '>exists'):

@@ -22,6 +22,40 @@ from devtools.ya.ide.gradle.symlinks import (
 from devtools.ya.ide.gradle.ya_settings import _YaSettings
 
 
+def _do_symlinks(config: _JavaSemConfig, parent_scope: str) -> tuple[_ExistsSymlinkCollector, _RemoveSymlinkCollector]:
+    with tracer.scope(parent_scope + 'symlinks'):
+        with tracer.scope(parent_scope + 'symlinks>collect symlinks'):
+            exists_symlinks, remove_symlinks = _collect_symlinks(config, parent_scope + 'symlinks>collect symlinks')
+
+        if config.params.remove or config.params.reexport:
+            with tracer.scope(parent_scope + 'symlinks>remove'):
+                remover = _Remover(config, remove_symlinks)
+                remover.remove()
+            if config.params.remove:
+                return None, None
+            config.sign()
+            with tracer.scope(parent_scope + 'symlinks>recollect symlinks'):
+                exists_symlinks, remove_symlinks = _collect_symlinks(
+                    config, parent_scope + 'symlinks>recollect symlinks'
+                )
+    return exists_symlinks, remove_symlinks
+
+
+def _async_symlinks(config: _JavaSemConfig):
+    return core_async.future(lambda: _do_symlinks(config, 'symlinks & semgraph>||'), daemon=False)
+
+
+def _do_semgraph(config: _JavaSemConfig, parent_scope: str) -> _JavaSemGraph:
+    with tracer.scope(parent_scope + 'sem-graph'):
+        sem_graph = _JavaSemGraph(config)
+        sem_graph.make()
+    return sem_graph
+
+
+def _async_semgraph(config: _JavaSemConfig):
+    return core_async.future(lambda: _do_semgraph(config, 'symlinks & semgraph>||'), daemon=False)
+
+
 def _do_ya_settings(config: _JavaSemConfig) -> None:
     _ya_settings = _YaSettings(config)
     _ya_settings.save()
@@ -37,11 +71,11 @@ def _do_export(
     exists_symlinks: _ExistsSymlinkCollector,
     remove_symlinks: _RemoveSymlinkCollector,
 ) -> None:
-    with tracer.scope('async>||export'):
+    with tracer.scope('export & build>||export'):
         exporter = _Exporter(config, sem_graph)
         exporter.export()
 
-        with tracer.scope('async>||export>make symlinks'):
+        with tracer.scope('export & build>||export>make symlinks'):
             new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
             new_symlinks.collect()
 
@@ -63,7 +97,7 @@ def _async_export(
 
 
 def _do_build(config: _JavaSemConfig, sem_graph: _JavaSemGraph) -> None:
-    with tracer.scope('async>||build'):
+    with tracer.scope('export & build>||build'):
         builder = _Builder(config, sem_graph)
         builder.build()
 
@@ -79,24 +113,22 @@ def do_gradle(params) -> int:
         try:
             config = _JavaSemConfig(params)
 
-            with tracer.scope('collect symlinks'):
-                exists_symlinks, remove_symlinks = _collect_symlinks(config)
+            if config.params.reexport:
+                # Can't do symlinks and semgraph parallel
+                exists_symlinks, remove_symlinks = _do_symlinks(config, "")
+                sem_graph = _do_semgraph(config, "")
+            else:
+                with tracer.scope('symlinks & semgraph'):
+                    wait_symlinks = _async_symlinks(config)
+                    if not config.params.remove:
+                        wait_semgraph = _async_semgraph(config)
 
-            if config.params.remove or config.params.reexport:
-                with tracer.scope('remove'):
-                    remover = _Remover(config, remove_symlinks)
-                    remover.remove()
-                if not config.params.reexport:
-                    return
-                config.sign()
-                with tracer.scope('recollect symlinks'):
-                    exists_symlinks, remove_symlinks = _collect_symlinks(config, 'recollect symlinks')
+                    exists_symlinks, remove_symlinks = wait_symlinks()
+                    if config.params.remove:
+                        return 0
+                    sem_graph = wait_semgraph()
 
-            with tracer.scope('sem-graph'):
-                sem_graph = _JavaSemGraph(config)
-                sem_graph.make()
-
-            with tracer.scope('async'):
+            with tracer.scope('export & build'):
                 wait_ya_settings = _async_ya_settings(config)
                 wait_export = _async_export(config, sem_graph, exists_symlinks, remove_symlinks)
                 wait_build = _async_build(config, sem_graph)

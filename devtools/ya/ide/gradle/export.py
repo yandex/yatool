@@ -34,7 +34,7 @@ class _Exporter:
         self._apply_force_jdk_version()
         self._fill_common_dir()
         self._make_yexport_toml()
-        with tracer.scope('async>||export>yexport'):
+        with tracer.scope('export & build>||export>yexport'):
             self._run_yexport()
 
     def _make_project_name(self) -> None:
@@ -194,6 +194,6 @@ class _Exporter:
             except RuntimeError:
                 continue
             # self.logger.info("Yexport stat: %s", event)
-            stage = tracer.start('async>||export>yexport>' + event["Stage"], start_time=t)
+            stage = tracer.start('export & build>||export>yexport>' + event["Stage"], start_time=t)
             t += event["SumSec"]  # emulate stage duration
             stage.finish(finish_time=t)
