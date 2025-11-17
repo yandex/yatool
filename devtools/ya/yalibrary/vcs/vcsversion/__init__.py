@@ -96,31 +96,37 @@ class VCSData:
         return yalibrary.tools.tool(cls.VCS_TOOL_NAME) if cls.VCS_TOOL_NAME else None
 
     @classmethod
-    def _execute_command(cls, *args: typing.Any, timeout: int | None = None, **kwargs: typing.Any) -> typing.Any:
+    def _execute_command(cls, args: list[str], timeout: int | None = None, **kwargs: typing.Any) -> typing.Any:
         logger.debug(
             'Run %s %s in directory %s with env %s',
             cls.VCS_TOOL_NAME,
-            kwargs.get('cmd', ''),
+            ' '.join(args),
             kwargs.get('cwd', ''),
             kwargs.get('env', ''),
         )
-        if cls._vcs_tool_path is None:
+        if cls._vcs_tool_path() is None:
             logger.warning('%s does not have a command module configured', cls.__name__)
             return '{}'
 
-        proc = exts.process.popen(cls._command_tool, *args, **kwargs)
-        return exts.process.wait_for_proc(proc, timeout=timeout)
+        cmd = [cls._vcs_tool_path()] + list(args)
+        proc = exts.process.popen(
+            cmd, **kwargs, creationflags=0, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        result, error = exts.process.wait_for_proc(proc, timeout=timeout)
+        if error:
+            logger.debug('Got an error while executing %s: %s', cmd, error)
+        return result
 
 
 @dataclasses.dataclass
 class ArcInfo(VCSData):
+    VCS_TOOL_NAME: typing.ClassVar[str] = 'arc'
     _arc_info_cache: typing.ClassVar[dict[str, str | None]] = {}
 
     info_output_string: str = ''
     revision: int = DEFAULT_VCS_REVISION
     patch_number: int = DEFAULT_VCS_PATCH_NUMBER
     dirty: bool = False
-    command_module_name: str = 'arc'
 
     @classmethod
     def from_repository_root(cls, vcs_root: str) -> typing.Self:
@@ -235,8 +241,8 @@ class ArcInfo(VCSData):
 
 @dataclasses.dataclass
 class SvnInfo(VCSData):
+    VCS_TOOL_NAME: typing.ClassVar[str] = 'svn'
     xml: str
-    command_module_name: str = 'svn'
 
     @classmethod
     def from_repository_root(cls, vcs_root: str) -> typing.Self:
@@ -308,8 +314,8 @@ class SvnInfo(VCSData):
 
 @dataclasses.dataclass
 class HgInfo(VCSData):
+    VCS_TOOL_NAME: typing.ClassVar[str] = 'hg'
     output: str
-    command_module_name: str = 'hg'
 
     @classmethod
     def from_repository_root(cls, vcs_root: str) -> typing.Self:
@@ -845,8 +851,8 @@ def _get_json(arc_root: str | None) -> SvnRevisionInfo:
         info = handler.from_repository_root(vcs_root).parse()
 
         return SvnRevisionInfo(vcs_info=info, root=vcs_root)
-    except Exception:
-        logger.debug('Cannot get vcs information', exc_info=True)
+    except Exception as e:
+        logger.debug('Cannot get vcs information', exc_info=e)
         return _get_default_json()
 
 
@@ -876,8 +882,8 @@ def get_fast_version_info(arc_root: str, timeout: int | None = None) -> dict[str
         info = handler.parse(vcs_data)
 
         return info
-    except Exception:
-        logger.debug('Cannot get vcs information', exc_info=True)
+    except Exception as e:
+        logger.debug('Cannot get vcs information', exc_info=e)
         return _get_default_json().vcs_info
 
 
