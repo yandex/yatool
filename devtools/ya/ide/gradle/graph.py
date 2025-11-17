@@ -5,8 +5,9 @@ from pathlib import Path
 
 from devtools.ya.core import event_handling
 from devtools.ya.build.sem_graph import SemNode, SemDep, Semantic, SemGraph
-from yalibrary import platform_matcher, tools
 from devtools.ya.yalibrary import sjson
+import exts.asyncthread as core_async
+from yalibrary import platform_matcher, tools
 
 from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException
 from devtools.ya.ide.gradle.config import _JavaSemConfig
@@ -82,6 +83,7 @@ class _JavaSemGraph(SemGraph):
             self.gradle_jdk_version = int(self.config.params.gradle_jdk_version)
         self.dont_symlink_jdk: bool = False  # Don't create symlinks to JDK (for tests)
         self.str_export_root = str(self.config.export_root)
+        self._wait_raw_graph = None
 
     def make(self, **kwargs) -> None:
         """Make sem-graph file by ymake"""
@@ -185,7 +187,14 @@ class _JavaSemGraph(SemGraph):
             and self.sem_graph_file
         ):
             # Save graph before patch for debug purposes
-            self._update_graph(self.sem_graph_file.parent / "raw.sem.json")
+            self._wait_raw_graph = core_async.future(
+                lambda: self._update_graph(self.sem_graph_file.parent / "raw.sem.json"), daemon=False
+            )
+
+    def _before_any_patch(self) -> None:
+        if self._wait_raw_graph:
+            self._wait_raw_graph()
+            self._wait_raw_graph = None
 
     def _update_graph(self, sem_graph_file: Path = None) -> None:
         """Write patched sem-graph back to file"""
@@ -242,6 +251,7 @@ class _JavaSemGraph(SemGraph):
             return
 
         self._fill_dep_paths()
+        self._before_any_patch()
 
         # patch AP paths by deps paths and check AP has version
         for node in self._graph_data:
@@ -357,6 +367,7 @@ class _JavaSemGraph(SemGraph):
 
     def _patch_jdk(self) -> None:
         """Patch JDK path and JDK version in graph"""
+        self._before_any_patch()
         for node in self._graph_data:
             if not isinstance(node, SemNode) or not node.has_semantics() or not node.name.startswith(self._BUILD_ROOT):
                 continue
@@ -473,6 +484,7 @@ class _JavaSemGraph(SemGraph):
         """Patch excluded targets in graph"""
         if not self.config.rel_exclude_targets:
             return
+        self._before_any_patch()
         for node in self._graph_data:
             if not isinstance(node, SemNode) or not node.has_semantics():
                 continue
