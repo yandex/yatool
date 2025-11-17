@@ -812,7 +812,7 @@ class AbstractTestSuite(facility.Suite):
         if self.meta.parallel_tests_within_node_workers == "auto":
             return self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 1)
         else:
-            return self.meta.parallel_tests_within_node_workers
+            return int(self.meta.parallel_tests_within_node_workers or 0)
 
     def get_fork_mode(self):
         return self.meta.fork_mode

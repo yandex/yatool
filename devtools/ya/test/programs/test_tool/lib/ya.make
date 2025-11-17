@@ -75,6 +75,7 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_playwright
     devtools/ya/test/programs/test_tool/run_playwright_large
     devtools/ya/test/programs/test_tool/run_pyimports
+    devtools/ya/test/programs/test_tool/run_pytest
     devtools/ya/test/programs/test_tool/run_skipped_test
     devtools/ya/test/programs/test_tool/run_stylelint
     devtools/ya/test/programs/test_tool/run_test
