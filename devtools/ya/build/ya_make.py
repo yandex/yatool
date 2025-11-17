@@ -563,7 +563,10 @@ def configure_build_graph_cache_dir(app_ctx, opts):
         return
 
     if build_graph_cache:
-        build_graph_cache_resource_dir = build_graph_cache.BuildGraphCacheResourceDir(app_ctx, opts)
+        _, _, sandbox_token = app_ctx.fetcher_params
+        build_graph_cache_resource_dir = build_graph_cache.BuildGraphCacheResourceDir(
+            opts, app_ctx.legacy_sandbox_fetcher, sandbox_token
+        )
 
     try:
         logger.debug("Build graph cache processing started")
