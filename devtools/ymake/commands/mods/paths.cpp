@@ -394,10 +394,10 @@ namespace {
 
     class TExtFilter: public TBasicModImpl {
     public:
-        TExtFilter(): TBasicModImpl({.Id = EMacroFunction::ExtFilter, .Name = "ext", .Arity = 2, .CanEvaluate = true}) {
+        TExtFilter(): TBasicModImpl({.Id = EMacroFunction::ExtFilter, .Name = "ext", .Arity = 2, .CanPreevaluate = true, .CanEvaluate = true}) {
         }
         TTermValue Evaluate(
-            [[maybe_unused]] std::span<const TTermValue> args,
+            std::span<const TTermValue> args,
             [[maybe_unused]] const TEvalCtx& ctx,
             [[maybe_unused]] ICommandSequenceWriter* writer
         ) const override {
@@ -420,6 +420,24 @@ namespace {
                 [&](TTaggedStrings v) -> TTermValue {
                     v.erase(std::remove_if(v.begin(), v.end(), [&](auto& s) { return !s.Data.EndsWith(ext); }), v.end());
                     return std::move(v);
+                }
+            }, args[1]);
+        }
+
+        TMacroValues::TValue Preevaluate([[maybe_unused]] const TPreevalCtx &ctx, std::span<TMacroValues::TValue> args) const override {
+            CheckArgCount(args);
+            const TStringBuf ext = std::get<TMacroValues::TXString>(args[0]).Data;
+            return std::visit(TOverloaded{
+                [&](TMacroValues::TXString item) -> TMacroValues::TValue {
+                    return item.Data.ends_with(ext) ? item : TMacroValues::TValue{};
+                },
+                [&](TMacroValues::TXStrings list) -> TMacroValues::TValue {
+                    auto toErase = std::ranges::remove_if(list.Data, [&](const std::string& item){return !item.ends_with(ext);});
+                    list.Data.erase(toErase.begin(), toErase.end());
+                    return std::move(list);
+                },
+                [](const auto&) -> TMacroValues::TValue {
+                    throw std::bad_variant_access();
                 }
             }, args[1]);
         }
