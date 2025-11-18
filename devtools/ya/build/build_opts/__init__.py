@@ -1659,6 +1659,10 @@ class YMakeModeOptions(Options):
                 'YA_YMAKE_USE_SUBINTERPRETERS',
                 hook=SetValueHook('ymake_use_subinterpreters', return_true_if_enabled),
             ),
+            EnvConsumer(
+                'YA_YMAKE_PARALLEL_RENDERING',
+                hook=SetValueHook('ymake_parallel_rendering', return_true_if_enabled),
+            ),
             ConfigConsumer('ymake_multiconfig'),
             ConfigConsumer('force_ymake_multiconfig'),
             ConfigConsumer('ymake_parallel_rendering'),
