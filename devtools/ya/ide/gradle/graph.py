@@ -70,10 +70,13 @@ class _JavaSemGraph(SemGraph):
         self.logger = logging.getLogger(type(self).__name__)
         self._graph_data: list[SemNode | SemDep] = []
         self._graph_patched = False
+        self.ap_class2path: dict[str, list[str]] = {}
         self.used_ap_class2path: dict[str, list[str]] = {}
         self.used_kapt_classpath2path: dict[str, list[str]] = {}
         self.use_ap_node_ids: list[int] = []
         self.node2dep_ids: dict[int, list[int]] = {}
+        self.handmade_ap_re = None
+        self.handmade_ap2dep_ids: dict[int, list[int]] = {}
         self.dep_paths: dict[int, Path] = {}
         self._cached_jdk_paths = {}
         self.jdk_paths: dict[int, str] = {}
@@ -228,6 +231,13 @@ class _JavaSemGraph(SemGraph):
             raise YaIdeGradleException(f"Not found {annotation_processors_file}")
         with annotation_processors_file.open('rb') as f:
             self.ap_class2path = sjson.load(f)
+        ap_paths = list(set(self.ap_class2path.values()))
+        handmade_ap_paths = []
+        for ap_path in ap_paths:
+            if not ap_path.startswith('contrib/'):
+                handmade_ap_paths.append(ap_path)
+        if handmade_ap_paths:
+            self.handmade_ap_re = re.compile('^(\\$B/)?(' + '/|'.join(handmade_ap_paths) + '/)')
 
     def _find_annotation_processors(self) -> None:
         """Find nodes with AP semantics (old or new), collect dep ids for old AP semantics"""
@@ -235,9 +245,13 @@ class _JavaSemGraph(SemGraph):
             if isinstance(item, SemDep):
                 if item.from_id in self.node2dep_ids:  # collect dep ids for patching AP
                     self.node2dep_ids[item.from_id].append(item.to_id)
+                if item.from_id in self.handmade_ap2dep_ids:  # collect dep ids for handmade APs
+                    self.handmade_ap2dep_ids[item.from_id].append(item.to_id)
             if not isinstance(item, SemNode) or not item.has_semantics():
                 continue
             node = item
+            if self.handmade_ap_re and self.handmade_ap_re.search(node.name):
+                self.handmade_ap2dep_ids[node.id] = []
             for semantic in node.semantics:
                 sem0 = semantic.sems[0]
                 if sem0 == self._OLD_AP_SEM or sem0 == self._KAPT_SEM:
@@ -266,20 +280,22 @@ class _JavaSemGraph(SemGraph):
 
     def _fill_dep_paths(self) -> None:
         """Collect all used with AP deps as id -> path"""
-        if not self.node2dep_ids:
+        if not self.node2dep_ids and not self.handmade_ap2dep_ids:
             return
 
         # collect all unique dep ids
         dep_ids = []
         for node_dep_ids in self.node2dep_ids.values():
             dep_ids += node_dep_ids
+        for ap_dep_ids in self.handmade_ap2dep_ids.values():
+            dep_ids += ap_dep_ids
         dep_ids = list(set(dep_ids))
 
         # collect all deps paths
         for node in self._graph_data:
             if not isinstance(node, SemNode):
                 continue
-            if node.id not in dep_ids:
+            if node.id not in dep_ids or not node.name.endswith('.jar'):
                 continue
             self.dep_paths[node.id] = Path(node.name.replace(self._BUILD_ROOT, ''))
 
@@ -292,12 +308,21 @@ class _JavaSemGraph(SemGraph):
                 for ap_class in ap_classes:
                     if ap_class in self.ap_class2path:
                         ap_path = self.ap_class2path[ap_class]
+                        node_dep_paths = []
                         for dep_id in self.node2dep_ids[node.id]:
+                            if dep_id not in self.dep_paths:
+                                continue
                             dep_path = self.dep_paths[dep_id]
+                            node_dep_paths.append(str(dep_path))
                             if dep_path.is_relative_to(Path(ap_path)):  # found dep with same base path
                                 ap_path_by_dep = str(dep_path)
                                 ap_paths.append(ap_path_by_dep)  # patch class by path
                                 self._on_patch_annotation_processor(ap_class, ap_path_by_dep)
+                                if dep_id in self.handmade_ap2dep_ids:  # Handmade AP
+                                    for apdep_id in self.handmade_ap2dep_ids[dep_id]:  # add it deps as APs too
+                                        if apdep_id in self.dep_paths:
+                                            ap_dep_path = str(self.dep_paths[apdep_id])
+                                            ap_paths.append(ap_dep_path)
                                 break
                         else:
                             self.logger.error(
@@ -306,7 +331,7 @@ class _JavaSemGraph(SemGraph):
                                 ap_path,
                                 node.name,
                                 node.id,
-                                [str(self.dep_paths[dep_id]) for dep_id in self.node2dep_ids[node.id]],
+                                node_dep_paths,
                             )
                             # Skip usage unknown AP path
                     else:
@@ -318,12 +343,21 @@ class _JavaSemGraph(SemGraph):
             elif semantic.sems[0] == self._KAPT_SEM:
                 kapt_paths = []
                 kapt_classpaths = semantic.sems[1:]
+                node_dep_paths = []
                 for kapt_classpath in kapt_classpaths:
                     for dep_id in self.node2dep_ids[node.id]:
+                        if dep_id not in self.dep_paths:
+                            continue
                         dep_path = self.dep_paths[dep_id]
+                        node_dep_paths.append(dep_path)
                         if dep_path.is_relative_to(Path(kapt_classpath)):  # found dep with same base path
                             kapt_path_by_dep = str(dep_path)
                             kapt_paths.append(kapt_path_by_dep)
+                            if dep_id in self.handmade_ap2dep_ids:  # Handmade AP
+                                for apdep_id in self.handmade_ap2dep_ids[dep_id]:  # add it deps as APs too
+                                    if apdep_id in self.dep_paths:
+                                        kapt_dep_path = str(self.dep_paths[apdep_id])
+                                        kapt_paths.append(kapt_dep_path)
                             break
                     else:
                         self.logger.error(
@@ -331,7 +365,7 @@ class _JavaSemGraph(SemGraph):
                             kapt_classpath,
                             node.name,
                             node.id,
-                            [str(self.dep_paths[dep_id]) for dep_id in self.node2dep_ids[node.id]],
+                            node_dep_paths,
                         )
                         kapt_paths.append(kapt_classpath)  # use classpath as path
                     self._on_patch_kapt(kapt_classpath, kapt_paths[-1])
@@ -356,7 +390,9 @@ class _JavaSemGraph(SemGraph):
         for semantic in node.semantics:
             if semantic.sems[0] == self._NEW_AP_SEM:
                 for ap_path in semantic.sems[1:]:
-                    if not _JavaSemGraph._is_path_has_version(ap_path):
+                    if (
+                        not self.handmade_ap_re or not self.handmade_ap_re.match(ap_path)
+                    ) and not _JavaSemGraph._is_path_has_version(ap_path):
                         self.logger.error(
                             "Using annotation processor without version %s in node %s", ap_path, node.as_dict()
                         )
