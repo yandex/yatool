@@ -442,6 +442,7 @@ void TBuildConfiguration::FillMiscValues() {
     SaveDartCaches_ = !IsFalse(CommandConf.EvalValue("YMAKE_SAVE_DART_CACHES"));
     LoadJsonCacheEarly_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_JSON_CACHE_EARLY"));
     LoadUidsCacheEarly_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_UIDS_CACHE_EARLY"));
+    ParallelRendering = ParallelRendering && !IsFalse(CommandConf.EvalValue("YMAKE_PARALLEL_RENDERING"));
 
     auto updateFlag = [&](bool& flag, const char* variableName, bool log = false) {
         TStringBuf value = CommandConf.EvalValue(variableName);
