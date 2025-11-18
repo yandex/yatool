@@ -648,3 +648,77 @@ class StylelintTestSuite(AbstractFrontendStyleSuite):
     @classmethod
     def list(cls, cmd, cwd):
         return [test_common.SubtestInfo(f, "ts_stylelint") for f in cmd]
+
+
+class BiomeTestSuite(AbstractFrontendStyleSuite):
+    def __init__(
+        self,
+        meta,
+        modulo=1,
+        modulo_index=0,
+        target_platform_descriptor=None,
+        multi_target_platform_run=False,
+    ):
+        super(BiomeTestSuite, self).__init__(
+            meta,
+            modulo,
+            modulo_index,
+            target_platform_descriptor,
+            split_file_name=None,
+            multi_target_platform_run=multi_target_platform_run,
+        )
+        self._files = self.meta.test_files
+
+    def get_type(self):
+        return "ts_biome"
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.STYLE
+
+    def _get_config_files(self):
+        return [self.meta.ts_biome_config]
+
+    def get_run_cmd(self, opts, retry=None, for_dist_build=True):
+        test_work_dir = test_common.get_test_suite_work_dir(
+            yalibrary.graph.const.BUILD_ROOT,
+            self.project_path,
+            self.name,
+            retry,
+            split_count=self._modulo,
+            split_index=self._modulo_index,
+            target_platform_descriptor=self.target_platform_descriptor,
+            multi_target_platform_run=self.multi_target_platform_run,
+            remove_tos=opts.remove_tos,
+        )
+        cmd = test_tools.get_test_tool_cmd(
+            opts,
+            "run_biome",
+            self.global_resources,
+            wrapper=True,
+            run_on_target_platform=True,
+        )
+
+        cmd_args = [
+            "--source-root",
+            yalibrary.graph.const.SOURCE_ROOT,
+            "--build-root",
+            yalibrary.graph.const.BUILD_ROOT,
+            "--project-path",
+            self.meta.source_folder_path,
+            "--nodejs-dir",
+            get_nodejs_res(self.meta),
+            "--test-config",
+            self.meta.ts_biome_config,
+            "--trace",
+            os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
+        ]
+
+        return cmd + cmd_args + self._files[self._modulo_index :: self._modulo]
+
+    def get_list_cmd(self, arc_root, build_root, opts):
+        return self._files
+
+    @classmethod
+    def list(cls, cmd, cwd):
+        return [test_common.SubtestInfo(f, "ts_biome") for f in cmd]

@@ -83,6 +83,7 @@ _META_MAP = [
     ('tested_project_filename', None, (dict.get, ('TESTED-PROJECT-FILENAME',))),
     ('tested_project_name', None, (dict.get, ('TESTED-PROJECT-NAME',))),
     ('ts_config_path', None, (dict.get, ('TS_CONFIG_PATH',))),
+    ('ts_biome_config', None, (dict.get, ('TS_BIOME_CONFIG',))),
     ('ts_stylelint_config', None, (dict.get, ('TS_STYLELINT_CONFIG',))),
     ('ts_test_data_dirs', None, (dict.get, ('TS-TEST-DATA-DIRS',))),
     ('ts_test_data_dirs_rename', None, (dict.get, ('TS-TEST-DATA-DIRS-RENAME',))),

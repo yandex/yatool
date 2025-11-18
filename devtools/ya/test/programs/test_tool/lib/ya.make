@@ -61,6 +61,7 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_coverage_extractor
     devtools/ya/test/programs/test_tool/run_custom_lint
     devtools/ya/test/programs/test_tool/run_eslint
+    devtools/ya/test/programs/test_tool/run_biome
     devtools/ya/test/programs/test_tool/run_exectest
     devtools/ya/test/programs/test_tool/run_fuzz
     devtools/ya/test/programs/test_tool/run_fuzz_result_node
