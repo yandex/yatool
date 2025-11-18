@@ -527,17 +527,7 @@ namespace {
                         while (moduleIt != nodesByModuleId.end()) {
                             auto chunkEnd = std::next(moduleIt, std::min(chunkSize, size_t(std::distance(moduleIt, nodesByModuleId.end()))));
                             const auto chunk = std::ranges::subrange(moduleIt, chunkEnd);
-                            // collect transitive peer info sequentially to avoid concurrent writes to module table
-                            // TODO: when restoring from cache, we should do less work here
-                            for (const auto& [modId, nodeIds] : chunk) {
-                                if (nodeIds.size() > 0) {
-                                    TModuleRestorer restorer({conf, graph, yMake.Modules}, graph[modId]);
-                                    restorer.RestoreModule();
-                                    restorer.MinePeers();
-                                    restorer.MineGlobalVars();
-                                    restorer.MineGlobVars();
-                                }
-                            }
+
                             renderChannels.push_back({exec, 1u});
                             auto& renderChannel = renderChannels.back();
                             writeChannels.push_back({exec, 1u});
@@ -554,7 +544,7 @@ namespace {
                                         RenderOrRestoreJSONNode(yMake, cmdbuilder, nodesArr, cache, nodeId, node, writer, modulesStatesCache);
                                         if (IsModuleType(graph[nodeId]->NodeType)) {
                                             // remove state from cache to free the memory
-                                            modulesStatesCache.GetState(nodeId).Reset();
+                                            modulesStatesCache.ClearState(nodeId);
                                             TProgressManager::Instance()->IncRenderModulesDone();
                                         }
                                     }

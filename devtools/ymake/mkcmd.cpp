@@ -77,6 +77,11 @@ TMakeModuleStatePtr TMakeModuleSequentialStates::GetState(TNodeId moduleId) {
     return LastState_;
 }
 
+void TMakeModuleSequentialStates::ClearState(TNodeId) {
+    LastStateId_ = TNodeId::Invalid;
+    LastState_.Reset();
+}
+
 inline NStats::TMakeCommandStats& TMakeModuleStates::GetStats() {
     static NStats::TMakeCommandStats stats{"TMakeCommand stats"};
     return stats;
@@ -89,8 +94,22 @@ TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake)
 
 TMakeModuleStatePtr TMakeModuleParallelStates::GetState(TNodeId moduleId) {
     return States_.InsertIfAbsentWithInit(moduleId, [&]() {
+        {
+            // we have to serialize all operations on TNodeListStore since it's not divided by modules
+            // for now it's enough to serialize only MinePeers
+            // TODO: make TNodeListStore more thread-safe
+            std::unique_lock<TAdaptiveLock> lock(NodeListsLock_);
+            TModuleRestorer restorer({Conf_, Graph_, Modules_}, Graph_[moduleId]);
+            restorer.RestoreModule();
+            restorer.MinePeers();
+        }
         return new TMakeModuleState{Conf_, Graph_, Modules_, moduleId};
     });
+}
+
+void TMakeModuleParallelStates::ClearState(TNodeId moduleId) {
+    TMakeModuleStatePtr state;
+    States_.TryRemove(moduleId, state);
 }
 
 TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake, const TVars* base0)

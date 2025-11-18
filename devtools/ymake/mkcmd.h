@@ -103,6 +103,7 @@ public:
 
     virtual ~TMakeModuleStates() = default;
     virtual TMakeModuleStatePtr GetState(TNodeId moduleId) = 0;
+    virtual void ClearState(TNodeId moduleId) = 0;
 
     static inline NStats::TMakeCommandStats& GetStats();
 };
@@ -119,11 +120,13 @@ public:
     }
 
     TMakeModuleStatePtr GetState(TNodeId moduleId) override;
+    void ClearState(TNodeId moduleId) override;
 };
 
 class TMakeModuleParallelStates : public TMakeModuleStates {
 private:
     TConcurrentHashMap<TNodeId, TMakeModuleStatePtr> States_;
+    TAdaptiveLock NodeListsLock_;
 
 public:
     TMakeModuleParallelStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules)
@@ -132,4 +135,5 @@ public:
     }
 
     TMakeModuleStatePtr GetState(TNodeId moduleId) override;
+    void ClearState(TNodeId moduleId) override;
 };
