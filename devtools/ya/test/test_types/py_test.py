@@ -430,7 +430,7 @@ class ExecTest(PyTestBinSuite):
         dep_dirs = {"$(BUILD_ROOT)/{}".format(os.path.dirname(dep)) for dep in self._custom_dependencies}
         env["PATH"] = os.path.pathsep.join(sorted(dep_dirs))
 
-    def get_run_cmd(self, opts, retry=None, for_dist_build=False):
+    def get_run_cmd(self, opts, retry=None, for_dist_build=False, for_listing=False):
         cmd = ["--test-param", "commands={}".format(self.meta.blob)]
         cmd += devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_exectest', self.global_resources, wrapper=True, run_on_target_platform=True
