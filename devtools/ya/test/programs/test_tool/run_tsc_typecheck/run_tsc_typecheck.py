@@ -3,6 +3,7 @@ import logging
 import os
 
 import build.plugins.lib.nots.package_manager.base.constants as pm_const
+import build.plugins.lib.nots.package_manager.base.utils as pm_utils
 import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
 import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
 from devtools.ya.test.const import Status
@@ -20,6 +21,21 @@ def main():
     args = parse_args()
     setup_logging(args.log_level, args.log_path)
     return run(args)
+
+
+def get_env(args):
+    build_dir = os.path.join(args.build_root, args.source_folder_path)
+    bindir_node_modules_path = os.path.join(build_dir, pm_const.NODE_MODULES_DIRNAME)
+    node_path = [
+        bindir_node_modules_path,
+        os.path.join(
+            pm_utils.build_vs_store_path(args.build_root, args.source_folder_path), pm_const.NODE_MODULES_DIRNAME
+        ),
+        # TODO: remove - no longer needed
+        os.path.join(bindir_node_modules_path, pnpm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+    ]
+
+    return {"NODE_PATH": os.pathsep.join(node_path)}
 
 
 def run(args):
@@ -59,7 +75,7 @@ def run(args):
     cmd = get_cmd(args)
 
     # Apparently suite.set_work_dir is not enough to make this work in the cwd, passing directly
-    res = execute(cmd, cwd=cwd, check_exit_code=False)
+    res = execute(cmd, cwd=cwd, env=get_env(args), check_exit_code=False)
 
     if res.exit_code != 0 and len(res.stdout or '') == 0 and len(res.stderr or '') != 0:
         return 1
