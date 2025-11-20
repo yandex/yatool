@@ -174,6 +174,9 @@ class MCDCRecord(tp.NamedTuple):
             [tv._asdict() for tv in self.executed_test_vectors],
         ]
 
+    def is_covered(self) -> bool:
+        return all(self.conditions)
+
 
 def merge_clang_mcdc_records_generator(
     left: Sequence[MCDCRecord], right: Sequence[MCDCRecord]

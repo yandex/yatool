@@ -51,7 +51,7 @@ class ClangBranch(tp.NamedTuple):
     def file_id_descriptor(self) -> tuple[int, ...]:
         return self.file_id, self.expanded_file_id, self.region_kind
 
-    def is_covered(self):
+    def is_covered(self) -> bool:
         return self.true_execution_count and self.false_execution_count
 
 
