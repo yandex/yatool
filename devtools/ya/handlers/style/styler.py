@@ -60,49 +60,62 @@ class StylerOutput(tp.NamedTuple):
 
 
 _SUFFIX_MAPPING: dict[str, set[type[Styler]]] = {}
+_NAME_MAPPING: dict[str, set[type[Styler]]] = {}
 
 
 def _register[T: Styler](cls: type[T]) -> type[T]:
-    for suffix in cls.suffixes:
+    for suffix in cls.match_suffixes:
         _SUFFIX_MAPPING.setdefault(suffix, set()).add(cls)
+    for name in cls.match_names:
+        _NAME_MAPPING.setdefault(name, set()).add(cls)
     return cls
 
 
-def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) -> set[type[Styler]] | None:
+def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) -> set[type[Styler]]:
     """Find and return matching styler class"""
+    if "/canondata/" in target.as_posix():
+        # Skip files inside canondata prior to other checks
+        # TODO: Python3.13 Use pathlib.PurePath.full_match
+        return set()
 
-    if target.suffix in _SUFFIX_MAPPING:
-        key = target.suffix
-    elif target.name in _SUFFIX_MAPPING:
-        key = target.name
-    else:
+    matches = _SUFFIX_MAPPING.get(target.suffix, set()) | _NAME_MAPPING.get(target.name, set())
+    if not matches:
         logger.warning('skip %s (sufficient styler not found)', target)
-        return
-
-    suffix_matches = _SUFFIX_MAPPING[key]
-    if not suffix_matches:
-        raise AssertionError(f'No styler found for target {target}, suffix {key}')
+        return set()
 
     if file_types:
-        matches = {m for m in suffix_matches if m.kind in file_types}
-        if not matches:
+        stylers = {m for m in matches if m.kind in file_types}
+        if not stylers:
             logger.warning('skip %s (filtered by file type)', target)
-            return
+            return set()
     else:
-        matches = {m for m in suffix_matches if m.kind.default_enabled}
-        if not matches:
-            options = ' or '.join(f'--{m.kind}' for m in suffix_matches)
+        stylers = {m for m in matches if m.kind.default_enabled}
+        if not stylers:
+            options = ' or '.join(f'--{m.kind}' for m in matches)
             logger.warning('skip %s (require explicit %s or --all)', target, options)
-            return
+            return set()
 
-    return matches
+    filtered: set[type[Styler]] = set()
+    for styler in stylers:
+        for pattern in styler.ignore:
+            if target.match(pattern):
+                # TODO: Python3.13 Use pathlib.PurePath.full_match
+                logger.warning('skip %s (filtered by ignore rules)', target)
+                break
+        else:
+            filtered.add(styler)
+
+    return filtered
 
 
 class Styler(tp.Protocol):
-    kind: tp.ClassVar[StylerKind]
+    kind: tp.ClassVar
     name: tp.ClassVar[str]
-    # Sequence of strings upon which the proper styler is selected
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]]
+    # Settings upon which the suitable stylers are selected
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]]
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]]
+    # Goes to pathlib.PurePath.match TODO: Python3.13 Use pathlib.PurePath.full_match
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]]
 
     def __init__(self, styler_opts: StylerOptions) -> None: ...
 
@@ -123,7 +136,9 @@ def is_configurable(styler: Styler) -> tp.TypeGuard[ConfigurableStyler]:
 class Black:
     kind: tp.ClassVar = StylerKind.PY
     name: tp.ClassVar = const.PythonLinterName.Black
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("black" if not styler_opts.py2 else "black_py2")  # type: ignore
@@ -171,7 +186,9 @@ class Black:
 class Ruff:
     kind: tp.ClassVar = StylerKind.PY
     name: tp.ClassVar = const.PythonLinterName.Ruff
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".py",)
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("ruff")  # type: ignore
@@ -240,7 +257,19 @@ class Ruff:
 class ClangFormat:
     kind: tp.ClassVar = StylerKind.CPP
     name: tp.ClassVar = const.CppLinterName.ClangFormat
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cpp", ".cc", ".C", ".c", ".cxx", ".h", ".hh", ".hpp", ".H")
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (
+        ".cpp",
+        ".cc",
+        ".C",
+        ".c",
+        ".cxx",
+        ".h",
+        ".hh",
+        ".hpp",
+        ".H",
+    )
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
@@ -259,9 +288,10 @@ class ClangFormat:
 
     def format(self, path: PurePath, content: str) -> StylerOutput:
         if path.suffix == ".h":
-            p = str(path)
+            p = path.as_posix()
             if 'yql/essentials/parser/pg_catalog' in p or 'yql/essentials/parser/pg_wrapper' in p:
                 # HACK: (DEVTOOLSSUPPORT-71462) Hardcode until introduction of custom settings in YA-2732
+                # TODO: Python3.13 Move to `ignore` and use pathlib.PurePath.full_match
                 pass
             else:
                 content = self.fix_header(content)
@@ -304,7 +334,7 @@ class ClangFormat:
 class Cuda(ClangFormat):
     kind: tp.ClassVar = StylerKind.CUDA
     name: tp.ClassVar = const.CppLinterName.ClangFormat
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cu", ".cuh")
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".cu", ".cuh")
 
 
 @_register
@@ -356,7 +386,9 @@ class ClangFormat18Vanilla(ClangFormat):
 class Golang:
     kind: tp.ClassVar = StylerKind.GO
     name: tp.ClassVar = 'yoimports'
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".go",)
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".go",)
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yoimports")  # type: ignore
@@ -386,7 +418,9 @@ class Golang:
 class YaMake:
     kind: tp.ClassVar = StylerKind.YAMAKE
     name: tp.ClassVar = 'yamake'
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = ("ya.make", "ya.make.inc")
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ("ya.make", "ya.make.inc")
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         pass
@@ -400,7 +434,9 @@ class YaMake:
 class Yql:
     kind: tp.ClassVar = StylerKind.YQL
     name: tp.ClassVar = 'yql'
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yql",)
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yql",)
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yql-format")  # type: ignore
@@ -435,7 +471,9 @@ class Yql:
 class StyLua:
     kind: tp.ClassVar = StylerKind.LUA
     name: tp.ClassVar = 'stylua'
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".lua",)
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".lua",)
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("stylua")  # type: ignore
@@ -470,7 +508,9 @@ class StyLua:
 class ClangFormatJson(ClangFormat):
     kind: tp.ClassVar = StylerKind.JSON
     name: tp.ClassVar = const.CustomExplicitLinterName.ClangFormatJson
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".json",)
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".json",)
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
@@ -493,7 +533,9 @@ class ClangFormatJson(ClangFormat):
 class YamlFmt:
     kind: tp.ClassVar = StylerKind.YAML
     name: tp.ClassVar = const.CustomExplicitLinterName.Yamlfmt
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yaml", ".yml")
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".yaml", ".yml")
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ("a.yaml", "t.yaml")
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yamlfmt")  # type: ignore
@@ -542,7 +584,7 @@ class YamlFmt:
 class EOLFmt:
     kind: tp.ClassVar = StylerKind.EOL
     name: tp.ClassVar = 'eolfmt'
-    suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (
         '.cpp',
         '.h',
         '.hpp',
@@ -555,9 +597,9 @@ class EOLFmt:
         '.xml',
         '.yaml',
         '.yml',
-        'Dockerfile',
-        'Makefile',
     )
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ('Dockerfile', 'Makefile')
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._pattern = re.compile(r'[ \t]+$', re.MULTILINE)
