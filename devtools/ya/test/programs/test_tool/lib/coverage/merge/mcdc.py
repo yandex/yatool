@@ -55,8 +55,11 @@ class MCDCRecord(tp.NamedTuple):
     executed_test_vectors: set[ExecutedTestVector]
 
     @classmethod
-    def from_raw(cls, raw_record: list) -> tp.Self:
+    def from_raw(cls, raw_record: list | tp.Self) -> tp.Self:
         """Parse a raw llvm-cov MC/DC record into an MCDCRecord."""
+
+        if isinstance(raw_record, cls):
+            return raw_record
 
         if (n := len(raw_record)) != 8:
             raise ValueError(f"Invalid raw MC/DC record: actual len = {n}, expected = 8")
