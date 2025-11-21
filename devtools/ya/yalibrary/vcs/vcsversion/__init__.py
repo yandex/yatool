@@ -83,12 +83,14 @@ class VCSData:
     def parse(self) -> ParsedVcsInfo:
         pass
 
+    @classmethod
     @abc.abstractmethod
-    def from_repository_root(self, vcs_root: str) -> typing.Self:
+    def from_repository_root(cls, vcs_root: str) -> typing.Self:
         pass
 
-    def from_repository_root_fast(self, vcs_root: str, timeout: int | None = None) -> typing.Self:
-        return self.from_repository_root(vcs_root)
+    @classmethod
+    def from_repository_root_fast(cls, vcs_root: str, timeout: int | None = None) -> typing.Self:
+        return cls.from_repository_root(vcs_root)
 
     @classmethod
     @functools.cache
@@ -104,11 +106,12 @@ class VCSData:
             kwargs.get('cwd', ''),
             kwargs.get('env', ''),
         )
-        if cls._vcs_tool_path() is None:
+        tool_path = cls._vcs_tool_path()
+        if tool_path is None:
             logger.warning('%s does not have a command module configured', cls.__name__)
             return '{}'
 
-        cmd = [cls._vcs_tool_path()] + list(args)
+        cmd = [tool_path] + list(args)
         proc = exts.process.popen(
             cmd, **kwargs, creationflags=0, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
@@ -386,6 +389,7 @@ class GitInfo(VCSData):
     branch_info: str
     depth: str
 
+    @classmethod
     def from_repository_root(cls, vcs_root: str) -> typing.Self:
         env = os.environ.copy()
         env['TZ'] = ''
@@ -416,7 +420,7 @@ class GitInfo(VCSData):
         except Exception:
             branch_info = [b'']
 
-        depth = str(cls._get_git_depth(env, vcs_root)).encode('utf-8')
+        depth = str(cls._get_git_depth(env, vcs_root))
 
         logger.debug('Git info commit:%s, author:%s, summary:%s, svn_id:%s', commit, author, summary, svn_id)
 
@@ -427,7 +431,7 @@ class GitInfo(VCSData):
             svn_id=six.ensure_str(svn_id),
             tag_info=six.ensure_str(tag_info[0]),
             branch_info=six.ensure_str(branch_info[0]),
-            depth=str(depth),
+            depth=depth,
         )
 
     def parse(self) -> ParsedVcsInfo:
