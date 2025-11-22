@@ -238,7 +238,7 @@ def _get_env_arg(opts, suite):
 
 # XXX WIP
 class TestFramer(object):
-    def __init__(self, arc_root, graph, platform, add_conf_error, opts):
+    def __init__(self, arc_root, graph, platform, add_conf_error, opts, host_tool_resolver: "_HostToolResolver"):
         self.arc_root = arc_root
         self.graph = graph
         self.opts = opts
@@ -246,6 +246,7 @@ class TestFramer(object):
         self.distbuild_runner = self.opts.use_distbuild
         self.add_conf_error = add_conf_error
         self.context_generator_cache = {}
+        self._host_tool_resolver = host_tool_resolver
 
     def prepare_suites(self, suites):
         return configure_suites(suites, self._prepare_suite, 'suites-configuration', add_error_func=self.add_conf_error)
@@ -338,6 +339,7 @@ class TestFramer(object):
             uid = uid_gen.get_uid([output, ctx_str], 'test-ctx-gen')
 
             tags, platform = gen_plan.prepare_tags(self.platform, {}, self.opts)
+            python3_pattern = self._host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
 
             node = {
                 "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
@@ -346,7 +348,7 @@ class TestFramer(object):
                 'cmds': [
                     {
                         'cmd_args': [
-                            '$(PYTHON)/python',
+                            '$({})/bin/python3'.format(python3_pattern),
                             SCRIPT_APPEND_FILE,
                             output,
                         ]
@@ -1665,7 +1667,7 @@ def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_
         )
     for i in range(tests_retries):
         retry = i + 1 if tests_retries > 1 else None
-        node = create_test_node(
+        node = create_test_node(  # TODO(nechda): need host_resolver
             arc_root,
             suite,
             graph,
@@ -1701,7 +1703,7 @@ def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_
         orig_split_params = suite.get_split_params()
         for chunk in suite.chunks:
             suite.set_split_params(chunk.nchunks, chunk.chunk_index, chunk.filename)
-            test_node = create_test_node(
+            test_node = create_test_node(  # TODO(nechda): need host_resolver
                 arc_root,
                 suite,
                 graph,
@@ -1849,7 +1851,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
                     suite,
                     test_deps,
                     opts,
-                    platform_descriptor,
+                    platform_descriptor,  # need host_resolver
                 )
             else:
                 test_nodes = inject_single_test_node(
@@ -1858,7 +1860,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
                     suite,
                     test_deps,
                     opts,
-                    platform_descriptor,
+                    platform_descriptor,  # need host_resolver
                 )
         except _DependencyException:
             logger.warning("Skipping test '%s (%s)' due to unresolved dependencies", suite.project_path, suite.name)
@@ -1923,7 +1925,7 @@ def in_fuzzing_mode(test_opts):  # XXX
     return False
 
 
-def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
+def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_tool_resolver):
     if not suites:
         return []
 
@@ -1942,7 +1944,9 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
         injected_tests = inject_test_list_nodes(arc_root, plan, suites, test_opts, custom_deps, platform_descriptor)
         timer.show_step('inject test list nodes')
     else:
-        injected_tests = inject_test_nodes(arc_root, plan, suites, platform_descriptor, custom_deps, opts=test_opts)
+        injected_tests = inject_test_nodes(
+            arc_root, plan, suites, platform_descriptor, custom_deps, opts=test_opts
+        )  # nedd host_resolver
         if in_canonize_mode(test_opts):
             canonization_nodes = []
             for suite in suites:

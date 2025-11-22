@@ -13,6 +13,7 @@ import sys
 import tempfile
 import devtools.ya.test.const as test_consts
 import traceback
+import functools
 
 import typing as tp  # noqa
 from itertools import chain
@@ -161,9 +162,10 @@ class _OptimizableGraph(dict):
 
 
 class _NodeGen:
-    def __init__(self):
+    def __init__(self, python3_pattern: str):
         self.extra_nodes: list[graph_descr.GraphNode] = []
         self._md5_cache = {}
+        self._python3_pattern = python3_pattern
 
     def resolve_file_md5(self, path):
         if path not in self._md5_cache:
@@ -189,7 +191,10 @@ class _NodeGen:
             'broadcast': False,
             'cmds': [
                 {
-                    'cmd_args': ["$(PYTHON)/python", '$(SOURCE_ROOT)/build/scripts/move.py']
+                    'cmd_args': [
+                        "$({})/bin/python3".format(self._python3_pattern),
+                        '$(SOURCE_ROOT)/build/scripts/move.py',
+                    ]
                     + cmdline.wrap_with_cmd_file_markers(cmd_args)
                 }
             ],
@@ -344,8 +349,8 @@ def _add_json_prefix(graph, tests, prefix):
     _substitute_uids(graph, tests, old_to_new_uids)
 
 
-def _gen_rename_nodes(graph: graph_descr.DictGraph, uid_map, src_dir):
-    node_gen = _NodeGen()
+def _gen_rename_nodes(graph: graph_descr.DictGraph, host_tool_resolver: "_HostToolResolver", uid_map, src_dir):
+    node_gen = _NodeGen(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern'])
     by_output = collections.defaultdict(list)
 
     for uid in graph['result']:
@@ -826,7 +831,7 @@ def _add_pgo_profile_resource(graph, pgo_path):
     return hashing.fast_filehash(os.path.abspath(pgo_path))
 
 
-def _gen_filter_node(node: graph_descr.GraphNode, flt) -> graph_descr.GraphNode:
+def _gen_filter_node(node: graph_descr.GraphNode, flt, python3_pattern: str) -> graph_descr.GraphNode:
     mapping = _get_node_out_names_map(node)
 
     inputs = []
@@ -840,7 +845,7 @@ def _gen_filter_node(node: graph_descr.GraphNode, flt) -> graph_descr.GraphNode:
         if renamed:
             cmd = {
                 'cmd_args': [
-                    "$(PYTHON)/python",
+                    "$({})/bin/python3".format(python3_pattern),
                     '$(SOURCE_ROOT)/build/scripts/fs_tools.py',
                     'link_or_copy',
                     inp,
@@ -871,6 +876,13 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
     if opts.add_result or opts.add_host_result:
         assert 'result' in graph
 
+        # Extract YMAKE_PYTHON3 pattern
+        python3_pattern = next(
+            r['pattern']
+            for r in graph.get('conf', {}).get('resources', {})
+            if r.get('pattern', '').startswith('YMAKE_PYTHON3-')
+        )
+
         def iter_filter_nodes(filters, host=False):
             for flt in filters:
                 for node, full_match in filter_nodes_by_output(
@@ -881,7 +893,7 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
                     if full_match:
                         yield node, False
                     else:
-                        yield _gen_filter_node(node, flt), True
+                        yield _gen_filter_node(node, flt, python3_pattern), True
 
         if opts.replace_result:
             graph['result'] = []
@@ -2371,12 +2383,13 @@ def _build_graph_and_tests(
     if opts.gen_renamed_results:
         # TODO: this works incorrectly with tests outputs
         by_uid = {n['uid']: n for n in graph['graph']}
-        graph = _gen_rename_nodes(graph, by_uid, src_dir)
+        graph = _gen_rename_nodes(graph, host_tool_resolver, by_uid, src_dir)
         timer.show_step('gen rename nodes')
 
     graph['result'] = list(sorted(set(graph['result'])))
 
     graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
+    graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
 
     if not opts.ymake_bin:
         graph['conf']['resources'].append(host_tool_resolver.resolve('ymake', 'YMAKE'))
@@ -2408,6 +2421,7 @@ def _build_graph_and_tests(
             opts.arc_root,
             opts.rel_targets,
             opts.version,
+            host_tool_resolver,
         )
 
     if opts.add_modules_to_results:
@@ -2600,13 +2614,14 @@ def _get_target_platform_descriptor(target_tc, opts):
     return "-".join(tags) if tags else platform
 
 
-def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver):
+def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver, host_tool_resolver: "_HostToolResolver"):
     modules = [
         n['target_properties']['module_dir'] for n in graph['graph'] if n.get('kv', {}).get('mvn_export', 'no') == 'yes'
     ]
     if len(modules) == 0:
         return graph
 
+    python3_pattern = host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
     inputs = [
         "build/scripts/fs_tools.py",
         "build/scripts/mkdir.py",
@@ -2615,7 +2630,7 @@ def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver):
     ]
     cmds = [
         [
-            "$(PYTHON)/python",
+            '$({})/bin/python3'.format(python3_pattern),
             '$(SOURCE_ROOT)/build/scripts/writer.py',
             '--file',
             '$(BUILD_ROOT)/modules_list.txt',
@@ -2625,7 +2640,7 @@ def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver):
         + [d for d in modules]
         + ['--ya-end-command-file'],
         [
-            '$(PYTHON)/python',
+            '$({})/bin/python3'.format(python3_pattern),
             '$(SOURCE_ROOT)/build/scripts/generate_pom.py',
             '--target',
             'ru.yandex:root-for-{}:{}'.format(
@@ -2688,11 +2703,12 @@ def _make_yndexing_graph(graph: graph_descr.DictGraph, opts, ymake_bin, host_too
 
     graph['conf']['resources'].append(host_tool_resolver.resolve('ytyndexer', 'YTYNDEXER'))
     graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
+    graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
 
     if opts.flags.get('YMAKE_YNDEXING', 'no') == 'yes':
         _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver)
     if py_yndexing:
-        _gen_pyndex_nodes(graph)  # TODO: Remove?
+        _gen_pyndex_nodes(graph, host_tool_resolver)  # TODO: Remove?
     if py3_yndexing:
         _gen_py3_yndexer_nodes(graph)
 
@@ -2798,10 +2814,11 @@ def _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver: "_HostTool
         graph['conf']['resources'].append(resource_json)
         ymakeyndexer_cmd = '$({})/ymakeyndexer'.format(resource_json['pattern'])
 
+    python3_pattern = host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
     cmds = [
         {
             'cmd_args': [
-                "$(PYTHON)/python",
+                "$({})/bin/python3".format(python3_pattern),
                 '$(SOURCE_ROOT)/build/ymake_conf.py',
                 '$(SOURCE_ROOT)',
                 'nobuild',
@@ -2855,7 +2872,8 @@ def _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver: "_HostTool
     graph['graph'].extend([yndexing_node])
 
 
-def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
+def _gen_pyndex_nodes(graph: graph_descr.DictGraph, host_tool_resolver: "_HostToolResolver", num_partitions: int = 10):
+    python3_pattern = host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
     yndexer_script = '$(SOURCE_ROOT)/build/scripts/python_yndexer.py'
     pyxref = next(
         os.path.join('$(' + r['pattern'] + ')', 'pyxref')
@@ -2871,7 +2889,7 @@ def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
         for part_id in range(num_partitions):
             ydx_output = "{}.{}.ydx.pb2".format(target, part_id)
             cmd = [
-                "$(PYTHON)/python",
+                "$({})/bin/python3".format(python3_pattern),
                 yndexer_script,
                 pyxref,
                 '1500',
@@ -3036,6 +3054,7 @@ class _HostToolResolver:
         host_tool['toolchain'] = 'default'
         return pm.stringize_platform(host_tool)
 
+    @functools.cache
     def resolve(self, name: str, pattern: str) -> graph_descr.GraphConfResourceInfo:
         tc = tools.resolve_tool(name, self._host_tool, self._host_tool)
         tc['params'] = {'match_root': pattern}
@@ -3181,7 +3200,7 @@ def _get_tools_from_suites(suites, ytexec_required):
 
 
 def _build_merged_graph(
-    host_tool_resolver: _HostToolResolver,
+    host_tool_resolver: "_HostToolResolver",
     conf_error_reporter: _ConfErrorReporter,
     opts,
     print_status,
@@ -3215,8 +3234,16 @@ def _build_merged_graph(
             tpc_test_opts = _get_tpc_test_opts(test_opts, tpc)
 
             with stager.scope('insert-tests-{}'.format(target_graph_num)):
-                requested, stripped = _inject_tests(
-                    opts, print_status, src_dir, conf_error_reporter, graph, tests, tpc, tpc_test_opts
+                requested, stripped = _inject_tests(  # need pass host_tools_resolver nechda
+                    opts,
+                    print_status,
+                    src_dir,
+                    conf_error_reporter,
+                    graph,
+                    tests,
+                    tpc,
+                    tpc_test_opts,
+                    host_tool_resolver,
                 )
                 injected_tests += requested
                 stripped_tests += stripped
@@ -3240,6 +3267,7 @@ def _build_merged_graph(
         merged_graph['conf']['resources'].extend(resources)
 
         merged_graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
+        merged_graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
         try:
             merged_graph['conf']['resources'].append(host_tool_resolver.resolve('gdb', 'GDB'))
         except Exception as e:
@@ -3271,7 +3299,17 @@ def _build_merged_graph(
     return merged_graph, list(injected_tests), list(stripped_tests), united_make_files
 
 
-def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests, tpc, test_opts):
+def _inject_tests(
+    opts,
+    print_status,
+    src_dir,
+    conf_error_reporter,
+    graph,
+    tests,
+    tpc,
+    test_opts,
+    host_tool_resolver: "_HostToolResolver",
+):
     assert test_opts is not None
     import devtools.ya.test.filter as test_filter
     import devtools.ya.test.test_node
@@ -3288,7 +3326,9 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
     plan = devtools.ya.build.build_plan.BuildPlan(graph)
 
     logger.debug("Preparing test suites")
-    test_framer = devtools.ya.test.test_node.TestFramer(src_dir, plan, tpc, conf_error_reporter, test_opts)
+    test_framer = devtools.ya.test.test_node.TestFramer(
+        src_dir, plan, tpc, conf_error_reporter, test_opts, host_tool_resolver
+    )
     tests = test_framer.prepare_suites(tests)
 
     logger.debug("Stripping static analysis irrelevant deps")
@@ -3298,7 +3338,7 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
     requested, stripped = _split_stripped_tests(tests, test_opts)
     # Some tests may have unmet dependencies, so they won't be injected into the graph.
     # Thus the returned set can be lesser than input one. (See DEVTOOLS-6384 for additional details).
-    requested = devtools.ya.test.test_node.inject_tests(src_dir, plan, requested, test_opts, tpc)
+    requested = devtools.ya.test.test_node.inject_tests(src_dir, plan, requested, test_opts, tpc, host_tool_resolver)
     timer.show_step('inject tests for {}'.format(_get_target_platform_descriptor(tpc, opts)))
     logger.debug('injected %s tests for %s', len(requested), _get_target_platform_descriptor(tpc, opts))
 
