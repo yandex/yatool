@@ -3,6 +3,7 @@ import logging
 import shutil
 from pathlib import Path
 from exts import hashing
+from exts.plocker import Lock, LOCK_EX, LOCK_NB
 
 from devtools.ya.core import yarg
 from devtools.ya.build import build_opts, ya_make
@@ -67,6 +68,8 @@ class _Builder:
         import app_ctx
 
         junk_ya_make = None
+        junk_lock_file = None
+        junk_lock = None
         try:
             if build_all_langs:
                 ya_make_opts = yarg.merge_opts(
@@ -103,8 +106,20 @@ class _Builder:
                         / ("ya_ide_gradle_" + hashing.fast_hash(junk_ya_make_content))
                         / "ya.make"
                     )
-                    if junk_ya_make.parent.exists():  # concurrent usage same temp directory
+                    junk_lock_file = junk_ya_make.parent.parent / (junk_ya_make.parent.name + '.lock')
+                    junk_lock = Lock(junk_lock_file, mode='w', flags=LOCK_EX | LOCK_NB)
+                    junk_lock_timeout = 1800
+                    try:
+                        junk_lock.acquire(timeout=junk_lock_timeout)
+                    except Exception:
+                        junk_lock = None
                         junk_ya_make = Path(str(junk_ya_make.parent) + "." + str(os.getpid())) / junk_ya_make.name
+                        self.logger.warning(
+                            "Fail lock %s during timeout %s sec, use another folder %s",
+                            str(junk_lock_file),
+                            junk_lock_timeout,
+                            str(junk_ya_make.parent),
+                        )
                     _SymlinkCollector.mkdir(junk_ya_make.parent)
                     with junk_ya_make.open('w') as f:
                         f.write(junk_ya_make_content)
@@ -134,3 +149,11 @@ class _Builder:
         finally:
             if junk_ya_make and junk_ya_make.parent.exists():
                 shutil.rmtree(junk_ya_make.parent)
+            if junk_lock:
+                junk_lock.release()
+            if junk_lock_file:
+                try:
+                    if junk_lock_file.exists():
+                        junk_lock_file.unlink()
+                except Exception:
+                    pass
