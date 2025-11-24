@@ -164,7 +164,6 @@ SRCS(
     plugins/error.cpp
     plugins/init.cpp
     plugins/ymake_module.cpp
-    plugins/plugin_go_fake_output_handler.cpp
     plugins/plugin_macro_impl.cpp
     plugins/resource_handler/impl.cpp
     plugins/scoped_py_object_ptr.cpp
