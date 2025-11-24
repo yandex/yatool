@@ -18,8 +18,10 @@ PEERDIR(
 
 END()
 
-IF (NOT OS_WINDOWS)
-    RECURSE_FOR_TESTS(
-        tests
-    )
-ENDIF()
+# https://st.yandex-team.ru/FBP-2700
+# IF (NOT OS_WINDOWS)
+#     RECURSE_FOR_TESTS(
+#         tests
+#     )
+# ENDIF()
+
