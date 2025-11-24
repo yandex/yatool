@@ -1,6 +1,5 @@
 import argparse
 from concurrent import futures
-import itertools
 import json
 import logging
 import os
@@ -9,6 +8,8 @@ import sys
 import tempfile
 import time
 from typing import Any
+
+from yatest_lib.test_splitter import get_shuffled_chunk
 
 from devtools.ya.test import const
 from devtools.ya.test.system import process
@@ -120,6 +121,11 @@ def merge_subchunk_traces(target: Any, source_file: str | None):
         report_subchunk_error(target, f"subchunk finished with empty trace file '{source_file}'")
 
 
+def split_into_subchunks(tests, worker_count: int):
+    for i in range(worker_count):
+        yield get_shuffled_chunk(tests, worker_count, i, is_sorted=True)
+
+
 def execute_tests(
     options: argparse.Namespace,
     binary_args: list[str],
@@ -175,20 +181,25 @@ def main():
     cmd = get_run_cmd(options, binary_args)
 
     tests_list = get_test_list(cmd, temp_dir=options.basetemp)
+    if not tests_list:
+        logger.debug("No tests to run")
+        return 0
 
     if options.temp_tracefile_dir:
         os.makedirs(options.temp_tracefile_dir, exist_ok=True)
 
-    worker_count = min(options.worker_count, len(tests_list))
-    assert worker_count
+    if options.worker_count > len(tests_list):
+        logger.debug("Reduce number of workers to count of tests, from %d to %d", options.worker_count, len(tests_list))
+        worker_count = len(tests_list)
+    else:
+        worker_count = options.worker_count
 
-    logger.debug("Running %s tests with %s workers", len(tests_list), worker_count)
-    subchunks = itertools.batched(tests_list, (len(tests_list) + worker_count - 1) // worker_count)
+    logger.debug("Running %d tests with %d workers", len(tests_list), options.worker_count)
+    subchunks = split_into_subchunks(tests_list, worker_count)
 
     exit_code = 0
     with futures.ThreadPoolExecutor(max_workers=worker_count) as pool:
         pendings = [pool.submit(execute_tests, options, binary_args, tests, i) for i, tests in enumerate(subchunks)]
-        assert len(pendings) == worker_count
         with open(options.ya_trace, "a") as ya_trace:
             for future in futures.as_completed(pendings):
                 try:

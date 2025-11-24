@@ -7,6 +7,7 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/test/const
     devtools/ya/test/system
+    library/python/testing/yatest_lib
 )
 
 END()
