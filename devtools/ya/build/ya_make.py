@@ -415,6 +415,7 @@ class CacheFactory:
             else:
                 yt_store_class = yt_store.YtStore2
             kwargs = dict(
+                proxy_role=self._opts.yt_proxy_role,
                 init_timeout=self._opts.yt_store_init_timeout,
                 prepare_timeout=self._opts.yt_store_prepare_timeout,
                 crit_level=self._opts.yt_store_crit,

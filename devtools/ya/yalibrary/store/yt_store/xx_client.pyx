@@ -151,15 +151,17 @@ cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace 
         TMaxCacheSize(size_t val)
         TMaxCacheSize(double val)
 
-    cdef cppclass TYtTokenOption:
+    cdef cppclass TYtConnectOptions:
         TString Token
+        TString ProxyRole
 
     enum ECritLevel:
         NONE "NYa::ECritLevel::NONE"
         GET "NYa::ECritLevel::GET"
         PUT "NYa::ECritLevel::PUT"
 
-    cdef cppclass TYtStore2Options(TYtTokenOption):
+    cdef cppclass TYtStore2Options:
+        TYtConnectOptions ConnectOptions
         void* Owner
         bool ReadOnly
         bool CheckSize
@@ -218,8 +220,9 @@ cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace 
             i64 DataSizePerJob
             ui64 DataSizePerKeyRange
 
-        cppclass TCreateTablesOptions(TYtTokenOption):
+        cppclass TCreateTablesOptions:
             TCreateTablesOptions()
+            TYtConnectOptions ConnectOptions
             int Version
             bool Replicated
             bool Tracked
@@ -229,20 +232,22 @@ cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace 
             optional[ui64] MetadataTabletCount
             optional[ui64] DataTabletCount
 
-        cppclass TModifyTablesStateOptions(TYtTokenOption):
+        cppclass TModifyTablesStateOptions:
             enum EAction:
                 MOUNT "NYa::TYtStore2::TModifyTablesStateOptions::EAction::MOUNT"
                 UNMOUNT "NYa::TYtStore2::TModifyTablesStateOptions::EAction::UNMOUNT"
 
             TModifyTablesStateOptions()
+            TYtConnectOptions ConnectOptions
             EAction Action
 
-        cppclass TModifyReplicaOptions(TYtTokenOption):
+        cppclass TModifyReplicaOptions:
             enum EAction:
                 CREATE "NYa::TYtStore2::TModifyReplicaOptions::EAction::CREATE"
                 REMOVE "NYa::TYtStore2::TModifyReplicaOptions::EAction::REMOVE"
 
             TModifyReplicaOptions()
+            TYtConnectOptions ConnectOptions
             EAction Action
             optional[bool] SyncMode
             optional[bool] Enable
@@ -366,6 +371,7 @@ cdef class YtStore2Impl:
         proxy: str,
         data_dir: str,
         token: str | None,
+        proxy_role: str | None,
         readonly: bool,
         check_size: bool,
         max_cache_size: int | str | None,
@@ -389,8 +395,7 @@ cdef class YtStore2Impl:
         cdef TString c_proxy = proxy.encode()
         cdef TString c_data_dir = data_dir.encode()
         cdef TYtStore2Options options
-        if token:
-            options.Token = token.encode()
+        options.ConnectOptions = YtStore2Impl._get_connect_options(token, proxy_role)
         options.Owner = <void*> self
         options.ReadOnly = readonly
         options.CheckSize = check_size
@@ -606,6 +611,7 @@ cdef class YtStore2Impl:
         data_dir: str,
         version: int,
         token: str | None = None,
+        proxy_role: str | None = None,
         replicated: bool = False,
         tracked: bool = False,
         in_memory: bool = False,
@@ -619,8 +625,7 @@ cdef class YtStore2Impl:
         cdef TYtStore2.TCreateTablesOptions options
         cdef ui64 c_metadata_tablet_count
         cdef ui64 c_data_tablet_count
-        if token:
-            options.Token = token.encode()
+        options.ConnectOptions = YtStore2Impl._get_connect_options(token, proxy_role)
         options.Version = version
         options.Replicated = replicated
         options.Tracked = tracked
@@ -639,22 +644,27 @@ cdef class YtStore2Impl:
         TYtStore2.CreateTables(c_proxy, c_data_dir, options)
 
     @staticmethod
-    def _change_state(proxy: str, data_dir: str, action: TYtStore2.TModifyTablesStateOptions.EAction, token: str | None):
+    def _change_state(
+        proxy: str,
+        data_dir: str,
+        action: TYtStore2.TModifyTablesStateOptions.EAction,
+        token: str | None,
+        proxy_role: str | None,
+    ):
         cdef TString c_proxy = proxy.encode()
         cdef TString c_data_dir = data_dir.encode()
         cdef TYtStore2.TModifyTablesStateOptions options
-        if token:
-            options.Token = token.encode()
+        options.ConnectOptions = YtStore2Impl._get_connect_options(token, proxy_role)
         options.Action = action
         TYtStore2.ModifyTablesState(c_proxy, c_data_dir, options)
 
     @staticmethod
-    def mount(proxy: str, data_dir: str, token: str | None = None):
-        YtStore2Impl._change_state(proxy, data_dir, TYtStore2.TModifyTablesStateOptions.EAction.MOUNT, token)
+    def mount(proxy: str, data_dir: str, token: str | None = None, proxy_role: str | None = None):
+        YtStore2Impl._change_state(proxy, data_dir, TYtStore2.TModifyTablesStateOptions.EAction.MOUNT, token, proxy_role)
 
     @staticmethod
-    def unmount(proxy: str, data_dir: str, token: str | None = None):
-        YtStore2Impl._change_state(proxy, data_dir, TYtStore2.TModifyTablesStateOptions.EAction.UNMOUNT, token)
+    def unmount(proxy: str, data_dir: str, token: str | None = None, proxy_role: str | None = None):
+        YtStore2Impl._change_state(proxy, data_dir, TYtStore2.TModifyTablesStateOptions.EAction.UNMOUNT, token, proxy_role)
 
     @staticmethod
     def setup_replica(
@@ -663,6 +673,7 @@ cdef class YtStore2Impl:
         replica_proxy: str,
         replica_data_dir: str,
         token: str | None = None,
+        proxy_role: str | None = None,
         replica_sync_mode: bool | None = None,
         enable: bool | None = None,
     ):
@@ -673,8 +684,7 @@ cdef class YtStore2Impl:
         cdef bool c_replica_sync_mode
         cdef bool c_enable
         cdef TYtStore2.TModifyReplicaOptions options
-        if token:
-            options.Token = token.encode()
+        options.ConnectOptions = YtStore2Impl._get_connect_options(token, proxy_role)
         options.Action = TYtStore2.TModifyReplicaOptions.EAction.CREATE
         if replica_sync_mode is not None:
             # Cython cannot cast python object to the std::optional
@@ -693,14 +703,14 @@ cdef class YtStore2Impl:
         replica_proxy: str,
         replica_data_dir: str,
         token: str | None = None,
+        proxy_role: str | None = None,
     ):
         cdef TString c_proxy = proxy.encode()
         cdef TString c_data_dir = data_dir.encode()
         cdef TString c_replica_proxy = replica_proxy.encode()
         cdef TString c_replica_data_dir = replica_data_dir.encode()
         cdef TYtStore2.TModifyReplicaOptions options
-        if token:
-            options.Token = token.encode()
+        options.ConnectOptions = YtStore2Impl._get_connect_options(token, proxy_role)
         options.Action = TYtStore2.TModifyReplicaOptions.EAction.REMOVE
         TYtStore2.ModifyReplica(c_proxy, c_data_dir, c_replica_proxy, c_replica_data_dir, options)
 
@@ -742,3 +752,12 @@ cdef class YtStore2Impl:
     def _at_exit(self):
         self._store_ptr.Shutdown();
         self._exiting = True
+
+    @staticmethod
+    cdef TYtConnectOptions _get_connect_options(token: str | None, proxy_role: str | None) noexcept:
+        cdef TYtConnectOptions options
+        if token:
+            options.Token = token.encode()
+        if proxy_role:
+            options.ProxyRole = proxy_role.encode()
+        return options

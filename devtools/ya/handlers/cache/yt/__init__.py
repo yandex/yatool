@@ -19,6 +19,7 @@ class YtClusterOptions(yarg.Options):
         self.yt_dir = None
         self.yt_token = None
         self.yt_token_path = "~/.yt/token"
+        self.yt_proxy_role = None
 
     @staticmethod
     def consumer():
@@ -33,6 +34,11 @@ class YtClusterOptions(yarg.Options):
                 ["--yt-token-path"],
                 help="YT token path",
                 hook=yarg.SetValueHook("yt_token_path"),
+            ),
+            yarg.ArgConsumer(
+                ["--yt-proxy-role"],
+                help="YT proxy role",
+                hook=yarg.SetValueHook("yt_proxy_role"),
             ),
             yarg.EnvConsumer(
                 "YA_YT_PROXY",
@@ -53,6 +59,11 @@ class YtClusterOptions(yarg.Options):
                 "YA_YT_TOKEN_PATH",
                 help="YT token path",
                 hook=yarg.SetValueHook("yt_token_path"),
+            ),
+            yarg.EnvConsumer(
+                "YA_YT_PROXY_ROLE",
+                help="YT proxy role",
+                hook=yarg.SetValueHook("yt_proxy_role"),
             ),
         ]
 
@@ -404,6 +415,7 @@ def strip(params):
         params.yt_proxy,
         params.yt_dir,
         token=params.yt_token,
+        proxy_role=params.yt_proxy_role,
         readonly=params.dry_run,
         max_cache_size=params.yt_max_cache_size,
         ttl=params.yt_store_ttl,
@@ -419,6 +431,7 @@ def data_gc(params):
         params.yt_proxy,
         params.yt_dir,
         token=params.yt_token,
+        proxy_role=params.yt_proxy_role,
         readonly=params.dry_run,
         operation_pool=params.yt_pool,
     )
@@ -438,6 +451,7 @@ def create_tables(params):
         params.yt_dir,
         version=params.cache_version,
         token=params.yt_token,
+        proxy_role=params.yt_proxy_role,
         replicated=params.replicated,
         tracked=params.tracked,
         in_memory=params.in_memory,
@@ -449,11 +463,11 @@ def create_tables(params):
 
 
 def mount(params):
-    YtStore2.mount(params.yt_proxy, params.yt_dir, token=params.yt_token)
+    YtStore2.mount(params.yt_proxy, params.yt_dir, token=params.yt_token, proxy_role=params.yt_proxy_role)
 
 
 def unmount(params):
-    YtStore2.unmount(params.yt_proxy, params.yt_dir, token=params.yt_token)
+    YtStore2.unmount(params.yt_proxy, params.yt_dir, token=params.yt_token, proxy_role=params.yt_proxy_role)
 
 
 def setup_replica(params):
@@ -462,6 +476,8 @@ def setup_replica(params):
         params.yt_dir,
         params.replica_proxy,
         params.replica_dir,
+        token=params.yt_token,
+        proxy_role=params.yt_proxy_role,
         replica_sync_mode=params.replica_sync_mode,
         enable=params.enable_replica,
     )
@@ -473,4 +489,6 @@ def remove_replica(params):
         params.yt_dir,
         params.replica_proxy,
         params.replica_dir,
+        token=params.yt_token,
+        proxy_role=params.yt_proxy_role,
     )

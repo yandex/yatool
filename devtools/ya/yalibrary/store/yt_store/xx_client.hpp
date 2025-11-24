@@ -50,8 +50,9 @@ namespace NYa {
         TDuration Ttl;
     };
 
-    struct TYtTokenOption {
+    struct TYtConnectOptions {
         TString Token{};
+        TString ProxyRole{};
     };
 
     enum class ECritLevel {
@@ -61,9 +62,10 @@ namespace NYa {
     };
 
     using TMaxCacheSize = std::variant<size_t, double>;
-    struct TYtStore2Options : public TYtTokenOption {
+    struct TYtStore2Options {
         TYtStore2Options() = default;
 
+        TYtConnectOptions ConnectOptions{};
         void* Owner{};
         bool ReadOnly{true};
         bool CheckSize{};
@@ -140,7 +142,8 @@ namespace NYa {
             TInstant TimeToFirstRecvMeta{};
         };
 
-        struct TCreateTablesOptions : public TYtTokenOption {
+        struct TCreateTablesOptions {
+            TYtConnectOptions ConnectOptions{};
             unsigned Version{};
             bool Replicated{};
             bool Tracked{};
@@ -151,21 +154,23 @@ namespace NYa {
             std::optional<ui64> DataTabletCount{};
         };
 
-        struct TModifyTablesStateOptions : public TYtTokenOption {
+        struct TModifyTablesStateOptions {
             enum EAction {
                 MOUNT,
                 UNMOUNT
             };
 
+            TYtConnectOptions ConnectOptions{};
             EAction Action;
         };
 
-        struct TModifyReplicaOptions : public TYtTokenOption {
+        struct TModifyReplicaOptions {
             enum EAction {
                 CREATE,
                 REMOVE
             };
 
+            TYtConnectOptions ConnectOptions{};
             EAction Action{CREATE};
             std::optional<bool> SyncMode{};
             std::optional<bool> Enable{};

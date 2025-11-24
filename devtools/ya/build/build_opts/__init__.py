@@ -2669,6 +2669,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
 
         self.yt_token = None
         self.yt_token_path = '~/.yt/token'
+        self.yt_proxy_role = None
         self.yt_readonly = True
         self.yt_max_cache_size = None
         self.yt_store_ttl = None
@@ -2702,6 +2703,13 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 ['--yt-token-path'],
                 help='YT token path',
                 hook=SetValueHook('yt_token_path'),
+                group=YT_CACHE_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            ArgConsumer(
+                ['--yt-proxy-role'],
+                help='YT proxy role',
+                hook=SetValueHook('yt_proxy_role'),
                 group=YT_CACHE_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
@@ -2747,6 +2755,11 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 hook=SetValueHook('yt_token_path'),
             ),
             EnvConsumer(
+                'YA_YT_PROXY_ROLE',
+                help='YT proxy role',
+                hook=SetValueHook('yt_proxy_role'),
+            ),
+            EnvConsumer(
                 'YA_YT_PUT',
                 help='Upload to YT store',
                 hook=SetConstValueHook('yt_readonly', False),
@@ -2764,6 +2777,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             ConfigConsumer('yt_proxy'),
             ConfigConsumer('yt_dir'),
             ConfigConsumer('yt_token_path'),
+            ConfigConsumer('yt_proxy_role'),
             ConfigConsumer('yt_max_cache_size'),
             ConfigConsumer('yt_store_ttl'),
             ConfigConsumer('yt_readonly'),

@@ -13,7 +13,7 @@
 namespace NYa {
     // Allow to change an implementation in tests
     struct IYtClusterConnector : TThrRefBase {
-        virtual NYT::IClientPtr operator() (const TString& proxy, const TString& token, NYT::TCreateClientOptions options) = 0;
+        virtual NYT::IClientPtr operator() (const TString& proxy, const NYT::TCreateClientOptions& options) = 0;
         virtual ~IYtClusterConnector() = default;
     };
     using IYtClusterConnectorPtr = TIntrusivePtr<IYtClusterConnector>;

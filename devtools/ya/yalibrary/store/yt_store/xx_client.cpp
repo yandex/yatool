@@ -892,7 +892,7 @@ namespace NYa {
     class TYtStore2::TImpl {
     public:
         TImpl(const TString& proxy, const TString& dataDir, const TYtStore2Options& options)
-            : Token_{options.Token}
+            : ConnectOptions_{options.ConnectOptions}
             , Owner_{options.Owner}
             , ReadOnly_{options.ReadOnly}
             , CheckSize_{options.CheckSize}
@@ -1442,7 +1442,7 @@ namespace NYa {
                 ythrow TYtStoreError::Muted() << "Incorrect cache version " << options.Version;
             }
 
-            auto ytc = ConnectToCluster(proxy, options.Token);
+            auto ytc = ConnectToCluster(proxy, options.ConnectOptions);
 
             if (!ytc->Exists(dataDir)) {
                 ythrow TYtStoreError::Muted() << "Path '" << dataDir << "' doesn't exist";
@@ -1510,7 +1510,7 @@ namespace NYa {
         static inline void ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) {
             using EAction = TModifyTablesStateOptions::EAction;
 
-            auto ytc = ConnectToCluster(proxy, options.Token);
+            auto ytc = ConnectToCluster(proxy, options.ConnectOptions);
             TVector<NYT::TYPath> allTables;
             for (const auto& table : ALL_TABLES) {
                 allTables.push_back(NYT::JoinYPaths(dataDir, table));
@@ -1534,8 +1534,8 @@ namespace NYa {
             const TString& replicaDataDir,
             const TModifyReplicaOptions& options
         ) {
-            auto ytc_main = ConnectToCluster(proxy, options.Token);
-            auto ytc_replica = ConnectToCluster(replicaProxy, options.Token);
+            auto ytc_main = ConnectToCluster(proxy, options.ConnectOptions);
+            auto ytc_replica = ConnectToCluster(replicaProxy, options.ConnectOptions);
 
             THashMap<NYT::TYPath, NYT::TYPath> allReplicaTables;
             for (const TYPath& table : ALL_TABLES) {
@@ -1916,23 +1916,30 @@ namespace NYa {
         }
 
         NYT::IClientPtr ConnectToCluster(const TString& proxy, bool defaultRetryPolicy = false) {
-            auto options = TCreateClientOptions();
-            if (!defaultRetryPolicy) {
-                NYT::TConfigPtr cfg = MakeIntrusive<NYT::TConfig>();
-                cfg->ConnectTimeout = TDuration::Seconds(5);
-                cfg->SocketTimeout = TDuration::Seconds(5);
-                cfg->RetryCount = 1;
-                options.Config(cfg);
+            if (defaultRetryPolicy) {
+                return ConnectToCluster(proxy, ConnectOptions_);
             }
-            return ConnectToCluster(proxy, Token_, options);
+            auto options = TCreateClientOptions();
+            NYT::TConfigPtr cfg = MakeIntrusive<NYT::TConfig>();
+            cfg->ConnectTimeout = TDuration::Seconds(5);
+            cfg->SocketTimeout = TDuration::Seconds(5);
+            cfg->RetryCount = 1;
+            options.Config(cfg);
+            return ConnectToCluster(proxy, ConnectOptions_, std::move(options));
         }
 
-        static inline NYT::IClientPtr ConnectToCluster(const TString& proxy, const TString& token, NYT::TCreateClientOptions options = {}) {
-            if (YtClusterConnectorPtr) {
-                return (*YtClusterConnectorPtr)(proxy, token, options);
+        static inline NYT::IClientPtr ConnectToCluster(const TString& proxy, const TYtConnectOptions& connectOptions, NYT::TCreateClientOptions options = {}) {
+            if (connectOptions.Token) {
+                options.Token(connectOptions.Token);
             }
-            if (token) {
-                options.Token(token);
+            if (connectOptions.ProxyRole) {
+                if (!options.Config_) {
+                    options.Config(MakeIntrusive<NYT::TConfig>());
+                }
+                options.Config_->HttpProxyRole = connectOptions.ProxyRole;
+            }
+            if (YtClusterConnectorPtr) {
+                return (*YtClusterConnectorPtr)(proxy, options);
             }
             return CreateClient(proxy, options);
         }
@@ -2605,7 +2612,7 @@ namespace NYa {
         }
 
     private:
-        TString Token_;
+        TYtConnectOptions ConnectOptions_;
         void* Owner_;
         std::atomic_bool ReadOnly_;
         bool CheckSize_;
