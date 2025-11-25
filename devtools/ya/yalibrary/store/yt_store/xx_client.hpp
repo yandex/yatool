@@ -190,6 +190,7 @@ namespace NYa {
         TMetrics GetMetrics() const;
         void Strip();
         void DataGc(const TDataGcOptions& options);
+        void PutStat(const TString& key, const TString& value);
         void Shutdown() noexcept;
 
         static void ValidateRegexp(const TString& re);

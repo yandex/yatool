@@ -1586,6 +1586,11 @@ namespace NYa {
             tx->Abort();
         }
 
+        void PutStat(const TString& key, const TString& value) {
+            TConfigureResultPtr config = InitializeControl_.GetValue();
+            PutStat(config, key, NYT::NodeFromYsonString(value));
+        }
+
         void Shutdown() noexcept {
             Disabled_ = true;
         }
@@ -2683,12 +2688,12 @@ namespace NYa {
         }
 
         void PutStat(TConfigureResultPtr config, const TString& key, const NYT::TNode& value) {
-            DEBUG_LOG << "Put to stat table:" << (ReadOnly_ ? " (dry run)" : "") << "\n" << NYT::NodeToYsonString(value, ::NYson::EYsonFormat::Pretty);
+            DEBUG_LOG << "Put to stat table key=" << key << ":" << (ReadOnly_ ? " (dry run)" : "") << "\n" << NYT::NodeToYsonString(value, ::NYson::EYsonFormat::Pretty);
             if (ReadOnly_) {
                 return;
             }
             NYT::TYPath statTable = NYT::JoinYPaths(config->MainCluster.DataDir, STAT_TABLE);
-            bool dynamic = config->MainCluster.Client->Get(JoinYPaths(statTable, "@dynamic")).AsBool();
+            bool dynamic = config->MainCluster.Client->Get(NYT::JoinYPaths(statTable, "@dynamic")).AsBool();
             auto row = NYT::TNode()("timestamp", ToYtTimestamp(TInstant::Now()))("key", key)("value", value);
             if (dynamic) {
                 row["salt"] = RandomNumber<ui64>();
@@ -3001,6 +3006,10 @@ namespace NYa {
 
     void TYtStore2::ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) {
         TImpl::ModifyTablesState(proxy, dataDir, options);
+    }
+
+    void TYtStore2::PutStat(const TString& key, const TString& value) {
+        Impl_->PutStat(key, value);
     }
 
     void TYtStore2::ModifyReplica(

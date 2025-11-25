@@ -340,6 +340,19 @@ class SetupReplicaOptions(yarg.Options):
         ]
 
 
+class PutStatOptions(yarg.Options):
+    def __init__(self):
+        self.put_stat_key = None
+        self.put_stat_value_file = None
+
+    @staticmethod
+    def consumer():
+        return [
+            yarg.SingleFreeArgConsumer(help='key', hook=yarg.SetValueHook('put_stat_key')),
+            yarg.SingleFreeArgConsumer(help='value_file', hook=yarg.SetValueHook('put_stat_value_file')),
+        ]
+
+
 class CacheYtHandler(yarg.CompositeHandler):
     description = "Yt cache maintenance"
 
@@ -399,6 +412,12 @@ class CacheYtHandler(yarg.CompositeHandler):
             + [
                 ReplicaOptions(),
             ],
+        )
+        self["put-stat"] = yarg.OptsHandler(
+            action=devtools.ya.app.execute(put_stat, respawn=devtools.ya.app.RespawnType.NONE),
+            description="Put data into the stat table (auxiliary handler for yt heaters)",
+            visible=False,
+            opts=get_common_opts() + [PutStatOptions()],
         )
 
 
@@ -492,3 +511,16 @@ def remove_replica(params):
         token=params.yt_token,
         proxy_role=params.yt_proxy_role,
     )
+
+
+def put_stat(params):
+    with open(params.put_stat_value_file, "rb") as f:
+        value = f.read()
+    yt_store = YtStore2(
+        params.yt_proxy,
+        params.yt_dir,
+        token=params.yt_token,
+        proxy_role=params.yt_proxy_role,
+        readonly=False,
+    )
+    yt_store.put_stat(params.put_stat_key, value)

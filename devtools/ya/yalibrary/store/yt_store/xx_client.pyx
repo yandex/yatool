@@ -263,6 +263,7 @@ cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace 
         bool Put(const TPutOptions& options) except +raise_yt_store_error
         void Strip() except +raise_yt_store_error
         void DataGc(const TDataGcOptions& options) except +raise_yt_store_error
+        void PutStat(const TString& key, const TString& value) except +raise_yt_store_error
         TMetrics GetMetrics() except +raise_yt_store_error
         void Shutdown()
         @staticmethod
@@ -604,6 +605,12 @@ cdef class YtStore2Impl:
             options.DataSizePerKeyRange = data_size_per_key_range
         with nogil:
             self._store_ptr.DataGc(options)
+
+    def put_stat(self, key: str, value: bytes):
+        cdef TString c_key = key.encode()
+        cdef TString c_value = value
+        with nogil:
+            self._store_ptr.PutStat(c_key, c_value)
 
     @staticmethod
     def validate_regexp(re_str: str) -> None:
