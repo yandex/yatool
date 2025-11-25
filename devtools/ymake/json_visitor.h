@@ -45,7 +45,7 @@ protected:
 public:
     using TBaseVisitor::Nodes;
 
-    TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget>& startDirs);
+    TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget> startDirs);
     TUidsData(const TUidsData&) = delete;
     TUidsData& operator=(const TUidsData&) = delete;
     TUidsData(TUidsData&&) noexcept = default;

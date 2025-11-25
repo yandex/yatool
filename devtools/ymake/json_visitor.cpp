@@ -106,7 +106,7 @@ namespace {
     }
 }
 
-TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget>& startDirs)
+TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget> startDirs)
     : TBaseVisitor{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
     , Loops(TGraphLoops::Find(restoreContext.Graph, startDirs, false))
     , LoopCnt(Loops.Ids())

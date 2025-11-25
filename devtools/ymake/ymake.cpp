@@ -16,7 +16,8 @@
 
 #include <asio/co_spawn.hpp>
 #include <asio/detached.hpp>
-#include <asio/experimental/concurrent_channel.hpp>
+#include <asio/experimental/promise.hpp>
+#include <asio/experimental/use_promise.hpp>
 #include <asio/use_awaitable.hpp>
 
 #include <util/generic/ptr.h>
@@ -256,30 +257,28 @@ void TYMake::UpdateUnreachableExternalFileChanges() {
     }
 }
 
-void TYMake::LoadJsonCacheAsync(asio::any_io_executor exec) {
-    JSONCacheLoadingCompletedPtr = MakeAtomicShared<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TMakePlanCache>)>>(exec, 1u);
-    asio::co_spawn(exec, [this]() -> asio::awaitable<void> {
+asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)> TYMake::LoadJsonCacheAsync(asio::any_io_executor exec) {
+    return asio::co_spawn(exec, [this]() -> asio::awaitable<THolder<TMakePlanCache>> {
         try {
             auto JSONCache = MakeHolder<TMakePlanCache>(Conf);
             JSONCacheLoaded(JSONCache->LoadFromFile());
-            co_await JSONCacheLoadingCompletedPtr->async_send(std::error_code{}, std::move(JSONCache));
+            co_return JSONCache;
         } catch (const std::exception& e) {
             YDebug() << "JSON cache failed to be loaded: " << e.what() << Endl;
-            JSONCacheLoadingCompletedPtr->try_send(std::error_code{}, nullptr);
+            co_return nullptr;
         }
-    }, asio::detached);
+    }, asio::experimental::use_promise);
 }
 
-void TYMake::LoadUidsAsync(asio::any_io_executor exec) {
-    UidsCacheLoadingCompletedPtr = MakeAtomicShared<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TUidsData>)>>(exec, 1u);
-    asio::co_spawn(exec, [this]() -> asio::awaitable<void> {
+asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)> TYMake::LoadUidsAsync(asio::any_io_executor exec) {
+    return asio::co_spawn(exec, [this]() -> asio::awaitable<THolder<TUidsData>> {
         try {
             auto UidsCache = MakeHolder<TUidsData>(GetRestoreContext(), StartTargets);
             LoadUids(UidsCache.Get());
-            co_await UidsCacheLoadingCompletedPtr->async_send(std::error_code{}, std::move(UidsCache));
+            co_return UidsCache;
         } catch (const std::exception& e) {
             YDebug() << "Uids cache failed to be loaded: " << e.what() << Endl;
-            UidsCacheLoadingCompletedPtr->try_send(std::error_code{}, nullptr);
+            co_return nullptr;
         }
-    }, asio::detached);
+    }, asio::experimental::use_promise);
 }

@@ -62,7 +62,6 @@
 #include <asio/thread_pool.hpp>
 #include <asio/use_awaitable.hpp>
 #include <asio/detached.hpp>
-
 #include <fmt/format.h>
 
 #include <Python.h>
@@ -826,6 +825,16 @@ void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     yMake->DumpMetaData();
 }
 
+template<typename T>
+auto GetOrEmptyAwaitable(std::optional<asio::experimental::promise<void(std::exception_ptr, T)>>& promise) {
+    if (promise) {
+        return promise.value()(asio::use_awaitable);
+    }
+    return []() -> asio::awaitable<T> {
+        co_return T{};
+    }();
+}
+
 asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<TExecContext> exec) {
     THolder<TYMake> yMake(new TYMake(conf));
     auto serial_exec = asio::make_strand(exec);
@@ -847,40 +856,51 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
 
     bool hasBadLoops = PostConfigureStage(conf, yMake);
 
+    auto mainFlow = asio::co_spawn(exec, [exec, &conf, &yMake, hasBadLoops]() -> asio::awaitable<TMaybe<EBuildResult>> {
+        auto result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
+        if (result.Defined()) {
+            co_return result.GetRef();
+        }
+
+        co_await asio::co_spawn(exec, [&conf, &yMake]() -> asio::awaitable<void> {
+            PerformDumps(conf, *yMake);
+            co_return;
+        }, asio::use_awaitable);
+
+        co_await asio::co_spawn(exec, ReportConfigureErrors(yMake), asio::use_awaitable);
+        co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
+
+        if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
+            co_return BR_CONFIGURE_FAILED;
+        }
+
+        result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake, exec), asio::use_awaitable);
+        if (result.Defined()) {
+            auto r = result.GetRef();
+            if (BR_OK == r) {
+                yMake->CommitCaches();
+            }
+            co_return r;
+        }
+        co_return Nothing();
+    }, asio::use_awaitable);
+
     if (conf.ShouldLoadJsonCacheEarly()) {
         // Must be started after bad loops detection
-        yMake->LoadJsonCacheAsync(exec);
+        yMake->JSONCachePreloadingPromise.emplace(yMake->LoadJsonCacheAsync(exec));
     }
 
     if (conf.ShouldLoadUidsCacheEarly()) {
         // Must be started after bad loops detection
-        yMake->LoadUidsAsync(exec);
+        yMake->UidsCachePreloadingPromise.emplace(yMake->LoadUidsAsync(exec));
     }
 
-    result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
+    result = co_await std::move(mainFlow);
+    co_await std::move(GetOrEmptyAwaitable(yMake->JSONCachePreloadingPromise));
+    co_await std::move(GetOrEmptyAwaitable(yMake->UidsCachePreloadingPromise));
+
     if (result.Defined()) {
         co_return result.GetRef();
-    }
-
-    co_await asio::co_spawn(exec, [&conf, &yMake]() -> asio::awaitable<void> {
-        PerformDumps(conf, *yMake);
-        co_return;
-    }, asio::use_awaitable);
-
-    co_await asio::co_spawn(exec, ReportConfigureErrors(yMake), asio::use_awaitable);
-    co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
-
-    if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
-        co_return BR_CONFIGURE_FAILED;
-    }
-
-    result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake, exec), asio::use_awaitable);
-    if (result.Defined()) {
-        auto r = result.GetRef();
-        if (BR_OK == r) {
-            yMake->CommitCaches();
-        }
-        co_return r;
     }
 
     DumpDarts(conf, yMake);

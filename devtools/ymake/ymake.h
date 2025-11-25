@@ -27,7 +27,7 @@
 #include <util/stream/format.h>
 
 #include <asio/awaitable.hpp>
-#include <asio/experimental/concurrent_channel.hpp>
+#include <asio/experimental/promise.hpp>
 #include <asio/thread_pool.hpp>
 #include <asio/strand.hpp>
 
@@ -80,8 +80,8 @@ public:
     TModules Modules;
     TCommands Commands;
 
-    TAtomicSharedPtr<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TMakePlanCache>)>> JSONCacheLoadingCompletedPtr;
-    TAtomicSharedPtr<asio::experimental::concurrent_channel<void(asio::error_code, THolder<TUidsData>)>> UidsCacheLoadingCompletedPtr;
+    std::optional<asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)>> JSONCachePreloadingPromise;
+    std::optional<asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)>> UidsCachePreloadingPromise;
 
 private:
     TFsPath DepCacheTempFile;      // Name of temporary file with delayed save data
@@ -126,8 +126,8 @@ public:
     void GetDependsToModulesClosure();
     asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) override;
     asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) override;
-    void LoadJsonCacheAsync(asio::any_io_executor exec);
-    void LoadUidsAsync(asio::any_io_executor exec);
+    asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)> LoadJsonCacheAsync(asio::any_io_executor exec);
+    asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)> LoadUidsAsync(asio::any_io_executor exec);
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();

@@ -430,11 +430,10 @@ namespace {
         FORCE_TRACE(U, NEvent::TStageStarted("Visit JSON"));
         THolder<TJSONVisitor> cmdbuilderHolder;
         THolder<TUidsData> uidsCache;
-        if (!conf.ShouldLoadUidsCacheEarly()) {
-            yMake.LoadUidsAsync(exec);
-        }
-        if (yMake.UidsCacheLoadingCompletedPtr) {
-            uidsCache = co_await yMake.UidsCacheLoadingCompletedPtr->async_receive();
+        if (yMake.UidsCachePreloadingPromise) {
+            uidsCache = co_await yMake.UidsCachePreloadingPromise.value()(asio::use_awaitable);
+        } else {
+            uidsCache = co_await yMake.LoadUidsAsync(exec);
         }
         auto cmdBuilderReset = [&]() {
             if (uidsCache) {
@@ -494,10 +493,12 @@ namespace {
             {
                 YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
 
-                if (!conf.ShouldLoadJsonCacheEarly()) {
-                    yMake.LoadJsonCacheAsync(exec);
+                THolder<TMakePlanCache> cachePtr;
+                if (yMake.JSONCachePreloadingPromise) {
+                    cachePtr = co_await yMake.JSONCachePreloadingPromise.value()(asio::use_awaitable);
+                } else {
+                    cachePtr = co_await yMake.LoadJsonCacheAsync(exec);
                 }
-                auto cachePtr = co_await yMake.JSONCacheLoadingCompletedPtr->async_receive();
                 if (!cachePtr) {
                     cachePtr = MakeHolder<TMakePlanCache>(yMake.Conf);
                 }
