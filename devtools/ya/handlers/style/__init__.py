@@ -25,6 +25,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.use_clang_format_yt = False
         self.use_clang_format_15 = False
         self.use_clang_format_18_vanilla = False
+        self.internal_enable_implicit_taxi_formatters = False
 
     @staticmethod
     def consumer():
@@ -98,6 +99,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_18_vanilla', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
+            devtools.ya.core.yarg.ConfigConsumer('internal_enable_implicit_taxi_formatters'),
         ]
 
 

@@ -71,7 +71,9 @@ def _register[T: Styler](cls: type[T]) -> type[T]:
     return cls
 
 
-def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) -> set[type[Styler]]:
+def select_suitable_stylers(
+    target: PurePath, file_types: Sequence[StylerKind], enable_implicit_taxi_formatters: bool = False
+) -> set[type[Styler]]:
     """Find and return matching styler class"""
     if "/canondata/" in target.as_posix():
         # Skip files inside canondata prior to other checks
@@ -89,7 +91,17 @@ def select_suitable_stylers(target: PurePath, file_types: Sequence[StylerKind]) 
             logger.warning('skip %s (filtered by file type)', target)
             return set()
     else:
-        stylers = {m for m in matches if m.kind.default_enabled}
+        stylers = set()
+        for m in matches:
+            if m.kind.default_enabled:
+                stylers.add(m)
+            elif (
+                enable_implicit_taxi_formatters
+                and m.kind in (StylerKind.JSON, StylerKind.YAML, StylerKind.EOL)
+                and 'taxi/' in target.as_posix()
+            ):
+                # HACK: Hardcode until introduction of custom settings in YA-2732
+                stylers.add(m)
         if not stylers:
             options = ' or '.join(f'--{m.kind}' for m in matches)
             logger.warning('skip %s (require explicit %s or --all)', target, options)

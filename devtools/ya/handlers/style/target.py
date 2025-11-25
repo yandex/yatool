@@ -20,6 +20,7 @@ class MineOptions(tp.NamedTuple):
     file_types: tuple[styler.StylerKind, ...] = ()
     stdin_filename: str = STDIN_FILENAME
     tty: bool = os.isatty(sys.stdin.fileno())
+    enable_implicit_taxi_formatters: bool = False
 
 
 class Target(tp.NamedTuple):
@@ -67,5 +68,9 @@ def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, se
     for target in _mine_targets(mine_opts):
         state_helper.check_cancel_state()
 
-        if styler_classes := styler.select_suitable_stylers(target=target.path, file_types=mine_opts.file_types):
+        if styler_classes := styler.select_suitable_stylers(
+            target=target.path,
+            file_types=mine_opts.file_types,
+            enable_implicit_taxi_formatters=mine_opts.enable_implicit_taxi_formatters,
+        ):
             yield target, styler_classes
