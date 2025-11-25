@@ -1,5 +1,6 @@
 #include "xx_client.hpp"
 #include "table_defs.h"
+#include "mem_sem.h"
 
 #define XX_CLIENT_INT_H_
 #include "xx_client_int.h"
@@ -31,10 +32,15 @@
 #include <util/generic/guid.h>
 #include <util/generic/scope.h>
 #include <util/generic/size_literals.h>
-#include <util/string/join.h>
+#include <util/memory/blob.h>
 #include <util/stream/format.h>
 #include <util/stream/printf.h>
+#include <util/string/builder.h>
+#include <util/string/join.h>
 #include <util/system/env.h>
+#include <util/system/filemap.h>
+#include <util/system/hostname.h>
+#include <util/system/tempfile.h>
 #include <util/system/thread.h>
 #include <util/thread/pool.h>
 
@@ -466,7 +472,7 @@ namespace NYa {
     IYtClusterConnectorPtr YtClusterConnectorPtr{};
 
     // TODO: Move to devtools/lib?
-    namespace NStreamingUntar {
+    namespace NStreamingTar {
         struct IInput {
             virtual size_t Read(const void** buffer) = 0;
             virtual ~IInput() = default;
@@ -477,17 +483,65 @@ namespace NYa {
 
         namespace {
             // TODO (YA-2800) Remove 'maybe_unused' later
-            [[maybe_unused]] constexpr TStringBuf MSG_CREATE = "Failed to create tar";
+            constexpr TStringBuf MSG_CREATE = "Failed to create tar";
             constexpr TStringBuf MSG_OPEN = "Failed to open tar";
             constexpr TStringBuf MSG_EXTRACT = "Failed to extract tar";
+            constexpr TStringBuf MSG_READ = "Failed to read file";
+            constexpr TStringBuf MSG_WRITE = "Failed to write tar";
 
-            static inline la_ssize_t Callback(struct archive*, void* client_data, const void** buffer) {
+            static inline la_ssize_t InputCallback(struct archive*, void* client_data, const void** buffer) {
                 return reinterpret_cast<IInput*>(client_data)->Read(buffer);
+            }
+
+            static inline la_ssize_t OutputCallback(struct archive*, void* client_data, const void *buffer, size_t length) {
+                reinterpret_cast<IOutputStream*>(client_data)->Write(buffer, length);
+                return length;
             }
 
             static inline void Check(int code, struct archive *a, TStringBuf msg) {
                 if (code != ARCHIVE_OK) {
                     ythrow TUntarError() << msg << ": " << archive_error_string(a);
+                }
+            }
+        }
+
+        static inline void Tar(IOutputStream& dest, const TFsPath& rootDir, const TVector<TFsPath>& files) {
+            struct archive* a = archive_write_new();
+            archive_write_add_filter_none(a);
+            archive_write_set_format_gnutar(a);
+            archive_write_set_bytes_in_last_block(a, 1);
+            Y_DEFER {
+                archive_write_free(a);
+            };
+            Check(archive_write_open2(a, &dest, nullptr, OutputCallback, nullptr, nullptr), a, MSG_CREATE);
+            struct archive_entry* entry = nullptr;
+            for(const auto &path: files) {
+                struct archive *disk = archive_read_disk_new();
+                Y_DEFER {
+                    archive_read_free(disk);
+                };
+                Check(archive_read_disk_open(disk, path.c_str()), disk, MSG_READ);
+
+                entry = archive_entry_new();
+                Y_DEFER {
+                    archive_entry_free(entry);
+                };
+                Check(archive_read_next_header2(disk, entry), disk, "Failed to read file");
+
+                archive_entry_set_pathname(entry, TFsPath(archive_entry_pathname(entry)).RelativeTo(rootDir).c_str());
+                archive_entry_set_mtime(entry, 0, 0);
+                archive_entry_set_uid(entry, 0);
+                archive_entry_set_gid(entry, 0);
+
+                Check(archive_write_header(a, entry), a, MSG_WRITE);
+                if (!archive_entry_hardlink(entry) && !archive_entry_symlink(entry)) {
+                    auto fileInput = TBlob::FromFile(path);
+                    if (fileInput.size()) {
+                        auto write = archive_write_data(a, fileInput.data(), fileInput.size());
+                        if (write == ARCHIVE_FATAL || write <= 0) {
+                            ythrow yexception() << MSG_WRITE << ": " << path << " " << write << archive_error_string(a);
+                        }
+                    }
                 }
             }
         }
@@ -504,7 +558,7 @@ namespace NYa {
                 archive_read_free(reader);
                 archive_write_free(writer);
             };
-            Check(archive_read_open(reader, &source, nullptr, Callback, nullptr), reader, MSG_OPEN);
+            Check(archive_read_open(reader, &source, nullptr, InputCallback, nullptr), reader, MSG_OPEN);
             while (archive_read_next_header(reader, &entry) == ARCHIVE_OK) {
                 archive_entry_set_pathname(entry, (destPath / archive_entry_pathname(entry)).c_str());
 
@@ -551,7 +605,7 @@ namespace NYa {
             return childNode.IsOfType<T>() ? childNode.As<T>() : T{};
         }
 
-        class TChunkFetcher: public IWalkInput, public NStreamingUntar::IInput {
+        class TChunkFetcher: public IWalkInput, public NStreamingTar::IInput {
         public:
             using TFetchDataFunc = std::function<NYT::TNode::TListType(const TVector<ui64>&)>;
             TChunkFetcher(TFetchDataFunc fetchDataFunc, ui64 chunksCount, ui64 dataSize)
@@ -637,7 +691,7 @@ namespace NYa {
             }
         };
 
-        class TChunkDecoder : public NStreamingUntar::IInput {
+        class TChunkDecoder : public NStreamingTar::IInput {
         public:
             TChunkDecoder(IInputStream& source)
                 : Decoder_{&source}
@@ -660,8 +714,6 @@ namespace NYa {
             TTempBuf Buf_{1 << 20};
             size_t DecodedSize_{};
         };
-
-
 
         struct TStripRawStat {
             static inline const TString INITIAL_DATA_SIZE_COLUMN = "initial_data_size";
@@ -905,6 +957,7 @@ namespace NYa {
             , ProbeBeforePut_{options.ProbeBeforePut}
             , ProbeBeforePutMinSize_{options.ProbeBeforePutMinSize}
             , CritLevel_{options.CritLevel}
+            , GSID_{options.GSID}
         {
             ThreadPool_.Start();
             ThreadPool_.SetMaxIdleTime(TDuration::Seconds(2));
@@ -914,16 +967,11 @@ namespace NYa {
                 ValidateRegexp(item.NameRe);
             }
 
+            std::size_t maxRetries = RETRY_MAX_COUNT;
+            auto maxTime = TDuration::Max();
             if (RetryTimeLimit_) {
-                RetryPolicy_ = TRetryPolicy::GetExponentialBackoffPolicy(
-                    [](const yexception&) {return ERetryErrorClass::ShortRetry;},
-                    RETRY_MIN_DELAY,
-                    RETRY_MIN_DELAY, // not used
-                    RETRY_MAX_DELAY,
-                    std::numeric_limits<size_t>::max(),
-                    options.RetryTimeLimit,
-                    RETRY_SCALE_FACTOR
-                );
+                maxRetries = std::numeric_limits<std::size_t>::max();
+                maxTime = options.RetryTimeLimit;
                 if (options.InitTimeout && options.InitTimeout < RetryTimeLimit_) {
                     WARNING_LOG << "init timeout (" <<  HumanReadable(options.InitTimeout) <<
                         ") is less than retry time limit (" << HumanReadable(RetryTimeLimit_) << ")";
@@ -932,17 +980,25 @@ namespace NYa {
                         WARNING_LOG << "prepare timeout (" <<  HumanReadable(PrepareTimeout_) <<
                             ") is less than retry time limit (" << HumanReadable(RetryTimeLimit_) << ")";
                 }
-            } else {
-                RetryPolicy_ = TRetryPolicy::GetExponentialBackoffPolicy(
-                    [](const yexception&) {return ERetryErrorClass::ShortRetry;},
-                    RETRY_MIN_DELAY,
-                    RETRY_MIN_DELAY, // not used
-                    RETRY_MAX_DELAY,
-                    RETRY_MAX_COUNT,
-                    TDuration::Max(),
-                    RETRY_SCALE_FACTOR
-                );
             }
+            auto retryClassFunction = [this] (const yexception& e) {
+                if (Disabled_) {
+                    return ERetryErrorClass::NoRetry;
+                }
+                if (IsYtError(e)) {
+                    return ERetryErrorClass::ShortRetry;
+                }
+                return ERetryErrorClass::NoRetry;
+            };
+            RetryPolicy_ = TRetryPolicy::GetExponentialBackoffPolicy(
+                std::move(retryClassFunction),
+                RETRY_MIN_DELAY,
+                RETRY_MIN_DELAY, // not used
+                RETRY_MAX_DELAY,
+                maxRetries,
+                maxTime,
+                RETRY_SCALE_FACTOR
+            );
 
             TDuration initTimeout{};
             if (options.InitTimeout) {
@@ -991,15 +1047,14 @@ namespace NYa {
                 auto deadLine = prepareTimeout.ToDeadLine();
                 auto promise = PrepareControl_.Init();
 
-                if (options->RefreshOnRead) {
-                    // To support refresh metadata only mode (--yt-store-refresh-on-read --threads=0)
-                    // we must call DoPrepare synchronously
+                ThreadPool_.SafeAddFunc([this, promise=std::move(promise), options, deadLine]() mutable {
+                    TThread::SetCurrentThreadName("YtStore::Prepare");
                     DoPrepare(std::move(promise), options, deadLine);
-                } else {
-                    ThreadPool_.SafeAddFunc([this, promise=std::move(promise), options, deadLine]() mutable {
-                        TThread::SetCurrentThreadName("YtStore::Prepare");
-                        DoPrepare(std::move(promise), options, deadLine);
-                    });
+                });
+                // To support refresh metadata only mode (--yt-store-refresh-on-read --threads=0)
+                // we must wait for DoPrepare result
+                if (options->RefreshOnRead) {
+                    PrepareControl_.GetValue();
                 }
             });
         }
@@ -1042,37 +1097,30 @@ namespace NYa {
                         for (auto chunk_i : chunks) {
                             keys.push_back(NYT::TNode()("hash", hash)("chunk_i", chunk_i));
                         }
-                        auto rows = RetryUntilDisabled([&] {
+                        auto rows = RetryYtError([&] {
                             return prepareResultPtr->Task->Client->LookupRows(
                                 NYT::JoinYPaths(prepareResultPtr->Task->DataDir, DATA_TABLE),
                                 keys,
-                                TLookupRowsOptions().Timeout(DATA_LOOKUP_TIMEOUT)
+                                TLookupRowsOptions().Timeout(DATA_LOOKUP_TIMEOUT).KeepMissingRows(true)
                             );
                         });
-                        if (rows.size() != chunks.size()) {
-                            TVector<ui64> missingChunks{};
-                            THashSet<ui64> got{};
-                            for (const auto& r : rows) {
-                                got.insert(r.ChildAsUint64("chunks_i"));
+                        std::unique_ptr<TVector<ui64>> missingChunks{};
+                        for (size_t i = 0; i < rows.size(); ++i) {
+                            if (rows[i].IsNull()) {
+                                ythrow TYtStoreError() << "hash=" << hash << " has at least one missing chunk: " << keys[i].ChildAsUint64("chunk_i");
                             }
-                            for (auto chunk_i : chunks) {
-                                if (!got.contains(chunk_i)) {
-                                    missingChunks.push_back(chunk_i);
-                                }
-                            }
-                            ythrow TYtStoreError() << "hash=" << hash << " has missing chunk(s): " << JoinSeq(",", missingChunks);
                         }
                         return rows;
                     };
 
                     TChunkFetcher chunkFetcher{fetchDataFunc, chunksCount, dataSize};
+                    NStreamingTar::IInput* input{&chunkFetcher};
                     std::unique_ptr<TChunkDecoder> decoder{};
                     if (codec) {
                         decoder = std::make_unique<TChunkDecoder>(chunkFetcher);
-                        NStreamingUntar::Untar(*decoder, intoDir);
-                    } else {
-                        NStreamingUntar::Untar(chunkFetcher, intoDir);
+                        input = decoder.get();
                     }
+                    NStreamingTar::Untar(*input, intoDir);
 
                     auto realHash = ToString(chunkFetcher.GetHash());
                     if (realHash != hash) {
@@ -1091,7 +1139,7 @@ namespace NYa {
                     Metrics_.CountFailures("get");
 
                     // Treat YT errors as permanent and proceed to disabling cache
-                    if (dynamic_cast<const NYT::TErrorResponse*>(&e) != nullptr) {
+                    if (IsYtError(e)) {
                         throw;
                     }
                     return false;
@@ -1103,9 +1151,128 @@ namespace NYa {
         }
 
         bool Put(const TPutOptions& options) {
-            // TODO YA-2800
-            Y_UNUSED(options);
-            return true;
+            if (options.Files.empty()) {
+                DEBUG_LOG << "Put (" << options.Uid << ") is failed: empty file list";
+                return false;
+            }
+
+            TString name = options.Files[0].RelativeTo(options.RootDir);
+            auto logPrefix = TStringBuilder() << "Put " << name << "(" << options.Uid << ") ";
+            DEBUG_LOG << logPrefix << "to YT";
+
+            if (ReadOnly() || Disabled()) {
+                DEBUG_LOG << logPrefix << "to YT rejected because of readonly or disabled storage";
+                return false;
+            }
+
+            try {
+                TConfigureResultPtr config = InitializeControl_.GetValue();
+                TPrepareResultPtr prepareResultPtr = PrepareControl_.GetValue();
+                if (prepareResultPtr->Meta.contains(options.Uid)) {
+                    // Should never happen
+                    DEBUG_LOG << logPrefix << "to YT completed(no-op)";
+                    return true;
+                }
+                // Yndexer support
+                if (options.Codec == NO_DATA_CODEC) {
+                    WriteMeta(
+                        config,
+                        prepareResultPtr,
+                        options.SelfUid,
+                        options.Uid,
+                        "" /* cuid */,
+                        name,
+                        options.Codec,
+                        options.ForcedSize,
+                        "" /* hash */,
+                        0 /* chunksCount */
+                    );
+                    return true;
+                }
+
+                if (config->Version >= 3 && options.Cuid && prepareResultPtr->Meta.contains(options.Cuid)) {
+                    const auto& meta = prepareResultPtr->Meta.at(options.Cuid);
+                    // Doing additional check in case the content uid is clashed in a some way
+                    if (meta.ChildAsString("name") == name && meta.ChildAsString("self_uid") == options.SelfUid) {
+                        WriteMeta(
+                            config,
+                            prepareResultPtr,
+                            options.SelfUid,
+                            options.Uid,
+                            options.Cuid,
+                            name,
+                            meta.ChildAsString("codec"),
+                            meta.ChildAsUint64("data_size"),
+                            meta.ChildAsString("hash"),
+                            meta.ChildAsUint64("chunks_count")
+                        );
+                        return true;
+                    }
+                }
+
+                ui64 rawFilesSize = 0;
+                for (const auto& f : options.Files) {
+                    rawFilesSize += TFileStat{f, true}.Size;
+                }
+                if (ProbeBeforePut_ && rawFilesSize >= ProbeBeforePutMinSize_) {
+                    try {
+                        if (ProbeMeta(config, prepareResultPtr, options.SelfUid, options.Uid)) {
+                            DEBUG_LOG << logPrefix << "to YT completed(no-op): uid already exists";
+                            return true;
+                        }
+                    } catch (...) {
+                        DEBUG_LOG << "meta probing failed with error: " << CurrentExceptionMessage();
+                    }
+                }
+
+                TFsPath archivePath{MakeTempName()};
+                PrepareData(archivePath, options.RootDir, options.Files, options.Codec);
+                auto archiveData = TBlob::FromFile(archivePath);
+
+                ui64 encodedDataSize = archiveData.size();
+                ui64 maxBatchSize = YT_CACHE_CELL_LIMIT * YT_CELLS_PER_INSERT_LIMIT;
+
+                auto memGuard = MemSem_.Acquire(Min(encodedDataSize, maxBatchSize));
+
+                TString hash = ToString(CityHash64(archiveData));
+
+                ui64 chunksCount = 0;
+                TYtTimestamp createTime = ToYtTimestamp(TInstant::Now());
+                for (auto data = archiveData.AsStringBuf(); !data.empty(); ) {
+                    NYT::TNode::TListType dataRows{};
+                    while (!data.empty() && dataRows.size() < YT_CELLS_PER_INSERT_LIMIT) {
+                        auto chunk = data.substr(0, YT_CACHE_CELL_LIMIT);
+                        dataRows.push_back(
+                            NYT::TNode()
+                                ("hash", hash)
+                                ("chunk_i", chunksCount)
+                                ("create_time", createTime)
+                                ("data", chunk)
+                        );
+                        data = data.substr(chunk.size());
+                        ++chunksCount;
+                    }
+                    SafeInsertRows(config, DATA_TABLE, std::move(dataRows), {"hash", "chunk_i"});
+                }
+
+                WriteMeta(config, prepareResultPtr, options.SelfUid, options.Uid, options.Cuid, name, options.Codec, encodedDataSize, hash, chunksCount);
+                Metrics_.IncDataSize("put", encodedDataSize);
+                if (options.Codec) {
+                    Metrics_.UpdateCompressionRatio(encodedDataSize, rawFilesSize);
+                }
+                DEBUG_LOG << logPrefix << "size=" << encodedDataSize << " to YT completed";
+                return true;
+            } catch (const TYtStoreFatalError&) {
+                throw;
+            } catch (...) {
+                ReadOnly_.store(true, std::memory_order::relaxed);
+                if (CritLevel_ == ECritLevel::PUT) {
+                    Disable(true);
+                }
+                Metrics_.CountFailures("put");
+                DEBUG_LOG << logPrefix << "to YT failed: " << CurrentExceptionMessage();
+            }
+            return false;
         }
 
         TMetrics GetMetrics() const {
@@ -1654,7 +1821,9 @@ namespace NYa {
         static constexpr size_t INSERT_ROWS_LIMIT = 5000;  // Too high value increases transaction conflicts
         static constexpr TDuration DATA_LOOKUP_TIMEOUT = TDuration::Seconds(60);
         static inline const TString NO_DATA_CODEC = "no_data";
-
+        static constexpr ui64 DEFAULT_MAX_MEMORY_USAGE = 8_GB;
+        static constexpr ui64 YT_CACHE_CELL_LIMIT = 14_MB;
+        static constexpr int YT_CELLS_PER_INSERT_LIMIT = 4;
 
         using TRetryPolicy = IRetryPolicy<const yexception&>;
         using TRetryPolicyPtr = TRetryPolicy::TPtr;
@@ -1772,19 +1941,20 @@ namespace NYa {
             }
             TMetaData Meta;
             TLoadMetaTaskPtr Task;
+            TAdaptiveLock UpdateMetaLock{};
         };
         using TPrepareResultPtr = TIntrusivePtr<TPrepareResult>;
 
         struct TPrepareControl {
             NThreading::TPromise<TPrepareResultPtr> Init() {
-                Y_ENSURE_FATAL(!Future.Initialized(), "PrepareControl is already initialized");
+                Y_ENSURE_FATAL(!Future.Initialized(), "PrepareControl is already initialized (prepare is called twice?)");
                 auto promise = NThreading::NewPromise<TPrepareResultPtr>();
                 Future = promise.GetFuture();
                 return promise;
             }
 
             TPrepareResultPtr GetValue() {
-                Y_ENSURE_FATAL(Future.Initialized(), "PrepareControl is not initialized");
+                Y_ENSURE_FATAL(Future.Initialized(), "PrepareControl is not initialized (forget to call prepare?)");
                 NeedResult.Cancel();
                 return Future.GetValueSync();
             }
@@ -1864,7 +2034,7 @@ namespace NYa {
 
     private:
         template <class TResult>
-        auto WithRetry(std::function<TResult()> func, TOnFailFunc onFail) -> decltype(func()) {
+        auto WithRetry(std::function<TResult()> func, TOnFailFunc onFail = {}) -> decltype(func()) {
             return std::move(*DoWithRetry(func, RetryPolicy_, true, onFail));
         }
 
@@ -1874,17 +2044,14 @@ namespace NYa {
         }
 
         template <class TFunc>
-        auto RetryUntilDisabled(TFunc func) -> decltype(func()) {
-            return WithRetry(std::function(func), [this](const yexception&) {
-                if (Disabled()) throw;
-            });
+        auto RetryYtError(TFunc func) -> decltype(func()) {
+            return WithRetry(std::function(func));
         }
 
         template <class TFunc>
-        auto RetryUntilCancelled(NThreading::TCancellationToken cToken, TFunc func) ->decltype(func()) {
-            return WithRetry(std::function(func), [this, cToken](const yexception&) {
+        auto RetryYtErrorUntilCancelled(NThreading::TCancellationToken cToken, TFunc func) ->decltype(func()) {
+            return WithRetry(std::function(func), [cToken](const yexception&) {
                 cToken.ThrowIfTokenCancelled();
-                if (Disabled()) throw;
             });
         }
 
@@ -2013,7 +2180,7 @@ namespace NYa {
             config->MainCluster.DataDir = dataDir;
             config->MainCluster.Client = ConnectToCluster(proxy);
 
-            NYT::TNode metadataAttrs = RetryUntilDisabled([&]() {
+            NYT::TNode metadataAttrs = RetryYtError([&]() {
                 auto getOpts = NYT::TGetOptions()
                     .AttributeFilter(TAttributeFilter().Attributes({"type", "schema", "atomicity", "replicas"}))
                     .ReadFrom(EMasterReadKind::Cache);
@@ -2043,7 +2210,7 @@ namespace NYa {
                 config->Replicated = true;
 
                 // Read data table replicas
-                NYT::TNode dataRawReplicas = RetryUntilDisabled([&]() {
+                NYT::TNode dataRawReplicas = RetryYtError([&]() {
                     auto getOpts = NYT::TGetOptions()
                         .ReadFrom(EMasterReadKind::Cache);
                     return config->MainCluster.Client->Get(NYT::JoinYPaths(config->MainCluster.DataDir, DATA_TABLE, "@replicas"), getOpts);
@@ -2105,11 +2272,11 @@ namespace NYa {
         }
 
         void Check(TConfigureResultPtr config) {
-            if (!config->Replicated || config->RequireSyncReplica && !ReadOnly_) {
+            if (!config->Replicated || config->RequireSyncReplica && !ReadOnly_ && CritLevel_ == ECritLevel::PUT) {
                 // Check important tables availability
                 for (const NYT::TYPath& table : {METADATA_TABLE, DATA_TABLE}) {
                     TString query = "1 from [" + NYT::JoinYPaths(config->MainCluster.DataDir, table) + "] limit 1";
-                    RetryUntilDisabled([&] {
+                    RetryYtError([&] {
                         config->MainCluster.Client->SelectRows(query);
                     });
                 }
@@ -2185,7 +2352,7 @@ namespace NYa {
         }
 
         size_t GetQuotaSize(IClientPtr client, const TYPath& dataDir) {
-            NYT::TNode tableAttrs = RetryUntilDisabled([&]{
+            NYT::TNode tableAttrs = RetryYtError([&]{
                 auto getOpts = NYT::TGetOptions()
                     .AttributeFilter(TAttributeFilter().Attributes({"primary_medium", "account"}))
                     .ReadFrom(EMasterReadKind::Cache);
@@ -2193,7 +2360,7 @@ namespace NYa {
             });
             const TString& accountName = tableAttrs.ChildAsString("account");
             const TString& primaryMedium = tableAttrs.ChildAsString("primary_medium");
-            const NYT::TNode limits = RetryUntilDisabled([&] {
+            const NYT::TNode limits = RetryYtError([&] {
                 return client->Get(
                     NYT::JoinYPaths("//sys/accounts/", accountName, "@resource_limits/disk_space_per_medium"),
                     NYT::TGetOptions().ReadFrom(EMasterReadKind::Cache)
@@ -2215,7 +2382,7 @@ namespace NYa {
         size_t GetTablesSize(IClientPtr client, const TYPath& dataDir) {
             size_t total = 0;
             for (const TYPath& tableName : {METADATA_TABLE, DATA_TABLE}) {
-                const NYT::TNode space = RetryUntilDisabled([&] {
+                const NYT::TNode space = RetryYtError([&] {
                     return client->Get(
                         NYT::JoinYPaths(dataDir, tableName, "@resource_usage", "disk_space"),
                         TGetOptions().ReadFrom(EMasterReadKind::Cache)
@@ -2380,7 +2547,7 @@ namespace NYa {
                 }
                 queryOut << ')';
                 queryOut.Finish();
-                rows = RetryUntilCancelled(cancellationToken, [&] {
+                rows = RetryYtErrorUntilCancelled(cancellationToken, [&] {
                     return task->Client->SelectRows(query);
                 });
             } else {
@@ -2396,7 +2563,7 @@ namespace NYa {
                     }
                 }
                 auto opts = TLookupRowsOptions().Columns(loadedColumns);
-                rows = RetryUntilCancelled(cancellationToken, [&] {
+                rows = RetryYtErrorUntilCancelled(cancellationToken, [&] {
                     return task->Client->LookupRows(NYT::JoinYPaths(task->DataDir, METADATA_TABLE), keys, opts);
                 });
             }
@@ -2454,7 +2621,7 @@ namespace NYa {
                 batch_start = batch_end;
 
                 while (!batch.empty()) {
-                    bool transactionConflict = RetryUntilDisabled([&] {
+                    bool transactionConflict = RetryYtError([&] {
                         try {
                             config->MainCluster.Client->InsertRows(metadataTablePath, batch, insertOpts);
                             return false;
@@ -2477,7 +2644,7 @@ namespace NYa {
                     for (auto& row : batch) {
                         row.AsMap().erase("access_time");
                     }
-                    NYT::TNode::TListType actualRows = RetryUntilDisabled([&] {
+                    NYT::TNode::TListType actualRows = RetryYtError([&] {
                         return config->MainCluster.Client->LookupRows(metadataTablePath, batch, lookupOpts);
                     });
 
@@ -2503,13 +2670,13 @@ namespace NYa {
             Y_ENSURE(!ReadOnly_);
             auto opts = MakeTransactionOpts<TDeleteRowsOptions>(config);
             if (!deleteMetadataKeys.empty()) {
-                RetryUntilDisabled([&] {
+                RetryYtError([&] {
                     config->MainCluster.Client->DeleteRows(NYT::JoinYPaths(config->MainCluster.DataDir, METADATA_TABLE), deleteMetadataKeys, opts);
 
                 });
             }
             if (!deleteDataKeys.empty()) {
-                RetryUntilDisabled([&] {
+                RetryYtError([&] {
                     config->MainCluster.Client->DeleteRows(NYT::JoinYPaths(config->MainCluster.DataDir, DATA_TABLE), deleteDataKeys, opts);
                 });
             }
@@ -2525,12 +2692,12 @@ namespace NYa {
             auto row = NYT::TNode()("timestamp", ToYtTimestamp(TInstant::Now()))("key", key)("value", value);
             if (dynamic) {
                 row["salt"] = RandomNumber<ui64>();
-                RetryUntilDisabled([&] {
+                RetryYtError([&] {
                     config->MainCluster.Client->InsertRows(statTable, {row}, MakeTransactionOpts<TInsertRowsOptions>(config));
                 });
             } else {
                 NYT::TRichYPath richPath = NYT::TRichYPath(statTable).Append(true);
-                RetryUntilDisabled([&] {
+                RetryYtError([&] {
                     auto writer = config->MainCluster.Client->CreateTableWriter<NYT::TNode>(richPath);
                     writer->AddRow(row);
                     writer->Finish();
@@ -2611,6 +2778,145 @@ namespace NYa {
             Sleep(TDuration::Seconds(RandomNumber<double>() * 0.1 + 0.05));
         }
 
+        static inline bool IsYtError(const std::exception& e) {
+            return dynamic_cast<const NYT::TErrorResponse*>(&e) || dynamic_cast<const NYT::TTransportError*>(&e);
+        }
+
+        bool ProbeMeta(TConfigureResultPtr config, TPrepareResultPtr prepareResultPtr, const TString& selfUid, const TString& uid) {
+            auto startTime = TInstant::Now();
+            Y_DEFER {
+                Metrics_.IncTime("probe-meta-before-put", startTime, TInstant::Now());
+            };
+
+            NYT::TNode keyRow{};
+            if (config->Version >= 3) {
+                keyRow("self_uid", selfUid)("uid", uid);
+            } else {
+                keyRow("uid", uid);
+            }
+            auto rows = RetryYtError([&] {
+                return prepareResultPtr->Task->Client->LookupRows(
+                    NYT::JoinYPaths(prepareResultPtr->Task->DataDir, METADATA_TABLE),
+                    NYT::TNode::TListType{keyRow},
+                    TLookupRowsOptions().Columns({"uid", "data_size"})
+                );
+            });
+            if (rows.empty()) {
+                return false;
+            }
+            Metrics_.IncCounter("skip-put");
+            if (auto data_size = SafeChildAs<ui64>(rows.back(), "data_size")) {
+                Metrics_.IncDataSize("skip-put", data_size);
+            }
+            return true;
+        }
+
+        void PrepareData(const TFsPath& archivePath, const TFsPath& rootDir, const TVector<TFsPath>& files, const TString& codec) {
+            TFileOutput out{archivePath};
+            IOutputStream* dest = &out;
+
+            std::unique_ptr<NUCompress::TCodedOutput> encoder;
+            if (codec) {
+                encoder = std::make_unique<NUCompress::TCodedOutput>(&out, NBlockCodecs::Codec(codec));
+                dest = encoder.get();
+            }
+            NStreamingTar::Tar(*dest, rootDir, files);
+        }
+
+        void WriteMeta(
+            TConfigureResultPtr config,
+            TPrepareResultPtr prepareResultPtr,
+            const TString& selfUid,
+            const TString& uid,
+            const TString& cuid,
+            const TString& name,
+            const TString& codec,
+            ui64 dataSize,
+            const TString& hash,
+            ui64 chunksCount
+        ) {
+            auto nowYtTs = ToYtTimestamp(TInstant::Now());
+            auto metaRow = NYT::TNode()
+                ("uid", uid)
+                ("name", name)
+                ("hash", hash)
+                ("chunks_count", chunksCount)
+                ("codec", codec)
+                ("data_size", dataSize)
+                ("hostname", HostName())
+                ("GSID", GSID_)
+                ("access_time", nowYtTs);
+
+            if (config->Version >= 3) {
+                metaRow
+                    ("self_uid", selfUid)
+                    ("cuid", cuid)
+                    ("create_time", nowYtTs);
+            }
+
+            SafeInsertRows(config, METADATA_TABLE, NYT::TNode::TListType{metaRow}, config->MetadataKeyColumns);
+            with_lock (prepareResultPtr->UpdateMetaLock) {
+                prepareResultPtr->Meta.try_emplace(uid, metaRow);
+                if (cuid) {
+                    prepareResultPtr->Meta.try_emplace(cuid, metaRow);
+                }
+            }
+        }
+
+        // replace or on transaction conflict do nothing
+        void SafeInsertRows(
+            TConfigureResultPtr config,
+            const NYT::TYPath& tableName,
+            NYT::TNode::TListType&& rows,
+            const TVector<TString>& keyColumns
+        ) {
+            NYT::TYPath tablePath = NYT::JoinYPaths(config->MainCluster.DataDir, tableName);
+
+            const auto insertOpts = MakeTransactionOpts<NYT::TInsertRowsOptions>(config);
+            const auto lookupOpts = NYT::TLookupRowsOptions().Columns(keyColumns).KeepMissingRows(true);
+            while (!rows.empty()) {
+                bool transactionConflict = RetryYtError([&] {
+                    try {
+                        config->MainCluster.Client->InsertRows(tablePath, rows, insertOpts);
+                        return false;
+                    } catch (const NYT::TErrorResponse& e) {
+                        if (e.GetError().ContainsErrorCode(NYT::NClusterErrorCodes::NTabletClient::TransactionLockConflict)) {
+                            return true;
+                        }
+                        throw;
+                    }
+                });
+
+                if (!transactionConflict || rows.size() == 1) {
+                    return;
+                }
+
+                SleepAfterTransactionConflict();
+
+                NYT::TNode::TListType keys{};
+                for (auto& row : rows) {
+                    NYT::TNode keyRow{};
+                    for (const auto& column: keyColumns) {
+                        keyRow(column, row[column]);
+                    }
+                    keys.push_back(std::move(keyRow));
+                }
+                NYT::TNode::TListType existingRows = RetryYtError([&] {
+                    return config->MainCluster.Client->LookupRows(tablePath,keys, lookupOpts);
+                });
+
+                Y_ASSERT(existingRows.size() == rows.size());
+
+                NYT::TNode::TListType&& oldRows{std::move(rows)};
+                rows.clear();
+                for (size_t i = 0; i < oldRows.size(); ++i) {
+                    if (existingRows[i].IsNull()) {
+                        rows.push_back(std::move(oldRows[i]));
+                    }
+                }
+            }
+        }
+
     private:
         TYtConnectOptions ConnectOptions_;
         void* Owner_;
@@ -2626,6 +2932,7 @@ namespace NYa {
         [[maybe_unused]] bool ProbeBeforePut_;
         [[maybe_unused]] size_t ProbeBeforePutMinSize_;
         ECritLevel CritLevel_;
+        TString GSID_;
 
         std::atomic_bool Disabled_{};
         TAdaptiveThreadPool ThreadPool_{};
@@ -2633,6 +2940,7 @@ namespace NYa {
         TPrepareControl PrepareControl_{};
         TRetryPolicyPtr RetryPolicy_;
         TMetricsManager Metrics_;
+        TMemorySemaphore MemSem_{DEFAULT_MAX_MEMORY_USAGE};
     };
 
     TYtStore2::TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options) {

@@ -175,6 +175,7 @@ cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace 
         bool ProbeBeforePut
         size_t ProbeBeforePutMinSize
         ECritLevel CritLevel
+        TString GSID
 
     cdef cppclass TYtStore2 nogil:
         ctypedef TVector[TString] TUidList
@@ -384,6 +385,7 @@ cdef class YtStore2Impl:
         probe_before_put: bool,
         probe_before_put_min_size: int | None,
         crit_level: str | None,
+        gsid: str | None,
         stager: stage_tracer.StageTracer.GroupStageTracer | None,
     ):
         self._proxy = proxy
@@ -427,6 +429,8 @@ cdef class YtStore2Impl:
                 options.CritLevel = ECritLevel.PUT
             else:
                 raise ValueError(f"Unknown crit_level value: {crit_level}")
+        if gsid:
+            options.GSID = gsid.encode()
         with nogil:
             self._store_ptr = new TYtStore2(
                 c_proxy,

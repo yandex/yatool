@@ -79,6 +79,7 @@ namespace NYa {
         bool ProbeBeforePut{};
         size_t ProbeBeforePutMinSize{};
         ECritLevel CritLevel{ECritLevel::NONE};
+        TString GSID{};
     };
 
     struct TYtStoreError : public yexception {

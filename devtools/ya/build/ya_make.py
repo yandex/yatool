@@ -24,6 +24,7 @@ import devtools.ya.build.reports.results_listener as pr
 import devtools.ya.build.stat.graph_metrics as st
 import devtools.ya.build.stat.statistics as bs
 import devtools.ya.core.config as core_config
+import devtools.ya.core.gsid
 import devtools.ya.core.error
 import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.profiler as cp
@@ -420,6 +421,7 @@ class CacheFactory:
                 prepare_timeout=self._opts.yt_store_prepare_timeout,
                 crit_level=self._opts.yt_store_crit,
                 check_size=not self._opts.yt_readonly and bool(self._opts.yt_max_cache_size),
+                gsid=devtools.ya.core.gsid.flat_session_id(),
             )
         else:
             if self._opts.yt_replace_result_yt_upload_only:

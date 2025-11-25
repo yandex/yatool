@@ -1,6 +1,9 @@
 PY3_LIBRARY()
 
-SRCS(xx_client.cpp)
+SRCS(
+    mem_sem.cpp
+    xx_client.cpp
+)
 
 PY_SRCS(
     NAMESPACE yalibrary.store.yt_store

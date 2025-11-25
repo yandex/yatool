@@ -681,6 +681,7 @@ class YtStore2(xx_client.YtStore2Impl, DistStore):
         init_timeout: float | None = None,
         prepare_timeout: float | None = None,
         crit_level: str | None = None,
+        gsid: str | None = None,
         stager: stage_tracer.StageTracer.GroupStageTracer | None = None,
         **kwargs
     ):
@@ -702,6 +703,7 @@ class YtStore2(xx_client.YtStore2Impl, DistStore):
             probe_before_put=probe_before_put,
             probe_before_put_min_size=probe_before_put_min_size,
             crit_level=crit_level,
+            gsid=gsid,
             stager=stager,
         )
         DistStore.__init__(
@@ -769,10 +771,7 @@ class YndexerYtStore2(YtStore2):
                 )
 
         if forced_node_size is None:
-            # TODO Calculate files size without prepare_data
-            # data_path = self._prepare_data(stack, files, codec, root_dir)
-            # forced_node_size = os.path.getsize(data_path)
-            pass
+            forced_node_size = sum(os.lstat(f).st_size for f in files)
 
         return super()._do_put(
             self_uid,
