@@ -13,7 +13,7 @@ namespace NYMake {
             PyObject* Obj_ = nullptr;
 
         public:
-            void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) override;
+            void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) override;
 
             TPluginMacroImpl(PyObject*);
 

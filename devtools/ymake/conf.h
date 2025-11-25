@@ -75,8 +75,8 @@ public:
     TBuildConfiguration();
     ~TBuildConfiguration() = default;
 
-    void InvokePluginMacro(TPluginUnit& unit, TStringBuf name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out = nullptr) const {
-        MacroFacade.InvokeMacro(unit, name, params, out);
+    void InvokePluginMacro(TPluginUnit& unit, TStringBuf name, const TVector<TStringBuf>& params) const {
+        MacroFacade.InvokeMacro(unit, name, params);
     }
     bool ContainsPluginMacro(TStringBuf name) const {
         return MacroFacade.ContainsMacro(name);

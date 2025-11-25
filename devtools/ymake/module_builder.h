@@ -168,7 +168,6 @@ private:
     // These return true
     bool AddByExt(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args);
     bool AddSource(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args);
-    void AddPluginCustomCmd(TMacroCmd& macroCmd);
 
     void ApplyVarAsMacro(const TStringBuf& name, bool force = false);
     void AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind = EModuleCmdKind::Default);

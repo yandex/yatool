@@ -275,13 +275,6 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
     return false;
 }
 
-void TModuleBuilder::AddPluginCustomCmd(TMacroCmd& macroCmd) {
-    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
-    cmdInfo->SetCommandSink(&Commands);
-    cmdInfo->GetCommandInfoFromPluginCmd(macroCmd, Vars, Module);
-    CmdAddQueue.push_back(std::move(cmdInfo));
-}
-
 void TModuleBuilder::AddDep(TVarStrEx& curSrc, TAddDepAdaptor& inputNode, bool isInput, ui64 groupId) {
     YDIAG(DG) << "SRCS dep for module: " << curSrc.Name << " " << curSrc.ElemId << Endl;
     EMakeNodeType nType = NodeTypeForVarEx(curSrc);
@@ -879,11 +872,7 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
 
 bool TModuleBuilder::PluginStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     if (Conf.ContainsPluginMacro(name)) {
-        TVector<TSimpleSharedPtr<TMacroCmd>> cmds;
-        Conf.InvokePluginMacro(*this, name, args, &cmds);
-        for (size_t i = 0; i < cmds.size(); ++i) {
-            AddPluginCustomCmd(*cmds[i]);
-        }
+        Conf.InvokePluginMacro(*this, name, args);
         return true;
     }
     return false;

@@ -14,7 +14,7 @@ namespace NYMake {
     namespace NPlugins {
 
         static const TSourceLocation docLink = __LOCATION__;
-        void TPluginResourceHandler::Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>*) {
+        void TPluginResourceHandler::Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) {
             TVector<TStringBuf>::const_iterator bucketStart = params.cbegin();
             bool useTextContext = false;
             bool dontYasm = false;

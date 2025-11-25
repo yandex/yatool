@@ -386,34 +386,6 @@ inline TNodeAddCtx *GetAddCtx(const TYVar& var) {
     return var.EntryPtr && var.EntryPtr->second.AddCtx ? var.EntryPtr->second.AddCtx : nullptr;
 }
 
-bool TCommandInfo::GetCommandInfoFromPluginCmd(const TMacroCmd& cmd, const TVars& vars, TModule& mod) {
-    cmd.Output(GetOutputInternal());
-    cmd.OutputInclude(GetOutputIncludeInternal());
-    cmd.Input(GetInputInternal());
-
-    TVector<TString> tools;
-    cmd.Tools(tools);
-
-    for (auto& tool : tools) {
-        TVarStr file(tool);
-        file.FromLocalVar = true;
-        GetToolsInternal().Push(std::move(file));
-    }
-
-    TSpecFileList* knownInputs = {};
-    TSpecFileList* knownOutputs = {};
-    if (auto specFiles = std::get_if<0>(&SpecFiles)) {
-        knownInputs = &specFiles->Input;
-        knownOutputs = &specFiles->Output;
-    }
-    auto compiled = CommandSink->Compile(cmd.ToString(), *Conf, vars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
-    const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
-    GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled, false, vars);
-    Y_UNUSED(mod);
-
-    return true;
-}
-
 THashMap<TString, TString> TCommandInfo::TakeRequirements() {
     if (Requirements) {
         THashMap<TString, TString> res;

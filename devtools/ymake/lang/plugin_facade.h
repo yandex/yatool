@@ -24,22 +24,6 @@ struct TCmdDescription {
 
 typedef TMap<TString, TVector<TString>> TPyDictReflection;
 
-class TMacroCmd: private TNonCopyable {
-public:
-    virtual ~TMacroCmd() {
-    }
-
-    virtual void Output(TSpecFileList& res) const = 0;
-
-    virtual void OutputInclude(TSpecFileList& res) const = 0;
-
-    virtual void Input(TSpecFileList& res) const = 0;
-
-    virtual void Tools(TVector<TString>& res) const = 0;
-
-    virtual TString ToString() const  = 0;
-};
-
 class TPluginUnit: private TNonCopyable {
 public:
     virtual void CallMacro(TStringBuf name, const TVector<TStringBuf>& args) = 0;
@@ -81,7 +65,7 @@ public:
 
 class TMacroImpl {
 public:
-    virtual void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) = 0;
+    virtual void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) = 0;
 
     virtual ~TMacroImpl();
 
@@ -111,7 +95,7 @@ private:
     THashMap<TString, TSimpleSharedPtr<TMacroImpl>> Name2Macro_;
 
 public:
-    void InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out = nullptr) const;
+    void InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params) const;
     bool ContainsMacro(const TStringBuf& name) const;
 
     void RegisterMacro(TBuildConfiguration& conf, const TString& name, TSimpleSharedPtr<TMacroImpl> action);

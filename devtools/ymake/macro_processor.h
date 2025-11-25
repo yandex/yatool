@@ -17,7 +17,6 @@
 #include <utility>
 #include <span>
 
-class TMacroCmd;
 class TYMake;
 class TModule;
 class TModuleBuilder;
@@ -151,8 +150,6 @@ public:
     bool Process(TModuleBuilder& mod, TAddDepAdaptor& node, bool finalTargetCmd);
     bool ProcessVar(TModuleBuilder& mod, TAddDepAdaptor& node);
     void AddCfgVars(const TVector<TDepsCacheId>& varLists, TNodeAddCtx& dst);
-
-    bool GetCommandInfoFromPluginCmd(const TMacroCmd& cmd, const TVars& vars, TModule& mod);
 
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
