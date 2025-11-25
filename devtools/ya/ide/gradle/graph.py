@@ -9,7 +9,7 @@ from devtools.ya.yalibrary import sjson
 import exts.asyncthread as core_async
 from yalibrary import platform_matcher, tools
 
-from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException
+from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException, ExclusiveLock
 from devtools.ya.ide.gradle.config import _JavaSemConfig
 from devtools.ya.ide.gradle.symlinks import _SymlinkCollector
 
@@ -101,6 +101,9 @@ class _JavaSemGraph(SemGraph):
                 foreign_subscriber = _ForeignEventSubscriber()
                 app_ctx.event_queue.subscribe(foreign_subscriber)
 
+            # FIXME(dimdim11) - all semgraph calls save cache to one point, without exclusive lock make semgraph may fail
+            lock = ExclusiveLock(self.config.export_root.parent / 'semgraph', timeout=600)
+            lock.acquire()
             super().make(
                 **kwargs,
                 dump_raw_graph=(
@@ -114,6 +117,7 @@ class _JavaSemGraph(SemGraph):
                 warn_mode=self.config.params.warn_mode,
                 dump_ymake_stderr=self.config.params.dump_ymake_stderr,
             )
+            lock.release()
             if 'dont_foreign' not in kwargs:
                 if foreign_subscriber.foreign_targets:
                     self.foreign_targets = list(set(foreign_subscriber.foreign_targets))

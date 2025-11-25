@@ -3,12 +3,11 @@ import logging
 import shutil
 from pathlib import Path
 from exts import hashing
-from exts.plocker import Lock, LOCK_EX, LOCK_NB
 
 from devtools.ya.core import yarg
 from devtools.ya.build import build_opts, ya_make
 
-from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException
+from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException, ExclusiveLock
 from devtools.ya.ide.gradle.config import _JavaSemConfig
 from devtools.ya.ide.gradle.graph import _JavaSemGraph
 from devtools.ya.ide.gradle.symlinks import _SymlinkCollector
@@ -68,7 +67,6 @@ class _Builder:
         import app_ctx
 
         junk_ya_make = None
-        junk_lock_file = None
         junk_lock = None
         try:
             if build_all_langs:
@@ -106,18 +104,14 @@ class _Builder:
                         / ("ya_ide_gradle_" + hashing.fast_hash(junk_ya_make_content))
                         / "ya.make"
                     )
-                    junk_lock_file = junk_ya_make.parent.parent / (junk_ya_make.parent.name + '.lock')
-                    junk_lock = Lock(junk_lock_file, mode='w', flags=LOCK_EX | LOCK_NB)
-                    junk_lock_timeout = 1800
-                    try:
-                        junk_lock.acquire(timeout=junk_lock_timeout)
-                    except Exception:
-                        junk_lock = None
+                    # Same temp ya.make need lock between processes, and it must be out of arcadia, exclusive lock work only at real filesystem!!!
+                    junk_lock = ExclusiveLock(path=self.config.export_root / junk_ya_make.parent.name, timeout=1800)
+                    if not junk_lock.acquire():
                         junk_ya_make = Path(str(junk_ya_make.parent) + "." + str(os.getpid())) / junk_ya_make.name
                         self.logger.warning(
                             "Fail lock %s during timeout %s sec, use another folder %s",
-                            str(junk_lock_file),
-                            junk_lock_timeout,
+                            junk_lock.lock.filename,
+                            junk_lock.lock.timeout,
                             str(junk_ya_make.parent),
                         )
                     _SymlinkCollector.mkdir(junk_ya_make.parent)
@@ -151,9 +145,3 @@ class _Builder:
                 shutil.rmtree(junk_ya_make.parent)
             if junk_lock:
                 junk_lock.release()
-            if junk_lock_file:
-                try:
-                    if junk_lock_file.exists():
-                        junk_lock_file.unlink()
-                except Exception:
-                    pass
