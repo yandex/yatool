@@ -1196,6 +1196,14 @@ def pstree_cmdline_limit(options):
     return None if const.YaTestTags.NoPstreeTrim in options.test_tags else PSTREE_CMDLINE_LIMIT
 
 
+def get_time_from_node_startup():
+    # NOTE: bin_exec_ts is a timestamp when a runner (local or distbuild) starts executing a node
+    # These env variables are retained when run_test is executed on YT,
+    # see devtools/ya/test/programs/test_tool/ytexec_run_test/ytexec_run_test.py::get_environ
+    bin_exec_ts = os.getenv('_BINARY_EXEC_TIMESTAMP') or os.getenv('DISTBUILD_RUNNER_BINARY_START_TIMESTAMP')
+    return int(time.time()) - int(float(bin_exec_ts) / 1e6) if bin_exec_ts else 0
+
+
 def main():
     subreaper_set_error = become_subreaper()
     is_subreaper_set = not bool(subreaper_set_error)
@@ -1235,15 +1243,7 @@ def main():
         options.split_file,
     )
 
-    # NOTE: bin_exec_ts is a timestamp when a runner (local or distbuild) starts executing a node
-    # These env variables are retained when run_test is executed on YT,
-    # see devtools/ya/test/programs/test_tool/ytexec_run_test/ytexec_run_test.py::get_environ
-    bin_exec_ts = os.getenv('_BINARY_EXEC_TIMESTAMP') or os.getenv('DISTBUILD_RUNNER_BINARY_START_TIMESTAMP')
-    if bin_exec_ts:
-        startup_delay = int(time.time()) - int(float(bin_exec_ts) / 1e6)
-    else:
-        startup_delay = 0
-
+    startup_delay = get_time_from_node_startup()
     if options.node_timeout and not exts.windows.on_win():
         timeout = options.node_timeout - 10
         if startup_delay:
