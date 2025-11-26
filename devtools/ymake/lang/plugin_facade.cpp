@@ -16,19 +16,9 @@
 #include <util/generic/singleton.h>
 #include <util/generic/yexception.h>
 
-void TMacroFacade::InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params) const {
-    THashMap<TString, TSimpleSharedPtr<TMacroImpl>>::const_iterator it = Name2Macro_.find(name);
-    if (it == Name2Macro_.end()) {
-        ythrow yexception() << "undefined macro with name: " << name;
-    }
-    it->second->Execute(unit, params);
-}
-
-bool TMacroFacade::ContainsMacro(const TStringBuf& name) const {
-    return Name2Macro_.find(name) != Name2Macro_.end();
-}
-
-TMacroImpl::~TMacroImpl() {
+TMacroImpl* TMacroFacade::FindMacro(TStringBuf name) const {
+    auto it = Name2Macro_.find(name);
+    return it != Name2Macro_.end() ? it->second.get() : nullptr;
 }
 
 void TMacroFacade::RegisterMacro(TBuildConfiguration& conf, const TString& name, TSimpleSharedPtr<TMacroImpl> action) {

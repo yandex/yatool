@@ -195,7 +195,7 @@ bool TModuleDef::IsMulti(const TStringBuf& name) const {
            || name == TStringBuf("DECLARE_EXTERNAL_HOST_RESOURCES_BUNDLE")
            || name == TStringBuf("DECLARE_EXTERNAL_HOST_RESOURCES_PACK")
            || name == NMacro::_LATE_GLOB
-           || IsUserMacro(name) || Conf.ContainsPluginMacro(name);
+           || IsUserMacro(name) || Conf.FindPluginMacro(name) != nullptr;
 }
 
 TDepsCacheId TModuleDef::Commit() {

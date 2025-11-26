@@ -871,11 +871,11 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
 }
 
 bool TModuleBuilder::PluginStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (Conf.ContainsPluginMacro(name)) {
-        Conf.InvokePluginMacro(*this, name, args);
-        return true;
-    }
-    return false;
+    auto* macro = Conf.FindPluginMacro(name);
+    if (!macro)
+        return false;
+    macro->Execute(*this, args);
+    return true;
 }
 
 bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {

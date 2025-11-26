@@ -67,7 +67,7 @@ class TMacroImpl {
 public:
     virtual void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) = 0;
 
-    virtual ~TMacroImpl();
+    virtual ~TMacroImpl() noexcept = default;
 
     struct TDefinition {
         TString DocText;
@@ -95,8 +95,7 @@ private:
     THashMap<TString, TSimpleSharedPtr<TMacroImpl>> Name2Macro_;
 
 public:
-    void InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params) const;
-    bool ContainsMacro(const TStringBuf& name) const;
+    TMacroImpl* FindMacro(TStringBuf name) const;
 
     void RegisterMacro(TBuildConfiguration& conf, const TString& name, TSimpleSharedPtr<TMacroImpl> action);
     void RegisterParser(TBuildConfiguration& conf, const TString& ext, TSimpleSharedPtr<TParser> parser);
