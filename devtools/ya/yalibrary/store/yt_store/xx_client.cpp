@@ -1906,7 +1906,7 @@ namespace NYa {
             TConfigureResultPtr GetValue() {
                 Y_ENSURE_FATAL(Future.Initialized(), "Initialization should start before getting value");
                 if (!Future.Wait(DeadLine)) {
-                    ythrow TYtStoreError() << "Initialization timed out";
+                    ythrow TYtStoreError::Muted() << "Initialization timed out";
                 }
                 return Future.GetValueSync();
             }
@@ -2234,13 +2234,13 @@ namespace NYa {
                             WARNING_LOG << error;
                             continue;
                         } else {
-                            ythrow TYtStoreError() << error;
+                            ythrow TYtStoreError::Muted() << error;
                         }
                     }
 
                     // In the readonly mode we use the lag to get best replica so sync/async mode is not so important as for writers
                     if (!ReadOnly_ && metadataReplicaInfo.Sync() != dataReplicaInfoPtr->Sync()) {
-                        ythrow TYtStoreError() << "Inconsistent cache configuration: metadata and data tables have a different replication mode for "
+                        ythrow TYtStoreError::Muted() << "Inconsistent cache configuration: metadata and data tables have a different replication mode for "
                             << metadataReplicaInfo.ClusterName << ":" << metadataReplicaInfo.GetDataDir();
                     }
 
@@ -2270,7 +2270,7 @@ namespace NYa {
                     }
                 }
                 if (config->Replicas.empty()) {
-                    ythrow TYtStoreError() << "No enabled replica is found";
+                    ythrow TYtStoreError::Muted() << "No enabled replica is found";
                 }
             }
             return config;
@@ -2304,7 +2304,7 @@ namespace NYa {
                     size_t currentSize = GetTablesSize(client, dataDir);
                     if (maxSize < currentSize) {
                         if (CritLevel_ == ECritLevel::PUT) {
-                            ythrow TYtStoreError() << "Cache size (" << currentSize << ") exceeds limit of " << maxSize;
+                            ythrow TYtStoreError::Muted() << "Cache size (" << currentSize << ") exceeds limit of " << maxSize;
                         } else {
                             WARNING_LOG << "Cache size (" << currentSize << ") exceeds limit of " << maxSize << " bytes, switch to readonly mode";
                             ReadOnly_ = true;
@@ -2473,7 +2473,7 @@ namespace NYa {
                     auto groupFuture = appropriateResultReceived ? NThreading::NWait::WaitAny(payloadFuture, needResultFuture) : payloadFuture;
                     if (!groupFuture.Wait(deadLine)) {
                         if (!currentResult) {
-                            ythrow TYtStoreError() << "Prepare timed out";
+                            ythrow TYtStoreError::Muted() << "Prepare timed out";
                         }
                         break;
                     }
