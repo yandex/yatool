@@ -20,6 +20,8 @@ import yalibrary.tools
 from . import config as cfg
 from . import state_helper
 
+if tp.TYPE_CHECKING:
+    from . import target as trgt
 
 logger = logging.getLogger(__name__)
 display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
@@ -72,15 +74,17 @@ def _register[T: Styler](cls: type[T]) -> type[T]:
 
 
 def select_suitable_stylers(
-    target: PurePath, file_types: Sequence[StylerKind], enable_implicit_taxi_formatters: bool = False
+    target: trgt.Target,
+    file_types: Sequence[StylerKind],
+    enable_implicit_taxi_formatters: bool = False,
 ) -> set[type[Styler]]:
     """Find and return matching styler class"""
-    if "/canondata/" in target.as_posix():
+    if "/canondata/" in target.path.as_posix() and not target.passed_directly:
         # Skip files inside canondata prior to other checks
         # TODO: Python3.13 Use pathlib.PurePath.full_match
         return set()
 
-    matches = _SUFFIX_MAPPING.get(target.suffix, set()) | _NAME_MAPPING.get(target.name, set())
+    matches = _SUFFIX_MAPPING.get(target.path.suffix, set()) | _NAME_MAPPING.get(target.path.name, set())
     if not matches:
         logger.warning('skip %s (sufficient styler not found)', target)
         return set()
@@ -98,7 +102,7 @@ def select_suitable_stylers(
             elif (
                 enable_implicit_taxi_formatters
                 and m.kind in (StylerKind.JSON, StylerKind.YAML, StylerKind.EOL)
-                and 'taxi/' in target.as_posix()
+                and 'taxi/' in target.path.as_posix()
             ):
                 # HACK: Hardcode until introduction of custom settings in YA-2732
                 stylers.add(m)
@@ -107,10 +111,14 @@ def select_suitable_stylers(
             logger.warning('skip %s (require explicit %s or --all)', target, options)
             return set()
 
+    if target.passed_directly:
+        # For files passed directly filtering by ignore rules is not applied
+        return stylers
+
     filtered: set[type[Styler]] = set()
     for styler in stylers:
         for pattern in styler.ignore:
-            if target.match(pattern):
+            if target.path.match(pattern):
                 # TODO: Python3.13 Use pathlib.PurePath.full_match
                 logger.warning('skip %s (filtered by ignore rules)', target)
                 break

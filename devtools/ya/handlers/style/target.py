@@ -3,7 +3,7 @@ import os
 import sys
 import typing as tp
 
-from collections.abc import Generator, Callable
+from collections.abc import Generator, Callable, Iterable
 from pathlib import Path, PurePath
 
 from . import state_helper
@@ -27,14 +27,15 @@ class Target(tp.NamedTuple):
     path: Path | PurePath
     reader: Callable[..., str]
     stdin: bool = False
+    passed_directly: bool = False
 
 
-def _mine_filepath_targets(paths: tuple[Path, ...]) -> Generator[Target]:
+def _mine_filepath_targets(paths: Iterable[Path]) -> Generator[Target]:
     for path in paths:
         if path.is_symlink():
             continue
         if path.is_file():
-            yield Target(path.resolve(), path.read_text)
+            yield Target(path.resolve(), path.read_text, passed_directly=True)
         elif path.is_dir():
             path = path.resolve()
             for dirpath, _, filenames in path.walk():
@@ -69,7 +70,7 @@ def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, se
         state_helper.check_cancel_state()
 
         if styler_classes := styler.select_suitable_stylers(
-            target=target.path,
+            target=target,
             file_types=mine_opts.file_types,
             enable_implicit_taxi_formatters=mine_opts.enable_implicit_taxi_formatters,
         ):
