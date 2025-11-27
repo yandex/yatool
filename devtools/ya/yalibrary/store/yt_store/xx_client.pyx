@@ -737,6 +737,7 @@ cdef class YtStore2Impl:
             "yt_proxy": self._proxy,
             "yt_dir": self._data_dir,
             "is_heater": self._is_heater,
+            "yt_store2": True,
         }
 
         try:
