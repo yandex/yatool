@@ -240,11 +240,12 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs, use_new_extra_pat
             if is_top_level(makelist) or is_flatbuf(makelist):
                 namespace = "."
             elif is_protobuf(makelist):
-                namespace = module_dir.replace('/', '.').replace('-', '_')
+                namespace = module_dir
             elif has_srcs(makelist):
                 namespace = "."
             else:
-                namespace = module_dir.replace('/', '.')
+                namespace = module_dir
+        namespace = namespace.replace('/', '.').replace('-', '_').strip('"\'')
         for src_dir in module_srcdirs:
             if use_new_extra_paths_logic:
                 source = new_root_src_path(src_dir, namespace)
