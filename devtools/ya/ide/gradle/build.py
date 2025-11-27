@@ -1,4 +1,3 @@
-import os
 import logging
 import shutil
 from pathlib import Path
@@ -105,15 +104,8 @@ class _Builder:
                         / "ya.make"
                     )
                     # Same temp ya.make need lock between processes, and it must be out of arcadia, exclusive lock work only at real filesystem!!!
-                    junk_lock = ExclusiveLock(path=self.config.export_root / junk_ya_make.parent.name, timeout=1800)
-                    if not junk_lock.acquire():
-                        junk_ya_make = Path(str(junk_ya_make.parent) + "." + str(os.getpid())) / junk_ya_make.name
-                        self.logger.warning(
-                            "Fail lock %s during timeout %s sec, use another folder %s",
-                            junk_lock.lock.filename,
-                            junk_lock.lock.timeout,
-                            str(junk_ya_make.parent),
-                        )
+                    junk_lock = ExclusiveLock(path=self.config.export_root / junk_ya_make.parent.name)
+                    junk_lock.acquire()
                     _SymlinkCollector.mkdir(junk_ya_make.parent)
                     with junk_ya_make.open('w') as f:
                         f.write(junk_ya_make_content)

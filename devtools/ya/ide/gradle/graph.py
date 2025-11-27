@@ -102,22 +102,20 @@ class _JavaSemGraph(SemGraph):
                 app_ctx.event_queue.subscribe(foreign_subscriber)
 
             # FIXME(dimdim11) - all semgraph calls save cache to one point, without exclusive lock make semgraph may fail
-            lock = ExclusiveLock(self.config.export_root.parent / 'semgraph', timeout=600)
-            lock.acquire()
-            super().make(
-                **kwargs,
-                dump_raw_graph=(
-                    self.config.ymake_root / "raw_graph"
-                    if (self.config.params.yexport_debug_mode or self.config.params.dump_ymake_stderr)
-                    else None
-                ),
-                foreign_on_nosem=True,
-                debug_options=self.config.params.debug_options,
-                dump_file=self.config.params.dump_file_path,
-                warn_mode=self.config.params.warn_mode,
-                dump_ymake_stderr=self.config.params.dump_ymake_stderr,
-            )
-            lock.release()
+            with ExclusiveLock(self.config.export_root.parent / 'semgraph'):
+                super().make(
+                    **kwargs,
+                    dump_raw_graph=(
+                        self.config.ymake_root / "raw_graph"
+                        if (self.config.params.yexport_debug_mode or self.config.params.dump_ymake_stderr)
+                        else None
+                    ),
+                    foreign_on_nosem=True,
+                    debug_options=self.config.params.debug_options,
+                    dump_file=self.config.params.dump_file_path,
+                    warn_mode=self.config.params.warn_mode,
+                    dump_ymake_stderr=self.config.params.dump_ymake_stderr,
+                )
             if 'dont_foreign' not in kwargs:
                 if foreign_subscriber.foreign_targets:
                     self.foreign_targets = list(set(foreign_subscriber.foreign_targets))
