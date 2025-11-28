@@ -357,7 +357,8 @@ class ChunkedQueue(BaseQueue):
                 self.logger.debug("Consumer asks to stop")
                 return False
             except Exception:
-                self.logger.debug("While consume chunk %s", chunk, exc_info=True)
+                # self.logger.debug("While consume chunk %s", chunk, exc_info=True)
+                pass
             else:
                 chunk.clear_and_release()  # will free flock here
             finally:
