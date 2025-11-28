@@ -417,7 +417,7 @@ void TYMake::AddModulesToStartTargets() {
     for (const auto& target : startTargetsModules) {
         auto mod = Modules.Get(Graph.GetFileName(Graph.Get(target.Id)).GetElemId());
         Y_ASSERT(mod);
-        if (target.IsDependsTarget || mod->IsStartTarget() && langFilter(*mod) && tagFilter(*mod, target)) {
+        if (target.IsDependsTarget || ((shouldCheckLanguages || mod->IsStartTarget()) && langFilter(*mod) && tagFilter(*mod, target))) {
             StartTargets.push_back(target);
             ModuleStartTargets.insert(target);
         }
