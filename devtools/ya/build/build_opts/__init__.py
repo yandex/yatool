@@ -1165,6 +1165,7 @@ class GraphFilterOutputResultOptions(Options):
         self.add_host_result = []
         self.replace_result = False
         self.all_outputs_to_result = False
+        self.add_binaries_to_results = False
 
     @staticmethod
     def consumer():
@@ -1215,6 +1216,13 @@ class GraphFilterOutputResultOptions(Options):
                 ['--replace-result'],
                 help='Build only --add-result targets',
                 hook=SetConstValueHook('replace_result', True),
+                group=OUTPUT_CONTROL_GROUP,
+                visible=HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--add-binaries-to-results'],
+                help='Add all binary targets (bin/so) to results',
+                hook=SetConstValueHook('add_binaries_to_results', True),
                 group=OUTPUT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
             ),

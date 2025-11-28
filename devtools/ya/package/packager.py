@@ -150,6 +150,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     merged_opts.add_host_result = params.add_host_result
     merged_opts.replace_result = params.replace_result
     merged_opts.all_outputs_to_result = params.all_outputs_to_result
+    merged_opts.add_binaries_to_results = params.add_binaries_to_results
 
     merged_opts.add_modules_to_results = params.add_modules_to_results
     merged_opts.gen_renamed_results = params.gen_renamed_results

@@ -873,7 +873,7 @@ def _gen_filter_node(node: graph_descr.GraphNode, flt, python3_pattern: str) -> 
 
 
 def finalize_graph(graph: graph_descr.DictGraph, opts):
-    if opts.add_result or opts.add_host_result:
+    if opts.add_result or opts.add_host_result or opts.add_binaries_to_results:
         assert 'result' in graph
 
         # Extract YMAKE_PYTHON3 pattern
@@ -897,6 +897,15 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
 
         if opts.replace_result:
             graph['result'] = []
+
+        # Add binary targets (bin/so) to results
+        if opts.add_binaries_to_results:
+            results = set(graph['result'])
+            for node in graph['graph']:
+                target_props = node.get('target_properties', {})
+                if target_props.get('module_type') in ('bin', 'so'):
+                    results.add(node['uid'])
+            graph['result'] = list(results)
 
         for node, need_to_add in chain(
             list(iter_filter_nodes(opts.add_result, host=False)),
