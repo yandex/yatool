@@ -868,11 +868,12 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         }, asio::use_awaitable);
 
         co_await asio::co_spawn(exec, ReportConfigureErrors(yMake), asio::use_awaitable);
-        co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
 
         if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
             co_return BR_CONFIGURE_FAILED;
         }
+
+        co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
 
         result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake, exec), asio::use_awaitable);
         if (result.Defined()) {
