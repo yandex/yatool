@@ -1,5 +1,6 @@
 import collections
 import logging
+import os
 
 import devtools.ya.build.build_opts
 import devtools.ya.core.yarg
@@ -432,6 +433,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.sloppy_deb = False
         self.store_debian = True
         self.strip = False
+        self.strip_threads = 1
         self.squashfs_compression_filter = None
         self.hardlink_package_outputs = False
         self.wheel_platform = ""
@@ -452,6 +454,16 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 names=['--full-strip'],
                 help='Strip binaries',
                 hook=devtools.ya.core.yarg.SetConstValueHook('full_strip', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--strip-threads'],
+                help='Number of strip threads',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'strip_threads',
+                    transform=lambda v: max(1, os.cpu_count() if v == 'auto' else int(v)),
+                ),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),
