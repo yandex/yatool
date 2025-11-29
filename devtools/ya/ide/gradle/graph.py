@@ -309,7 +309,6 @@ class _JavaSemGraph(SemGraph):
         for semantic in node.semantics:
             sem0 = semantic.sems[0]
             if sem0 == self._OLD_AP_SEM:
-                ap_paths = []
                 ap_deps = []
                 ap_classes = semantic.sems[1:]
                 for ap_class in ap_classes:
@@ -323,13 +322,21 @@ class _JavaSemGraph(SemGraph):
                             node_dep_paths.append(str(dep_path))
                             if dep_path.is_relative_to(Path(ap_path)):  # found dep with same base path
                                 ap_path_by_dep = str(dep_path)
-                                ap_paths.append(ap_path_by_dep)  # patch class by path
                                 self._on_patch_annotation_processor(ap_class, ap_path_by_dep)
                                 if dep_id in self.handmade_ap2dep_ids:  # Handmade AP
                                     for apdep_id in self.handmade_ap2dep_ids[dep_id]:  # add it deps as APs too
                                         if apdep_id in self.dep_paths:
                                             ap_dep_path = str(self.dep_paths[apdep_id])
                                             ap_deps.append(ap_dep_path)
+                                # Replace old semantic with classes by new semantic with paths
+                                patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-ITEM']}))
+                                patched_semantics.append(
+                                    Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-jar'] + [ap_path_by_dep]})
+                                )
+                                if ap_deps:
+                                    patched_semantics.append(
+                                        Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-deps'] + ap_deps})
+                                    )
                                 break
                         else:
                             self.logger.error(
@@ -344,14 +351,8 @@ class _JavaSemGraph(SemGraph):
                     else:
                         self.logger.error("Not found path for AP class %s, skip it", ap_class)
                         # Skip usage unknown AP class
-                # Replace old semantic with classes by new semantic with paths
-                patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-ITEM']}))
-                patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-jar'] + ap_paths}))
-                if ap_deps:
-                    patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-deps'] + ap_deps}))
                 continue
             elif sem0 == self._NOW_KAPT_SEM:
-                kapt_paths = []
                 kapt_deps = []
                 kapt_classpaths = semantic.sems[1:]
                 node_dep_paths = []
@@ -363,12 +364,21 @@ class _JavaSemGraph(SemGraph):
                         node_dep_paths.append(dep_path)
                         if dep_path.is_relative_to(Path(kapt_classpath)):  # found dep with same base path
                             kapt_path_by_dep = str(dep_path)
-                            kapt_paths.append(kapt_path_by_dep)
+                            self._on_patch_kapt(kapt_classpath, kapt_path_by_dep)
                             if dep_id in self.handmade_ap2dep_ids:  # Handmade AP
                                 for apdep_id in self.handmade_ap2dep_ids[dep_id]:  # add it deps as APs too
                                     if apdep_id in self.dep_paths:
                                         kapt_dep_path = str(self.dep_paths[apdep_id])
                                         kapt_deps.append(kapt_dep_path)
+                            # Replace semantic classpaths by deps paths
+                            patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-ITEM']}))
+                            patched_semantics.append(
+                                Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-jar'] + [kapt_path_by_dep]})
+                            )
+                            if kapt_deps:
+                                patched_semantics.append(
+                                    Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-deps'] + kapt_deps})
+                                )
                             break
                     else:
                         self.logger.error(
@@ -378,13 +388,7 @@ class _JavaSemGraph(SemGraph):
                             node.id,
                             node_dep_paths,
                         )
-                        kapt_paths.append(kapt_classpath)  # use classpath as path
-                    self._on_patch_kapt(kapt_classpath, kapt_paths[-1])
-                # Replace semantic classpaths by deps paths
-                patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-ITEM']}))
-                patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-jar'] + kapt_paths}))
-                if kapt_deps:
-                    patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-deps'] + kapt_deps}))
+                        # Skip usage unknown KAPT path
                 continue
             else:
                 patched_semantics.append(semantic)
