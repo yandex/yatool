@@ -430,11 +430,15 @@ namespace {
         FORCE_TRACE(U, NEvent::TStageStarted("Visit JSON"));
         THolder<TJSONVisitor> cmdbuilderHolder;
         THolder<TUidsData> uidsCache;
+        YDebug() << "RenderJSONGraph: before waiting for UIDS cache" << Endl;
         if (yMake.UidsCachePreloadingPromise) {
+            YDebug() << "RenderJSONGraph: waiting for UIDS cache preload" << Endl;
             uidsCache = co_await yMake.UidsCachePreloadingPromise.value()(asio::use_awaitable);
         } else {
+            YDebug() << "RenderJSONGraph: waiting for UIDS cache load" << Endl;
             uidsCache = co_await yMake.LoadUidsAsync(exec);
         }
+        YDebug() << "RenderJSONGraph: after waiting for UIDS cache" << Endl;
         auto cmdBuilderReset = [&]() {
             if (uidsCache) {
                 cmdbuilderHolder.Reset(new TJSONVisitor(std::move(*uidsCache), yMake.GetRestoreContext(), yMake.Commands, graph.Names().CommandConf, startTargets));
@@ -494,11 +498,15 @@ namespace {
                 YDebug() << "Store inputs in JSON cache: " << (yMake.Conf.StoreInputsInJsonCache ? "enabled" : "disabled") << '\n';
 
                 THolder<TMakePlanCache> cachePtr;
+                YDebug() << "RenderJSONGraph: before waiting for JSON cache" << Endl;
                 if (yMake.JSONCachePreloadingPromise) {
+                    YDebug() << "RenderJSONGraph: waiting for JSON cache preload" << Endl;
                     cachePtr = co_await yMake.JSONCachePreloadingPromise.value()(asio::use_awaitable);
                 } else {
+                    YDebug() << "RenderJSONGraph: waiting for JSON cache load" << Endl;
                     cachePtr = co_await yMake.LoadJsonCacheAsync(exec);
                 }
+                YDebug() << "RenderJSONGraph: after waiting for JSON cache" << Endl;
                 if (!cachePtr) {
                     cachePtr = MakeHolder<TMakePlanCache>(yMake.Conf);
                 }

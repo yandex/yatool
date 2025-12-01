@@ -896,9 +896,13 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         yMake->UidsCachePreloadingPromise.emplace(yMake->LoadUidsAsync(exec));
     }
 
+    YDebug() << "main: waiting for main flow" << Endl;
     result = co_await std::move(mainFlow);
+    YDebug() << "main: waiting for JSON cache after main flow" << Endl;
     co_await std::move(GetOrEmptyAwaitable(yMake->JSONCachePreloadingPromise));
+    YDebug() << "main: waiting for UIDS cache after main flow" << Endl;
     co_await std::move(GetOrEmptyAwaitable(yMake->UidsCachePreloadingPromise));
+    YDebug() << "main: UIDS cache waiting after main flow completed" << Endl;
 
     if (result.Defined()) {
         co_return result.GetRef();
