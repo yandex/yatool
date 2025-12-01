@@ -2,7 +2,9 @@ import sys
 import time
 
 import yalibrary.worker_threads as worker_threads
+from yalibrary.runner.runner3 import Node
 from yalibrary.runner.tasks.enums import WorkerPoolType
+from yalibrary.store.dist_store import DistStore
 from yalibrary.toolscache import tc_force_gc
 
 
@@ -215,16 +217,34 @@ class PutInCacheTask(object):
         pass
 
 
-class RestoreFromCacheTask(object):
+class DistCacheMixin:
+    def __init__(self, dist_cache: DistStore, node: Node, result_only: bool):
+        self.__dist_cache = dist_cache
+        self.__node = node
+        self.__result_only = result_only
+
+    def should_put_in_dist_cache(self) -> bool:
+        return (
+            self.dist_cache_exists_and_writable()
+            and (not self.__result_only or self.__node.is_result_node)
+            and self.__dist_cache.fits(self._node)
+            and not self.__dist_cache.has(self.__node.uid)
+        )
+
+    def dist_cache_exists_and_writable(self) -> bool:
+        return self.__dist_cache and not self.__dist_cache.readonly()
+
+
+class RestoreFromCacheTask(DistCacheMixin):
     node_type = 'RestoreFromCache'
     worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, node, build_root, ctx, cache, dist_cache, execution_log):
+        super().__init__(dist_cache, node, ctx.opts.yt_replace_result)
         self._node = node
         self._build_root = build_root
         self._ctx = ctx
         self._cache = cache
-        self._dist_cache = dist_cache
         self._execution_log = execution_log
 
     @property
@@ -234,14 +254,6 @@ class RestoreFromCacheTask(object):
     @property
     def uid(self):
         return self._node.uid
-
-    def should_put_in_dist_cache(self):
-        return (
-            self._dist_cache
-            and not self._dist_cache.readonly()
-            and self._dist_cache.fits(self._node)
-            and not self._dist_cache.has(self._node.uid)
-        )
 
     def __call__(self, *args, **kwargs):
         start_time = time.time()
@@ -289,19 +301,19 @@ class RestoreFromCacheTask(object):
         return 'restore[{}]'.format(self._node.kv.get('p', '??'))
 
 
-class WriteThroughCachesTask(object):
+class WriteThroughCachesTask(DistCacheMixin):
     node_type = 'WriteThroughCaches'
     worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(self, node, ctx, cache, dist_cache, build_root):
+        super().__init__(dist_cache, node, ctx.opts.yt_replace_result)
         self._node = node
         self._ctx = ctx
         self._cache = cache
-        self._dist_cache = dist_cache
         self._build_root = build_root
 
     def __call__(self, *args, **kwargs):
-        if self._ctx.opts.yt_store_wt or not self._dist_cache or self._dist_cache.readonly():
+        if self._ctx.opts.yt_store_wt or not self.dist_cache_exists_and_writable():
             self._ctx.runq.add(
                 self._ctx.put_in_cache(self._node, self._build_root),
                 deps=[],
@@ -310,12 +322,7 @@ class WriteThroughCachesTask(object):
         else:
             self._build_root.dec()
 
-        if (
-            self._dist_cache
-            and not self._dist_cache.readonly()
-            and self._dist_cache.fits(self._node)
-            and not self._dist_cache.has(self._node.uid)
-        ):
+        if self.should_put_in_dist_cache():
             self._ctx.runq.add(
                 self._ctx.put_in_dist_cache(self._node, self._build_root),
                 deps=[],
