@@ -2669,8 +2669,9 @@ class DistCacheSetupOptions(LocalCacheOptions):
         super().__init__()
 
         if app_config.in_house:
-            self.yt_proxy = 'hahn.yt.yandex.net'
-            self.yt_dir = '//home/devtools/cache'
+            # TODO YA-2887
+            self.yt_proxy = 'kolmogorov.yt.yandex.net'
+            self.yt_dir = '//home/devtools-cache'
         else:
             self.yt_proxy = ''
             self.yt_dir = ''
@@ -2800,6 +2801,16 @@ class DistCacheSetupOptions(LocalCacheOptions):
             self.yt_max_cache_size = parse_yt_max_cache_size(self.yt_max_cache_size)
         except ValueError as e:
             raise ArgsValidatingException(f"Wrong yt_max_cache_size value {self.yt_max_cache_size}: {e!s}")
+
+    def postprocess2(self, params):
+        super().postprocess2(params)
+        if params.yt_proxy.startswith('hahn') and params.yt_dir == '//home/devtools/cache' and params.yt_store:
+            logger.warning(
+                "Attempt to use the obsolete YT-store (hahn://home/devtools/cache). Please, remove incorrect settings from all ya.conf files or command line parameters"
+            )
+            # TODO YA-2887
+            params.yt_proxy = 'kolmogorov.yt.yandex.net'
+            params.yt_dir = '//home/devtools-cache'
 
     def _read_token_file(self):
         if self.yt_token:
