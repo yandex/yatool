@@ -221,6 +221,7 @@ bool TGeneralParser::NeedUpdateFile(ui64 fileId, EMakeNodeType type, TFileHolder
 
 void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStack& stack, TFileHolder& fileContent, TModule* mod) {
     YDIAG(DG) << "Adding " << name << " (" << node.NodeType << ") to DepGraph:" << Endl;
+    YMake.InitPluginsAndParsers();
 
     auto& nodeEntry = stack.back().EntryPtr->second;
 

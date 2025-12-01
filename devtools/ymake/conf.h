@@ -51,8 +51,9 @@ public:
     THashMap<TString, TFsPath> CustomDataGen;
     TParsersList ParserPlugins;
 
-    TVector<TString> Plugins;
+    TVector<TFsPath> Plugins;
     THashMap<TString, THashSet<TString>> PluginDeps;
+    bool PluginsInitilized = false;
 
     TSysinclResolver Sysincl;
     THashMap<TString, TLicenseGroup> Licenses;
@@ -88,6 +89,10 @@ public:
     void ClearPlugins() {
         ParserPlugins.clear();
         MacroFacade.Clear();
+    }
+
+    void LoadPlugins() {
+        ::LoadPlugins(PluginsRoots, Plugins, WriteConfCache ? BuildRoot : TFsPath{}, this);
     }
 
     void AddOptions(NLastGetopt::TOpts& opts);
@@ -233,6 +238,10 @@ public:
         return LoadUidsCacheEarly_;
     }
 
+    bool ShouldLoadPLuginsLazily() const noexcept {
+        return LoadPLuginsLazily_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
     IMemoryPool* GetStringPool() const { return StrPool.Get(); }
@@ -274,6 +283,7 @@ private:
     bool SaveDartCaches_ = true;
     bool LoadJsonCacheEarly_ = false;
     bool LoadUidsCacheEarly_ = false;
+    bool LoadPLuginsLazily_ = false;
 
     bool UseOnlyYmakeCache_ = false;
     bool LoadGraph_ = false;

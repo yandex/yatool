@@ -65,6 +65,7 @@ public:
 public:
     explicit TIncParserManager(const TBuildConfiguration& conf, TSymbols& names);
     void InitManager(const TParsersList& parsersList); // must be called after loading graph from cache (uses id's for Graph)
+    void AddParsers(const TParsersList& parsersList);
 
     void ProcessFile(TFileContentHolder& incFile, TFileProcessContext context) const;
     bool HasIncludeChanges(TFileContentHolder& incFile, const TParserBase* parser) const;
@@ -95,7 +96,6 @@ public:
 
 private:
     TParserBase* ParserByExt(const TStringBuf& ext) const;
-    void AddParsers(const TParsersList& parsersList);
     TStringBuf ExtPreprocess(TStringBuf ext,
                              const TSymbols& names,
                              const TAddIterStack& stack) const;

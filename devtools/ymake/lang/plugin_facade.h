@@ -105,7 +105,9 @@ public:
 
 // functions below implemented outside
 
-void LoadPlugins(const TVector<TFsPath> &pluginsRoot, const TFsPath& pycache, TBuildConfiguration *conf);
+void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &pluginFiles, const TFsPath& pycache, TBuildConfiguration *conf);
+
+std::pair<TVector<TFsPath>, TVector<TFsPath>> DiscoverPlugins(const TVector<TFsPath> &pluginsRoots);
 
 void RegisterPluginFilename(TBuildConfiguration& conf, const char* fileName);
 

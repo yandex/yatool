@@ -282,12 +282,17 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     // (after an error that file is not found)
     if (!DontUsePlugins) {
         if (!PluginsRoots.empty()) {
-            TTraceStage stage("Load plugins");
-            LoadPlugins(PluginsRoots, WriteConfCache ? BuildRoot : TFsPath{}, this);
-            for (const auto& it : Plugins) {
+            TTraceStage stage("Discover plugins");
+            auto [allFiles, pluginFiles] = DiscoverPlugins(PluginsRoots);
+            for (const auto& it : allFiles) {
                 TBlob pluginContent = TBlob::FromFile(it);
                 confData.Update((const char*)pluginContent.Data(), pluginContent.Size());
             }
+            Plugins = std::move(pluginFiles);
+        }
+        if (!ShouldLoadPLuginsLazily()) {
+            LoadPlugins();
+            PluginsInitilized = true;
         }
 
         // All cpp plugins should be registered in RegisterCppPlugins()
@@ -443,6 +448,7 @@ void TBuildConfiguration::FillMiscValues() {
     LoadJsonCacheEarly_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_JSON_CACHE_EARLY"));
     LoadUidsCacheEarly_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_UIDS_CACHE_EARLY"));
     ParallelRendering = ParallelRendering && !IsFalse(CommandConf.EvalValue("YMAKE_PARALLEL_RENDERING"));
+    LoadPLuginsLazily_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_PLUGINS_LAZILY"));
 
     auto updateFlag = [&](bool& flag, const char* variableName, bool log = false) {
         TStringBuf value = CommandConf.EvalValue(variableName);

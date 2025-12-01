@@ -209,6 +209,8 @@ public:
     TTraverseStartsContext GetTraverseStartsContext() const noexcept;
     TFileProcessContext GetFileProcessContext(TModule* module, TAddDepAdaptor& node);
 
+    void InitPluginsAndParsers();
+
     const TStringBuf& GetExportLang() {
         if (ExportLang_ == "?") {
             ExportLang_ = Conf.CommandConf.EvalValue("EXPORT_LANG");

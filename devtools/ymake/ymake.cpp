@@ -282,3 +282,12 @@ asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)> TYMake
         }
     }, asio::experimental::use_promise);
 }
+
+void TYMake::InitPluginsAndParsers() {
+    if (Conf.PluginsInitilized) {
+        return;
+    }
+    Conf.LoadPlugins();
+    IncParserManager.AddParsers(Conf.ParserPlugins);
+    Conf.PluginsInitilized = true;
+}
