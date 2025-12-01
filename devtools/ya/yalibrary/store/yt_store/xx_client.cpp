@@ -1177,7 +1177,6 @@ namespace NYa {
                 if (options.Codec == NO_DATA_CODEC) {
                     WriteMeta(
                         config,
-                        prepareResultPtr,
                         options.SelfUid,
                         options.Uid,
                         "" /* cuid */,
@@ -1196,7 +1195,6 @@ namespace NYa {
                     if (meta.ChildAsString("name") == name && meta.ChildAsString("self_uid") == options.SelfUid) {
                         WriteMeta(
                             config,
-                            prepareResultPtr,
                             options.SelfUid,
                             options.Uid,
                             options.Cuid,
@@ -1255,7 +1253,7 @@ namespace NYa {
                     SafeInsertRows(config, DATA_TABLE, std::move(dataRows), {"hash", "chunk_i"});
                 }
 
-                WriteMeta(config, prepareResultPtr, options.SelfUid, options.Uid, options.Cuid, name, options.Codec, encodedDataSize, hash, chunksCount);
+                WriteMeta(config, options.SelfUid, options.Uid, options.Cuid, name, options.Codec, encodedDataSize, hash, chunksCount);
                 Metrics_.IncDataSize("put", encodedDataSize);
                 if (options.Codec) {
                     Metrics_.UpdateCompressionRatio(encodedDataSize, rawFilesSize);
@@ -1946,7 +1944,6 @@ namespace NYa {
             }
             TMetaData Meta;
             TLoadMetaTaskPtr Task;
-            TAdaptiveLock UpdateMetaLock{};
         };
         using TPrepareResultPtr = TIntrusivePtr<TPrepareResult>;
 
@@ -2830,7 +2827,6 @@ namespace NYa {
 
         void WriteMeta(
             TConfigureResultPtr config,
-            TPrepareResultPtr prepareResultPtr,
             const TString& selfUid,
             const TString& uid,
             const TString& cuid,
@@ -2860,12 +2856,6 @@ namespace NYa {
             }
 
             SafeInsertRows(config, METADATA_TABLE, NYT::TNode::TListType{metaRow}, config->MetadataKeyColumns);
-            with_lock (prepareResultPtr->UpdateMetaLock) {
-                prepareResultPtr->Meta.try_emplace(uid, metaRow);
-                if (cuid) {
-                    prepareResultPtr->Meta.try_emplace(cuid, metaRow);
-                }
-            }
         }
 
         // replace or on transaction conflict do nothing
