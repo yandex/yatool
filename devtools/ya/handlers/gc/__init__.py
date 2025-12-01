@@ -255,6 +255,7 @@ def _do_collect_cache(cache, build_root, opts):
 
     logger.debug('Cleaning conf root')
     fs.remove_tree_safe(os.path.join(build_root, 'conf'))
+    fs.remove_tree_safe(os.path.join(cc.misc_root(), 'conf'))
 
     errors = _clean_tools()
 
