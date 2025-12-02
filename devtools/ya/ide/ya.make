@@ -61,6 +61,7 @@ END()
 
 RECURSE(
     fsnotifier
+    yigck
 )
 
 RECURSE_FOR_TESTS(
