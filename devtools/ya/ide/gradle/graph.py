@@ -308,7 +308,7 @@ class _JavaSemGraph(SemGraph):
         patched_semantics = []
         for semantic in node.semantics:
             sem0 = semantic.sems[0]
-            if sem0 == self._OLD_AP_SEM:
+            if sem0 == self._OLD_AP_SEM or sem0 == (self._NEW_AP_SEM + '-jar'):
                 ap_deps = []
                 ap_classes = semantic.sems[1:]
                 for ap_class in ap_classes:
@@ -329,7 +329,8 @@ class _JavaSemGraph(SemGraph):
                                             ap_dep_path = str(self.dep_paths[apdep_id])
                                             ap_deps.append(ap_dep_path)
                                 # Replace old semantic with classes by new semantic with paths
-                                patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-ITEM']}))
+                                if not patched_semantics or patched_semantics[-1].sems[0] != self._NEW_AP_SEM + '-ITEM':
+                                    patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-ITEM']}))
                                 patched_semantics.append(
                                     Semantic({Semantic.SEM: [self._NEW_AP_SEM + '-jar'] + [ap_path_by_dep]})
                                 )
@@ -352,7 +353,7 @@ class _JavaSemGraph(SemGraph):
                         self.logger.error("Not found path for AP class %s, skip it", ap_class)
                         # Skip usage unknown AP class
                 continue
-            elif sem0 == self._NOW_KAPT_SEM:
+            elif sem0 == self._NOW_KAPT_SEM or sem0 == (self._NEW_KAPT_SEM + '-jar'):
                 kapt_deps = []
                 kapt_classpaths = semantic.sems[1:]
                 node_dep_paths = []
@@ -371,7 +372,8 @@ class _JavaSemGraph(SemGraph):
                                         kapt_dep_path = str(self.dep_paths[apdep_id])
                                         kapt_deps.append(kapt_dep_path)
                             # Replace semantic classpaths by deps paths
-                            patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-ITEM']}))
+                            if not patched_semantics or patched_semantics[-1].sems[0] != self._NEW_KAPT_SEM + '-ITEM':
+                                patched_semantics.append(Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-ITEM']}))
                             patched_semantics.append(
                                 Semantic({Semantic.SEM: [self._NEW_KAPT_SEM + '-jar'] + [kapt_path_by_dep]})
                             )
