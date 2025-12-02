@@ -112,7 +112,7 @@ def run_scheduled(count, threads, check_error_fn):
         if check_error_fn():
             arg_collection.clear()
             return
-        time.sleep(0.1)
+        time.sleep(0.005)
     for _, v in sorted(arg_collection.items()):
         param.Binary = six.ensure_binary(v['binary'])
         param.Args.clear()
