@@ -30,6 +30,46 @@ GOVET_TEST_TYPE = "govet"
 CLASSPATH_CLASH_TYPE = "classpath.clash"
 
 
+class PytestSubtestInfo(test_common.SubtestInfo):
+    @classmethod
+    def from_json(cls, d):
+        return cls(d["test"], d.get("subtest", ""), skipped=d.get("skipped", False), tags=d.get("tags", []))
+
+    def __init__(
+        self,
+        test,
+        subtest="",
+        skipped=False,
+        tags=None,
+        nodeid=None,
+        path=None,
+        line=None,
+        params=None,
+        pytest_class=None,
+    ):
+        self.test = test
+        self.subtest = test_common.normalize_utf8(subtest)
+        self.skipped = skipped
+        self.tags = tags
+        self.nodeid = nodeid
+        self.path = path
+        self.line = line
+        self.params = params
+        self.pytest_class = pytest_class
+
+    def to_json(self):
+        return {
+            "test": self.test,
+            "subtest": self.subtest,
+            "skipped": self.skipped,
+            "tags": getattr(self, "tags", []),
+            "nodeid": getattr(self, "nodeid"),
+            "path": getattr(self, "path"),
+            "line": getattr(self, "line"),
+            "params": getattr(self, "params"),
+        }
+
+
 class PyTestSuite(common.PythonTestSuite):
     """
     Support for pytest framework http://pytest.org/
@@ -376,10 +416,15 @@ class PyTestBinSuite(PyTestSuite):
                 tests = json.load(afile)
             for t in tests:
                 result.append(
-                    test_common.SubtestInfo(
-                        test_common.strings_to_utf8(t["class"]),
-                        test_common.strings_to_utf8(t["test"]),
-                        tags=t.get("tags", []),
+                    PytestSubtestInfo(
+                        test=test_common.strings_to_utf8(t["class"]),
+                        subtest=test_common.strings_to_utf8(t["test"]),
+                        tags=test_common.strings_to_utf8(t.get("tags", [])),
+                        nodeid=test_common.strings_to_utf8(t.get("nodeid")),
+                        path=test_common.strings_to_utf8(t.get("path")),
+                        line=test_common.strings_to_utf8(t.get("line")),
+                        params=test_common.strings_to_utf8(t.get("params")),
+                        pytest_class=test_common.strings_to_utf8(t.get("pytest_class")),
                     )
                 )
             return result
