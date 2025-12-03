@@ -1,15 +1,12 @@
 import logging
-import shutil
 from pathlib import Path
-from exts import hashing
 
 from devtools.ya.core import yarg
 from devtools.ya.build import build_opts, ya_make
 
-from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException, ExclusiveLock
+from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException
 from devtools.ya.ide.gradle.config import _JavaSemConfig
 from devtools.ya.ide.gradle.graph import _JavaSemGraph
-from devtools.ya.ide.gradle.symlinks import _SymlinkCollector
 
 
 class _Builder:
@@ -65,8 +62,6 @@ class _Builder:
         """Build all relative targets by one graph, build_all_langs control only java targets or all languages targets"""
         import app_ctx
 
-        junk_ya_make = None
-        junk_lock = None
         try:
             if build_all_langs:
                 ya_make_opts = yarg.merge_opts(
@@ -81,35 +76,7 @@ class _Builder:
                     ya_make_opts.initialize(self.config.params.ya_make_extra + ['-DSOURCES_JAR=yes'])
                 )
                 if proto_rel_targets:
-                    proto_rel_targets = list(set(proto_rel_targets))
-                    proto_rel_targets.sort()
-                    opts.add_result.append(".jar")  # require make symlinks to all .jar files
-                    junk_ya_make_content = "\n".join(
-                        [
-                            "JAVA_PROGRAM()",
-                            "PEERDIR(",
-                            *["    " + str(proto_rel_target) for proto_rel_target in proto_rel_targets],
-                            ")",
-                            "END()",
-                            "",
-                        ]
-                    )
-                    # For build PROTO_SCHEMA to jar, require build it as PEERDIR
-                    # Make one temporary ya.make with JAVA_PROGRAM and PEERDIR to all proto targets
-                    junk_ya_make = (
-                        self.config.arcadia_root
-                        / "junk"
-                        / Path.home().name
-                        / ("ya_ide_gradle_" + hashing.fast_hash(junk_ya_make_content))
-                        / "ya.make"
-                    )
-                    # Same temp ya.make need lock between processes, and it must be out of arcadia, exclusive lock work only at real filesystem!!!
-                    junk_lock = ExclusiveLock(path=self.config.export_root / junk_ya_make.parent.name)
-                    junk_lock.acquire()
-                    _SymlinkCollector.mkdir(junk_ya_make.parent)
-                    with junk_ya_make.open('w') as f:
-                        f.write(junk_ya_make_content)
-                    build_rel_targets.append(junk_ya_make.parent.relative_to(self.config.arcadia_root))
+                    build_rel_targets += proto_rel_targets
 
             opts.bld_dir = self.config.params.bld_dir
             opts.arc_root = str(self.config.arcadia_root)
@@ -132,8 +99,3 @@ class _Builder:
                 raise YaIdeGradleException('Some builds failed')
         except Exception as e:
             raise YaIdeGradleException(f'Failed in build process: {e}') from e
-        finally:
-            if junk_ya_make and junk_ya_make.parent.exists():
-                shutil.rmtree(junk_ya_make.parent)
-            if junk_lock:
-                junk_lock.release()
