@@ -18,7 +18,6 @@ import traceback
 import threading
 import subprocess
 import collections
-import multiprocessing
 import concurrent.futures as futures
 
 from six import string_types
@@ -110,14 +109,9 @@ def parse_args():
 
     parser.add_argument(
         "--parallel-tests-within-node-workers",
+        type=int,
         default=None,
         help="Amount of workers to run tests in parallel",
-    )
-    parser.add_argument(
-        '--cpu-per-test-requested',
-        help="Amount of CPUs requested by test",
-        default=0,
-        type=int,
     )
     parser.add_argument('--temp-tracefile-dir', help="Directory to place temporary trace-files", default=None)
 
@@ -1141,14 +1135,8 @@ def main():
                     if SHUTDOWN_REQUESTED or rc in [0, TIMEOUT_RC]:
                         break
                 else:
-                    workers_count = multiprocessing.cpu_count()
-                    if args.parallel_tests_within_node_workers != 'all':
-                        workers_count = min(workers_count, int(args.parallel_tests_within_node_workers))
-
-                    if args.cpu_per_test_requested != 0:
-                        workers_count = max(workers_count // args.cpu_per_test_requested, 1)
-
-                    logger.debug("Launching tests in parallel with %d workers", workers_count)
+                    workers_count = args.parallel_tests_within_node_workers
+                    logger.debug("Launching %d tests in parallel with %d workers", len(test_names), workers_count)
                     executor = futures.ThreadPoolExecutor(max_workers=workers_count)
                     runs = []
 
