@@ -537,9 +537,15 @@ namespace NYa {
                 if (!archive_entry_hardlink(entry) && !archive_entry_symlink(entry)) {
                     auto fileInput = TBlob::FromFile(path);
                     if (fileInput.size()) {
-                        auto write = archive_write_data(a, fileInput.data(), fileInput.size());
-                        if (write == ARCHIVE_FATAL || write <= 0) {
-                            ythrow yexception() << MSG_WRITE << ": " << path << " " << write << archive_error_string(a);
+                        auto data = fileInput.data();
+                        auto size = fileInput.size();
+                        while (size) {
+                            auto written = archive_write_data(a, data, size);
+                            if (written < 0) {
+                                ythrow yexception() << MSG_WRITE << ": " << path << " " << written << archive_error_string(a);
+                            }
+                            size -= written;
+                            data += written;
                         }
                     }
                 }
