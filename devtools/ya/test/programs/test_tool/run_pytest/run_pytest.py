@@ -18,15 +18,6 @@ logger = logging.getLogger(__name__)
 
 LIST_ARGUMENTS = ["--collect-only", "--mode", "list", "-qqq"]
 
-FILTER_ARGUMENTS = [
-    "--modulo",
-    "--modulo-index",
-    "--partition-mode",
-    "--split-by-tests",
-    "--test-filter",
-    "--test-file-filter",
-]
-
 
 def setup_logging():
     level = logging.DEBUG
@@ -45,38 +36,58 @@ def parse_args():
     parser.add_argument("--output-dir")
     parser.add_argument("--temp-tracefile-dir")
 
-    for arg in FILTER_ARGUMENTS:
-        parser.add_argument(arg)
-
     return parser.parse_known_args()
+
+
+def strip_filter_args(args):
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--modulo")
+    parser.add_argument("--modulo-index")
+    parser.add_argument("--partition-mode")
+    parser.add_argument("--test-filter")
+    parser.add_argument("--test-file-filter")
+    parser.add_argument("--split-by-tests", action="store_true")
+
+    return parser.parse_known_args(args)[1]
+
+
+def get_list_cmd(options: argparse.Namespace, binary_and_filter_args: list[str]) -> list[str]:
+    cmd = [
+        options.binary,
+        "--build-root",
+        options.build_root,
+        "--basetemp",
+        options.basetemp,
+        "--ya-trace",
+        options.ya_trace,
+        "--output-dir",
+        options.output_dir,
+    ]
+    return cmd + binary_and_filter_args
 
 
 def get_run_cmd(
     options: argparse.Namespace,
     binary_args: list[str],
-    tracefile: str | None = None,
-    temp_dir: str | None = None,
-    output_dir: str | None = None,
-    filter_file: str | None = None,
+    tracefile: str,
+    temp_dir: str,
+    output_dir: str,
+    filter_file: str,
 ) -> list[str]:
     cmd = [
         options.binary,
         "--build-root",
         options.build_root,
         "--basetemp",
-        temp_dir or options.basetemp,
+        temp_dir,
         "--ya-trace",
-        tracefile or options.ya_trace,
+        tracefile,
         "--output-dir",
-        output_dir or options.output_dir,
+        output_dir,
+        "--test-filter-file",
+        filter_file,
     ]
-    if not filter_file:
-        for arg in FILTER_ARGUMENTS:
-            value = getattr(options, arg[2:].replace("-", "_"), None)
-            if value:
-                cmd.extend((arg, value))
-    else:
-        cmd.extend(("--test-filter-file", filter_file))
     return cmd + binary_args
 
 
@@ -177,13 +188,12 @@ def main():
     setup_logging()
 
     options, binary_args = parse_args()
-
-    cmd = get_run_cmd(options, binary_args)
-
-    tests_list = get_test_list(cmd, temp_dir=options.basetemp)
+    tests_list = get_test_list(get_list_cmd(options, binary_args), temp_dir=options.basetemp)
     if not tests_list:
         logger.debug("No tests to run")
         return 0
+
+    binary_args = strip_filter_args(binary_args)
 
     if options.temp_tracefile_dir:
         os.makedirs(options.temp_tracefile_dir, exist_ok=True)
