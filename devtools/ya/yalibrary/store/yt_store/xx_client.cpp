@@ -2550,7 +2550,7 @@ namespace NYa {
                 queryOut << ')';
                 queryOut.Finish();
                 rows = RetryYtErrorUntilCancelled(cancellationToken, [&] {
-                    return task->Client->SelectRows(query);
+                    return task->Client->SelectRows(query, TSelectRowsOptions().InputRowLimit(Max<i64>()).OutputRowLimit(Max<i64>()));
                 });
             } else {
                 Y_ENSURE_FATAL(options->SelfUids.size() == options->Uids.size(), "SelfUids and Uids lists must be the same size");
