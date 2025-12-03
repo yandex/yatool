@@ -64,7 +64,6 @@ def create_package(
     docker_use_remote_cache,
     docker_remote_image_version,
     docker_export_cache_to_registry,
-    docker_dest_remote_image_version,
     platform,
     add_host,
     target,
@@ -102,12 +101,8 @@ def create_package(
         build_command += ['--cache-from', remote_name]
 
     if docker_export_cache_to_registry:
-        remote_name = image_full_name
-        if docker_dest_remote_image_version:
-            remote_name = get_image_name(
-                registry, repository, image_name, package_name, docker_dest_remote_image_version
-            )
-        build_command += ['--cache-to', remote_name]
+        build_command += ['--cache-to', 'type=inline']
+        buildx_required = True
 
     if platform:
         build_command += ["--platform={}".format(platform)]

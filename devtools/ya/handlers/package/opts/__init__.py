@@ -38,7 +38,6 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.docker_push_image = False
         self.docker_remote_image_version = None
         self.docker_use_remote_cache = False
-        self.docker_dest_remote_image_version = None
         self.docker_export_cache_to_registry = False
         self.docker_use_buildx = False
         self.dump_build_targets = None
@@ -290,15 +289,8 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--docker-export-cache-to-registry'],
-                help='Export build cache to registry',
+                help='Export build cache to registry (inline only, requires buildx)',
                 hook=devtools.ya.core.yarg.SetConstValueHook('docker_export_cache_to_registry', True),
-                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=DOCKER_SUBGROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                names=['--docker-dest-remote-image-version'],
-                help='Specify image version to be used as cache destination',
-                hook=devtools.ya.core.yarg.SetValueHook('docker_dest_remote_image_version'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DOCKER_SUBGROUP,
             ),
