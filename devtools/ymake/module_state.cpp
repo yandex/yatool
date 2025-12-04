@@ -198,6 +198,8 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
 
     RawIncludes = std::move(saved.RawIncludes);
 
+    ConfigVars = std::move(saved.ConfigVars);
+
     Loaded = true;
 }
 
@@ -218,29 +220,6 @@ void TModule::Save(TModuleSavedState& saved) const {
 
     PeersRules.Save(saved.PeersRules);
 
-    if (!Tag.empty()) {
-        saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_TAG, Tag)));
-    }
-    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_FILENAME, FileName)));
-    saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_BASENAME, BaseName)));
-    if (!Provides.empty()) {
-        saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_PROVIDES, JoinStrings(Provides.begin(), Provides.end(), TStringBuf(" ")))));
-    }
-    for (const auto& name : CONFIG_VAR_NAMES) {
-        const auto value = Get(name);
-        if (!value.empty()) {
-            saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
-        }
-    }
-    for (auto item: TRANSITIVE_CHECK_REGISTRY) {
-        for (auto name: item.ConfVars) {
-            const auto value = Get(name);
-            if (!value.empty()) {
-                saved.ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
-            }
-        }
-    }
-
     saved.OwnEntries = GetOwnEntries().Data();
 
     saved.SrcsDirsIds = SrcDirs.SaveAsIds();
@@ -257,6 +236,8 @@ void TModule::Save(TModuleSavedState& saved) const {
     saved.ResolveResults = ResolveResults;
 
     saved.RawIncludes = RawIncludes;
+
+    saved.ConfigVars = ConfigVars;
 }
 
 TModule::TModule(TFileView dir, TStringBuf makefile, TStringBuf tag, TModulesSharedContext& context)
@@ -560,6 +541,32 @@ void TModule::TrimVars() {
 void TModule::OnBuildCompleted() {
     if (!IsLoaded()) {
         TrimVars();
+    }
+}
+
+void TModule::ComputeConfigVars() {
+    ConfigVars.clear();
+    if (!Tag.empty()) {
+        ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_TAG, Tag)));
+    }
+    ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_FILENAME, FileName)));
+    ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_BASENAME, BaseName)));
+    if (!Provides.empty()) {
+        ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_PROVIDES, JoinStrings(Provides.begin(), Provides.end(), TStringBuf(" ")))));
+    }
+    for (const auto& name : CONFIG_VAR_NAMES) {
+        const auto value = Get(name);
+        if (!value.empty()) {
+            ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
+        }
+    }
+    for (auto item: TRANSITIVE_CHECK_REGISTRY) {
+        for (auto name: item.ConfVars) {
+            const auto value = Get(name);
+            if (!value.empty()) {
+                ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
+            }
+        }
     }
 }
 

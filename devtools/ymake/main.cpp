@@ -62,9 +62,13 @@
 #include <asio/thread_pool.hpp>
 #include <asio/use_awaitable.hpp>
 #include <asio/detached.hpp>
+#include <asio/experimental/awaitable_operators.hpp>
+
 #include <fmt/format.h>
 
 #include <Python.h>
+
+using namespace asio::experimental::awaitable_operators;
 
 namespace {
     void MakeUnique(TVector<TTarget>& targets) {
@@ -873,9 +877,11 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
             co_return BR_CONFIGURE_FAILED;
         }
 
-        co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
-
-        result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake, exec), asio::use_awaitable);
+        co_await (asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable)
+            && asio::co_spawn(exec, [&result, &conf, &yMake, &exec]() -> asio::awaitable<void> {
+                result = co_await RenderGraph(conf, yMake, exec);
+                co_return;
+            }, asio::use_awaitable));
         if (result.Defined()) {
             auto r = result.GetRef();
             if (BR_OK == r) {

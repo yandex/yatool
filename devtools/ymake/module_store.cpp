@@ -76,6 +76,7 @@ void TModules::Commit(TModule& module) {
         }
     }
     ModulesById[id] = &module;
+    module.ComputeConfigVars();
     module.Committed = true;
     YDIAG(V) << "Committed module: " << module.GetMakefile() << " as " << module.GetFileName() << " (" << id << ")" << Endl;
 

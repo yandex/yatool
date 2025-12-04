@@ -525,6 +525,8 @@ private:
     mutable THolder<TOwnEntries> OwnEntries;
     THolder<TOwnEntries>& SharedEntries;
 
+    TVector<ui32> ConfigVars;
+
     TModule(TFileView dir, TStringBuf makefile, TStringBuf tag, TModulesSharedContext& context);
     TModule(TModuleSavedState&& saved, TModulesSharedContext& context);
 
@@ -536,6 +538,7 @@ private:
 
     void TrimVars();
     void OnBuildCompleted();
+    void ComputeConfigVars();
 
     bool IsStaticLib() const {
         return GetNodeType() == EMNT_Library && !IsCompleteTarget();
