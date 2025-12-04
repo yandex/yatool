@@ -11,6 +11,13 @@ import devtools.ya.test.const
 from devtools.ya.test.const import Status
 import yatest.common as yac
 
+_YMAKE_PYTHON3_PATTERN = None
+
+
+def set_python_pattern(python3_pattern):
+    global _YMAKE_PYTHON3_PATTERN
+    _YMAKE_PYTHON3_PATTERN = python3_pattern
+
 
 def get_test_suite_work_dir(
     build_root,
@@ -227,10 +234,11 @@ def get_unique_file_path(dir_path, filename, create_file=True):
 
 def get_python_cmd(opts=None, suite=None):
     if opts and getattr(opts, 'flags', {}).get("USE_ARCADIA_PYTHON") == "no":
-        return ["python"]
+        return ["python3"]
     if suite and not suite._use_arcadia_python:
-        return ["python"]
-    return ["$(PYTHON)/python"]
+        return ["python3"]
+    assert _YMAKE_PYTHON3_PATTERN is not None, "Seems you are not call set_python_pattern() function"
+    return ["$({})/bin/python3".format(_YMAKE_PYTHON3_PATTERN)]
 
 
 def normalize_filename(filename, rstrip=False):

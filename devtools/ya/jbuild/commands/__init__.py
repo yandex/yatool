@@ -1,11 +1,12 @@
 import os
 
+import devtools.ya.test.common as test_common
 import devtools.ya.jbuild.gen.consts as consts
 import yalibrary.graph.commands as graph_commands
 
 
 class BuildTools(object):  # TODO: use something from yalibrary.tools to detect executable file path
-    PYTHON_PATTERN = 'PYTHON'
+    PYTHON_PATTERN = None
     MAVEN_ARTIFACT_UPLOADER = 'MAVEN_ARTIFACT_UPLOADER'
     JSTYLE_RUNNER_PATTERN = 'JSTYLERUNNER'
 
@@ -19,7 +20,9 @@ class BuildTools(object):  # TODO: use something from yalibrary.tools to detect 
 
     @staticmethod
     def python():
-        return os.path.join(os.path.join('$({})'.format(BuildTools.PYTHON_PATTERN), 'python'))
+        if BuildTools.PYTHON_PATTERN is None:
+            BuildTools.PYTHON_PATTERN = test_common.get_python_cmd()[0]
+        return BuildTools.PYTHON_PATTERN
 
 
 def move_if_exists(src, dest, cwd=None):

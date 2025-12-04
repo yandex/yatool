@@ -59,6 +59,7 @@ import devtools.ya.build.genconf as bg
 from devtools.ya.build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
 from devtools.ya.test.test_types.common import SemanticLinterSuite
+from devtools.ya.test.common import set_python_pattern
 
 if tp.TYPE_CHECKING:
     from devtools.ya.test.test_types.common import AbstractTestSuite
@@ -2297,6 +2298,7 @@ def _build_graph_and_tests(
     )
 
     host_tool_resolver = _HostToolResolver(parsed_host_p, res_dir)
+    set_python_pattern(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern'])
 
     graph_handles: list[_TargetGraphsResult] = []
     tool_targets_queue = create_tool_event_queue(opts)
@@ -3335,9 +3337,7 @@ def _inject_tests(
     plan = devtools.ya.build.build_plan.BuildPlan(graph)
 
     logger.debug("Preparing test suites")
-    test_framer = devtools.ya.test.test_node.TestFramer(
-        src_dir, plan, tpc, conf_error_reporter, test_opts, host_tool_resolver
-    )
+    test_framer = devtools.ya.test.test_node.TestFramer(src_dir, plan, tpc, conf_error_reporter, test_opts)
     tests = test_framer.prepare_suites(tests)
 
     logger.debug("Stripping static analysis irrelevant deps")

@@ -238,7 +238,7 @@ def _get_env_arg(opts, suite):
 
 # XXX WIP
 class TestFramer(object):
-    def __init__(self, arc_root, graph, platform, add_conf_error, opts, host_tool_resolver: "_HostToolResolver"):
+    def __init__(self, arc_root, graph, platform, add_conf_error, opts):
         self.arc_root = arc_root
         self.graph = graph
         self.opts = opts
@@ -246,7 +246,6 @@ class TestFramer(object):
         self.distbuild_runner = self.opts.use_distbuild
         self.add_conf_error = add_conf_error
         self.context_generator_cache = {}
-        self._host_tool_resolver = host_tool_resolver
 
     def prepare_suites(self, suites):
         return configure_suites(suites, self._prepare_suite, 'suites-configuration', add_error_func=self.add_conf_error)
@@ -339,7 +338,6 @@ class TestFramer(object):
             uid = uid_gen.get_uid([output, ctx_str], 'test-ctx-gen')
 
             tags, platform = gen_plan.prepare_tags(self.platform, {}, self.opts)
-            python3_pattern = self._host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
 
             node = {
                 "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
@@ -348,7 +346,7 @@ class TestFramer(object):
                 'cmds': [
                     {
                         'cmd_args': [
-                            '$({})/bin/python3'.format(python3_pattern),
+                            test_common.get_python_cmd()[0],
                             SCRIPT_APPEND_FILE,
                             output,
                         ]
@@ -739,7 +737,10 @@ def create_test_node(
                 'uid': uid,
                 'broadcast': False,
                 'cmds': [
-                    {'cmd_args': ['$(PYTHON)/python', '$(SOURCE_ROOT)/build/scripts/fs_tools.py', 'copy', src, dst]}
+                    {
+                        'cmd_args': test_common.get_python_cmd(opts=opts)
+                        + ['$(SOURCE_ROOT)/build/scripts/fs_tools.py', 'copy', src, dst]
+                    }
                 ],
                 'deps': [],
                 'inputs': [src],
