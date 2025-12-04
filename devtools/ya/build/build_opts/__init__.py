@@ -3197,13 +3197,19 @@ class DistCacheOptions(DistCacheSetupOptions):
                 arg_opts=dict(
                     hook=lambda n: SetConstValueHook(n, True),
                     group=YT_CACHE_CONTROL_GROUP,
-                    # TODO (YA-2800) Make visible when YtStore2 becomes ready
-                    visible=HelpLevel.NONE,
                 ),
                 env_opts=dict(
-                    hook=lambda n: SetConstValueHook(n, True),
+                    hook=lambda n: SetValueHook(n, transform=return_true_if_enabled),
                 ),
                 cfg_opts={},
+            )
+            + make_opt_consumers(
+                'no_yt_store2',
+                help='Disable yt store client v2',
+                arg_opts=dict(
+                    hook=lambda n: SetConstValueHook('yt_store2', False),
+                    group=YT_CACHE_CONTROL_GROUP,
+                ),
             )
             + make_opt_consumers(
                 'yt_store_init_timeout',
