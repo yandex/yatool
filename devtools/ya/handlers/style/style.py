@@ -80,12 +80,12 @@ def _style(style_opts: StyleOptions, styler: stlr.Styler, target: trgt.Target) -
     target_path = target.path
 
     if target.stdin:
-        print(styler.format(target_path, content).content)
+        print(styler.format(target_path, content, target.stdin).content)
         return StyleOutput(rc=0, styler=styler)
 
     target_path = tp.cast(Path, target_path)  # could be PurePath only when from stdin
     if style_opts.force or not (reason := rules.get_skip_reason(str(target_path), content)):
-        styler_output = styler.format(target_path, content)
+        styler_output = styler.format(target_path, content, target.stdin)
         if styler_output.content == content:
             return StyleOutput(rc=0, styler=styler, config=styler_output.config)
 

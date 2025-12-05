@@ -11,7 +11,6 @@ from enum import StrEnum, auto
 from pathlib import PurePath
 
 import devtools.ya.test.const as const
-import exts.func
 import exts.os2
 import yalibrary.display
 import yalibrary.makelists
@@ -86,13 +85,13 @@ def select_suitable_stylers(
 
     matches = _SUFFIX_MAPPING.get(target.path.suffix, set()) | _NAME_MAPPING.get(target.path.name, set())
     if not matches:
-        logger.warning('skip %s (sufficient styler not found)', target)
+        logger.warning('skip %s (sufficient styler not found)', target.path)
         return set()
 
     if file_types:
         stylers = {m for m in matches if m.kind in file_types}
         if not stylers:
-            logger.warning('skip %s (filtered by file type)', target)
+            logger.warning('skip %s (filtered by file type)', target.path)
             return set()
     else:
         stylers = set()
@@ -108,7 +107,7 @@ def select_suitable_stylers(
                 stylers.add(m)
         if not stylers:
             options = ' or '.join(f'--{m.kind}' for m in matches)
-            logger.warning('skip %s (require explicit %s or --all)', target, options)
+            logger.warning('skip %s (require explicit %s or --all)', target.path, options)
             return set()
 
     if target.passed_directly:
@@ -120,7 +119,7 @@ def select_suitable_stylers(
         for pattern in styler.ignore:
             if target.path.match(pattern):
                 # TODO: Python3.13 Use pathlib.PurePath.full_match
-                logger.warning('skip %s (filtered by ignore rules)', target)
+                logger.warning('skip %s (filtered by ignore rules)', target.path)
                 break
         else:
             filtered.add(styler)
@@ -139,8 +138,16 @@ class Styler(tp.Protocol):
 
     def __init__(self, styler_opts: StylerOptions) -> None: ...
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
-        """Format and return output"""
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
+        """
+        Format and return output. The function mustn't change the file.
+        It should only return the formatted content.
+
+        `path` is a PurePath when it's passed with --stdin-filename option,
+        otherwise it's a Path
+        `content` is a file content or content read from stdin
+        `stdin` signifies that the input comes from stdin
+        """
         ...
 
 
@@ -198,7 +205,7 @@ class Black:
 
         return StylerOutput(out, config)
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         return self._run_black(content, path)
 
 
@@ -258,7 +265,7 @@ class Ruff:
 
         return out
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         ruff_config = self._config_finder.lookup_config(path)
 
         stdin_filename = ["--stdin-filename", str(path)]
@@ -306,7 +313,7 @@ class ClangFormat:
             )
         )
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         if path.suffix == ".h":
             p = path.as_posix()
             if 'yql/essentials/parser/pg_catalog' in p or 'yql/essentials/parser/pg_wrapper' in p:
@@ -413,7 +420,7 @@ class Golang:
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yoimports")  # type: ignore
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         p = subprocess.Popen(
             [self._tool, "-"],
             stdin=subprocess.PIPE,
@@ -445,7 +452,7 @@ class YaMake:
     def __init__(self, styler_opts: StylerOptions) -> None:
         pass
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         yamake = yalibrary.makelists.from_str(content)
         return StylerOutput(yamake.dump())
 
@@ -483,7 +490,7 @@ class Yql:
 
         return out
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         return StylerOutput(self._run_format(path, content))
 
 
@@ -520,7 +527,7 @@ class StyLua:
 
         return out
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         return StylerOutput(self._run_format(path, content))
 
 
@@ -573,19 +580,45 @@ class YamlFmt:
             ),
         )
 
-    def _run_format(self, path: PurePath, content: str) -> StylerOutput:
+    def _run_format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         config = self._config_finder.lookup_config(path)
-        args = [self._tool, '-conf', config.path, '-']
-
-        p = subprocess.Popen(
-            args,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=False,
-            text=True,
-        )
-        out, err = p.communicate(input=content)
+        if stdin:
+            args = [self._tool, '-conf', config.path, '-']
+            p = subprocess.Popen(
+                args,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=False,
+                text=True,
+            )
+            out, err = p.communicate(input=content)
+        else:
+            # XXX: yamlfmt doesn't support -stdin_filename, include/exclude
+            # config settings don't work if the input comes from stdin so we
+            # first have to check if the modification would happen. If yes, then
+            # we get the formatted content by passing it to yamlfmt's stdin.
+            # If no, then we might as well return the original file content.
+            args = [self._tool, '-conf', config.path, '-dry', '-q', path]
+            p = subprocess.run(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if not p.stdout:
+                out, err = content, p.stderr
+            elif not p.returncode:
+                args = [self._tool, '-conf', config.path, '-']
+                p = subprocess.Popen(
+                    args,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    shell=False,
+                    text=True,
+                )
+                out, err = p.communicate(input=content)
 
         # Abort styling on signal
         if p.returncode < 0:
@@ -596,8 +629,8 @@ class YamlFmt:
 
         return StylerOutput(out, config)
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
-        return self._run_format(path, content)
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
+        return self._run_format(path, content, stdin)
 
 
 @_register
@@ -628,5 +661,5 @@ class EOLFmt:
         out = re.sub(self._pattern, '', content)
         return StylerOutput(out)
 
-    def format(self, path: PurePath, content: str) -> StylerOutput:
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         return self._run_format(path, content)
