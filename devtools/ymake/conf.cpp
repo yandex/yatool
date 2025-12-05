@@ -11,6 +11,7 @@
 #include <devtools/ymake/macro_string.h>
 #include <devtools/ymake/plugins/cpp_plugins.h>
 #include <devtools/ymake/lang/plugin_facade.h>
+#include <devtools/ymake/python_runtime.h>
 #include <devtools/ymake/vardefs.h>
 #include <devtools/ymake/yndex/builtin.h>
 #include <devtools/ymake/diag/diag.h>
@@ -278,6 +279,8 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
 
+    FillMiscValues();
+
     // this code hangs on win while trying to lock locked non-recursive mutex
     // (after an error that file is not found)
     if (!DontUsePlugins) {
@@ -325,7 +328,6 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     extraData.Update(rules.RawData);
     confData.Update(rules.RawData);
 
-    FillMiscValues();
     InitExcludedPeerdirs();
 
     confData.Final(YmakeConfMD5.RawData);
@@ -512,4 +514,23 @@ bool TBuildConfiguration::IsIncludeOnly(const TStringBuf& name) const {
 
 bool TBuildConfiguration::IsRequiredBuildAndSrcRoots(const TStringBuf& lang) const {
     return Find(LangsRequireBuildAndSrcRoots, lang) != LangsRequireBuildAndSrcRoots.end();
+}
+
+void TBuildConfiguration::LoadPlugins() {
+    if (!SubState && SubinterpreterStateGetter) {
+        SubState = SubinterpreterStateGetter();
+        if (NYMake::CurrentThreadStateScope) {
+            NYMake::CurrentThreadStateScope->Set(SubState);
+        }
+    }
+    ::LoadPlugins(PluginsRoots, Plugins, WriteConfCache ? BuildRoot : TFsPath{}, this);
+}
+
+void TBuildConfiguration::ClearPlugins() {
+    if (!PluginsInitilized) {
+        return;
+    }
+    NYMake::TPythonThreadStateScope finiState{SubState};
+    ParserPlugins.clear();
+    MacroFacade.Clear();
 }

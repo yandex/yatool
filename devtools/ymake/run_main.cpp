@@ -164,23 +164,22 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
 // logger initialization and it's failure is reported later. This var keeps mlock call result.
 bool MLOCK_FAILED = false;
 
-asio::awaitable<int> RunConfigure(TVector<const char*> value, PyInterpreterState* interp, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
+asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyInterpreterState*()> subinterpreterStateGetter, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
     TBuildConfiguration conf;
+    conf.SubinterpreterStateGetter = subinterpreterStateGetter;
     TMaybe<EBuildResult> result{};
     {
-        NYMake::TPythonThreadStateScope initState{interp};
+        NYMake::TPythonThreadStateScope initState{nullptr};
         result = InitConf(value, conf, pipeline);
     }
 
     Y_DEFER {
-        NYMake::TPythonThreadStateScope finiState{interp};
         conf.ClearPlugins();
     };
 
     if (result.Defined()) {
         co_return result.GetRef();
     }
-    conf.SubState = interp;
 
     if (MLOCK_FAILED) {
         YDebug() << "mlockall failed" << Endl;
@@ -242,7 +241,7 @@ void SubmitNextConfigIfAny(NYMake::TPythonRuntimeScope& pythonRuntime, TAdaptive
     with_lock(confQueueLock) {
         channels.push_back(p); // TODO: mb other lock
     }
-    asio::co_spawn(proxy, RunConfigure(config.CmdLine, pythonRuntime.GetSubinterpreterState(config.Id), proxy, *pipeline), [p, &pythonRuntime, &confQueueLock, &confQueue, exec, &pipeline, &channels](std::exception_ptr ptr, int rc) {
+    asio::co_spawn(proxy, RunConfigure(config.CmdLine, pythonRuntime.GetSubinterpreterStateGetter(config.Id), proxy, *pipeline), [p, &pythonRuntime, &confQueueLock, &confQueue, exec, &pipeline, &channels](std::exception_ptr ptr, int rc) {
         if (ptr) {
             p->cancel();
             std::rethrow_exception(ptr);

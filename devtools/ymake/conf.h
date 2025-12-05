@@ -38,6 +38,8 @@ constexpr TStringBuf MODULE_MANGLING_DELIM = "__from__";
 
 class TFileConf;
 struct IMemoryPool;
+struct _is;
+typedef struct _is PyInterpreterState;
 
 /// required directories - source, build, svn and path operations only
 // build configuration operates local-formatted paths
@@ -70,7 +72,8 @@ public:
     THashSet<TStringBuf> GlobRestrictionExtends{};
     bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
 
-    void* SubState = nullptr;
+    PyInterpreterState* SubState = nullptr;
+    std::function<PyInterpreterState*()> SubinterpreterStateGetter;
 
 public:
     TBuildConfiguration();
@@ -86,14 +89,9 @@ public:
     void RegisterPluginParser(const TString& ext, TSimpleSharedPtr<TParser> parser) {
         MacroFacade.RegisterParser(*this, ext, parser);
     }
-    void ClearPlugins() {
-        ParserPlugins.clear();
-        MacroFacade.Clear();
-    }
+    void ClearPlugins();
 
-    void LoadPlugins() {
-        ::LoadPlugins(PluginsRoots, Plugins, WriteConfCache ? BuildRoot : TFsPath{}, this);
-    }
+    void LoadPlugins();
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
