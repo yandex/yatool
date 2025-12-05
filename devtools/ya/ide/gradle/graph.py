@@ -47,9 +47,7 @@ class _JavaSemGraph(SemGraph):
     _BUILD_ROOT = '$B/'  # Build root in graph
 
     _OLD_AP_SEM = 'annotation_processors'
-    _NOW_AP_SEM = 'use_annotation_processor'
     _NEW_AP_SEM = 'use_annotation_processors'
-    _NOW_KAPT_SEM = 'kapt-classpaths'
     _NEW_KAPT_SEM = 'kapt-kapts'
     JAR_SEM = 'jar'
     JAR_PROTO_SEM = 'jar_proto'
@@ -258,9 +256,9 @@ class _JavaSemGraph(SemGraph):
                 self.handmade_ap2dep_ids[node.id] = []
             for semantic in node.semantics:
                 sem0 = semantic.sems[0]
-                if sem0 == self._OLD_AP_SEM or (sem0 == self._NOW_KAPT_SEM) or (sem0 == self._NEW_KAPT_SEM + '-jar'):
+                if sem0 == self._OLD_AP_SEM or (sem0 == self._NEW_KAPT_SEM + '-jar'):
                     self.node2dep_ids[node.id] = []  # require collect deps for patch AP classes to AP paths
-                elif sem0 == self._NOW_AP_SEM or sem0 == (self._NEW_AP_SEM + '-jar'):
+                elif sem0 == (self._NEW_AP_SEM + '-jar'):
                     self.use_ap_node_ids.append(node.id)  # collect node ids to check for versions of all AP
 
     def _do_patch_annotation_processors(self) -> None:
@@ -353,7 +351,7 @@ class _JavaSemGraph(SemGraph):
                         self.logger.error("Not found path for AP class %s, skip it", ap_class)
                         # Skip usage unknown AP class
                 continue
-            elif sem0 == self._NOW_KAPT_SEM or sem0 == (self._NEW_KAPT_SEM + '-jar'):
+            elif sem0 == (self._NEW_KAPT_SEM + '-jar'):
                 kapt_deps = []
                 kapt_classpaths = semantic.sems[1:]
                 node_dep_paths = []
@@ -412,7 +410,7 @@ class _JavaSemGraph(SemGraph):
 
     def _check_annotation_processors_has_version(self, node: SemNode) -> None:
         for semantic in node.semantics:
-            if (semantic.sems[0] == self._NOW_AP_SEM) or (semantic.sems[0] == (self._NEW_AP_SEM + '-jar')):
+            if semantic.sems[0] == (self._NEW_AP_SEM + '-jar'):
                 for ap_path in semantic.sems[1:]:
                     if (
                         not self.handmade_ap_re or not self.handmade_ap_re.match(ap_path)
