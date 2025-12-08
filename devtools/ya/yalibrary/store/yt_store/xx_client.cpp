@@ -1910,7 +1910,7 @@ namespace NYa {
             TConfigureResultPtr GetValue() {
                 Y_ENSURE_FATAL(Future.Initialized(), "Initialization should start before getting value");
                 if (!Future.Wait(DeadLine)) {
-                    ythrow TYtStoreInitTimeoutError();
+                    ythrow TYtStoreInitTimeoutError() << "Initialization timed out";
                 }
                 return Future.GetValueSync();
             }
@@ -2476,7 +2476,7 @@ namespace NYa {
                     auto groupFuture = appropriateResultReceived ? NThreading::NWait::WaitAny(payloadFuture, needResultFuture) : payloadFuture;
                     if (!groupFuture.Wait(deadLine)) {
                         if (!currentResult) {
-                            ythrow TYtStorePrepareTimeoutError();
+                            ythrow TYtStorePrepareTimeoutError() << "Prepare timed out";
                         }
                         break;
                     }

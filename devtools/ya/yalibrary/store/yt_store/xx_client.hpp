@@ -99,7 +99,6 @@ namespace NYa {
         TYtStoreInitTimeoutError()
             : TYtStoreError(true)
         {
-            *this << "Initialization timed out";
         }
     };
 
@@ -107,7 +106,6 @@ namespace NYa {
         TYtStorePrepareTimeoutError()
             : TYtStoreError(true)
         {
-            *this << "Prepare timed out";
         }
     };
 
