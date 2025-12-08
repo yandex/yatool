@@ -2541,12 +2541,13 @@ namespace NYa {
                 }
             }
             NYT::TNode::TListType rows{};
+            auto startTime = TInstant::Now();
             if (config->Version >= 3 && options->ContentUidsEnabled) {
                 Y_ENSURE_FATAL(!options->SelfUids.empty(), "SelfUids list must not be empty");
                 TString query{};
                 TStringOutput queryOut{query};
                 queryOut << JoinSeq(",", loadedColumns) << " from [" << NYT::JoinYPaths(task->DataDir, METADATA_TABLE) << "]";
-                queryOut << "where self_uid in (";
+                queryOut << " where self_uid in (";
                 for (auto it = options->SelfUids.begin(); it != options->SelfUids.end(); ++it) {
                     if (it != options->SelfUids.begin()) {
                         queryOut << ',';
@@ -2577,7 +2578,7 @@ namespace NYa {
             }
             cancellationToken.ThrowIfCancellationRequested();
 
-            DEBUG_LOG << "Fetched " << rows.size() << " metadata rows from "<< task->Proxy << ":" << task->DataDir;
+            DEBUG_LOG << "Fetched " << rows.size() << " metadata rows from "<< task->Proxy << ":" << task->DataDir << " in " << (TInstant::Now() - startTime);
             TMetaData result{};
             for (auto& row : rows) {
                 if (const NYT::TNode* cuidPtr = row.AsMap().FindPtr("cuid")) {
