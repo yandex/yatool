@@ -490,7 +490,8 @@ cdef class YtStore2Impl:
         for u in uids:
             options.Get().Uids.push_back(u.encode())
         options.Get().RefreshOnRead = refresh_on_read
-        options.Get().ContentUidsEnabled = content_uids
+        # XXX TODO YA-2886
+        # options.Get().ContentUidsEnabled = content_uids
         with nogil:
             self._store_ptr.Prepare(options)
 
