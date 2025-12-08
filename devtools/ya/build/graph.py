@@ -1964,7 +1964,7 @@ class _GraphMaker:
             ev_listener=self._get_event_listener_debug_id_wrapper(ev_listener, debug_id, tc),
             enabled_events=enabled_events,
             no_caches_on_retry=no_caches_on_retry,
-            no_ymake_retry=no_ymake_retry,
+            no_ymake_retry=no_ymake_retry or self._opts.ymake_multiconfig,
             disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
             parallel_rendering=self._opts.ymake_parallel_rendering,
             use_subinterpreters=self._opts.ymake_use_subinterpreters,

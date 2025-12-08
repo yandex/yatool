@@ -249,7 +249,7 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
     }
 
     if (exitCode != 0) {
-        Cerr << errStream.Str() << Endl;
+        Cerr << Endl << errStream.Str() << Endl;
     }
 
     for (const auto& [i, param]: Enumerate(params)) {
