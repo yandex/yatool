@@ -2280,7 +2280,7 @@ namespace NYa {
         }
 
         void Check(TConfigureResultPtr config) {
-            if (!config->Replicated || config->RequireSyncReplica && !ReadOnly_ && CritLevel_ == ECritLevel::PUT) {
+            if ((!config->Replicated || config->RequireSyncReplica) && CritLevel_ != ECritLevel::NONE) {
                 // Check important tables availability
                 for (const NYT::TYPath& table : {METADATA_TABLE, DATA_TABLE}) {
                     TString query = "1 from [" + NYT::JoinYPaths(config->MainCluster.DataDir, table) + "] limit 1";
