@@ -95,6 +95,22 @@ namespace NYa {
         bool Mute{};
     };
 
+    struct TYtStoreInitTimeoutError : public TYtStoreError {
+        TYtStoreInitTimeoutError()
+            : TYtStoreError(true)
+        {
+            *this << "Initialization timed out";
+        }
+    };
+
+    struct TYtStorePrepareTimeoutError : public TYtStoreError {
+        TYtStorePrepareTimeoutError()
+            : TYtStoreError(true)
+        {
+            *this << "Prepare timed out";
+        }
+    };
+
     // This exception reports about an incorrect YtStore usage or internal error.
     struct TYtStoreFatalError : public yexception {
     };
