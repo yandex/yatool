@@ -142,6 +142,7 @@ def get_config_files(cmd_name=None, user_config=True, global_config=True):
                 dirs.append(devtools.ya.core.config.junk_path(repository_root))
 
             dirs += [
+                repository_root,
                 os.path.dirname(repository_root),
                 devtools.ya.core.config.misc_root(),
                 xdg_config_home,
