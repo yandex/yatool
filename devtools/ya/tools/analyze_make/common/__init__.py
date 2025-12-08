@@ -124,9 +124,9 @@ def load_from_evlog(evlog_reader, detailed=False):
 
         if v['namespace'] == 'ymake':
             if v['event'] == ymake_stage_started:
-                opened_ymake_stages[(v['thread_name'], v['value']['StageName'])] = v
+                opened_ymake_stages[(v['value']['ymake_run_uid'], v['value']['StageName'])] = v
             elif v['event'] == ymake_stage_finished:
-                ymake_nodes.append((opened_ymake_stages[(v['thread_name'], v['value']['StageName'])], v))
+                ymake_nodes.append((opened_ymake_stages[(v['value']['ymake_run_uid'], v['value']['StageName'])], v))
 
     for x, y in ymake_nodes:
         yield Node(
