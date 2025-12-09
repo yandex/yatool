@@ -960,7 +960,11 @@ class Context:
 
         self.ymake_stats = YmakeTimeStatistic()
         self.configure_errors = {}
-        if graph is not None and tests is not None:
+        if (graph is not None or opts.custom_json) and tests is not None:
+            if graph is None and opts.custom_json:
+                with udopen(opts.custom_json, "rb") as custom_json_file:
+                    graph = sjson.load(custom_json_file, intern_keys=True, intern_vals=True)
+                    lg.finalize_graph(graph, opts)
             self.graph = graph
             self.tests = tests
             self.stripped_tests = []
