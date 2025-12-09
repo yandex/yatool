@@ -1,10 +1,11 @@
 import logging
 from pathlib import Path
+from datetime import datetime
 
 from devtools.ya.core import yarg
 from devtools.ya.build import build_opts, ya_make
 
-from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException
+from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException, ExclusiveLock
 from devtools.ya.ide.gradle.config import _JavaSemConfig
 from devtools.ya.ide.gradle.graph import _JavaSemGraph
 
@@ -93,8 +94,17 @@ class _Builder:
             self.logger.info(
                 "Building %i %s targets...", len(build_rel_targets), "foreign" if build_all_langs else "java"
             )
+            lock = None
+            if self.config.params.exclusive_lock_build:
+                start = datetime.now()
+                self.logger.info("Getting lock for build...")
+                lock = ExclusiveLock(self.config.export_root.parent / 'build')
+                lock.acquire()
+                self.logger.info("Got lock for build [ %.4fs ]", (datetime.now() - start).total_seconds())
             builder = ya_make.YaMake(opts, app_ctx)
             return_code = builder.go()
+            if lock:
+                lock.release()
             if return_code != 0:
                 raise YaIdeGradleException('Some builds failed')
         except Exception as e:

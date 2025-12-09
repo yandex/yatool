@@ -102,12 +102,20 @@ class SemConfig:
     def _prepare_targets(self) -> None:
         """Add current directory to input targets, if targets empty"""
         if not self.params.abs_targets:
-            abs_target = Path.cwd().resolve()
-            self.params.abs_targets.append(str(abs_target))
-            self.params.rel_targets.append(os.path.relpath(abs_target, self.arcadia_root))
+            path_abs_target = Path.cwd().resolve()
+            if path_abs_target.is_relative_to(self.arcadia_root):
+                self.params.abs_targets.append(str(path_abs_target))
+                self.params.rel_targets.append(str(path_abs_target.relative_to(self.arcadia_root)))
+            else:
+                raise SemException("Not found targets for export")
         for abs_target in self.params.abs_targets:
-            if not Path(abs_target).exists():
-                raise SemException(f"Not found target {abs_target}")
+            path_abs_target = Path(abs_target)
+            if not path_abs_target.exists():
+                raise SemException(f"Not found target {path_abs_target}")
+            if self.arcadia_root == path_abs_target:
+                raise SemException("Full arcadia can't be used as target")
+            if not path_abs_target.is_relative_to(self.arcadia_root):
+                raise SemException(f"Path {path_abs_target} outside arcadia")
         self.logger.info("Targets: %s", self.params.rel_targets)
 
     def _get_export_root(self) -> Path:

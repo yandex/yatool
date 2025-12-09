@@ -391,6 +391,7 @@ class GradleOptions(yarg.Options):
     EXPOPT_YEXPORT_TOML = '--yexport-toml'
     EXPOPT_DUMP_YMAKE_STDERR = '--dump-ymake-stderr'
     EXPOPT_YEXPORT_DEBUG_MODE = '--yexport-debug-mode'
+    EXPOPT_EXCLUSIVE_LOCK_BUILD = '--exclusive-lock-build'
 
     AVAILABLE_JDK_VERSIONS = ('11', '17', '21', '22', '23', '24', '25')
     # Gradle >= 9 require JDK17 or above
@@ -420,6 +421,7 @@ class GradleOptions(yarg.Options):
         self.yexport_toml: list[str] = []
         self.dump_ymake_stderr: str = None
         self.yexport_debug_mode: str = None
+        self.exclusive_lock_build: bool = False
 
     @staticmethod
     def consumer():
@@ -554,6 +556,13 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.EXPOPT_YEXPORT_DEBUG_MODE],
                 help='Debug mode for yexport',
                 hook=yarg.SetValueHook('yexport_debug_mode'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.EXPOPT_EXCLUSIVE_LOCK_BUILD],
+                help='Exclusive lock during prebuild depends (recommended for few parallel ya ide gradle)',
+                hook=yarg.SetConstValueHook('exclusive_lock_build', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
                 visible=HelpLevel.EXPERT,
             ),

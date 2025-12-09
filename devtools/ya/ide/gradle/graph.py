@@ -2,6 +2,7 @@ import os
 import logging
 import re
 from pathlib import Path
+from datetime import datetime
 
 from devtools.ya.core import event_handling
 from devtools.ya.build.sem_graph import SemNode, SemDep, Semantic, SemGraph
@@ -102,7 +103,10 @@ class _JavaSemGraph(SemGraph):
                 app_ctx.event_queue.subscribe(foreign_subscriber)
 
             # FIXME(dimdim11) - all semgraph calls save cache to one point, without exclusive lock make semgraph may fail
+            start = datetime.now()
+            self.logger.info("Getting lock for semgraph...")
             with ExclusiveLock(self.config.export_root.parent / 'semgraph'):
+                self.logger.info("Got lock for semgraph [ %.4fs ]", (datetime.now() - start).total_seconds())
                 super().make(
                     **kwargs,
                     dump_raw_graph=(
