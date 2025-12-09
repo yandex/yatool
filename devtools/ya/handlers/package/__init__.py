@@ -89,5 +89,6 @@ class PackageYaHandler(devtools.ya.core.yarg.OptsHandler):
             ]
             + build_opts.distbs_options()
             + build_opts.checkout_options()
-            + build_opts.svn_checkout_options(),
+            + build_opts.svn_checkout_options()
+            + build_opts.build_graph_cache_config_opts(),
         )

@@ -176,6 +176,13 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     build_options.pgo_user_path = build_info.get("pgo_use", params.pgo_user_path)
 
+    # Build graph cache options
+    build_options.debug_options = params.debug_options
+    build_options.build_graph_cache_dir = params.build_graph_cache_dir
+    build_options.build_graph_cache_archive = params.build_graph_cache_archive
+    build_options.build_graph_cache_cl = params.build_graph_cache_cl
+    build_options.build_graph_cache_trust_cl = params.build_graph_cache_trust_cl
+
     build_options.build_threads = params.build_threads
     build_options.output_root = build_info["output_root"]
     build_options.create_symlinks = False
