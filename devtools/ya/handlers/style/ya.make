@@ -34,6 +34,7 @@ PY_SRCS(
     style.py
     styler.py
     target.py
+    validate.py
 )
 
 END()

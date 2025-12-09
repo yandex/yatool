@@ -6,8 +6,8 @@ import typing as tp
 from collections.abc import Generator, Callable, Iterable
 from pathlib import Path, PurePath
 
-from . import state_helper
-from . import styler
+import devtools.ya.handlers.style.state_helper as state_helper
+import devtools.ya.handlers.style.styler as stlr
 
 
 STDIN_FILENAME = 'source.cpp'
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class MineOptions(tp.NamedTuple):
     targets: tuple[Path, ...]
-    file_types: tuple[styler.StylerKind, ...] = ()
+    file_types: tuple[stlr.StylerKind, ...] = ()
     stdin_filename: str = STDIN_FILENAME
     tty: bool = os.isatty(sys.stdin.fileno())
     enable_implicit_taxi_formatters: bool = False
@@ -65,11 +65,11 @@ def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
     yield from _mine_filepath_targets(paths)
 
 
-def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, set[type[styler.Styler]]]]:
+def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, set[type[stlr.Styler]]]]:
     for target in _mine_targets(mine_opts):
         state_helper.check_cancel_state()
 
-        if styler_classes := styler.select_suitable_stylers(
+        if styler_classes := stlr.select_suitable_stylers(
             target=target,
             file_types=mine_opts.file_types,
             enable_implicit_taxi_formatters=mine_opts.enable_implicit_taxi_formatters,

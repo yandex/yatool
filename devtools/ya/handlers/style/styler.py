@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 import os
 import re
@@ -16,11 +17,11 @@ import yalibrary.display
 import yalibrary.makelists
 import yalibrary.tools
 
-from . import config as cfg
-from . import state_helper
+import devtools.ya.handlers.style.config as cfg
+import devtools.ya.handlers.style.state_helper as state_helper
 
 if tp.TYPE_CHECKING:
-    from . import target as trgt
+    import devtools.ya.handlers.style.target as trgt
 
 logger = logging.getLogger(__name__)
 display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
@@ -152,11 +153,16 @@ class Styler(tp.Protocol):
 
 
 class ConfigurableStyler(Styler, tp.Protocol):
-    _config_finder: cfg.ConfigFinder
+    config_finder: cfg.ConfigFinder
 
 
 def is_configurable(styler: Styler) -> tp.TypeGuard[ConfigurableStyler]:
-    return hasattr(styler, '_config_finder')
+    return hasattr(styler, 'config_finder')
+
+
+@functools.cache
+def init_styler_cached(cls: type[Styler], opts: StylerOptions):
+    return cls(opts)
 
 
 @_register
@@ -169,7 +175,7 @@ class Black:
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("black" if not styler_opts.py2 else "black_py2")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
@@ -183,7 +189,7 @@ class Black:
         )
 
     def _run_black(self, content: str, path: PurePath) -> StylerOutput:
-        config = self._config_finder.lookup_config(path)
+        config = self.config_finder.lookup_config(path)
         black_args = [self._tool, "-q", "-", "--config", config.path]
 
         p = subprocess.Popen(
@@ -219,7 +225,7 @@ class Ruff:
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("ruff")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
@@ -266,7 +272,7 @@ class Ruff:
         return out
 
     def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
-        ruff_config = self._config_finder.lookup_config(path)
+        ruff_config = self.config_finder.lookup_config(path)
 
         stdin_filename = ["--stdin-filename", str(path)]
 
@@ -300,7 +306,7 @@ class ClangFormat:
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             styler_opts.config_loaders
             if styler_opts.config_loaders
             else (
@@ -323,7 +329,7 @@ class ClangFormat:
             else:
                 content = self.fix_header(content)
 
-        config = self._config_finder.lookup_config(path)
+        config = self.config_finder.lookup_config(path)
         p = subprocess.Popen(
             [self._tool, f"-assume-filename={path.name}", f"-style=file:{config.path}"],
             stdin=subprocess.PIPE,
@@ -370,7 +376,7 @@ class ClangFormatYT(ClangFormat):
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("ads-clang-format")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
@@ -385,7 +391,7 @@ class ClangFormat15(ClangFormat):
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format-15")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
@@ -400,7 +406,7 @@ class ClangFormat18Vanilla(ClangFormat):
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format-18-vanilla")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
@@ -541,7 +547,7 @@ class ClangFormatJson(ClangFormat):
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("clang-format")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
@@ -566,7 +572,7 @@ class YamlFmt:
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("yamlfmt")  # type: ignore
-        self._config_finder = cfg.ConfigFinder(
+        self.config_finder = cfg.ConfigFinder(
             (
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
@@ -581,7 +587,7 @@ class YamlFmt:
         )
 
     def _run_format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
-        config = self._config_finder.lookup_config(path)
+        config = self.config_finder.lookup_config(path)
         if stdin:
             args = [self._tool, '-conf', config.path, '-']
             p = subprocess.Popen(

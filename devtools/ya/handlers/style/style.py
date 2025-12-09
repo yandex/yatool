@@ -6,16 +6,17 @@ import logging
 import os
 import sys
 import typing as tp
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import exts.os2
 import yalibrary.display
-from . import config as cfg
-from . import disambiguate
-from . import state_helper
-from . import styler as stlr
-from . import target as trgt
+import devtools.ya.handlers.style.config as cfg
+import devtools.ya.handlers.style.disambiguate as disambiguate
+import devtools.ya.handlers.style.state_helper as state_helper
+import devtools.ya.handlers.style.styler as stlr
+import devtools.ya.handlers.style.target as trgt
+import devtools.ya.handlers.style.validate as vldt
 from library.python.testing.style import rules
 from library.python.fs import replace_file
 
@@ -29,12 +30,6 @@ class StyleOptions(tp.NamedTuple):
     dry_run: bool = False
     check: bool = False
     full_output: bool = False
-
-
-class StyleOutput(tp.NamedTuple):
-    rc: int
-    styler: stlr.Styler | None = None
-    config: cfg.MaybeConfig = None
 
 
 def _setup_logging(quiet: bool = False) -> None:
@@ -71,59 +66,66 @@ def _flush_to_terminal(content: str, formatted_content: str, full_output: bool) 
         display.emit_message(diff)
 
 
-def _style(style_opts: StyleOptions, styler: stlr.Styler, target: trgt.Target) -> StyleOutput:
+def _style(style_opts: StyleOptions, stylers: list[stlr.Styler], target: trgt.Target) -> int:
     """
     Execute `format` and store or display the result.
     Return 0 if no formatting happened, 1 otherwise
     """
-    content = target.reader()
+    orig_content = content = target.reader()
     target_path = target.path
 
     if target.stdin:
-        print(styler.format(target_path, content, target.stdin).content)
-        return StyleOutput(rc=0, styler=styler)
+        for styler in stylers:
+            content = styler.format(target_path, content, target.stdin).content
+        print(content)
+        return 0
 
     target_path = tp.cast(Path, target_path)  # could be PurePath only when from stdin
     if style_opts.force or not (reason := rules.get_skip_reason(str(target_path), content)):
-        styler_output = styler.format(target_path, content, target.stdin)
-        if styler_output.content == content:
-            return StyleOutput(rc=0, styler=styler, config=styler_output.config)
+        message = ""
+        for styler in stylers:
+            styler_output = styler.format(target_path, content, target.stdin)
+            content = styler_output.content
+            message += f"[[good]]{type(styler).__name__} styler fixed {target_path}[[rst]]"
+            if styler_output.config:
+                message += f" [[unimp]](config: {styler_output.config.pretty})[[rst]]"
+            message += "\n"
+
+        # TODO: check out cityhash comparison performance
+        if content == orig_content:
+            return 0
 
         if not style_opts.dry_run and style_opts.check:
-            return StyleOutput(rc=1, styler=styler, config=styler_output.config)
-
-        message = f"[[good]]{type(styler).__name__} styler fixed {target_path}[[rst]]"
-        if styler_output.config:
-            message += f" [[unimp]](config: {styler_output.config.pretty})[[rst]]"
+            return 1
 
         if not style_opts.dry_run and not style_opts.check:
             display.emit_message(message)
-            _flush_to_file(str(target_path), styler_output.content)
+            _flush_to_file(str(target_path), content)
         elif style_opts.dry_run:
             display.emit_message(message)
-            _flush_to_terminal(content, styler_output.content, style_opts.full_output)
-        return StyleOutput(rc=1, styler=styler, config=styler_output.config)
+            _flush_to_terminal(orig_content, content, style_opts.full_output)
+        return 1
     else:
         logger.warning("skip by rule: %s", reason)
 
-    return StyleOutput(rc=0)
+    return 0
 
 
-def _collect_style_targets(
+def _collect_target_stylers(
     mine_opts: trgt.MineOptions,
     disambiguation_opts: disambiguate.DisambiguationOptions,
-) -> tuple[dict[type[stlr.Styler], list[trgt.Target]], list[str]]:
-    style_targets: dict[type[stlr.Styler], list[trgt.Target]] = {}
-    disamb_errors: list[str] = []
+) -> Generator[tuple[trgt.Target, list[type[stlr.Styler]], list[str]]]:
     key_fn: Callable[[type[stlr.Styler]], stlr.StylerKind] = lambda sc: sc.kind
     for target, styler_classes in trgt.discover_style_targets(mine_opts):
+        target_stylers: list[type[stlr.Styler]] = []
+        disamb_errors: list[str] = []
         for _, styler_group_by_kind in itertools.groupby(sorted(styler_classes, key=key_fn), key=key_fn):
             res = disambiguate.disambiguate_targets(target.path, set(styler_group_by_kind), disambiguation_opts)
             if isinstance(res, str):
                 disamb_errors.append(res)
             else:
-                style_targets.setdefault(res, []).append(target)
-    return style_targets, disamb_errors
+                target_stylers.append(res)
+        yield target, target_stylers, disamb_errors
 
 
 def run_style(args) -> int:
@@ -141,7 +143,6 @@ def run_style(args) -> int:
         use_clang_format_15=args.use_clang_format_15,
         use_clang_format_18_vanilla=args.use_clang_format_18_vanilla,
     )
-    style_targets, disamb_errors = _collect_style_targets(mine_opts, disambiguation_opts)
 
     style_opts = StyleOptions(
         force=args.force,
@@ -151,48 +152,32 @@ def run_style(args) -> int:
     )
     styler_opts = stlr.StylerOptions(py2=args.py2)
 
-    # We may have:
-    # 1. Multiple stylers using the same user config;
-    # 2. A single styler using different user configs for different targets.
-    user_configs: dict[cfg.ConfigPath, set[stlr.ConfigurableStyler]] = {}
-
     rc = 0
+    disamb_errors: list[str] = []
+    validation_configs: set[tuple[cfg.MaybeConfig, cfg.Config, Path]] = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.build_threads) as executor:
-        futures: list[concurrent.futures.Future[StyleOutput]] = []
+        style_futures: list[concurrent.futures.Future[int]] = []
+        for target, styler_classes, errors in _collect_target_stylers(mine_opts, disambiguation_opts):
+            disamb_errors.extend(errors)
+            stylers = [stlr.init_styler_cached(cls, styler_opts) for cls in styler_classes]
+            style_futures.append(executor.submit(_style, style_opts, stylers, target))
+            if args.validate:
+                for styler in filter(stlr.is_configurable, stylers):
+                    if configs := vldt.get_validation_configs(styler, target):
+                        validation_configs.add(configs)
 
-        for styler_class, targets in style_targets.items():
-            styler_ = styler_class(styler_opts)
-            futures.extend(executor.submit(_style, style_opts, styler_, target) for target in targets)
-
-        for future in concurrent.futures.as_completed(futures):
+        for style_future in concurrent.futures.as_completed(style_futures):
             state_helper.check_cancel_state()
             try:
-                out = future.result()
+                rc = style_future.result() or rc
             except stlr.StylingError as e:
-                logger.error(e, exc_info=True)
+                logger.exception(e)
                 return 1
 
-            rc = out.rc or rc
-
-            # save user defined configs for validation
-            if (
-                args.validate
-                and out.styler
-                and stlr.is_configurable(out.styler)
-                and out.config
-                and out.config.user_defined
-            ):
-                user_configs.setdefault(out.config.path, set()).add(out.styler)
-
-    for config_path, stylers in user_configs.items():
-        for styler, rules_config, errors in cfg.validate(config_path, stylers):
-            logger.info(
-                'Config validation failed for config %s, styler %s, rules %s',
-                config_path,
-                type(styler).__name__,
-                rules_config,
-            )
-            logger.info('\n'.join(errors) + '\n')
+    for configs in validation_configs:
+        state_helper.check_cancel_state()
+        if error := vldt.validate(*configs):
+            logger.info(error)
 
     if disamb_errors:
         logger.warning(

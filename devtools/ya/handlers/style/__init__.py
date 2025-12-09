@@ -1,14 +1,10 @@
+import devtools.ya.app
 import devtools.ya.core.common_opts
 import devtools.ya.core.yarg
-
+import devtools.ya.handlers.style.styler as stlr
+import devtools.ya.handlers.style.target as trgt
+import devtools.ya.handlers.style.style as stl
 from devtools.ya.build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
-import devtools.ya.core.yarg.consumers
-
-from .style import run_style
-from .styler import StylerKind
-from .target import STDIN_FILENAME
-
-import devtools.ya.app
 
 
 class StyleOptions(devtools.ya.core.yarg.Options):
@@ -17,7 +13,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.dry_run = False
         self.check = False
         self.full_output = False
-        self.stdin_filename = STDIN_FILENAME
+        self.stdin_filename = trgt.STDIN_FILENAME
         self.py2 = False
         self.force = False
         self.validate = False
@@ -109,9 +105,9 @@ class FilterOptions(devtools.ya.core.yarg.Options):
 
     @staticmethod
     def consumer():
-        checks = list(StylerKind)
+        checks = list(stlr.StylerKind)
         # temporary until stylua support for all platform is added
-        checks_without_lua = [kind for kind in checks if kind != StylerKind.LUA]
+        checks_without_lua = [kind for kind in checks if kind != stlr.StylerKind.LUA]
 
         return [
             devtools.ya.core.yarg.ArgConsumer(
@@ -153,7 +149,7 @@ class StyleYaHandler(devtools.ya.core.yarg.OptsHandler):
     def __init__(self):
         devtools.ya.core.yarg.OptsHandler.__init__(
             self,
-            action=devtools.ya.app.execute(action=run_style, respawn=devtools.ya.app.RespawnType.OPTIONAL),
+            action=devtools.ya.app.execute(action=stl.run_style, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description,
             opts=[
                 StyleOptions(),
