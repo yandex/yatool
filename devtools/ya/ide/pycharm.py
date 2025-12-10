@@ -60,11 +60,9 @@ def generate_wrappers(params, arcadia_root):
     params.ya_make_extra.extend(['-DBUILD_LANGUAGES=PY3', '-r'])
     ya_make_opts = devtools.ya.core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
     params = devtools.ya.core.yarg.merge_params(ya_make_opts.initialize(params.ya_make_extra), params)
-    old_add_result = params.add_result or []
-    if '_pb2.pyi' not in old_add_result:
-        params.add_result = old_add_result + ['_pb2.pyi']
-    if '.fbs.pysrc' not in old_add_result:
-        params.add_result.append('.fbs.pysrc')
+    if params.do_codegen:
+        to_add = {'.py', '.pyi', '.fbs.pysrc'}
+        params.add_result.extend(to_add - set(params.add_result))
 
     params.create_symlinks = True
     params.force_build_depends = True

@@ -598,6 +598,7 @@ class PycharmOptions(yarg.Options):
         self.wrapper_name = PycharmOptions.PYTHON_WRAPPER_NAME
         self.list_ide = False
         self.ide_version = None
+        self.do_codegen = True
 
     @staticmethod
     def consumer():
@@ -627,6 +628,11 @@ class PycharmOptions(yarg.Options):
                 ),
                 hook=yarg.SetValueHook('ide_version'),
                 group=PycharmOptions.PYCHARM_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                ['--no-codegen'],
+                help='Disable codegen',
+                hook=yarg.SetConstValueHook('do_codegen', False),
             ),
         ]
 
