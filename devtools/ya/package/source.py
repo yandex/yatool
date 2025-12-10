@@ -480,6 +480,9 @@ class BuildOutputSource(Source):
         else:
             self.copy(source, destination)
 
+    def keep_symlinks(self):
+        return self.data['source'].get('untar')
+
 
 class RelativeSource(Source):
     def _prepare(self):
