@@ -565,19 +565,19 @@ def configure_build_graph_cache_dir(app_ctx, opts):
     if opts.build_graph_cache_heater:
         return
 
-    if build_graph_cache:
-        _, _, sandbox_token = app_ctx.fetcher_params
-        build_graph_cache_resource_dir = build_graph_cache.BuildGraphCacheResourceDir(
-            opts, app_ctx.legacy_sandbox_fetcher, sandbox_token
-        )
+    if not build_graph_cache:
+        logger.debug('Build graph cache is not available in opensource')
+        return
+
+    _, _, sandbox_token = app_ctx.fetcher_params
+    build_graph_cache_resource_dir = build_graph_cache.BuildGraphCacheResourceDir(
+        opts, app_ctx.legacy_sandbox_fetcher, sandbox_token
+    )
 
     try:
         logger.debug("Build graph cache processing started")
-        if not build_graph_cache or not build_graph_cache_resource_dir.enabled():
+        if not build_graph_cache_resource_dir.enabled():
             logger.debug("Build graph cache processing disabled")
-            if not build_graph_cache:
-                logger.debug('Build graph cache is not available in opensource')
-                return
 
             if build_graph_cache.is_cache_provided(opts) and not opts.build_graph_cache_cl and not opts.distbuild_patch:
                 logger.warning(
