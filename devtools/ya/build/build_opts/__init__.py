@@ -692,6 +692,10 @@ class PGOOptions(Options):
         if self.pgo_add and self.pgo_user_path:
             raise ArgsValidatingException("Don't use --pgo-add and --pgo-use options together")
 
+    def postprocess2(self, params):
+        if params.pgo_add and getattr(params, 'clang_coverage', False):
+            raise ArgsValidatingException("--pgo-add is not compatible with --clang-coverage")
+
 
 class PICOptions(Options):
     def __init__(self):

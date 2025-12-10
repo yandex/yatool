@@ -1514,6 +1514,9 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
             )
 
     def postprocess2(self, params):
+        if params.clang_coverage and getattr(params, 'pgo_add', False):
+            raise devtools.ya.core.yarg.ArgsValidatingException("--pgo-add is not compatible with --clang-coverage")
+
         coverage_requested = False
 
         if params.go_coverage:
