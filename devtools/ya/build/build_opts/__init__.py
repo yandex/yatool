@@ -2669,8 +2669,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
         super().__init__()
 
         if app_config.in_house:
-            # TODO YA-2887
-            self.yt_proxy = 'kolmogorov.yt.yandex.net'
+            self.yt_proxy = 'markov.yt.yandex.net'
             self.yt_dir = '//home/devtools-cache'
         else:
             self.yt_proxy = ''
@@ -2808,8 +2807,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             logger.warning(
                 "Attempt to use the obsolete YT-store (hahn://home/devtools/cache). Please, remove incorrect settings from all ya.conf files or command line parameters"
             )
-            # TODO YA-2887
-            params.yt_proxy = 'kolmogorov.yt.yandex.net'
+            params.yt_proxy = 'markov.yt.yandex.net'
             params.yt_dir = '//home/devtools-cache'
 
     def _read_token_file(self):
@@ -2861,7 +2859,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_probe_before_put = False
         self.yt_store_probe_before_put_min_size = 0
         self.yt_store_retry_time_limit = None
-        self.yt_store2 = False
+        self.yt_store2 = True
         self.yt_store_init_timeout = None
         self.yt_store_prepare_timeout = None
         self.yt_store_crit = None

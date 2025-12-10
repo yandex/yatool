@@ -1820,7 +1820,7 @@ namespace NYa {
         static constexpr TDuration DATA_GC_MIN_AGE = TDuration::Hours(2);
         static constexpr ui64 DEFAULT_METADATA_TABLET_COUNT = 128;
         static constexpr ui64 DEFAULT_DATA_TABLET_COUNT = 256;
-        static constexpr TDuration DEFAULT_INTERACTIVE_INIT_TIMEOUT = TDuration::Seconds(3);
+        static constexpr TDuration DEFAULT_INTERACTIVE_INIT_TIMEOUT = TDuration::Seconds(5);
         static constexpr TDuration DEFAULT_INTERACTIVE_PREPARE_TIMEOUT = TDuration::Seconds(8); // XXX YA-2886
         static constexpr TDuration DEFAULT_BG_INIT_TIMEOUT = TDuration::Seconds(30);
         static constexpr TDuration DEFAULT_BG_PREPARE_TIMEOUT = TDuration::Seconds(30);
