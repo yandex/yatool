@@ -126,8 +126,8 @@ public:
     void GetDependsToModulesClosure();
     asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) override;
     asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) override;
-    asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)> LoadJsonCacheAsync(asio::any_io_executor exec);
-    asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)> LoadUidsAsync(asio::any_io_executor exec);
+    asio::awaitable<THolder<TMakePlanCache>> LoadJsonCacheAsync(asio::any_io_executor exec);
+    asio::awaitable<THolder<TUidsData>> LoadUidsAsync(asio::any_io_executor exec);
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();

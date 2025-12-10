@@ -892,23 +892,8 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         co_return Nothing();
     }, asio::use_awaitable);
 
-    if (conf.ShouldLoadJsonCacheEarly()) {
-        // Must be started after bad loops detection
-        yMake->JSONCachePreloadingPromise.emplace(yMake->LoadJsonCacheAsync(exec));
-    }
-
-    if (conf.ShouldLoadUidsCacheEarly()) {
-        // Must be started after bad loops detection
-        yMake->UidsCachePreloadingPromise.emplace(yMake->LoadUidsAsync(exec));
-    }
-
     YDebug() << "main: waiting for main flow" << Endl;
     result = co_await std::move(mainFlow);
-    YDebug() << "main: waiting for JSON cache after main flow" << Endl;
-    co_await std::move(GetOrEmptyAwaitable(yMake->JSONCachePreloadingPromise));
-    YDebug() << "main: waiting for UIDS cache after main flow" << Endl;
-    co_await std::move(GetOrEmptyAwaitable(yMake->UidsCachePreloadingPromise));
-    YDebug() << "main: UIDS cache waiting after main flow completed" << Endl;
 
     if (result.Defined()) {
         co_return result.GetRef();

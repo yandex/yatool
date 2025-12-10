@@ -257,7 +257,7 @@ void TYMake::UpdateUnreachableExternalFileChanges() {
     }
 }
 
-asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)> TYMake::LoadJsonCacheAsync(asio::any_io_executor exec) {
+asio::awaitable<THolder<TMakePlanCache>> TYMake::LoadJsonCacheAsync(asio::any_io_executor exec) {
     return asio::co_spawn(exec, [this]() -> asio::awaitable<THolder<TMakePlanCache>> {
         try {
             auto JSONCache = MakeHolder<TMakePlanCache>(Conf);
@@ -267,10 +267,10 @@ asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)> T
             YDebug() << "JSON cache failed to be loaded: " << e.what() << Endl;
             co_return nullptr;
         }
-    }, asio::experimental::use_promise);
+    }, asio::use_awaitable);
 }
 
-asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)> TYMake::LoadUidsAsync(asio::any_io_executor exec) {
+asio::awaitable<THolder<TUidsData>> TYMake::LoadUidsAsync(asio::any_io_executor exec) {
     return asio::co_spawn(exec, [this]() -> asio::awaitable<THolder<TUidsData>> {
         try {
             auto UidsCache = MakeHolder<TUidsData>(GetRestoreContext(), StartTargets);
@@ -280,7 +280,7 @@ asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)> TYMake
             YDebug() << "Uids cache failed to be loaded: " << e.what() << Endl;
             co_return nullptr;
         }
-    }, asio::experimental::use_promise);
+    }, asio::use_awaitable);
 }
 
 void TYMake::InitPluginsAndParsers() {
