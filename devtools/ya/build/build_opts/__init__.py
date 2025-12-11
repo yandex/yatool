@@ -3764,6 +3764,9 @@ def build_graph_cache_config_opts():
                 self.build_graph_use_ymake_cache_params = None
                 self.build_graph_use_ymake_cache_params_str = None
 
+                self.build_graph_cache_use_arc_bin = False
+                self.build_graph_cache_arc_bin = None
+
         return [BuildGraphCacheConfigOptions()]
 
     else:
