@@ -988,10 +988,7 @@ namespace NYa {
                 }
             }
             auto retryClassFunction = [this] (const yexception& e) {
-                if (Disabled_) {
-                    return ERetryErrorClass::NoRetry;
-                }
-                if (IsYtError(e)) {
+                if (!Disabled_ && IsYtError(e) && !IsPermanentError(e)) {
                     return ERetryErrorClass::ShortRetry;
                 }
                 return ERetryErrorClass::NoRetry;
@@ -2155,7 +2152,11 @@ namespace NYa {
                 try {
                     std::rethrow_exception(errPtr);
                 } catch (const std::exception& e) {
-                    errType = TypeName(e);
+                    if (IsYtAuthError(e)) {
+                        errType = "YtAuthError";
+                    } else {
+                        errType = TypeName(e);
+                    }
                     errMessage = e.what();
                 } catch (...) {
                     errType = "UNKNOWN";
@@ -2789,6 +2790,36 @@ namespace NYa {
 
         static inline bool IsYtError(const std::exception& e) {
             return dynamic_cast<const NYT::TErrorResponse*>(&e) || dynamic_cast<const NYT::TTransportError*>(&e);
+        }
+
+        static inline bool IsYtAuthError(const std::exception& e) {
+            static constexpr int authErrorCodes[] = {
+                NYT::NClusterErrorCodes::NRpc::InvalidCredentials,
+                NYT::NClusterErrorCodes::NSecurityClient::AuthenticationError,
+                NYT::NClusterErrorCodes::NSecurityClient::AuthorizationError,
+            };
+
+            if (auto error = dynamic_cast<const NYT::TErrorResponse*>(&e)) {
+                for (auto code : authErrorCodes) {
+                    if (error->GetError().ContainsErrorCode(code)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        static inline bool IsPermanentError(const std::exception& e) {
+            if (IsYtAuthError(e)) {
+                return true;
+            }
+            if (auto error = dynamic_cast<const NYT::TErrorResponse*>(&e)) {
+                // "Error resolving path ..."
+                if (error->GetError().ContainsErrorCode(NYT::NClusterErrorCodes::NYTree::ResolveError)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         bool ProbeMeta(TConfigureResultPtr config, TPrepareResultPtr prepareResultPtr, const TString& selfUid, const TString& uid) {
