@@ -81,6 +81,7 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_stylelint
     devtools/ya/test/programs/test_tool/run_test
     devtools/ya/test/programs/test_tool/run_tsc_typecheck
+    devtools/ya/test/programs/test_tool/run_vitest
     devtools/ya/test/programs/test_tool/run_ut
     devtools/ya/test/programs/test_tool/run_y_benchmark
     devtools/ya/test/programs/test_tool/unify_clang_coverage

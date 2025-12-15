@@ -61,6 +61,7 @@ SUITE_MAP: dict[str, type[types_common.AbstractTestSuite]] = {
     'ts_biome': ts_test.BiomeTestSuite,
     'ts_stylelint': ts_test.StylelintTestSuite,
     'tsc_typecheck': ts_test.TscTypecheckTestSuite,
+    'vitest': ts_test.VitestTestSuite,
     'unittest.py': library_ut.UnitTestSuite,
     'y_benchmark': benchmark.YBenchmarkSuite,
 }

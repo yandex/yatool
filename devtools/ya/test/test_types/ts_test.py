@@ -192,6 +192,48 @@ class JestTestSuite(BaseFrontendRegularSuite):
         return True
 
 
+class VitestTestSuite(BaseFrontendRegularSuite):
+    def get_type(self):
+        return "vitest"
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.REGULAR
+
+    def support_splitting(self, opts=None):
+        return False
+
+    def get_run_cmd(self, opts, retry=None, for_dist_build=True):
+        common_cmd_opts = self._get_run_cmd_opts(opts, retry, for_dist_build)
+        generic_cmd = test_tools.get_test_tool_cmd(
+            opts,
+            "run_vitest",
+            self.global_resources,
+            wrapper=True,
+            run_on_target_platform=True,
+        )
+
+        cmd = (
+            generic_cmd
+            + common_cmd_opts
+            + [
+                "--config",
+                self.meta.config_path,
+                "--ts-config-path",
+                self.meta.ts_config_path,
+                "--timeout",
+                str(self.timeout),
+                "--verbose",
+            ]
+        )
+
+        return cmd
+
+    @property
+    def supports_coverage(self):
+        return True
+
+
 class HermioneTestSuite(BaseFrontendRegularSuite):
     def get_type(self):
         return HERMIONE_TEST_TYPE
