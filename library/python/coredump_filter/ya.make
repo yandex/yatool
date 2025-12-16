@@ -1,8 +1,8 @@
 PY23_LIBRARY()
 
-PY_SRCS(
-    __init__.py
-)
+STYLE_PYTHON()
+
+ALL_PY_SRCS()
 
 RESOURCE_FILES(
     PREFIX library/python/coredump_filter/
@@ -16,8 +16,10 @@ PEERDIR(
     contrib/python/six
 )
 
-IF(PYTHON2)
-    PEERDIR(contrib/deprecated/python/enum34)
+IF (PYTHON2)
+    PEERDIR(
+        contrib/deprecated/python/enum34
+    )
 ENDIF()
 
 END()
