@@ -686,8 +686,8 @@ cdef class YtStore2Impl:
         replica_data_dir: str,
         token: str | None = None,
         proxy_role: str | None = None,
-        replica_sync_mode: bool | None = None,
-        enable: bool | None = None,
+        replica_sync_mode: bool | NoneType = None,
+        enable: bool | NoneType = None,
     ):
         cdef TString c_proxy = proxy.encode()
         cdef TString c_data_dir = data_dir.encode()
