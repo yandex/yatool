@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from datetime import datetime
 
-from devtools.ya.core import event_handling
+from devtools.ya.core import event_handling, config as core_config
 from devtools.ya.build.sem_graph import SemNode, SemDep, Semantic, SemGraph
 from devtools.ya.yalibrary import sjson
 import exts.asyncthread as core_async
@@ -457,7 +457,9 @@ class _JavaSemGraph(SemGraph):
         if platform.startswith('darwin'):
             jdk_home = Path.home() / "Library" / "Java" / "JavaVirtualMachines"
         elif platform.startswith('linux'):
-            jdk_home = Path.home() / ".jdks"
+            m = re.match(r'^.ya(\d+)$', Path(core_config.misc_root()).name)
+            jdks_suf = m.group(1) if m else ''
+            jdk_home = Path.home() / (".jdks" + jdks_suf)
         else:
             self.logger.error("Unknown platform %s, put JDK symlink to user home", platform)
             jdk_home = Path.home()
