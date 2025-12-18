@@ -1507,19 +1507,17 @@ namespace NYa {
             const NYT::TNode::TListType& pivotKeys = dataAttrs["pivot_keys"].AsList();
             ui64 begin = 0;
             if (pivotKeys.size() > 1 && options.DataSizePerKeyRange > 0) {
-                ui64 lastPivotBegin = pivotKeys.back()[0].AsUint64();
-                ui64 maxKeyValue = lastPivotBegin + lastPivotBegin / (pivotKeys.size() - 1);
-                auto dataSize = dataAttrs.ChildAsInt64("uncompressed_data_size");
-                auto rangeCount = Max<i64>(dataSize / options.DataSizePerKeyRange, 1);
-                ui64 step = maxKeyValue / rangeCount;
-                ui64 rem = maxKeyValue % rangeCount;
+                double lastPivotBegin = pivotKeys.back()[0].AsUint64();
+                double maxKeyValue = lastPivotBegin + lastPivotBegin / (pivotKeys.size() - 1);
+                auto rangeCount = Max<i64>(dataAttrs.ChildAsInt64("uncompressed_data_size") / options.DataSizePerKeyRange, 1);
+                double step = maxKeyValue / rangeCount;
                 for (int i = 1; i < rangeCount; i++) {
-                    ui64 end = step * i + rem * i / rangeCount;
+                    ui64 end = step * i;
                     keyRanges.push_back({begin, end});
                     begin = end;
                 }
             }
-            keyRanges.push_back({begin, Max<ui64>()});
+            keyRanges.push_back({begin, {}});
             INFO_LOG << "Data table scanning split into " << keyRanges.size() << " operations";
 
             const TYtTimestamp timeThreshold = ToYtTimestamp(TInstant::Now() - DATA_GC_MIN_AGE);
@@ -1851,14 +1849,24 @@ namespace NYa {
 
         struct TKeyRange {
             ui64 Begin;
-            ui64 End;
+            std::optional<ui64> End;
 
             friend IOutputStream& operator<<(IOutputStream& stream, const TKeyRange& self) {
-                return stream << self.Begin << "-" << self.End;
+                stream << self.Begin << "-";
+                if (self.End) {
+                    stream << *self.End;
+                } else {
+                    stream << "unlimited";
+                }
+                return stream;
             }
 
             NYT::TReadRange AsReadRange() const {
-                return NYT::TReadRange::FromKeys(NYT::TNode(Begin), NYT::TNode(End));
+                auto range = NYT::TReadRange().LowerLimit(NYT::TReadLimit().Key(Begin));
+                if (End) {
+                    range.UpperLimit(NYT::TReadLimit().Key(*End));
+                }
+                return range;
             }
         };
 
