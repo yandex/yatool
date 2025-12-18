@@ -832,7 +832,7 @@ def _add_pgo_profile_resource(graph, pgo_path):
     return hashing.fast_filehash(os.path.abspath(pgo_path))
 
 
-def _gen_filter_node(node: graph_descr.GraphNode, flt, python3_pattern: str) -> graph_descr.GraphNode:
+def _gen_filter_node(node: graph_descr.GraphNode, flt, python_binary_path: str) -> graph_descr.GraphNode:
     mapping = _get_node_out_names_map(node)
 
     inputs = []
@@ -846,7 +846,7 @@ def _gen_filter_node(node: graph_descr.GraphNode, flt, python3_pattern: str) -> 
         if renamed:
             cmd = {
                 'cmd_args': [
-                    "$({})/bin/python3".format(python3_pattern),
+                    python_binary_path,
                     '$(SOURCE_ROOT)/build/scripts/fs_tools.py',
                     'link_or_copy',
                     inp,
@@ -873,18 +873,49 @@ def _gen_filter_node(node: graph_descr.GraphNode, flt, python3_pattern: str) -> 
     }
 
 
-def finalize_graph(graph: graph_descr.DictGraph, opts):
-    if opts.add_result or opts.add_host_result or opts.add_binaries_to_results:
-        assert 'result' in graph
-
-        # Extract YMAKE_PYTHON3 pattern
-        python3_pattern = next(
+def _mining_python3_from_graph_and_options(graph: graph_descr.DictGraph, opts):
+    # Try extract grom graph
+    try:
+        pattern = next(
             r['pattern']
             for r in graph.get('conf', {}).get('resources', {})
             if r.get('pattern', '').startswith('YMAKE_PYTHON3-')
         )
+        return "$({})/bin/python3".format(pattern), False
+    except StopIteration:
+        # This may occur when the graph is not present or the Python3 resource is not available.
+        # In this case, python3 will be added using HostToolResolver. See the code below.
+        pass
+
+    # Then try extract from host resolver
+    try:
+        host = getattr(opts, 'host_platform', None)
+        if host:
+            host = bg.mine_platform_name(host)
+        if not host:
+            host = bg.host_platform_name()
+        res_dir = devtools.ya.core.config.tool_root(toolscache_version(opts))
+        parsed_host_p = pm.parse_platform(host)
+        host_tool_resolver = _HostToolResolver(parsed_host_p, res_dir)
+        return host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'), True
+    except Exception as err:
+        msg = 'We cannot find a Python 3 resource for the host platform. '
+        msg += 'Use the system Python 3 binary as fallback. '
+        msg += 'Original exception error: ' + str(err)
+        logger.warn(msg, exc_info=True)
+
+    # Well, use system
+    return "python3", False
+
+
+def finalize_graph(graph: graph_descr.DictGraph, opts):
+    if opts.add_result or opts.add_host_result or opts.add_binaries_to_results:
+        assert 'result' in graph
+
+        python_binary_path = None
 
         def iter_filter_nodes(filters, host=False):
+            nonlocal python_binary_path
             for flt in filters:
                 for node, full_match in filter_nodes_by_output(
                     graph, flt, warn=False, host=host, any_match=opts.all_outputs_to_result
@@ -894,7 +925,14 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
                     if full_match:
                         yield node, False
                     else:
-                        yield _gen_filter_node(node, flt, python3_pattern), True
+                        if python_binary_path is None:
+                            resolved_py3, should_add_resource = _mining_python3_from_graph_and_options(graph, opts)
+                            if should_add_resource:
+                                graph['conf']['resources'].append(resolved_py3)
+                                python_binary_path = "$({})/bin/python3".format(resolved_py3['pattern'])
+                            else:
+                                python_binary_path = resolved_py3
+                        yield _gen_filter_node(node, flt, python_binary_path), True
 
         if opts.replace_result:
             graph['result'] = []
