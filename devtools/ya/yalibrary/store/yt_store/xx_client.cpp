@@ -1627,7 +1627,29 @@ namespace NYa {
             }
 
             INFO_LOG << "Create tables";
-            NYT::ENodeType tableType = options.Replicated ? NYT::ENodeType::NT_REPLICATED_TABLE : NYT::ENodeType::NT_TABLE;
+            NYT::ENodeType tableType{};
+            auto metadataAttrs = NYT::TNode::CreateMap();
+            auto dataAttrs = NYT::TNode::CreateMap();
+            if (options.Replicated) {
+                tableType = NYT::ENodeType::NT_REPLICATED_TABLE;
+            } else {
+                tableType = NYT::ENodeType::NT_TABLE;
+                auto commonAttrs = NYT::TNode()(
+                    "mount_config", NYT::TNode()
+                        ("periodic_compaction_mode", "partition")
+                );
+                metadataAttrs = commonAttrs;
+                dataAttrs = commonAttrs;
+                if (options.InMemory) {
+                    metadataAttrs("in_memory_mode", "uncompressed");
+                }
+                dataAttrs(
+                    "tablet_balancer_config", NYT::TNode()
+                        // Don't let the balancer creates too many tablets
+                        ("enable_auto_reshard", false)
+                        ("enable_auto_tablet_move", true)
+                );
+            }
             CreateDynamicTable(
                 ytc,
                 metadataTable,
@@ -1636,7 +1658,7 @@ namespace NYa {
                 options.MetadataTabletCount.value_or(DEFAULT_METADATA_TABLET_COUNT),
                 options.IgnoreExisting,
                 options.Tracked,
-                options.InMemory ? NYT::TNode()("in_memory_mode", "uncompressed") : NYT::TNode{}
+                metadataAttrs
             );
             CreateDynamicTable(
                 ytc,
@@ -1646,12 +1668,7 @@ namespace NYa {
                 options.DataTabletCount.value_or(DEFAULT_DATA_TABLET_COUNT),
                 options.IgnoreExisting,
                 options.Tracked,
-                NYT::TNode()
-                    ("tablet_balancer_config", NYT::TNode()
-                        // Don't let the balancer create too many tablets
-                        ("enable_auto_reshard", false)
-                        ("enable_auto_tablet_move", true)
-                    )
+                dataAttrs
             );
             CreateDynamicTable(ytc, statTable, tableType, YT_CACHE_STAT_SCHEMA, 0, options.IgnoreExisting, options.Tracked);
 
