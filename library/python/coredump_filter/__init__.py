@@ -356,6 +356,7 @@ class FrameBase(object):
         self.source = source
         self.source_no = source_no
         self.func_name = func_name
+        self.commit_hash = None  # type: str | None
 
     def __str__(self):
         return "{}\t{}\t{}".format(
@@ -399,6 +400,20 @@ class FrameBase(object):
                 source_fmt=source_fmt,
             )
         )
+
+    def build_arcadia_link(self, source):
+        if not source:
+            return ""
+
+        link = os.path.join(ARCADIA_ROOT_LINK, source)
+
+        if self.commit_hash:
+            link = link + "?rev={rev}".format(rev=self.commit_hash)
+
+        if self.source_no:
+            link = link + "#L{line_no}".format(line_no=self.source_no)
+
+        return link
 
 
 class LLDBFrame(FrameBase):
@@ -496,13 +511,12 @@ class GDBFrame(FrameBase):
         if len(dirs) > 1 and "/{dir}/".format(dir=dirs[1]) in ARCADIA_ROOT_DIRS:
             if dirs[0] in KNOWN_ARCADIA_ROOT_SIGNS:
                 source = os.path.join(*dirs[1:])
-                link = os.path.join(ARCADIA_ROOT_LINK, source)
+                link = self.build_arcadia_link(source)
         else:
             source = self.source
+
         if self.source_no:
             source_fmt = ' +<span class="source-no">{}</span>'.format(self.source_no)
-            if link:
-                link += "?#L{line}".format(line=self.source_no)
 
         if link:
             source = '<a href="{link}">{source_path}</a>'.format(
@@ -552,10 +566,7 @@ class PythonFrame(FrameBase):
     def source_link(self):  # type: () -> str
         if self.source.startswith("<"):
             return ""
-        link = os.path.join(ARCADIA_ROOT_LINK, self.source)
-        if self.source_no:
-            link = link + "#L{}".format(self.source_no)
-        return link
+        return self.build_arcadia_link(self.source)
 
     @property
     def error_line(self):
@@ -720,6 +731,7 @@ class Stack(object):
         stream=None,
         mode=None,  # type: CoredumpMode
         ignore_bad_frames=True,
+        commit_hash=None,  # type: str | None
     ):
         self.lines = lines
         self.source_root = source_root
@@ -738,6 +750,7 @@ class Stack(object):
         self.stack_fp = stack_fp
         self.stream = stream
         self.ignore_bad_frames = ignore_bad_frames
+        self.commit_hash = commit_hash
 
     def to_json(self):
         """Should be symmetric with `from_json`."""
@@ -799,10 +812,12 @@ class Stack(object):
                 self.important = self.LOW_IMPORTANT
 
     def push_frame(self, frame):
+        # type: (FrameBase) -> None
         self.check_importance(frame)
         # ignore duplicated frames
         if len(self.frames) and self.frames[-1].frame_no == frame.frame_no:
             return
+        frame.commit_hash = self.commit_hash
         self.frames.append(frame)
 
     def parse(self):
@@ -1026,6 +1041,7 @@ class SDCAssertStack(LLDBStack):
 
 def parse_python_traceback(
     trace,  # type: str
+    commit_hash=None,
 ):  # type: (...) -> tuple[list[list[Stack]], list[list[str]], int]
     trace = trace.replace("/home/zomb-sandbox/client/", "/")
     trace = trace.replace("/home/zomb-sandbox/tasks/", "/sandbox/")
@@ -1033,7 +1049,7 @@ def parse_python_traceback(
     exception = trace[-1]  # noqa: F841
     trace = trace[1:-1]
     pairs = zip(trace[::2], trace[1::2])
-    stack = Stack(lines=[])
+    stack = Stack(lines=[], commit_hash=commit_hash)
     for frame_no, (path, row) in enumerate(pairs):
         # FIXME: wrap into generic tracer
         m = PythonStack.REGEXPS[0].match(path.strip())
@@ -1049,6 +1065,7 @@ def parse_python_traceback(
 
 def parse_python_traceback_2(
     trace,  # type: str
+    commit_hash=None,
 ):  # type: (...) -> tuple[list[list[Stack]], list[list[str]], int]
     """
     This is a replacement for an older parse_python_traceback (find above).
@@ -1061,7 +1078,7 @@ def parse_python_traceback_2(
 
     frame_no = 0
     line_index = 1
-    stack = Stack(lines=[])
+    stack = Stack(lines=[], commit_hash=commit_hash)
     stack_list = []
 
     while line_index < len(trace):
@@ -1073,7 +1090,7 @@ def parse_python_traceback_2(
 
         if line.strip().startswith("Traceback"):
             stack_list.append(stack)
-            stack = Stack(lines=[])
+            stack = Stack(lines=[], commit_hash=commit_hash)
             line_index += 1
             frame_no = 0
             continue
@@ -1202,6 +1219,7 @@ def filter_stack_dump(
     output_stream=None,
     timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     ignore_bad_frames=True,
+    commit_hash=None,
 ):
     """New interface for stacktrace filtering. Preferred to use."""
     if not core_text and not stack_file_name:
@@ -1226,6 +1244,7 @@ def filter_stack_dump(
         timestamp=timestamp,
         use_fingerprint=use_fingerprint,
         use_stream=output_stream is not None,
+        commit_hash=commit_hash,
     )
 
 
@@ -1244,6 +1263,7 @@ class StackDumperBase(object):
         mode,
         file_name=None,
         ignore_bad_frames=True,
+        commit_hash=None,
     ):
         self.source_root = SourceRoot()
         self.use_fingerprint = use_fingerprint
@@ -1256,6 +1276,7 @@ class StackDumperBase(object):
         self.timestamp = timestamp
         self.ignore_bad_frames = ignore_bad_frames
         self.stack_class = self.get_stack_class(mode)
+        self.commit_hash = commit_hash
 
         self.signal = SIGNAL_NOT_FOUND
         self.stacks = []
@@ -1298,6 +1319,7 @@ class StackDumperBase(object):
             thread_id=thread_id,
             stream=self.stream,
             ignore_bad_frames=self.ignore_bad_frames,
+            commit_hash=self.commit_hash,
         )
         self.stacks.append(stack)
 
@@ -1380,9 +1402,7 @@ class StackDumperBase(object):
 
             html_epilog(self.stream)
         else:
-            raw_hash_stacks = [
-                [stack.raw() for stack in common_hash_stacks] for common_hash_stacks in all_hash_stacks
-            ]  # type: list[list[str]]
+            raw_hash_stacks = [[stack.raw() for stack in common_hash_stacks] for common_hash_stacks in all_hash_stacks]  # type: list[list[str]]
             return all_hash_stacks, raw_hash_stacks, self.signal
 
     def _collect_stacks(self):
@@ -1541,6 +1561,7 @@ def filter_stackdump(
     timestamp=None,
     ignore_bad_frames=True,
     mode=None,
+    commit_hash=None,
 ):
     if mode is None and file_name is not None:
         mode = detect_coredump_mode(_read_file(file_name))
@@ -1563,6 +1584,7 @@ def filter_stackdump(
         timestamp=timestamp,
         ignore_bad_frames=ignore_bad_frames,
         mode=mode,
+        commit_hash=commit_hash,
     )
 
     return dumper.dump()
