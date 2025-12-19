@@ -22,6 +22,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.use_clang_format_15 = False
         self.use_clang_format_18_vanilla = False
         self.internal_enable_implicit_taxi_formatters = False
+        self.internal_paths_with_integrations: list[str] = []
 
     @staticmethod
     def consumer():
@@ -96,6 +97,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
             devtools.ya.core.yarg.ConfigConsumer('internal_enable_implicit_taxi_formatters'),
+            devtools.ya.core.yarg.ConfigConsumer('internal_paths_with_integrations'),
         ]
 
 

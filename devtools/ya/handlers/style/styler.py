@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import functools
 import logging
 import os
@@ -7,9 +8,10 @@ import re
 import subprocess
 import sys
 import typing as tp
-from collections.abc import Sequence
+import yaml
+from collections.abc import Sequence, Generator
 from enum import StrEnum, auto
-from pathlib import PurePath
+from pathlib import PurePath, Path
 
 import devtools.ya.test.const as const
 import exts.os2
@@ -25,6 +27,9 @@ if tp.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
+
+
+_DISABLE_PATHS_WILDCARDS = "disable-paths-wildcards"
 
 
 class StylingError(Exception):
@@ -73,10 +78,65 @@ def _register[T: Styler](cls: type[T]) -> type[T]:
     return cls
 
 
+@functools.cache
+def _read_linters_yaml_ignores(linters_yaml: Path) -> tuple[list[str], dict[type[Styler], list[str]]]:
+    config = yaml.safe_load(linters_yaml.read_text())
+    if not isinstance(config, dict):
+        return [], {}
+    linters = config.get("linters")
+    if not linters:
+        return [], {}
+    common_ignores = linters.get(_DISABLE_PATHS_WILDCARDS, [])
+    tool_ignores: dict[type[Styler], list[str]] = {}
+    for name in _TAXI_NAME_TO_STYLER_MAP:
+        if name in linters and (ignores := linters[name].get(_DISABLE_PATHS_WILDCARDS)):
+            tool_ignores[_TAXI_NAME_TO_STYLER_MAP[name]] = ignores
+    return common_ignores, tool_ignores
+
+
+def _walk_linters_yaml(target: trgt.Target) -> Generator[Path]:
+    if not (root := cfg.find_root()):
+        return
+    else:
+        root = Path(root)
+    # It's not PurePath because earlier we made sure it's not from stdin
+    temp = tp.cast(Path, target.path)
+    while temp != root and temp.parent != temp:
+        config_path = temp.parent / "linters.yaml"
+        if config_path.exists():
+            yield config_path
+        temp = temp.parent
+
+
+def _apply_linters_yaml_ignores(
+    target: trgt.Target,
+    config_path: Path,
+    stylers: set[type[Styler]],
+    common_ignores: list[str],
+    styler_ignores: dict[type[Styler], list[str]],
+) -> set[type[Styler]]:
+    target_path = target.path.relative_to(config_path.parent).as_posix()
+    for pat in common_ignores:
+        if fnmatch.fnmatch(target_path, pat):
+            return set()
+    filtered: set[type[Styler]] = set()
+    for styler in stylers:
+        if styler in styler_ignores:
+            for pat in styler_ignores[styler]:
+                if fnmatch.fnmatch(target_path, pat):
+                    break
+            else:
+                filtered.add(styler)
+        else:
+            filtered.add(styler)
+    return filtered
+
+
 def select_suitable_stylers(
     target: trgt.Target,
     file_types: Sequence[StylerKind],
     enable_implicit_taxi_formatters: bool = False,
+    paths_with_integrations: tuple[str, ...] = (),
 ) -> set[type[Styler]]:
     """Find and return matching styler class"""
     if "/canondata/" in target.path.as_posix() and not target.passed_directly:
@@ -124,6 +184,20 @@ def select_suitable_stylers(
                 break
         else:
             filtered.add(styler)
+
+    target_s = target.path.as_posix()
+    if not target.stdin and not target.passed_directly and any(p in target_s for p in paths_with_integrations):
+        for linters_yaml in _walk_linters_yaml(target):
+            ignores = _read_linters_yaml_ignores(linters_yaml)
+            filtered2 = _apply_linters_yaml_ignores(target, linters_yaml, filtered, *ignores)
+            if ClangFormat in filtered and ClangFormat not in filtered2:
+                # XXX: We assume that linters.yaml can only contain common clang-format settings.
+                # So we apply it to every other clang-format flavor
+                filtered2 -= {ClangFormatYT, ClangFormat18Vanilla, ClangFormat15}
+
+            filtered = filtered2
+            if not filtered:
+                break
 
     return filtered
 
@@ -669,3 +743,14 @@ class EOLFmt:
 
     def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         return self._run_format(path, content)
+
+
+_TAXI_NAME_TO_STYLER_MAP = {
+    "ruff": Ruff,
+    "black": Black,
+    "clang-format": ClangFormat,
+    "eolfmt": EOLFmt,
+    "jsonfmt": ClangFormatJson,
+    "yamlfmt": YamlFmt,
+    "gofmt": Golang,
+}

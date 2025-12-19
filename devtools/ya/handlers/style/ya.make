@@ -8,6 +8,7 @@ PEERDIR(
     build/config/tests/yaml_style
     contrib/python/coloredlogs
     contrib/python/marisa-trie
+    contrib/python/PyYAML
     devtools/ya/app
     devtools/ya/build/build_opts
     devtools/ya/core/common_opts

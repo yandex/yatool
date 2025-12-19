@@ -21,6 +21,7 @@ class MineOptions(tp.NamedTuple):
     stdin_filename: str = STDIN_FILENAME
     tty: bool = os.isatty(sys.stdin.fileno())
     enable_implicit_taxi_formatters: bool = False
+    paths_with_integrations: tuple[str, ...] = ()
 
 
 class Target(tp.NamedTuple):
@@ -73,5 +74,6 @@ def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, se
             target=target,
             file_types=mine_opts.file_types,
             enable_implicit_taxi_formatters=mine_opts.enable_implicit_taxi_formatters,
+            paths_with_integrations=mine_opts.paths_with_integrations,
         ):
             yield target, styler_classes

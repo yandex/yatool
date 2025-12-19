@@ -136,6 +136,7 @@ def run_style(args) -> int:
         file_types=tuple(stlr.StylerKind(t) for t in args.file_types),
         stdin_filename=args.stdin_filename,
         enable_implicit_taxi_formatters=args.internal_enable_implicit_taxi_formatters,
+        paths_with_integrations=tuple(args.internal_paths_with_integrations),
     )
     disambiguation_opts = disambiguate.DisambiguationOptions(
         use_ruff=args.use_ruff,
