@@ -2863,7 +2863,6 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_probe_before_put = False
         self.yt_store_probe_before_put_min_size = 0
         self.yt_store_retry_time_limit = None
-        self.yt_store2 = True
         self.yt_store_init_timeout = None
         self.yt_store_prepare_timeout = None
         self.yt_store_crit = None
@@ -3193,26 +3192,22 @@ class DistCacheOptions(DistCacheSetupOptions):
                     hook=lambda n: SetValueHook(n, transform=float),
                 ),
             )
-            + make_opt_consumers(
-                'yt_store2',
-                help='Use yt store client v2',
-                arg_opts=dict(
-                    hook=lambda n: SetConstValueHook(n, True),
-                    group=YT_CACHE_CONTROL_GROUP,
+            + [
+                ArgConsumer(
+                    ['--yt-store2'],
+                    help='Deprecated. Do nothing',
+                    hook=NoValueDummyHook(),
+                    visible=False,
+                    deprecated=True,
                 ),
-                env_opts=dict(
-                    hook=lambda n: SetValueHook(n, transform=return_true_if_enabled),
+                ArgConsumer(
+                    ['--no-yt-store2'],
+                    help='Deprecated. Do nothing',
+                    hook=NoValueDummyHook(),
+                    visible=False,
+                    deprecated=True,
                 ),
-                cfg_opts={},
-            )
-            + make_opt_consumers(
-                'no_yt_store2',
-                help='Disable yt store client v2',
-                arg_opts=dict(
-                    hook=lambda n: SetConstValueHook('yt_store2', False),
-                    group=YT_CACHE_CONTROL_GROUP,
-                ),
-            )
+            ]
             + make_opt_consumers(
                 'yt_store_init_timeout',
                 help='Maximum duration of store initialization',

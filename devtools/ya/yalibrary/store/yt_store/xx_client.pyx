@@ -1,9 +1,7 @@
 from cpython.object cimport PyObject
-from cpython.unicode cimport PyUnicode_AsUTF8
 from cython.operator cimport dereference as deref
 from cython.operator cimport preincrement as preinc
 from libcpp cimport bool
-from libcpp.atomic cimport atomic, memory_order
 from libcpp.optional cimport optional
 from libcpp.pair cimport pair
 from util.datetime.base cimport TDuration, TInstant
@@ -16,16 +14,15 @@ from util.system.types cimport i64, ui64
 
 import atexit
 import logging
-import os
 import time
-import typing as tp
-from collections.abc import Callable
 
 from devtools.ya.core import config as core_config
 from devtools.ya.core import monitoring as core_monitoring
 from devtools.ya.core import report
 from devtools.ya.core import stage_tracer
-from yalibrary.store.yt_store import consts
+
+
+YT_CACHE_EXCLUDED_P = frozenset(['UN', 'PK', 'GO', 'ld', 'SB', 'CP', 'DL', 'TS_JST', 'TSHRM', 'TSPW'])
 
 
 logger = logging.getLogger(__name__)
@@ -111,32 +108,6 @@ cdef extern from *:
     """
     cdef void raise_yt_store_error()
 
-
-cdef extern from 'devtools/ya/yalibrary/store/yt_store/xx_client.hpp':
-    cdef cppclass YtStoreClientResponse nogil:
-        bool Success;
-        bool NetworkErrors;
-        size_t DecodedSize;
-        char ErrorMsg[4096];
-    cdef cppclass YtStoreClientRequest nogil:
-        const char *Hash;
-        const char *IntoDir;
-        const char *Codec;
-        size_t DataSize;
-        int Chunks;
-    cdef cppclass YtStorePrepareDataRequest nogil:
-        const char* OutPath;
-        const char* Codec;
-        const char* RootDir;
-        TVector[cstr] Files;
-    cdef cppclass YtStorePrepareDataResponse nogil:
-        bool Success;
-        size_t RawSize;
-        char ErrorMsg[4096];
-    cdef cppclass YtStore:
-        YtStore(const char *yt_proxy, const char *yt_dir, const char *yt_token, TDuration retry_time_limit) except +
-        void DoTryRestore(const YtStoreClientRequest &req, YtStoreClientResponse &rsp) nogil
-        void PrepareData(const YtStorePrepareDataRequest& req, YtStorePrepareDataResponse& rsp) nogil
 
 cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace "NYa":
     cdef void AtExit()
@@ -290,58 +261,6 @@ def on_exit():
 InitializeLogger()
 
 
-class NetworkException(Exception):
-    pass
-
-cdef class YtStoreWrapper:
-    cdef YtStore *c_ytstore
-
-    def __init__(self, yt_proxy, yt_dir, yt_token, retry_time_limit):
-        self.c_ytstore = new YtStore(
-            PyUnicode_AsUTF8(yt_proxy),
-            PyUnicode_AsUTF8(yt_dir),
-            PyUnicode_AsUTF8(yt_token or ""),
-            TDuration.MicroSeconds(int((retry_time_limit or 0) * 1_000_000))
-        )
-
-    def do_try_restore(self, shash, into_dir, codec, chunks_count, data_size):
-        cdef YtStoreClientResponse resp
-        cdef YtStoreClientRequest req
-        req.Hash = PyUnicode_AsUTF8(shash)
-        req.IntoDir = PyUnicode_AsUTF8(into_dir)
-        req.Codec = PyUnicode_AsUTF8(codec or '')
-        req.Chunks = chunks_count
-        req.DataSize = data_size
-        with nogil:
-            self.c_ytstore.DoTryRestore(req, resp)
-        if resp.ErrorMsg[0] and not resp.Success:
-            errmsg = str(resp.ErrorMsg)
-            raise (NetworkException if resp.NetworkErrors else Exception)(errmsg)
-        result = resp.DecodedSize
-        return result
-
-    def prepare_data(self, out_path, files, codec, root_dir):
-        cdef YtStorePrepareDataResponse resp
-        cdef YtStorePrepareDataRequest req
-        req.OutPath = PyUnicode_AsUTF8(out_path)
-        req.Codec = PyUnicode_AsUTF8(codec or '')
-        req.RootDir = PyUnicode_AsUTF8(root_dir)
-        req.Files = TVector[cstr]()
-        for file in sorted(files):
-            req.Files.push_back(PyUnicode_AsUTF8(file))
-
-        with nogil:
-            self.c_ytstore.PrepareData(req, resp)
-
-        if resp.ErrorMsg[0] and not resp.Success:
-            errmsg = str(resp.ErrorMsg)
-            raise Exception(errmsg)
-        return resp.RawSize
-
-    def __dealloc__(self):
-        del self.c_ytstore
-
-
 class YtStoreMetrics:
     def __init__(self):
         self.timers: dict[str, float] = {}
@@ -468,7 +387,7 @@ cdef class YtStore2Impl:
             return False
 
         p = kv.get('p')
-        if p in consts.YT_CACHE_EXCLUDED_P:
+        if p in YT_CACHE_EXCLUDED_P:
             return False
         for o in outputs:
             for p in 'library/cpp/svnversion', 'library/cpp/build_info':
@@ -738,7 +657,6 @@ cdef class YtStore2Impl:
             "yt_proxy": self._proxy,
             "yt_dir": self._data_dir,
             "is_heater": self._is_heater,
-            "yt_store2": True,
         }
 
         try:

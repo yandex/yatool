@@ -345,7 +345,6 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
     build_options.yt_create_tables = params.yt_create_tables
     build_options.yt_store_retry_time_limit = params.yt_store_retry_time_limit
-    build_options.yt_store2 = params.yt_store2
     build_options.yt_store_init_timeout = params.yt_store_init_timeout
     build_options.yt_store_prepare_timeout = params.yt_store_prepare_timeout
     build_options.yt_store_crit = params.yt_store_crit

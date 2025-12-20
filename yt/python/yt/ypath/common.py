@@ -1,2 +1,0 @@
-class YPathError(Exception):
-    pass

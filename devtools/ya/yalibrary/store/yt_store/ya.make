@@ -7,12 +7,7 @@ SRCS(
 
 PY_SRCS(
     NAMESPACE yalibrary.store.yt_store
-    CYTHON_CPP
     yt_store.py
-    client.py
-    consts.py
-    utils.py
-    retries.py
     xx_client.pyx
 )
 
@@ -32,13 +27,9 @@ PEERDIR(
     library/cpp/threading/cancellation
     library/cpp/threading/future/subscription
     library/cpp/ucompress
-    library/python/retry
 
     yt/cpp/mapreduce/client
     yt/cpp/mapreduce/util
-    yt/python/client_lite
-    yt/python/yt/yson
-    yt/yt/python/yt_yson_bindings
 )
 
 CHECK_DEPENDENT_DIRS(

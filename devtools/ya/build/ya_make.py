@@ -410,47 +410,28 @@ class CacheFactory:
         from yalibrary.store.yt_store import yt_store
 
         token = self._get_yt_token()
-        if self._opts.yt_store2:
-            if self._opts.yt_replace_result_yt_upload_only:
-                yt_store_class = yt_store.YndexerYtStore2
-            else:
-                yt_store_class = yt_store.YtStore2
-            kwargs = dict(
-                proxy_role=self._opts.yt_proxy_role,
-                init_timeout=self._opts.yt_store_init_timeout,
-                prepare_timeout=self._opts.yt_store_prepare_timeout,
-                crit_level=self._opts.yt_store_crit,
-                check_size=not self._opts.yt_readonly and bool(self._opts.yt_max_cache_size),
-                gsid=devtools.ya.core.gsid.flat_session_id(),
-            )
+        if self._opts.yt_replace_result_yt_upload_only:
+            yt_store_class = yt_store.YndexerYtStore2
         else:
-            if self._opts.yt_replace_result_yt_upload_only:
-                yt_store_class = yt_store.YndexerYtStore
-            else:
-                yt_store_class = yt_store.YtStore
-            # These options will be deleted after migration to YtStore2
-            kwargs = dict(
-                new_client=self._opts.yt_store_cpp_client,
-                cpp_prepare_data=self._opts.yt_store_cpp_prepare_data,
-                create_tables=self._opts.yt_create_tables,
-                with_self_uid=self._opts.yt_self_uid,
-                heater_mode=self._opts.yt_store_crit == "put",
-                yt_store_exclusive=self._opts.yt_store_exclusive,
-            )
+            yt_store_class = yt_store.YtStore2
 
         return yt_store_class(
             self._opts.yt_proxy,
             self._opts.yt_dir,
             token=token,
+            proxy_role=self._opts.yt_proxy_role,
             readonly=self._opts.yt_readonly,
-            max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
+            check_size=not self._opts.yt_readonly and bool(self._opts.yt_max_cache_size),
             max_cache_size=self._opts.yt_max_cache_size,
-            ttl=self._opts.yt_store_ttl,
-            stager=stager,
+            max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
             probe_before_put=self._opts.yt_store_probe_before_put,
             probe_before_put_min_size=self._opts.yt_store_probe_before_put_min_size,
             retry_time_limit=self._opts.yt_store_retry_time_limit,
-            **kwargs,
+            init_timeout=self._opts.yt_store_init_timeout,
+            prepare_timeout=self._opts.yt_store_prepare_timeout,
+            crit_level=self._opts.yt_store_crit,
+            gsid=devtools.ya.core.gsid.flat_session_id(),
+            stager=stager,
         )
 
     def _can_use_bazel_remote_cache(self):
