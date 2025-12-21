@@ -277,12 +277,6 @@ class SandboxStorage(object):
 
         return resource_info, dst_filepath
 
-    def cleanup(self, resource_id):
-        resource_path = self._get_resource_path(resource_id)
-        if os.path.exists(resource_path):
-            logger.debug("Removing existing resource at %s", resource_path)
-            exts.fs.remove_tree(resource_path)
-
     def _download_resource(self, resource_id, decompress_if_archive, rename_to, resource_file):
         """
         :param resource_file: downloaded resource file RESOURCE_CONTENT_FILE_NAME with accompanying RESOURCE_INFO_JSON in the same directory

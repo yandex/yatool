@@ -90,32 +90,9 @@ def main():
             resource_id, decompress_if_archive=False, rename_to=options.rename_to, resource_file=options.resource_file
         )
         if options.dir_output_tared_path is not None:
-            try:
-                storage.dir_outputs_prepare_downloaded_resource(
-                    resource, resource_id, dir_outputs_in_runner=not options.for_dist_build
-                )
-            except Exception as e:
-                # Just in case if network blinked or something like that
-                if "Truncated tar archive" in str(e):
-                    logger.debug(
-                        "Got truncated tar archive. Will try to download the resource %s one more time", resource_id
-                    )
-
-                    storage.cleanup(resource_id)
-
-                    resource = storage.get(
-                        resource_id,
-                        decompress_if_archive=False,
-                        rename_to=options.rename_to,
-                        resource_file=None,
-                    )
-
-                    storage.dir_outputs_prepare_downloaded_resource(
-                        resource, resource_id, dir_outputs_in_runner=not options.for_dist_build
-                    )
-                else:
-                    raise
-
+            storage.dir_outputs_prepare_downloaded_resource(
+                resource, resource_id, dir_outputs_in_runner=not options.for_dist_build
+            )
     except Exception as e:
         logger.exception("Error while downloading resource %s", resource_id)
         if devtools.ya.core.error.is_temporary_error(e):
