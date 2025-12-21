@@ -82,7 +82,7 @@ class HttpParams:
     connect_timeout_ms: int = 30_000
     socket_timeout_ms: int = 5_000
     max_redirect_count: int = 5
-    user_agent: str = "HttpUnifetcher/0.1"
+    user_agent: str = "universal_fetcher"
 
     def to_dict(self) -> dict:
         return {
