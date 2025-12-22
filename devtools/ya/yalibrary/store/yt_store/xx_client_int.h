@@ -19,19 +19,19 @@ namespace NYa {
     using IYtClusterConnectorPtr = TIntrusivePtr<IYtClusterConnector>;
     extern IYtClusterConnectorPtr YtClusterConnectorPtr;
 
-    struct TYtStore2::TInternalState {
+    struct TYtStore::TInternalState {
         struct TReplica {
             TString Proxy;
             NYT::TYPath DataDir;
             TDuration Lag;
 
-            friend bool operator== (const TYtStore2::TInternalState::TReplica&, const TYtStore2::TInternalState::TReplica&) = default;
+            friend bool operator== (const TYtStore::TInternalState::TReplica&, const TYtStore::TInternalState::TReplica&) = default;
         };
 
         NYT::EAtomicity Atomicity;
         int Version{};
         TVector<TReplica> GoodReplicas;
         TReplica PreparedReplica;
-        friend bool operator== (const TYtStore2::TInternalState&, const TYtStore2::TInternalState&) = default;
+        friend bool operator== (const TYtStore::TInternalState&, const TYtStore::TInternalState&) = default;
     };
  }

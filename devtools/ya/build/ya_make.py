@@ -411,9 +411,9 @@ class CacheFactory:
 
         token = self._get_yt_token()
         if self._opts.yt_replace_result_yt_upload_only:
-            yt_store_class = yt_store.YndexerYtStore2
+            yt_store_class = yt_store.YndexerYtStore
         else:
-            yt_store_class = yt_store.YtStore2
+            yt_store_class = yt_store.YtStore
 
         return yt_store_class(
             self._opts.yt_proxy,

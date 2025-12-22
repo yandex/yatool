@@ -647,9 +647,9 @@ namespace NYa {
         REGISTER_REDUCER(TOrphanHashesExtractReducer);
     }
 
-    class TYtStore2::TImpl {
+    class TYtStore::TImpl {
     public:
-        TImpl(const TString& proxy, const TString& dataDir, const TYtStore2Options& options)
+        TImpl(const TString& proxy, const TString& dataDir, const TYtStoreOptions& options)
             : ConnectOptions_{options.ConnectOptions}
             , Owner_{options.Owner}
             , ReadOnly_{options.ReadOnly}
@@ -2701,71 +2701,71 @@ namespace NYa {
         TMemorySemaphore MemSem_{DEFAULT_MAX_MEMORY_USAGE};
     };
 
-    TYtStore2::TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options) {
+    TYtStore::TYtStore(const TString& proxy, const TString& dataDir, const TYtStoreOptions& options) {
         Impl_ = std::make_unique<TImpl>(proxy, dataDir, options);
     }
 
-    TYtStore2::~TYtStore2() {
+    TYtStore::~TYtStore() {
         Shutdown();
     };
 
-    bool TYtStore2::Disabled() const noexcept {
+    bool TYtStore::Disabled() const noexcept {
         return Impl_->Disabled();
     }
 
-    bool TYtStore2::ReadOnly() const noexcept {
+    bool TYtStore::ReadOnly() const noexcept {
         return Impl_->ReadOnly();
     }
 
-    void TYtStore2::Prepare(TPrepareOptionsPtr options) {
+    void TYtStore::Prepare(TPrepareOptionsPtr options) {
         Impl_->Prepare(options);
     }
 
-    bool TYtStore2::Has(const TString& uid) {
+    bool TYtStore::Has(const TString& uid) {
         return Impl_->Has(uid);
     }
 
-    bool TYtStore2::TryRestore(const TString& uid, const TString& intoDir) {
+    bool TYtStore::TryRestore(const TString& uid, const TString& intoDir) {
         return Impl_->TryRestore(uid, intoDir);
     }
 
-    bool TYtStore2::Put(const TPutOptions& options) {
+    bool TYtStore::Put(const TPutOptions& options) {
         return Impl_->Put(options);
     }
 
-    TYtStore2::TMetrics TYtStore2::GetMetrics() const {
+    TYtStore::TMetrics TYtStore::GetMetrics() const {
         return Impl_->GetMetrics();
     }
 
-    void TYtStore2::Strip() {
+    void TYtStore::Strip() {
         Impl_->Strip();
     }
 
-    void TYtStore2::DataGc(const TDataGcOptions& options) {
+    void TYtStore::DataGc(const TDataGcOptions& options) {
         Impl_->DataGc(options);
     }
 
-    void TYtStore2::Shutdown() noexcept {
+    void TYtStore::Shutdown() noexcept {
         Impl_->Shutdown();
     }
 
-    void TYtStore2::ValidateRegexp(const TString& re) {
+    void TYtStore::ValidateRegexp(const TString& re) {
         TImpl::ValidateRegexp(re);
     }
 
-    void TYtStore2::CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options) {
+    void TYtStore::CreateTables(const TString& proxy, const TString& dataDir, const TCreateTablesOptions& options) {
         TImpl::CreateTables(proxy, dataDir, options);
     }
 
-    void TYtStore2::ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) {
+    void TYtStore::ModifyTablesState(const TString& proxy, const TString& dataDir, const TModifyTablesStateOptions& options) {
         TImpl::ModifyTablesState(proxy, dataDir, options);
     }
 
-    void TYtStore2::PutStat(const TString& key, const TString& value) {
+    void TYtStore::PutStat(const TString& key, const TString& value) {
         Impl_->PutStat(key, value);
     }
 
-    void TYtStore2::ModifyReplica(
+    void TYtStore::ModifyReplica(
         const TString& proxy,
         const TString& dataDir,
         const TString& replicaProxy,
@@ -2775,7 +2775,7 @@ namespace NYa {
         TImpl::ModifyReplica(proxy, dataDir, replicaProxy, replicaDataDir, options);
     }
 
-    std::unique_ptr<TYtStore2::TInternalState> TYtStore2::GetInternalState() {
+    std::unique_ptr<TYtStore::TInternalState> TYtStore::GetInternalState() {
         return Impl_->GetInternalState();
     }
 }

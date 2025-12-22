@@ -25,8 +25,8 @@ namespace NYa {
     };
 
     using TMaxCacheSize = std::variant<size_t, double>;
-    struct TYtStore2Options {
-        TYtStore2Options() = default;
+    struct TYtStoreOptions {
+        TYtStoreOptions() = default;
 
         TYtConnectOptions ConnectOptions{};
         void* Owner{};
@@ -76,7 +76,7 @@ namespace NYa {
     struct TYtStoreFatalError : public yexception {
     };
 
-    class TYtStore2 {
+    class TYtStore {
     public:
         using TUidList = TVector<TString>;
 
@@ -155,8 +155,8 @@ namespace NYa {
         };
 
     public:
-        TYtStore2(const TString& proxy, const TString& dataDir, const TYtStore2Options& options);
-        ~TYtStore2();
+        TYtStore(const TString& proxy, const TString& dataDir, const TYtStoreOptions& options);
+        ~TYtStore();
 
         bool Disabled() const noexcept;
         bool ReadOnly() const noexcept;

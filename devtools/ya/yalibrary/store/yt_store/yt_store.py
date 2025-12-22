@@ -15,7 +15,7 @@ YT_CACHE_NO_DATA_CODEC = "no_data"
 logger = logging.getLogger(__name__)
 
 
-class YtStore2(xx_client.YtStore2Impl, DistStore):
+class YtStore(xx_client.YtStoreImpl, DistStore):
     def __init__(
         self,
         proxy: str,
@@ -39,7 +39,7 @@ class YtStore2(xx_client.YtStore2Impl, DistStore):
         stager: stage_tracer.StageTracer.GroupStageTracer | None = None,
         **kwargs
     ):
-        xx_client.YtStore2Impl.__init__(
+        xx_client.YtStoreImpl.__init__(
             self,
             proxy,
             data_dir,
@@ -70,7 +70,7 @@ class YtStore2(xx_client.YtStore2Impl, DistStore):
         )
 
     def stats(self, execution_log, evlog_writer):
-        metrics = xx_client.YtStore2Impl.get_metrics(self)
+        metrics = xx_client.YtStoreImpl.get_metrics(self)
         for tag, val in metrics.timers.items():
             self._timers[tag] += val
         for tag, intervals in metrics.time_intervals.items():
@@ -93,7 +93,7 @@ class YtStore2(xx_client.YtStore2Impl, DistStore):
         report.telemetry.report('{}-{}'.format(self._stats_name, 'additional-info'), stat)
 
 
-class YndexerYtStore2(YtStore2):
+class YndexerYtStore(YtStore):
     YDX_PB2_EXT = '.ydx.pb2.yt'
 
     def __init__(self, *args, **kwargs):
@@ -101,7 +101,7 @@ class YndexerYtStore2(YtStore2):
 
     def fits(self, node):
         outputs = node["outputs"] if isinstance(node, dict) else node.outputs
-        return any(out.endswith(YndexerYtStore2.YDX_PB2_EXT) for out in outputs)
+        return any(out.endswith(YndexerYtStore.YDX_PB2_EXT) for out in outputs)
 
     def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         assert codec == YT_CACHE_NO_DATA_CODEC

@@ -7,7 +7,7 @@ import devtools.ya.core.yarg as yarg
 from devtools.ya.core.common_opts import LogFileOptions
 from devtools.ya.yalibrary.store.yt_store.opts_helper import parse_yt_max_cache_size
 from exts.asyncthread import future
-from yalibrary.store.yt_store.yt_store import YtStore2
+from yalibrary.store.yt_store.yt_store import YtStore
 
 
 logger = logging.getLogger(__name__)
@@ -142,7 +142,7 @@ class StripOptions(yarg.Options):
                 raise yarg.ArgsValidatingException(f"Value '{value}' has wrong format")
             regexp, ttl = items
             try:
-                YtStore2.validate_regexp(regexp)
+                YtStore.validate_regexp(regexp)
             except ValueError as e:
                 # The exception already contains wrong regexp value so we don't need to add it to the error message
                 raise yarg.ArgsValidatingException(f"Cannot compile regexp: {e}")
@@ -430,7 +430,7 @@ def get_common_opts():
 
 
 def strip(params):
-    yt_store = YtStore2(
+    yt_store = YtStore(
         params.yt_proxy,
         params.yt_dir,
         token=params.yt_token,
@@ -446,7 +446,7 @@ def strip(params):
 
 
 def data_gc(params):
-    yt_store = YtStore2(
+    yt_store = YtStore(
         params.yt_proxy,
         params.yt_dir,
         token=params.yt_token,
@@ -465,7 +465,7 @@ def data_gc(params):
 
 
 def create_tables(params):
-    YtStore2.create_tables(
+    YtStore.create_tables(
         params.yt_proxy,
         params.yt_dir,
         version=params.cache_version,
@@ -482,15 +482,15 @@ def create_tables(params):
 
 
 def mount(params):
-    YtStore2.mount(params.yt_proxy, params.yt_dir, token=params.yt_token, proxy_role=params.yt_proxy_role)
+    YtStore.mount(params.yt_proxy, params.yt_dir, token=params.yt_token, proxy_role=params.yt_proxy_role)
 
 
 def unmount(params):
-    YtStore2.unmount(params.yt_proxy, params.yt_dir, token=params.yt_token, proxy_role=params.yt_proxy_role)
+    YtStore.unmount(params.yt_proxy, params.yt_dir, token=params.yt_token, proxy_role=params.yt_proxy_role)
 
 
 def setup_replica(params):
-    YtStore2.setup_replica(
+    YtStore.setup_replica(
         params.yt_proxy,
         params.yt_dir,
         params.replica_proxy,
@@ -503,7 +503,7 @@ def setup_replica(params):
 
 
 def remove_replica(params):
-    YtStore2.remove_replica(
+    YtStore.remove_replica(
         params.yt_proxy,
         params.yt_dir,
         params.replica_proxy,
@@ -516,7 +516,7 @@ def remove_replica(params):
 def put_stat(params):
     with open(params.put_stat_value_file, "rb") as f:
         value = f.read()
-    yt_store = YtStore2(
+    yt_store = YtStore(
         params.yt_proxy,
         params.yt_dir,
         token=params.yt_token,
