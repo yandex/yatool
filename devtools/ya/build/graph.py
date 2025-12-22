@@ -2728,10 +2728,14 @@ def _clean_maven_deploy_from_run_java_program(graph):
 
     reachable_exported = set()
     queue = collections.deque(res for res in graph['result'] if res in all_exported)
+    reachable_exported.update(queue)
     while queue:
         uid = queue.popleft()
-        queue.extend(dep for dep in all_exported[uid].get('deps', []) if dep in all_exported)
-        reachable_exported.add(uid)
+        deps = [
+            dep for dep in all_exported[uid].get('deps', []) if dep in all_exported and dep not in reachable_exported
+        ]
+        reachable_exported.update(deps)
+        queue.extend(deps)
 
     for uid, node in all_exported.items():
         if uid in reachable_exported:
