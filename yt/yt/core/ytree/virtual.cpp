@@ -8,6 +8,7 @@
 
 #include <yt/yt/core/yson/tokenizer.h>
 #include <yt/yt/core/yson/writer.h>
+#include <yt/yt/core/yson/protobuf_helpers.h>
 
 #include <yt/yt/core/ypath/tokenizer.h>
 
@@ -22,6 +23,7 @@ using namespace NYPath;
 using namespace NConcurrency;
 
 using NYT::FromProto;
+using NYT::ToProto;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -106,7 +108,7 @@ void ReplyFromAsyncYsonWriter(
         .Subscribe(BIND([=] (const TErrorOr<TYsonString>& resultOrError) {
             if (resultOrError.IsOK()) {
                 auto* response = &context->Response();
-                response->set_value(resultOrError.Value().ToString());
+                response->set_value(ToProto(resultOrError.Value()));
                 context->Reply();
             } else {
                 context->Reply(resultOrError);
@@ -541,7 +543,12 @@ private:
 
     // TSupportsAttributes members
 
-    IAttributeDictionary* GetCustomAttributes() override
+    const IAttributeDictionary& CustomAttributes() const override
+    {
+        return Attributes();
+    }
+
+    IAttributeDictionary* MutableCustomAttributesOrNull() override
     {
         return MutableAttributes();
     }

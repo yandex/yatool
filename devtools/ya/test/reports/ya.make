@@ -17,7 +17,6 @@ PEERDIR(
     devtools/ya/test/common
     devtools/ya/test/const
     devtools/ya/test/facility
-    devtools/ya/test/test_types
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/term

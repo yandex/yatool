@@ -17,18 +17,18 @@ class Environ(object):
     PATHSEP = ':'
 
     def __init__(self, env=None, only_mandatory_env=False):
-        env = os.environ.copy() if env is None else env
+        env = os.environ.copy() if env is None else dict(env)
         if only_mandatory_env:
             self._env = {}
         else:
             self._env = env
 
         self._mandatory = set()
-        names = [_f for _f in self._env.get(const.MANDATORY_ENV_VAR_NAME, '').split(self.PATHSEP) if _f]
+        names = [_f for _f in env.get(const.MANDATORY_ENV_VAR_NAME, '').split(self.PATHSEP) if _f]
         for name in names:
             self._mandatory.add(name)
             if name in env:
-                self._env[name] = env[name]
+                self.set(name, env[name])
 
     def __setitem__(self, key, value):
         self.set(key, value)
@@ -53,24 +53,38 @@ class Environ(object):
         return self._env.get(name, default)
 
     def set(self, name, value):
-        self._env[name] = value
+        if value is None:
+            self.pop(name)
+        else:
+            self._env[name] = value
 
     def set_mandatory(self, name, value):
-        self._env[name] = value
-        self._mandatory.add(name)
+        if value is None:
+            self.pop(name)
+        else:
+            self._env[name] = value
+            self._mandatory.add(name)
+
+    def pop(self, name, default=None):
+        value = default
+        if name in self:
+            value = self[name]
+            del self[name]
+        return value
 
     def items(self):
         return self._env.items()
 
     def update(self, data):
-        self._env.update(data)
+        for k, v in six.iteritems(data):
+            self.set(k, v)
 
     def update_mandatory(self, data):
-        self._env.update(data)
-        self._mandatory.update(data.keys())
+        for k, v in six.iteritems(data):
+            self.set_mandatory(k, v)
 
     def _extend(self, name, val):
-        if name in self._env:
+        if name in self:
             prefix = self.get(name, '')
         else:
             prefix = os.environ.get(name)
@@ -106,6 +120,12 @@ class Environ(object):
         for k, v in env.items():
             assert isinstance(v, six.string_types), (k, v)
         return env
+
+    def clear(self):
+        self._env = {}
+
+    def clean_mandatory(self):
+        self._mandatory = set()
 
 
 @library.python.func.lazy

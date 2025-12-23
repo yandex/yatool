@@ -17,7 +17,6 @@
 #include <utility>
 #include <span>
 
-class TMacroCmd;
 class TYMake;
 class TModule;
 class TModuleBuilder;
@@ -38,11 +37,6 @@ enum ESubstMode {
 };
 
 struct TCommandInfo {
-    enum ECmdType : ui8 {
-        Macro = 0,
-        MacroImplInp = 1, // when EMT_Usual macro type is used instead of EMT_MacroCall
-    };
-
     enum ECmdInfoState {
         OK = 0,
         FAILED = 1,
@@ -54,10 +48,11 @@ struct TCommandInfo {
     explicit TCommandInfo(const TBuildConfiguration& conf, TDepGraph* graph, TUpdIter* updIter, TModule* module = nullptr);
     void SetCommandSink(TCommands* commands);
     void SetCommandSource(const TCommands* commands);
-    bool Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& mod);
+    bool Init(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args, TModuleBuilder& mod, TVars* extraVars = nullptr);
 
 public:
     TYVar Cmd; // dep for the main output
+    THolder<TVars> ExtraVars;
     THolder<TVars> LocalVars;
     THolder<TVars> GlobalVars; // TODO remove this when TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes is out
     THolder<THashMap<TString, TString>> KV;
@@ -66,6 +61,7 @@ public:
     THolder<TVector<TString>> LateOuts;
     struct TMultiCmdDescr* MkCmdAcceptor = nullptr; // for command builder only
     bool KeepTargetPlatform = false;
+    bool DisableStructCmd = false;
 
 private:
     friend class TCmdProperty;
@@ -110,7 +106,6 @@ private:
     ui32 MainInputCandidateIdx = Max<ui32>();
 
     mutable ui8 MsgDepth = 0; // for debug messages
-    ECmdType CmdType = Macro;
     bool AllVarsNeedSubst = false;
     bool HasGlobalInput = false;
 
@@ -154,9 +149,7 @@ public:
     }
     bool Process(TModuleBuilder& mod, TAddDepAdaptor& node, bool finalTargetCmd);
     bool ProcessVar(TModuleBuilder& mod, TAddDepAdaptor& node);
-    void AddCfgVars(const TVector<TDepsCacheId>& varLists, ui64 nsId, TNodeAddCtx& dst, bool structCmd);
-
-    bool GetCommandInfoFromPluginCmd(const TMacroCmd& cmd, const TVars& vars, TModule& mod);
+    void AddCfgVars(const TVector<TDepsCacheId>& varLists, TNodeAddCtx& dst);
 
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
@@ -193,8 +186,6 @@ public:
         ECmdFormat formatFor = ECF_Unset,
         const TSubstObserver& substObserver = {});
 
-    ECmdType GetCmdType() const { return CmdType; }
-    void SetCmdType(ECmdType type) { CmdType = type; }
     void SetAllVarsNeedSubst(bool need) { AllVarsNeedSubst = need; }
 
     void WriteRequirements(TStringBuf reqs);
@@ -238,8 +229,11 @@ private:
     // Switches TSpecFiles representation from TSpecFileList to TSpecFileArr.
     void Finalize();
 
-    ui64 InitCmdNode(const TYVar& var);
-    void AddCmdNode(const TYVar& var, ui64 elemId);
+    enum class EStructCmd {No, Yes};
+    enum class EExprRole {Cmd, Var};
+
+    ui64 InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role);
+    void AddCmdNode(const TYVar& var, ui64 elemId, EStructCmd structCmd, EExprRole role);
     // TODO: move MsgPad here, too?
     TString SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor = ECF_Unset);
     void FillCoords(const TYVar* origin, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& localVars, ECmdFormat cmdFormat, bool setAddCtxFilled = true);

@@ -40,16 +40,20 @@ static TString FindSourceRootByTarget(const TFsPath& path) {
 }
 
 void TStartUpOptions::AddOptions(NLastGetopt::TOpts& opts) {
+    thread_local bool deprecatesUseSubinterpreter = false;
     TRootsOptions::AddOptions(opts);
     opts.AddLongOption('c', "config").StoreResult(&YmakeConf).Required();
     opts.AddLongOption("targets-from-evlog", "read start targets from evlog").SetFlag(&ReadStartTargetsFromEvlog).NoArgument();
     opts.AddLongOption("transition-source").StoreResult<ETransition>(&TransitionSource).Optional();
+    opts.AddLongOption("platform-id").StoreResult(&TargetPlatformId).Optional();
     opts.AddLongOption("descend-into-foreign", "follow deps leading into foreign platforms").StoreResult(&DescendIntoForeignPlatform);
     opts.AddLongOption("report-pic-nopic", "report pic/no-pic foreign target events").StoreResult(&ReportPicNoPic);
     opts.AddLongOption("fd-in", "input pipe fd").StoreResult(&InputPipeFd);
     opts.AddLongOption("fd-out", "output pipe fd").StoreResult(&OutputPipeFd);
     opts.AddLongOption("fd-err", "error pipe fd").StoreResult(&ErrorPipeFd);
     opts.AddLongOption("dont-check-transitive-requirements", "").StoreFalse(&CheckTransitiveRequirements);
+    opts.AddLongOption("parallel-rendering", "").StoreTrue(&ParallelRendering);
+    opts.AddLongOption("use-subinterpreters", "Use subinterpreters").SetFlag(&deprecatesUseSubinterpreter).NoArgument();
 }
 
 void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {
@@ -94,6 +98,7 @@ void TStartUpOptions::PostProcess(const TVector<TString>& freeArgs) {
     YmakeUidsCache = BuildRoot / "ymake.uids.cache";
     YmakeJsonCache = BuildRoot / "ymake.json.cache";
     ConfDir = SourceRoot / "build";
+    YmakeDartsCacheDir = BuildRoot;
 }
 
 void TStartUpOptions::MineTargetsAndSourceRoot(const TVector<char*>& optPos) {

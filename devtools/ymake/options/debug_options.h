@@ -46,6 +46,7 @@ struct TDebugOptions {
     bool DumpPeers = false;
     bool DumpDependentDirs = false;
     bool DumpData = false;  // This is for DumpFiles and DumpSrcDeps
+    bool DumpDepends = false; // Dump depends as direct edges from modules
     bool DumpRenderedCmds = false; // byte
     bool DumpExpressions = false;
     bool DumpBuildables = false;
@@ -114,6 +115,8 @@ struct TDebugOptions {
     enum class EShowExpressionErrors {None, One, All};
     EShowExpressionErrors ParseShowExpressionErrors(TStringBuf s);
     std::optional<EShowExpressionErrors> ExpressionErrorDetails;
+    bool ValidateCmdNodes = false;
+    bool DeprecateNonStructCmdNodes = false;
 
     // The Uids cache can be controlled by the Deps cache settings,
     // but this still could be overridden by --xCC=u and --xRC=u.

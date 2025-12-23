@@ -1,7 +1,7 @@
 import pytest
 import io
 
-from build.plugins.lib.nots.package_manager.pnpm.lockfile import PnpmLockfile, PnpmLockfileHelper
+from build.plugins.lib.nots.package_manager.pnpm.pnpm_lockfile import PnpmLockfile, PnpmLockfileHelper
 
 
 @pytest.fixture()
@@ -101,6 +101,19 @@ def test_lockfile_get_packages_meta_ok():
     assert pkg.sky_id == "rbtorrent:cb1849da3e4947e56a8f6bde6a1ec42703ddd187"
     assert pkg.integrity == "JDZ+T/br9pPfT2lmAMJypJDTTTHM9ePD/ED10TRjRzJVdEVy+JB3iRlhzYmTt5YkNgHvxWGlUVnLtdv6ruiDrQ=="
     assert pkg.integrity_algorithm == "sha512"
+
+
+def test_lockfile_get_packages_skip_directory():
+    lf = PnpmLockfile(path="/pnpm-lock.yaml")
+    lf.data = {
+        "packages": {
+            "@plus-int/auth@file:../../packages/platform/auth": {
+                "resolution": {"directory": "../../packages/platform/auth", "type": "directory"}
+            }
+        },
+    }
+
+    assert len(list(lf.get_packages_meta())) == 0
 
 
 def test_lockfile_get_packages_empty():

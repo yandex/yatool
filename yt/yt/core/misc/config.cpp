@@ -56,7 +56,7 @@ void TLogDigestConfig::Register(TRegistrar registrar)
 void TFairShareHierarchicalSchedulerDynamicConfig::Register(TRegistrar registrar)
 {
     registrar.Parameter("window_size", &TThis::WindowSize)
-        .Default(TDuration::Minutes(5));
+        .Default(TDuration::Minutes(1));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -121,6 +121,18 @@ void TAdaptiveHedgingManagerConfig::Register(TRegistrar registrar)
         .Default(TDuration::Zero());
     registrar.Parameter("max_hedging_delay", &TThis::MaxHedgingDelay)
         .Default(TDuration::Seconds(10));
+
+    registrar.Parameter("max_token_count", &TThis::MaxTokenCount)
+        .GreaterThanOrEqual(1)
+        .LessThan(10000)
+        .Default(10)
+        .DontSerializeDefault();
+
+    registrar.Parameter("secondary_request_ratio", &TThis::SecondaryRequestRatio)
+        .GreaterThan(0.)
+        .LessThanOrEqual(1.)
+        .Optional()
+        .DontSerializeDefault();
 
     registrar.Postprocessor([] (TAdaptiveHedgingManagerConfig* config) {
         if (config->MinHedgingDelay > config->MaxHedgingDelay) {

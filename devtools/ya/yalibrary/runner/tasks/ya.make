@@ -20,6 +20,7 @@ IF (NOT YA_OPENSOURCE)
 ENDIF()
 
 PEERDIR(
+    devtools/libs/acdigest/python
     devtools/libs/parse_number/python
     devtools/executor/proto
     devtools/ya/exts

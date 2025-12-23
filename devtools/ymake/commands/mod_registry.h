@@ -27,7 +27,7 @@ namespace NCommands {
     public:
         virtual TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& unwrappedArgs
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const = 0;
         virtual TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,

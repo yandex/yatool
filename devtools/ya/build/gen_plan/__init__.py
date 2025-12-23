@@ -170,7 +170,7 @@ def gen_extra_dict_by_opts(
         getattr(opts, 'arc_root', None),
         priority or getattr(opts, 'dist_priority', 0),
         getattr(opts, 'distbuild_patch', None),
-        cluster or getattr(opts, 'distbuild_cluster', None),
+        cluster,
         coordinators_filter or getattr(opts, 'coordinators_filter', None),
         getattr(opts, 'force_coordinators_filter', False),
         getattr(opts, 'cache_namespace', None),
@@ -215,6 +215,10 @@ def get_python_resource(platform):
     return get_tool_resource('python', platform)
 
 
+def get_python3_resource(platform):
+    return get_tool_resource('python3', platform)
+
+
 def get_ymake_bin_resource(platform):
     return get_tool_resource('ymake', platform)
 
@@ -243,6 +247,14 @@ def _meta_by_platform(opts, platform, add_compilers=True, add_uc=False):
         {
             "resource": python_resource_id,
             "pattern": python_pattern,
+        }
+    )
+
+    python3_pattern, python3_resource_id = get_python3_resource(platform)
+    meta["resources"].append(
+        {
+            "resource": python3_resource_id,
+            "pattern": python3_pattern,
         }
     )
 
@@ -481,7 +493,7 @@ def gen_dummy_graph(
 
 
 def generate_fetch_from_sandbox_node(uid, res_id, archive, source_root_pattern):
-    python_pattern, _ = get_python_resource("linux")
+    python3_pattern, _ = get_python3_resource("linux")
     return {
         'type': 2,
         "uid": uid,
@@ -490,7 +502,7 @@ def generate_fetch_from_sandbox_node(uid, res_id, archive, source_root_pattern):
         "cmds": [
             {
                 "cmd_args": [
-                    "$({})/python".format(python_pattern),
+                    "$({})/bin/python3".format(python3_pattern),
                     "$({})/build/scripts/fetch_from_sandbox.py".format(source_root_pattern),
                     "--resource-id",
                     res_id,
@@ -633,9 +645,9 @@ def _calculate_static_uid(node):
     )
 
 
-def inject_stats_and_static_uids(graph):
+def inject_stats_and_static_uids(graph, inject_static_uids=False):
     for node in graph['graph']:
         if 'stats_uid' not in node:
             node['stats_uid'] = _calculate_stats_uid(node)
-        if 'static_uid' not in node:
+        if inject_static_uids and 'static_uid' not in node:
             node['static_uid'] = _calculate_static_uid(node)

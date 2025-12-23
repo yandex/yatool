@@ -2,17 +2,17 @@ GO_LIBRARY()
 
 LICENSE(BSD-3-Clause)
 
-VERSION(v0.31.0)
+VERSION(v0.36.0)
 
 BUILD_ONLY_IF(
     WARNING
     OS_DARWIN
     OS_LINUX
+    OS_ANDROID
 )
 
 SRCS(
     endian_little.go
-    vgetrandom_unsupported.go
 )
 
 IF (OS_LINUX)
@@ -45,6 +45,7 @@ IF (OS_LINUX)
         sysvshm_linux.go
         sysvshm_unix.go
         timestruct.go
+        vgetrandom_linux.go
         zerrors_linux.go
         zsyscall_linux.go
         ztypes_linux.go
@@ -147,6 +148,7 @@ IF (OS_DARWIN)
         sysvshm_unix.go
         sysvshm_unix_other.go
         timestruct.go
+        vgetrandom_unsupported.go
     )
 
     GO_TEST_SRCS(
@@ -204,6 +206,84 @@ IF (OS_DARWIN AND ARCH_ARM64)
     )
 
     GO_TEST_SRCS(darwin_arm64_test.go)
+ENDIF()
+
+IF (OS_WINDOWS)
+    SRCS(
+        vgetrandom_unsupported.go
+    )
+ENDIF()
+
+IF (OS_ANDROID)
+    SRCS(
+        affinity_linux.go
+        aliases.go
+        asm_linux_arm64.s
+        auxv.go
+        bluetooth_linux.go
+        constants.go
+        dev_linux.go
+        dirent.go
+        env_unix.go
+        fcntl.go
+        fdset.go
+        ifreq_linux.go
+        ioctl_linux.go
+        ioctl_unsigned.go
+        mremap.go
+        pagesize_unix.go
+        race0.go
+        readdirent_getdents.go
+        sockcmsg_linux.go
+        sockcmsg_unix.go
+        sockcmsg_unix_other.go
+        syscall.go
+        syscall_linux.go
+        syscall_linux_arm64.go
+        syscall_linux_gc.go
+        syscall_unix.go
+        syscall_unix_gc.go
+        sysvshm_linux.go
+        sysvshm_unix.go
+        timestruct.go
+        vgetrandom_linux.go
+        zerrors_linux.go
+        zerrors_linux_arm64.go
+        zptrace_armnn_linux.go
+        zptrace_linux_arm64.go
+        zsyscall_linux.go
+        zsyscall_linux_arm64.go
+        zsysnum_linux_arm64.go
+        ztypes_linux.go
+        ztypes_linux_arm64.go
+    )
+
+    GO_TEST_SRCS(
+        export_mremap_test.go
+        ifreq_linux_test.go
+        syscall_internal_linux_test.go
+    )
+
+    GO_XTEST_SRCS(
+        auxv_linux_test.go
+        creds_test.go
+        dev_linux_test.go
+        dirent_test.go
+        dup3_test.go
+        example_exec_test.go
+        example_flock_test.go
+        fdset_test.go
+        mmap_unix_test.go
+        mremap_test.go
+        pipe2_test.go
+        sendfile_test.go
+        syscall_linux_test.go
+        syscall_test.go
+        syscall_unix_test.go
+        sysvshm_unix_test.go
+        timestruct_test.go
+        xattr_test.go
+    )
 ENDIF()
 
 END()

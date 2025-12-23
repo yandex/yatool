@@ -371,7 +371,7 @@ private:
             {
                 // NB: Requests without timeout are rare but may occur.
                 // For these requests we still need to register a timeout cookie with TDelayedExecutor
-                // since this also provides proper cleanup and cancelation when global shutdown happens.
+                // since this also provides proper cleanup and cancellation when global shutdown happens.
                 if (TDispatcher::Get()->ShouldAlertOnUnsetRequestTimeout() && !options.Timeout.has_value()) {
                     YT_LOG_ALERT("Request without timeout (RequestId: %v, Method: %v.%v, Endpoint: %v)",
                         requestControl->GetRequestId(),
@@ -726,7 +726,7 @@ private:
                 header.clear_timeout();
             }
 
-            if (options.RequestHeavy || request->IsAttachmentCompressionEnabled()) {
+            if (options.RequestHeavy || (request->IsAttachmentCompressionEnabled() && request->HasAttachments())) {
                 BIND(&IClientRequest::Serialize, request)
                     .AsyncVia(TDispatcher::Get()->GetHeavyInvoker())
                     .Run()
@@ -889,7 +889,7 @@ private:
                 Bus_->GetEndpointDescription(),
                 GetMessageBodySize(requestMessage),
                 GetTotalMessageAttachmentSize(requestMessage),
-                request->GetRequestInfo() ? std::string(Format(", %v", *request->GetRequestInfo())) : std::string());
+                !request->GetRequestInfo().empty() ? std::string(Format(", %v", request->GetRequestInfo())) : std::string());
         }
 
 
@@ -962,23 +962,11 @@ private:
                 }
                 if (error.IsOK()) {
                     message = TrackMemory(MemoryUsageTracker_, std::move(message));
-                    if (MemoryUsageTracker_->IsExceeded()) {
-                        auto error = TError(
-                            NRpc::EErrorCode::ResponseMemoryPressure,
-                            "Response is dropped due to high memory pressure");
-                        requestControl->ProfileError(error);
-                        NotifyError(
-                            requestControl,
-                            responseHandler,
-                            TStringBuf("Response is dropped due to high memory pressure"),
-                            error);
-                    } else {
-                        NotifyResponse(
-                            requestId,
-                            requestControl,
-                            responseHandler,
-                            std::move(message));
-                    }
+                    NotifyResponse(
+                        requestId,
+                        requestControl,
+                        responseHandler,
+                        std::move(message));
                 } else {
                     requestControl->ProfileError(error);
                     if (error.GetCode() == EErrorCode::PoisonPill) {

@@ -205,6 +205,7 @@ class DumpReportOptions(Options):
         self.dump_raw_results = False
         self.json_line_report_file = None
         self.dump_results2_json = False
+        self.stat_only_report_file = None
 
     @staticmethod
     def consumer():
@@ -299,6 +300,15 @@ class DumpReportOptions(Options):
                 'YA_DUMP_RESULTS2_JSON',
                 help='Dump build results to results2.json',
                 hook=SetConstValueHook('dump_results2_json', True),
+            ),
+            ArgConsumer(
+                ['--stat-only'],
+                help='Predict build statistics without running the build. '
+                'Cache based on content-only dynamic uids not considered. '
+                'Output jsonl to file',
+                hook=SetValueHook('stat_only_report_file'),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
             ),
         ]
 
@@ -682,6 +692,10 @@ class PGOOptions(Options):
         if self.pgo_add and self.pgo_user_path:
             raise ArgsValidatingException("Don't use --pgo-add and --pgo-use options together")
 
+    def postprocess2(self, params):
+        if params.pgo_add and getattr(params, 'clang_coverage', False):
+            raise ArgsValidatingException("--pgo-add is not compatible with --clang-coverage")
+
 
 class PICOptions(Options):
     def __init__(self):
@@ -711,6 +725,7 @@ class SandboxAuthOptions(AuthOptions):
         self.sandbox_oauth_token = None
         self.sandbox_oauth_token_path = None
         self.sandbox_oauth_token_path_depr = None
+        self._sandbox_session_token = None
 
     def consumer(self):
         return super().consumer() + [
@@ -734,6 +749,11 @@ class SandboxAuthOptions(AuthOptions):
                 hook=SetValueHook('username'),
                 group=AUTH_OPT_GROUP,
             ),
+            EnvConsumer(
+                'SANDBOX_SESSION_TOKEN',
+                help='oAuth token that is available only in SB task (takes precedance on everything else)',
+                hook=SetValueHook('_sandbox_session_token'),
+            ),
         ]
 
     def postprocess(self):
@@ -756,6 +776,12 @@ class SandboxAuthOptions(AuthOptions):
                 self.sandbox_oauth_token = token
             else:
                 self.sandbox_oauth_token_path = None
+
+        if self._sandbox_session_token:
+            # If the token is leaked we don't care, since it's available only inside a task
+            logger.debug('Using SANDBOX_SESSION_TOKEN for authorization')
+            self.sandbox_oauth_token = self._sandbox_session_token
+            self.sandbox_oauth_token_path = None
 
         if not self.sandbox_oauth_token:
             # fall back to common oauth token if sandbox options are not set.
@@ -1038,7 +1064,7 @@ class ExecutorOptions(Options):
         self.use_clonefile = True
         self.runner_dir_outputs = True
         self.dir_outputs_test_mode = False
-        self.schedule_strategy = schedule_strategy.strategy_name(schedule_strategy.Strategies.default_w_cache)
+        self.schedule_strategy = None
 
     @staticmethod
     def consumer():
@@ -1058,6 +1084,13 @@ class ExecutorOptions(Options):
                 visible=HelpLevel.EXPERT,
             ),
             EnvConsumer('YA_LOCAL_EXECUTOR', hook=SetValueHook('local_executor', return_true_if_enabled)),
+            ArgConsumer(
+                ['--eager-execution'],
+                help='Run tasks on the fly as soon as possible (mainly used in cache heaters)',
+                hook=SetConstValueHook('eager_execution', True),
+                group=FEATURES_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
             EnvConsumer('YA_EAGER_EXECUTION', hook=SetValueHook('eager_execution', return_true_if_enabled)),
             ConfigConsumer('local_executor'),
             ConfigConsumer('eager_execution'),
@@ -1136,6 +1169,7 @@ class GraphFilterOutputResultOptions(Options):
         self.add_host_result = []
         self.replace_result = False
         self.all_outputs_to_result = False
+        self.add_binaries_to_results = False
 
     @staticmethod
     def consumer():
@@ -1186,6 +1220,13 @@ class GraphFilterOutputResultOptions(Options):
                 ['--replace-result'],
                 help='Build only --add-result targets',
                 hook=SetConstValueHook('replace_result', True),
+                group=OUTPUT_CONTROL_GROUP,
+                visible=HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--add-binaries-to-results'],
+                help='Add all binary targets (bin/so) to results',
+                hook=SetConstValueHook('add_binaries_to_results', True),
                 group=OUTPUT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
             ),
@@ -1537,6 +1578,10 @@ class YMakeModeOptions(Options):
         self.ymake_tool_servermode = False
         self.ymake_pic_servermode = False
         self.ymake_multiconfig = False
+        self.force_ymake_multiconfig = False
+        self.ymake_parallel_rendering = False
+        self.ymake_internal_servermode = False
+        self.ymake_use_subinterpreters = False
 
     @staticmethod
     def consumer():
@@ -1593,12 +1638,64 @@ class YMakeModeOptions(Options):
                 group=DEVELOPERS_OPT_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
+            ArgConsumer(
+                ['--force-ymake-multiconfig'],
+                help='Run one ymake for all configurations regardless of the number of target platforms',
+                hook=SetConstValueHook('force_ymake_multiconfig', True),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--ymake-use-subinterpreters'],
+                help='Use Python subinterpreters',
+                hook=SetConstValueHook('ymake_use_subinterpreters', True),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--no-ymake-use-subinterpreters'],
+                help='Do not use Python subinterpreters',
+                hook=SetConstValueHook('ymake_use_subinterpreters', False),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
             EnvConsumer(
                 'YA_YMAKE_MULTICONFIG',
                 hook=SetValueHook('ymake_multiconfig', return_true_if_enabled),
             ),
+            EnvConsumer(
+                'YA_FORCE_YMAKE_MULTICONFIG',
+                hook=SetValueHook('force_ymake_multiconfig', return_true_if_enabled),
+            ),
+            EnvConsumer(
+                'YA_YMAKE_USE_SUBINTERPRETERS',
+                hook=SetValueHook('ymake_use_subinterpreters', return_true_if_enabled),
+            ),
+            EnvConsumer(
+                'YA_YMAKE_PARALLEL_RENDERING',
+                hook=SetValueHook('ymake_parallel_rendering', return_true_if_enabled),
+            ),
             ConfigConsumer('ymake_multiconfig'),
+            ConfigConsumer('force_ymake_multiconfig'),
+            ConfigConsumer('ymake_parallel_rendering'),
+            ConfigConsumer('ymake_internal_servermode'),
+            ConfigConsumer('ymake_use_subinterpreters'),
         ]
+
+    def postprocess2(self, params):
+        if self.force_ymake_multiconfig:
+            self.ymake_multiconfig = True
+            logger.debug('Ymake multiconfig is forced for more than one target platform')
+        elif self.ymake_multiconfig and len(getattr(params, 'target_platforms', [])) > 1:
+            self.ymake_multiconfig = False
+            logger.debug('Ymake multiconfig is disabled for more than one target platform')
+        if not self.ymake_multiconfig:
+            self.ymake_internal_servermode = False
+            logger.debug('Ymake internal servermode is available only in multiconfig mode')
+            self.ymake_parallel_rendering = False
+            logger.debug('Ymake parallel rendering is available only in multiconfig mode')
+            self.ymake_use_subinterpreters = False
+            logger.debug('Ymake subinterpreters is available only in multiconfig mode')
 
 
 class YMakeBinOptions(Options):
@@ -1743,6 +1840,8 @@ class YMakeDumpGraphOptions(Options):
         self.dump_graph = None
         self.dump_graph_file = None
         self.use_json_cache = True
+        self.save_context_to = None
+        self.save_graph_to = None
 
     @staticmethod
     def consumer():
@@ -1770,6 +1869,20 @@ class YMakeDumpGraphOptions(Options):
             ),
             ConfigConsumer(
                 'use_json_cache', help='Use cache for json-graph in ymake (-xs)', group=DEVELOPERS_OPT_GROUP
+            ),
+            ArgConsumer(
+                ['--save-context-to'],
+                help='Save context and exit',
+                hook=SetValueHook('save_context_to'),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--save-graph-to'],
+                help='File to save graph from context',
+                hook=SetValueHook('save_graph_to'),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
             ),
         ]
 
@@ -2560,18 +2673,18 @@ class DistCacheSetupOptions(LocalCacheOptions):
         super().__init__()
 
         if app_config.in_house:
-            self.yt_proxy = 'hahn.yt.yandex.net'
-            self.yt_dir = '//home/devtools/cache'
+            self.yt_proxy = 'markov.yt.yandex.net'
+            self.yt_dir = '//home/devtools-cache'
         else:
             self.yt_proxy = ''
             self.yt_dir = ''
 
         self.yt_token = None
         self.yt_token_path = '~/.yt/token'
+        self.yt_proxy_role = None
         self.yt_readonly = True
         self.yt_max_cache_size = None
         self.yt_store_ttl = None
-        self.yt_store_retry_time_limit = None
 
     @staticmethod
     def consumer():
@@ -2602,6 +2715,13 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 ['--yt-token-path'],
                 help='YT token path',
                 hook=SetValueHook('yt_token_path'),
+                group=YT_CACHE_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            ArgConsumer(
+                ['--yt-proxy-role'],
+                help='YT proxy role',
+                hook=SetValueHook('yt_proxy_role'),
                 group=YT_CACHE_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
@@ -2647,6 +2767,11 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 hook=SetValueHook('yt_token_path'),
             ),
             EnvConsumer(
+                'YA_YT_PROXY_ROLE',
+                help='YT proxy role',
+                hook=SetValueHook('yt_proxy_role'),
+            ),
+            EnvConsumer(
                 'YA_YT_PUT',
                 help='Upload to YT store',
                 hook=SetConstValueHook('yt_readonly', False),
@@ -2661,14 +2786,10 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 help='YT store ttl in hours',
                 hook=SetValueHook('yt_store_ttl'),
             ),
-            EnvConsumer(
-                'YA_YT_STORE_RETRY_TIME_LIMIT',
-                help='Maximum duration of YT method execution attempts',
-                hook=SetValueHook('yt_store_retry_time_limit', transform=float),
-            ),
             ConfigConsumer('yt_proxy'),
             ConfigConsumer('yt_dir'),
             ConfigConsumer('yt_token_path'),
+            ConfigConsumer('yt_proxy_role'),
             ConfigConsumer('yt_max_cache_size'),
             ConfigConsumer('yt_store_ttl'),
             ConfigConsumer('yt_readonly'),
@@ -2683,6 +2804,15 @@ class DistCacheSetupOptions(LocalCacheOptions):
             self.yt_max_cache_size = parse_yt_max_cache_size(self.yt_max_cache_size)
         except ValueError as e:
             raise ArgsValidatingException(f"Wrong yt_max_cache_size value {self.yt_max_cache_size}: {e!s}")
+
+    def postprocess2(self, params):
+        super().postprocess2(params)
+        if params.yt_proxy.startswith('hahn') and params.yt_dir == '//home/devtools/cache' and params.yt_store:
+            logger.warning(
+                "Attempt to use the obsolete YT-store (hahn://home/devtools/cache). Please, remove incorrect settings from all ya.conf files or command line parameters"
+            )
+            params.yt_proxy = 'markov.yt.yandex.net'
+            params.yt_dir = '//home/devtools-cache'
 
     def _read_token_file(self):
         if self.yt_token:
@@ -2720,7 +2850,6 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store = True if app_config.in_house else False  # should be false for opensource
         self.yt_create_tables = False
         self.yt_self_uid = False
-        self.yt_cache_filter = None
         self.yt_store_codec = None
         self.yt_replace_result = False
         self.yt_replace_result_yt_upload_only = False
@@ -2733,6 +2862,10 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_cpp_prepare_data = False
         self.yt_store_probe_before_put = False
         self.yt_store_probe_before_put_min_size = 0
+        self.yt_store_retry_time_limit = None
+        self.yt_store_init_timeout = None
+        self.yt_store_prepare_timeout = None
+        self.yt_store_crit = None
         self.bazel_remote_store = False
         self.bazel_remote_baseuri = 'http://[::1]:8080/'
         self.bazel_remote_username = None
@@ -2868,31 +3001,34 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ),
                 ArgConsumer(
                     ['--no-yt-write-through'],
-                    help='Don\'t populate local cache while updating YT store (heater mode)',
+                    help='Don\'t populate local cache while updating YT store',
                     hook=SetConstValueHook('yt_store_wt', False),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
                 ),
                 ArgConsumer(
                     ['--yt-create-tables'],
-                    help='Create YT storage tables',
+                    help='Create YT storage tables (DEPRECATED. Use "ya cache yt create-tables")',
                     hook=SetConstValueHook('yt_create_tables', True),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
+                    deprecated=True,
                 ),
                 ArgConsumer(
                     ['--yt-self-uid'],
-                    help='Include self_uid in YT store metadata (use with --yt-create-tables)',
+                    help='Include self_uid in YT store metadata (DEPRECATED. Use "ya cache yt create-tables --version 3")',
                     hook=SetConstValueHook('yt_self_uid', True),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
+                    deprecated=True,
                 ),
                 ArgConsumer(
                     ['--yt-store-filter'],
-                    help='YT store filter',
-                    hook=SetValueHook('yt_cache_filter'),
+                    help='YT store filter (DEPRECATED. Do nothing)',
+                    hook=SwallowValueDummyHook(),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
-                    visible=HelpLevel.EXPERT,
+                    visible=HelpLevel.NONE,
+                    deprecated=True,
                 ),
                 ArgConsumer(
                     ['--yt-store-codec'],
@@ -2923,7 +3059,6 @@ class DistCacheOptions(DistCacheSetupOptions):
                     help='Create YT storage tables',
                     hook=SetConstValueHook('yt_create_tables', True),
                 ),
-                EnvConsumer('YA_YT_STORE_FILTER', help='YT store filter', hook=SetValueHook('yt_cache_filter')),
                 EnvConsumer('YA_YT_STORE_CODEC', help='YT store codec', hook=SetValueHook('yt_store_codec')),
                 EnvConsumer(
                     'YA_YT_STORE_THREADS',
@@ -2931,7 +3066,6 @@ class DistCacheOptions(DistCacheSetupOptions):
                     hook=SetValueHook('yt_store_threads', transform=int),
                 ),
                 ConfigConsumer('yt_store'),
-                ConfigConsumer('yt_cache_filter'),
                 ConfigConsumer('yt_store_wt'),
                 ConfigConsumer('yt_store_threads'),
                 ConfigConsumer('yt_store_codec'),
@@ -3046,6 +3180,72 @@ class DistCacheOptions(DistCacheSetupOptions):
                     hook=lambda n: SetConstValueHook(n, True),
                 ),
             )
+            + make_opt_consumers(
+                'yt_store_retry_time_limit',
+                help='Maximum duration of YT method execution attempts',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                ),
+            )
+            + [
+                ArgConsumer(
+                    ['--yt-store2'],
+                    help='Deprecated. Do nothing',
+                    hook=NoValueDummyHook(),
+                    visible=False,
+                    deprecated=True,
+                ),
+                ArgConsumer(
+                    ['--no-yt-store2'],
+                    help='Deprecated. Do nothing',
+                    hook=NoValueDummyHook(),
+                    visible=False,
+                    deprecated=True,
+                ),
+            ]
+            + make_opt_consumers(
+                'yt_store_init_timeout',
+                help='Maximum duration of store initialization',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                ),
+                cfg_opts={},
+            )
+            + make_opt_consumers(
+                'yt_store_prepare_timeout',
+                help='Maximum duration of metadata reading',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, transform=float),
+                ),
+                cfg_opts={},
+            )
+            + make_opt_consumers(
+                'yt_store_crit',
+                help='Break execution if YT store fails ("get" - if get fails, "put" - if either get or put fails)',
+                arg_opts=dict(
+                    hook=lambda n: SetValueHook(n, values=["get", "put"]),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetValueHook(n, values=["get", "put"]),
+                ),
+            )
         )
 
     def postprocess(self):
@@ -3072,6 +3272,15 @@ class DistCacheOptions(DistCacheSetupOptions):
                 raise ArgsValidatingException('YT storage is enabled but YT proxy is not set')
             if not self.yt_dir:
                 raise ArgsValidatingException('YT storage is enabled but YT dir is not set')
+
+        if self.yt_store_exclusive and self.yt_store_crit is None:
+            self.yt_store_crit = "get"
+
+        if not self.yt_store_wt:
+            self.yt_store_crit = "put"
+
+        if self.yt_readonly and self.yt_store_crit == "put":
+            self.yt_store_crit = "get"
 
 
 class JavaSpecificOptions(Options):
@@ -3504,6 +3713,7 @@ def distbs_options(use_distbuild=False):
                 self.graph_stat_path = None
                 self.dump_graph_execution_cost = False
                 self.download_artifacts = False
+                self.upload_to_remote_store = False
 
         return [
             DistbsOptions(),
@@ -3549,7 +3759,8 @@ def build_graph_cache_config_opts():
                 self.build_graph_use_ymake_cache_params = None
                 self.build_graph_use_ymake_cache_params_str = None
 
-                self.build_graph_use_public_api = False
+                self.build_graph_cache_use_arc_bin = False
+                self.build_graph_cache_arc_bin = None
 
         return [BuildGraphCacheConfigOptions()]
 

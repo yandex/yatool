@@ -33,6 +33,7 @@ import devtools.ya.core.config
 import devtools.ya.core.respawn
 import exts.process
 import exts.windows
+import exts.asyncthread
 
 logger = logging.getLogger(__name__)
 
@@ -178,13 +179,17 @@ def do_tool(params):
         print(resource_id(tool_name, params.toolchain, for_platform))
         return
 
-    tool_path = tool(
-        tool_name,
-        params.toolchain,
-        target_platform=target_platform,
-        for_platform=host_platform,
-        force_refetch=params.force_refetch,
+    tool_getter = exts.asyncthread.future(
+        lambda: tool(
+            tool_name,
+            params.toolchain,
+            target_platform=target_platform,
+            for_platform=host_platform,
+            force_refetch=params.force_refetch,
+        )
     )
+    tool_path = tool_getter()
+
     if exts.windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
         logger.debug('Rename tool for win: %s', tool_path)
         tool_path += '.exe'

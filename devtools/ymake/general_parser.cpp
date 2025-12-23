@@ -1,6 +1,7 @@
 #include "general_parser.h"
 
 #include "add_node_context_inline.h"
+#include "glob_helper.h"
 #include "makefile_loader.h"
 #include "macro_string.h"
 #include "macro_processor.h"
@@ -30,16 +31,23 @@ namespace {
 
     void ProcessMakefileGlobs(TNodeAddCtx& node, const TVector<TModuleDef*>& modules) {
         for (const auto module : modules) {
+            THashMap<ui32, TVector<ui32>> globVarElemId2PatternElemIds;
             for (const auto& globInfo : module->GetModuleGlobs()) {
                 // EMNT_Makefile -> GlobCmd -> WatchDirs
-                node.AddUniqueDep(EDT_Property, EMNT_BuildCommand, globInfo.GlobId);
-                auto& [id, entryStats] = *node.UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, globInfo.GlobId), &node.YMake, node.Module);
+                const auto globPatternElemId = globInfo.GlobPatternId;
+                globVarElemId2PatternElemIds[globInfo.ReferencedByVar].push_back(globPatternElemId);
+                const auto emnt = EMNT_BuildCommand;
+                node.AddUniqueDep(EDT_Property, emnt, globPatternElemId);
+                auto& [id, entryStats] = *node.UpdIter.Nodes.Insert(MakeDepsCacheId(emnt, globPatternElemId), &node.YMake, node.Module);
                 auto& globNode = entryStats.GetAddCtx(node.Module, node.YMake);
-                globNode.NodeType = EMNT_BuildCommand;
-                globNode.ElemId = globInfo.GlobId;
+                globNode.NodeType = emnt;
+                globNode.ElemId = globPatternElemId;
                 entryStats.SetOnceEntered(false);
                 entryStats.SetReassemble(true);
                 PopulateGlobNode(globNode, globInfo);
+            }
+            for (auto& [globVarElemId, globPatternElemIds]: globVarElemId2PatternElemIds) {
+                TGlobHelper::SaveGlobPatternElemIds(module->GetModuleGlobsData(), globVarElemId, std::move(globPatternElemIds));
             }
         }
     }
@@ -213,6 +221,7 @@ bool TGeneralParser::NeedUpdateFile(ui64 fileId, EMakeNodeType type, TFileHolder
 
 void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStack& stack, TFileHolder& fileContent, TModule* mod) {
     YDIAG(DG) << "Adding " << name << " (" << node.NodeType << ") to DepGraph:" << Endl;
+    YMake.InitPluginsAndParsers();
 
     auto& nodeEntry = stack.back().EntryPtr->second;
 
@@ -437,7 +446,38 @@ void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
         SBDIAG << "Result dep: " << tool << Endl;
         node.AddUniqueDep(EDT_Include, EMNT_Directory, tool);
         Graph.Names().CommandConf.GetById(TVersionedCmdId(node.ElemId).CmdId()).KeepTargetPlatform = true;
+        YDebug() << "TGeneralParser::AddCommandNodeDeps: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << tool << Endl;
     }
+
+    // a dirty copy-paste from ProcessBuildCommand
+    // TODO: move this one level upper since it's common code for all implementations
+    bool depsChanged = false;
+    if (node.UpdNode != TNodeId::Invalid) {
+        TDeps oldDeps;
+        node.GetOldDeps(oldDeps, 0, false);
+        const auto& delayedDeps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, static_cast<ui32>(node.ElemId)}, EDT_Search);
+        if (oldDeps.Size() != node.Deps.Size() + delayedDeps.size()) {
+            depsChanged = true;
+        } else {
+            for (size_t n = 0; n < node.Deps.Size(); n++) {
+                if (oldDeps[n].ElemId != node.Deps[n].ElemId) {
+                    depsChanged = true;
+                    break;
+                }
+            }
+            if (!depsChanged) {
+                size_t n = 0;
+                for (const auto& dirId : delayedDeps) {
+                    if (oldDeps[node.Deps.Size() + n].ElemId != dirId) {
+                        depsChanged = true;
+                        break;
+                    }
+                    n++;
+                }
+            }
+        }
+    }
+    node.UpdCmdStampForNewCmdNode(Graph.Names().CommandConf, YMake.TimeStamps, depsChanged);
 }
 
 void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) {
@@ -558,6 +598,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
                 node.AddUniqueDep(EDT_Include, EMNT_Directory, dir);
                 if (cmd.Result) {
                     Graph.Names().CommandConf.GetById(node.ElemId).KeepTargetPlatform = true;
+                    YDebug() << "TGeneralParser::ProcessBuildCommand: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << dir << Endl;
                 }
             }
         }
@@ -638,7 +679,7 @@ void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, 
 }
 
 void PopulateGlobNode(TNodeAddCtx& node, const TModuleGlobInfo& globInfo) {
-    node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.GlobHash);
+    node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.GlobPatternHash);
     for (ui32 fileId: globInfo.MatchedFiles) {
         node.AddUniqueDep(EDT_Property, EMNT_File, fileId);
     }

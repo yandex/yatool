@@ -10,7 +10,12 @@ from devtools.ya.build.ymake2 import ymake_sem_graph
 from yalibrary import tools
 from devtools.ya.yalibrary import sjson
 from devtools.ya.build import build_facade
-from devtools.ya.core import config as core_config
+from exts import hashing
+
+try:
+    import yalibrary.build_graph_cache as bg_cache
+except ImportError:
+    bg_cache = None
 
 
 class SemException(Exception):
@@ -97,12 +102,20 @@ class SemConfig:
     def _prepare_targets(self) -> None:
         """Add current directory to input targets, if targets empty"""
         if not self.params.abs_targets:
-            abs_target = Path.cwd().resolve()
-            self.params.abs_targets.append(str(abs_target))
-            self.params.rel_targets.append(os.path.relpath(abs_target, self.arcadia_root))
+            path_abs_target = Path.cwd().resolve()
+            if path_abs_target.is_relative_to(self.arcadia_root):
+                self.params.abs_targets.append(str(path_abs_target))
+                self.params.rel_targets.append(str(path_abs_target.relative_to(self.arcadia_root)))
+            else:
+                raise SemException("Not found targets for export")
         for abs_target in self.params.abs_targets:
-            if not Path(abs_target).exists():
-                raise SemException(f"Not found target {abs_target}")
+            path_abs_target = Path(abs_target)
+            if not path_abs_target.exists():
+                raise SemException(f"Not found target {path_abs_target}")
+            if self.arcadia_root == path_abs_target:
+                raise SemException("Full arcadia can't be used as target")
+            if not path_abs_target.is_relative_to(self.arcadia_root):
+                raise SemException(f"Path {path_abs_target} outside arcadia")
         self.logger.info("Targets: %s", self.params.rel_targets)
 
     def _get_export_root(self) -> Path:
@@ -192,7 +205,7 @@ class SemNode:
                     raise SemException(f'Fail parse semantic {data_semantic}: {e}') from e
 
     def has_semantics(self) -> bool:
-        return self.semantics is not None
+        return self.semantics is not None and len(self.semantics) > 0
 
     @staticmethod
     def take_id(data: dict) -> int:
@@ -285,34 +298,64 @@ class SemGraph:
         if prepared_ymake_conf:
             if prepared_ymake_conf != ymake_conf:
                 shutil.copy(prepared_ymake_conf, ymake_conf)
+            custom_conf = ymake_conf
         else:
-            conf = build_facade.gen_conf(
-                build_root=core_config.build_root(),
-                build_type='nobuild',
+            custom_conf = build_facade.gen_conf(
+                build_root=None,
+                build_type='semgraph',
                 build_targets=self.config.params.abs_targets,
                 flags=self.config.params.flags,
                 host_platform=self.config.params.host_platform,
                 target_platforms=self.config.params.target_platforms,
                 arc_root=self.config.arcadia_root,
+                custom_conf_dir=os.path.join(self.config.params.bld_root, 'conf'),
             )
-            shutil.copy(conf, ymake_conf)
+            shutil.copy(custom_conf, ymake_conf)
+
+        try:
+            import app_ctx
+
+            evlog = getattr(app_ctx, "evlog", None)
+            store = getattr(app_ctx, "changelist_store", None)
+            vcs_type = app_ctx.vcs_type
+        except ImportError:
+            evlog = None
+            store = None
+            vcs_type = None
+
+        changelist_generator = (
+            bg_cache.BuildGraphCacheCLFromArc(evlog, self.config.params, store=store)
+            if bg_cache and vcs_type == 'arc'
+            else None
+        )
+
+        custom_build_directory = (
+            str(Path(custom_conf).parent) + f"_{hashing.md5_value(str([2, self.config.ymake_bin]))}"
+        )
+
+        kwargs = {
+            **self.config.params.as_dict(),
+            **kwargs,
+            'continue_on_fail': True,
+            'custom_conf': str(custom_conf),
+            'custom_build_directory': custom_build_directory,
+            'source_root': str(self.config.arcadia_root),
+            'ymake_bin': str(self.config.ymake_bin),
+            'changelist_generator': changelist_generator,
+            'patch_path': (
+                changelist_generator.get_changelist(custom_build_directory) if changelist_generator else None
+            ),
+        }
 
         dump_ymake_stderr = kwargs.pop('dump_ymake_stderr', None)
-        for key, value in {  # Defaults from config, if absent in kwargs
-            'source_root': self.config.arcadia_root,
-            'custom_build_directory': self.config.ymake_root,
-            'ymake_bin': self.config.ymake_bin,
-        }.items():
-            if key not in kwargs:
-                kwargs[key] = value
 
-        r, _ = ymake_sem_graph(
-            custom_conf=ymake_conf,
-            continue_on_fail=True,
-            dump_sem_graph=True,
-            abs_targets=self.config.params.abs_targets,
-            **kwargs,
-        )
+        if kwargs['patch_path']:
+            if not ('debug_options' in kwargs):
+                kwargs['debug_options'] = ['completely-trust-fs-cache']
+            elif not ('completely-trust-fs-cache' in kwargs['debug_options']):
+                kwargs['debug_options'].append('completely-trust-fs-cache')
+
+        r, _ = ymake_sem_graph(**kwargs)
 
         if dump_ymake_stderr:
             if dump_ymake_stderr == "log":
@@ -376,7 +419,7 @@ class SemGraph:
         except Exception as e:
             raise SemException(f'Fail read sem-graph from {self.sem_graph_file}: {e}') from e
 
-    def update(self, data: list[dict]) -> None:
+    def update(self, data: list[dict], sem_graph_file: Path = None) -> None:
         """Rewrite sem-graph file by updated data"""
-        with self.sem_graph_file.open('wb') as f:  # Update sem-graph in file
+        with (sem_graph_file if sem_graph_file else self.sem_graph_file).open('wb') as f:  # Update sem-graph in file
             sjson.dump({SemGraph.DATA: data}, f)

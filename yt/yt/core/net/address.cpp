@@ -19,6 +19,8 @@
 
 #include <yt/yt/core/profiling/timing.h>
 
+#include <yt/yt/core/rpc/dispatcher.h>
+
 #include <library/cpp/yt/threading/rw_spin_lock.h>
 
 #include <library/cpp/yt/memory/atomic_intrusive_ptr.h>
@@ -68,7 +70,7 @@ void UpdateLoopbackAddress(const TAddressResolverConfigPtr& config);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-TString BuildServiceAddress(TStringBuf hostName, int port)
+std::string BuildServiceAddress(TStringBuf hostName, int port)
 {
     return Format("%v:%v", hostName, port);
 }
@@ -264,7 +266,7 @@ socklen_t* TNetworkAddress::GetLengthPtr()
 
 TErrorOr<TNetworkAddress> TNetworkAddress::TryParse(TStringBuf address)
 {
-    TString ipAddress(address);
+    std::string ipAddress(address);
     std::optional<int> port;
 
     auto closingBracketIndex = address.find(']');
@@ -284,14 +286,14 @@ TErrorOr<TNetworkAddress> TNetworkAddress::TryParse(TStringBuf address)
             }
         }
 
-        ipAddress = TString(address.substr(1, closingBracketIndex - 1));
+        ipAddress = address.substr(1, closingBracketIndex - 1);
     } else {
         if (address.find('.') != TString::npos) {
             auto colonIndex = address.find(':', closingBracketIndex + 1);
             if (colonIndex != TString::npos) {
                 try {
                     port = FromString<int>(address.substr(colonIndex + 1));
-                    ipAddress = TString(address.substr(0, colonIndex));
+                    ipAddress = address.substr(0, colonIndex);
                 } catch (const std::exception) {
                     return TError("Port number in address %Qv is malformed",
                         address);
@@ -987,6 +989,7 @@ public:
     explicit TImpl(TAddressResolverConfigPtr config)
         : TAsyncExpiringCache(
             config,
+            NYT::NRpc::TDispatcher::Get()->GetHeavyInvoker(),
             /*logger*/ {},
             DnsProfiler().WithPrefix("/resolve_cache"))
     {

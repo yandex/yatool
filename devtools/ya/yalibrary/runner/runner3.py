@@ -43,6 +43,7 @@ import yalibrary.runner.sandboxing as sandboxing
 
 
 logger = logging.getLogger(__name__)
+BUILD_ERRORS_REPORT_LIMIT = 5
 
 
 if tp.TYPE_CHECKING:
@@ -303,9 +304,10 @@ class TaskContext(object):
         )
 
     def run_dist_node(self, node: "Node") -> "DistDownloadTask":
-        import yalibrary.runner.tasks.distbuild
+        # XXX: (DEVTOOLSSUPPORT-69240) Intentionally importing a single class
+        from yalibrary.runner.tasks.distbuild import DistDownloadTask
 
-        return yalibrary.runner.tasks.distbuild.DistDownloadTask(
+        return DistDownloadTask(
             node,
             self,
             self._build_root_set,
@@ -384,6 +386,7 @@ class TaskContext(object):
         replay_info = list(self.runq.replay())
 
         exit_code_map: dict[GraphNodeUid, ExitCode] = {}
+        total_errors = 0
         for group in replay_info:
             for task_info in group:
                 try:
@@ -400,12 +403,35 @@ class TaskContext(object):
                     )
                     task_uid = getattr(task_info.task, 'uid', getattr(task_info.task, 'short_name', 'UnknownTask'))
                     exit_code_map[task_uid] = rc
+
+                    error_info = {
+                        "uid": task_uid,
+                        "exit_code": rc,
+                        "stderr": stderr if stderr else 'no strderr was provided',
+                        "outputs": getattr(task_info.task, 'outputs', []),
+                    }
+
+                    if total_errors < BUILD_ERRORS_REPORT_LIMIT:
+                        devtools.ya.core.report.telemetry.report(
+                            devtools.ya.core.report.ReportTypes.BUILD_ERRORS,
+                            error_info,
+                        )
+
+                    total_errors += 1
+
                 elif stderr:
                     if len(stderr) <= TRUNCATE_STDERR * 2:
                         truncated_stderr = stderr
                     else:
                         truncated_stderr = "\n".join((stderr[:TRUNCATE_STDERR], "...", stderr[-TRUNCATE_STDERR:]))
                     logger.debug("Task %s has stderr:\n%s", task_info.task, truncated_stderr)
+
+        devtools.ya.core.report.telemetry.report(
+            devtools.ya.core.report.ReportTypes.BUILD_ERRORS_COUNT,
+            {
+                "total_build_errors": total_errors,
+            },
+        )
 
         merged_exit_code = devtools.ya.core.error.merge_exit_codes([0] + list(exit_code_map.values()))
         logger.debug("Merged exit code: %d", merged_exit_code)
@@ -497,7 +523,7 @@ class TaskContext(object):
             download=self._threads + net_threads,
             upload=net_threads,
         )
-        worker_pools = {WorkerPoolType.BASE: self._threads, WorkerPoolType.SERVICE: net_threads + 1}
+        worker_pools = {WorkerPoolType.BASE: self._threads + 1, WorkerPoolType.SERVICE: net_threads}
         strategy = schedule_strategy.Strategies.pick(self.opts.schedule_strategy, build_time_cache_availability)
 
         self._workers = worker_threads.WorkerThreads(
@@ -651,6 +677,7 @@ class TaskContext(object):
                     timeout=self.opts.status_refresh_interval, ready_to_stop=lambda: self.runq.pending == 0
                 )
             except StopIteration:
+                logger.debug("_process_queue: StopIteration")
                 break
             self._ticker.tick(False, self.compact_cache_task.fmt_size())
             if f:

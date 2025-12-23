@@ -1,6 +1,7 @@
 PY3_LIBRARY()
 
 PY_SRCS(
+    process_json_report.py
     run_playwright.py
 )
 
@@ -18,3 +19,7 @@ PEERDIR(
 )
 
 END()
+
+RECURSE_FOR_TESTS(
+    tests
+)

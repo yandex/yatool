@@ -27,12 +27,12 @@ class Status(enum.Enum):
 
 
 class DistStore(object):
-    def __init__(self, name, stats_name, tag, readonly, max_file_size=0, fits_filter=None, heater_mode=False):
+    def __init__(self, name, stats_name, tag, readonly, max_file_size=0, fits_filter=None):
         self._readonly = readonly
         metrics = ['has', 'put', 'get', 'get-meta', 'probe-meta-before-put']
         self._timers = {m: 0 for m in metrics}
         self._time_intervals = {m: [] for m in metrics}
-        self._counters = {m: 0 for m in metrics + ['skip-put']}
+        self._counters = {m: 0 for m in metrics + ['skip-put', 'get-by-cuid']}
         self._failures = {m: 0 for m in metrics}
         self._data_size = {'put': 0, 'get': 0, 'skip-put': 0}
         self._cache_hit = {'requested': 0, 'found': 0}
@@ -42,7 +42,6 @@ class DistStore(object):
         self._tag = tag
         self._fits_filter = fits_filter
         self._exclude_filter = self._gen_exclude_filter(max_file_size)
-        self._heater_mode = heater_mode
 
     def _inc_time(self, x, tag):
         cur_time = time.time()
@@ -137,6 +136,7 @@ class DistStore(object):
             report.telemetry.report('{}-{}-data-size'.format(self._stats_name, k), stat_dict)
             execution_log['$({}-{}-data-size)'.format(self._name, k)] = stat_dict
         execution_log['$({}-cache-hit)'.format(self._name)] = self._cache_hit
+        execution_log['$({}-get-by-cuid)'.format(self._name)] = {'count': self._counters['get-by-cuid']}
 
         real_times = {}
         for k, v in six.iteritems(self._timers):

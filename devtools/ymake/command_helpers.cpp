@@ -1,9 +1,9 @@
 #include "command_helpers.h"
 
 namespace {
-    TVector<TString> splitString(TStringBuf str, const TString &delimiter, bool cleanup) {
-        TVector<TString> tokens;
-        TString token;
+    TVector<std::string> splitString(TStringBuf str, const TString &delimiter, bool cleanup) {
+        TVector<std::string> tokens;
+        std::string token;
 
         TString serviceChars = " \\'\"&";
         char quote = ' ';
@@ -63,8 +63,8 @@ namespace {
     }
 }
 
-TVector<TVector<TString>> SplitCommandsAndArgs(TStringBuf cmd) {
-    TVector<TVector<TString>> res;
+TVector<TVector<std::string>> SplitCommandsAndArgs(TStringBuf cmd) {
+    TVector<TVector<std::string>> res;
     auto split = splitString(cmd, "&&", false);
     res.reserve(split.size());
     for(auto& str : split)
@@ -72,8 +72,8 @@ TVector<TVector<TString>> SplitCommandsAndArgs(TStringBuf cmd) {
     return res;
 }
 
-TVector<TString> SplitCommands(TStringBuf cmd) {
-    TVector<TString> res;
+TVector<std::string> SplitCommands(TStringBuf cmd) {
+    TVector<std::string> res;
     auto split = splitString(cmd, "&&", false);
     res.reserve(split.size());
     for(auto& str : split) {
@@ -88,6 +88,6 @@ TVector<TString> SplitCommands(TStringBuf cmd) {
     return res;
 }
 
-TVector<TString> SplitArgs(TStringBuf cmd) {
+TVector<std::string> SplitArgs(TStringBuf cmd) {
     return splitString(cmd, " ", true);
 }

@@ -309,27 +309,29 @@ class YmakeTimeStatistic(event_handling.SubscriberSpecifiedTopics):
     topics = {"NEvent.TStageStarted", "NEvent.TStageFinished"}
 
     def __init__(self):
-        self.current_open_threads = {}
+        self.current_working_ymakes = {}
         self.threads_time = []
         self.min_timestamp_ms = None
         self.max_timestamp_ms = None
 
     def _action(self, event):
         if event["_typename"] == "NEvent.TStageStarted" and event["StageName"] == "ymake run":
-            thread_name = threading.current_thread().name
-            self.current_open_threads[thread_name] = event['_timestamp']
+            ymake_run_uid = event['ymake_run_uid']
+
+            self.current_working_ymakes[ymake_run_uid] = event['_timestamp']
             if self.min_timestamp_ms is None:
                 self.min_timestamp_ms = event["_timestamp"] / 1000
 
         elif event["_typename"] == "NEvent.TStageFinished" and event["StageName"] == "ymake run":
-            thread_name = threading.current_thread().name
+            ymake_run_uid = event['ymake_run_uid']
+
             self.max_timestamp_ms = event["_timestamp"] / 1000
             self.threads_time.append(
                 ConfigureTask(
-                    start=self.current_open_threads[thread_name],
+                    start=self.current_working_ymakes[ymake_run_uid],
                     end=event["_timestamp"],
-                    thread_name=thread_name,
+                    thread_name=ymake_run_uid,
                     debug_id=event.get("debug_id", 0),
                 )
             )
-            del self.current_open_threads[thread_name]
+            del self.current_working_ymakes[ymake_run_uid]

@@ -43,6 +43,7 @@ PROJECT_MACROS = {
     'JAVA_PROGRAM',
     'JAVA_PROTO_LIBRARY',
     'JTEST',
+    'JUNIT5',
     'LIBRARY',
     'METAQUERY',
     'PACKAGE',

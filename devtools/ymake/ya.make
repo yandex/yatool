@@ -3,11 +3,11 @@ LIBRARY()
 USE_PYTHON3()
 
 PEERDIR(
+    library/cpp/yt/mlock
     contrib/libs/asio
     contrib/libs/yaml-cpp
-    contrib/python/PyYAML
-    contrib/python/six
     contrib/libs/fmt
+    contrib/libs/pugixml
     contrib/libs/re2
     devtools/draft
     devtools/common/blacklist
@@ -96,7 +96,9 @@ SRCS(
     export_json_debug.cpp
     export_json.cpp
     flat_json_graph.cpp
+    foreign_platforms/pipeline.cpp
     general_parser.cpp
+    glob_helper.cpp
     global_vars_collector.cpp
     graph_changes_predictor.cpp
     incl_fixer.cpp
@@ -162,12 +164,12 @@ SRCS(
     plugins/error.cpp
     plugins/init.cpp
     plugins/ymake_module.cpp
-    plugins/plugin_go_fake_output_handler.cpp
     plugins/plugin_macro_impl.cpp
     plugins/resource_handler/impl.cpp
     plugins/scoped_py_object_ptr.cpp
     plugins/ymake_module_adapter.cpp
     propagate_change_flags.cpp
+    python_runtime.cpp
     recurse_graph.cpp
     run_main.cpp
     saveload.cpp

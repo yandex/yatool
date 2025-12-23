@@ -41,6 +41,7 @@ PEERDIR(
     devtools/ya/yalibrary/profiler
     devtools/ya/yalibrary/showstack
     devtools/ya/yalibrary/vcs
+    devtools/ya/yalibrary/vcs/vcsversion
 )
 
 IF (NOT YA_OPENSOURCE)

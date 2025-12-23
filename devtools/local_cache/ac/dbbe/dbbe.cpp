@@ -153,9 +153,9 @@ namespace NACCache {
     }
 
     void DefaultErrorHandler(TLog& log, const std::exception& exc) {
-        if (auto sqlExc = dynamic_cast<const NSQLite::TSQLiteError*>(&exc)) {
+        if (/* auto sqlExc = */ dynamic_cast<const NSQLite::TSQLiteError*>(&exc)) {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_ERR, "ERR[ACBE]") << "SQLite exception: " << exc.what() << Endl;
-        } else if (auto yExc = dynamic_cast<const yexception*>(&exc)) {
+        } else if (/* auto yExc = */ dynamic_cast<const yexception*>(&exc)) {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_CRIT, "CRIT[ACBE]") << "yexception: " << exc.what() << Endl;
         } else {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_EMERG, "EMERG[ACBE]") << "std::exception: " << exc.what() << Endl;

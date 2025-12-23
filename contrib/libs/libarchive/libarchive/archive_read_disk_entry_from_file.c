@@ -338,7 +338,7 @@ setup_mac_metadata(struct archive_read_disk *a,
 	int ret = ARCHIVE_OK;
 	void *buff = NULL;
 	int have_attrs;
-	const char *name, *tempdir;
+	const char *name;
 	struct archive_string tempfile;
 
 	(void)fd; /* UNUSED */
@@ -357,15 +357,11 @@ setup_mac_metadata(struct archive_read_disk *a,
 	if (have_attrs == 0)
 		return (ARCHIVE_OK);
 
-	tempdir = NULL;
-	if (issetugid() == 0)
-		tempdir = getenv("TMPDIR");
-	if (tempdir == NULL)
-		tempdir = _PATH_TMP;
 	archive_string_init(&tempfile);
-	archive_strcpy(&tempfile, tempdir);
-	archive_strcat(&tempfile, "tar.md.XXXXXX");
-	tempfd = mkstemp(tempfile.s);
+	archive_strcpy(&tempfile, name);
+	archive_string_dirname(&tempfile);
+	archive_strcat(&tempfile, "/tar.XXXXXXXX");
+	tempfd = __archive_mkstemp(tempfile.s);
 	if (tempfd < 0) {
 		archive_set_error(&a->archive, errno,
 		    "Could not open extended attribute file");

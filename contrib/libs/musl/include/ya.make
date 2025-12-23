@@ -30,4 +30,6 @@ NO_PLATFORM()
 
 NO_RUNTIME()
 
+LD_PLUGIN(musl.py)
+
 END()

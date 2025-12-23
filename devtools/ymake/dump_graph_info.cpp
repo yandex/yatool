@@ -40,7 +40,12 @@ static void PrintFlatGraph(const TYMake& ymake) {
 
     for (auto node : graph.Nodes()) {
         TString name = (node->NodeType != EMNT_Deleted || node->ElemId != 0) ? graph.ToString(node) : "<Null>";
-        Cout << node.Id() << ' ' << node->NodeType << ' ' << name << '(' << node->ElemId << ") - " << node.Edges().Total() << " deps:" << Endl;
+        TString flags = DumpNodeFlags(node->ElemId, node->NodeType, ymake.Names);
+        Cout << node.Id() << ' ' << node->NodeType << ' ' << name << '(' << node->ElemId << ")";
+        if (!flags.empty())
+            Cout << " - [" << flags << "]";
+        Cout << " - " << node.Edges().Total() << " deps:";
+        Cout << Endl;
 
         for (auto dep : node.Edges()) {
             Cout << "  "

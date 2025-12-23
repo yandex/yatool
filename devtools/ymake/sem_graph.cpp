@@ -73,7 +73,9 @@ namespace {
                 const auto& varStr = RestoreContext.Graph.GetCmdName(dep.To()).GetStr();
                 const TStringBuf varname = GetCmdName(varStr);
                 const TStringBuf varval = GetCmdValue(varStr);
-                vars[varname + TString("_RAW")].push_back(varval);
+                auto& var = vars[varname + TString("_RAW")];
+                var.push_back(varval);
+                var.back().StructCmdForVars = true;
             }
         }
 
@@ -135,7 +137,7 @@ namespace {
         TSemFormatter formatter{};
         TMakeCommand mkcmd{modulesStatesCache, restoreContext, commands, nullptr, &restoreContext.Conf.CommandConf};
         mkcmd.CmdInfo.MkCmdAcceptor = formatter.GetAcceptor();
-        mkcmd.GetFromGraph(nodeId, modId, ECmdFormat::ECF_Json, &semInfoProvider);
+        mkcmd.GetFromGraph(nodeId, modId, &semInfoProvider);
         return std::move(formatter).TakeCommands();
     }
 
@@ -177,7 +179,15 @@ namespace {
             if (!state.HasIncomingDep() && IsDirToModuleDep(dep) && !ModStartTargets.contains(TTarget{dep.To().Id()})) {
                 return false;
             }
-            return !IsIncludeFileDep(dep) && *dep != EDT_OutTogetherBack;
+            if (*dep == EDT_OutTogetherBack) {
+                return false;
+            }
+            if (!IsIncludeFileDep(dep)) {
+                return true;
+            }
+            // Check IsLink and resolve it only if ready return false
+            return TFileId::Create(dep.From()->ElemId).IsLink()
+                && NPath::GetType(RestoreContext.Graph.GetFileName(dep.From()->ElemId).GetTargetStr()) == NPath::ERoot::Build;
         }
 
         bool Enter(TState& state) {
@@ -217,7 +227,10 @@ namespace {
                 if (topNode->NodeType == EMNT_Directory && StartDirs.contains(topNode.Id())) {
                     node.AddProp("Tag", "StartDir");
                 }
-                if (IsOutputType(topNode->NodeType) && !AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_OutTogether;})) {
+                if (IsOutputType(topNode->NodeType) && !AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_OutTogether;})
+                    // Some link may has no commands, skip render semantics for it, else "No pattern for node" error
+                    && (!TFileConf::IsLink(topNode->ElemId) || AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_BuildFrom || dep.To()->NodeType == EMNT_BuildCommand;}))
+                ) {
                     Y_ASSERT(!ModulesStack.empty());
                     const auto& modinfo = ModulesStack.top();
                     TDumpInfoSem semVarsProvider{
@@ -225,9 +238,10 @@ namespace {
                         modinfo.GlobalLibId == topNode->ElemId ? RestoreContext.Graph[modinfo.ModNodeId] : topNode
                     };
                     static const TSingleCmd::TCmdStr CMD_IGNORED = TStringBuilder() << "[\"" << TModuleConf::SEM_IGNORED << "\"]";
+                    static const TSingleCmd::TCmdStr CMD_IGNORED_NEW = TVector<TString>{TString{TModuleConf::SEM_IGNORED}};
                     auto sem = FormatCmd(RestoreContext, Commands, topNode.Id(), ModulesStack.top().ModNodeId, semVarsProvider, ModulesStatesCache);
                     bool ignored = AnyOf(sem, [](const TSingleCmd& cmd) {
-                        return cmd.CmdStr == CMD_IGNORED;
+                        return cmd.CmdStr == CMD_IGNORED || cmd.CmdStr == CMD_IGNORED_NEW;
                     });
                     if (!ignored && mod && mod->IsSemIgnore()) {
                         ignored = true;
@@ -354,7 +368,7 @@ namespace {
         THashSet<TNodeId> StartDirs;
         const THashSet<TTarget>& ModStartTargets;
         TToolMiner ToolMiner;
-        TMakeModuleStates ModulesStatesCache;
+        TMakeModuleSequentialStates ModulesStatesCache;
     };
 
 }

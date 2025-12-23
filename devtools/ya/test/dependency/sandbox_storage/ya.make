@@ -13,6 +13,7 @@ PEERDIR(
 IF (NOT OPENSOURCE)
     PEERDIR(
         devtools/ya/yalibrary/yandex/sandbox
+        devtools/ya/yalibrary/fetcher/ufetcher
     )
 ENDIF()
 

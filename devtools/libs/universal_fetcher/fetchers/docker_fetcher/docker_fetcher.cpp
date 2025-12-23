@@ -74,6 +74,10 @@ namespace NUniversalFetcher {
                 };
                 Log() << TLOG_INFO << "Run skopeo: " << JoinSeq(" ", args);
                 auto res = ProcessRunner_->Run(args, runParams, cancellation);
+                if (cancellation.IsCancellationRequested()) {
+                    Log() << TLOG_INFO << "Skopeo run cancelled";
+                    return {EFetchStatus::Cancelled};
+                }
 
                 if (res.StdErr && !res.StdErr.empty() && res.StdErr.find("no image found in image index for architecture") != TString::npos) {
                     Log() << TLOG_INFO << "No image found in image index for architecture, trying to fetch it with --override-os linux";
@@ -92,10 +96,15 @@ namespace NUniversalFetcher {
 
                     Log() << TLOG_INFO << "Run skopeo: " << JoinSeq(" ", args);
                     res = ProcessRunner_->Run(args, runParams, std::move(cancellation));
+
+                    if (cancellation.IsCancellationRequested()) {
+                        Log() << TLOG_INFO << "Skopeo run cancelled";
+                        return {EFetchStatus::Cancelled};
+                    }
                 }
 
                 // TODO(trofimenkov): Where Skopeo will store temporary files with layers?
-                // Setup env for it like in https://a.yandex-team.ru/arcadia/devtools/experimental/podman_recipe/run.sh
+                // Setup env for it like in https://a.yandex-team.ru/arcadia/library/recipes/podman_recipe/run.sh
 
                 if (res.ExitStatus == 0) {
                     return {

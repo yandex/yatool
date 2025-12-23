@@ -2,7 +2,7 @@
 
 PY3_LIBRARY()
 
-VERSION(1.0.0)
+VERSION(1.1.0)
 
 LICENSE(BSD-3-Clause)
 
@@ -14,7 +14,6 @@ PY_SRCS(
     tlz/_build_tlz.py
     toolz/__init__.py
     toolz/_signatures.py
-    toolz/_version.py
     toolz/compatibility.py
     toolz/curried/__init__.py
     toolz/curried/exceptions.py

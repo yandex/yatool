@@ -738,7 +738,6 @@ private:
 class TFDConnectionImpl
     : public TPollableBase
 {
-    struct TIODirection;
 public:
     static TFDConnectionImplPtr Create(
         TFileDescriptor fd,
@@ -827,6 +826,8 @@ public:
             if (SynchronousIOCount_ > 0) {
                 return;
             }
+            ReadDirection_.OnShutdown();
+            WriteDirection_.OnShutdown();
         }
 
         if (ReadDirection_.Operation) {
@@ -843,9 +844,6 @@ public:
         FD_ = -1;
 
         OnPeerDisconnected();
-        ReadDirection_.OnShutdown();
-        WriteDirection_.OnShutdown();
-
         ShutdownPromise_.Set();
     }
 
@@ -1961,7 +1959,7 @@ IPacketConnectionPtr CreatePacketConnection(
     const TNetworkAddress& at,
     NConcurrency::IPollerPtr poller)
 {
-    TFileDescriptorGuard fd = CreateUdpSocket();
+    TFileDescriptorGuard fd = CreateUdpSocket(at.GetSockAddr()->sa_family);
     try {
         SetReuseAddrFlag(fd.Get());
         BindSocket(fd.Get(), at);

@@ -4,7 +4,6 @@
 
 import os
 import io
-import shutil
 import logging
 
 import exts.fs
@@ -68,35 +67,6 @@ def link_file(src, dst):
     if exts.windows.on_win():
         return exts.fs.hardlink_or_copy(src, dst)
     return exts.fs.symlink(src, dst)
-
-
-def copy_dir_contents(src_dir, dest_dir, ignore_list=[], skip_links=True):
-    """Copy src_dir directory content to dest_dir
-
-    Args:
-        src_dir (path): Source directory
-        dest_dir (path): Destination directory
-        ignore_list (list, optional): Top level items to be ignored. Defaults to [].
-        skip_links (bool, optional): Ignore top level links. Defaults to True.
-    """
-    if not os.path.exists(dest_dir):
-        os.makedirs(dest_dir)
-
-    for entry in os.listdir(src_dir):
-        if entry in ignore_list:
-            continue
-
-        src = os.path.join(src_dir, entry)
-        dst = os.path.normpath(os.path.join(dest_dir, entry))
-
-        if os.path.islink(src) and skip_links:
-            continue
-
-        if os.path.isdir(src):
-            copy_dir_contents(src, dst)
-
-        if os.path.isfile(src) and not os.path.exists(dst):
-            shutil.copy(src, dst)
 
 
 def get_log_results_link(opts):

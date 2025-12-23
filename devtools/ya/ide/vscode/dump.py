@@ -133,7 +133,7 @@ def mine_test_cwd(params, modules):
             module["TEST_CWD"] = os.path.join(params.arc_root, test_cwd)
 
 
-def collect_python_path(arc_root, links_dir, modules, srcdirs):
+def collect_python_path(arc_root, links_dir, modules, srcdirs, use_new_extra_paths_logic=False):
     source_paths = set()
 
     def find_py_namespace(node):
@@ -160,7 +160,7 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
     def is_protobuf(node):
         if isinstance(node, yalibrary.makelists.macro_definitions.Macro) and node.name == 'PROTO_LIBRARY':
             return True
-        return any(is_flatbuf(child) for child in node.children)
+        return any(is_protobuf(child) for child in node.children)
 
     def is_top_level(node):
         if isinstance(node, yalibrary.makelists.macro_definitions.SrcValue) and node.name == "TOP_LEVEL":
@@ -191,7 +191,33 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
                 return module_virtual_dir
         if path:
             return os.path.join(arc_root, path)
-        return arc_root
+        return None
+
+    def new_root_src_path(src_path, namespace):
+        path_hash = "{}_{}".format(namespace, hashlib.md5((src_path + namespace).encode("utf-8")).hexdigest()[:8])
+        namespace_path = namespace.replace(".", "/") if (namespace and namespace != ".") else "."
+
+        if src_dir == namespace_path:
+            return None
+
+        if not src_path and namespace_path == ".":
+            return None
+
+        module_virtual_dir = os.path.join(links_dir, path_hash)
+        if namespace_path != ".":
+            link_path = os.path.join(module_virtual_dir, namespace_path)
+            link_dir = os.path.dirname(link_path)
+            fs.ensure_dir(link_dir)
+        else:
+            link_path = module_virtual_dir
+
+        source_dir = os.path.join(arc_root, src_path) if src_path else arc_root
+
+        if os.path.lexists(link_path):
+            os.unlink(link_path)
+
+        os.symlink(source_dir, link_path)
+        return module_virtual_dir
 
     for module_name, module in modules.items():
         module_lang = module.get("MODULE_LANG")
@@ -214,14 +240,22 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs):
             if is_top_level(makelist) or is_flatbuf(makelist):
                 namespace = "."
             elif is_protobuf(makelist):
-                namespace = module_dir.replace('/', '.')
+                namespace = module_dir
             elif has_srcs(makelist):
                 namespace = "."
             else:
-                namespace = module_dir.replace('/', '.')
+                namespace = module_dir
+        namespace = namespace.replace('/', '.').replace('-', '_').strip('"\'')
         for src_dir in module_srcdirs:
-            source_paths.add(root_src_path(src_dir, namespace))
+            if use_new_extra_paths_logic:
+                source = new_root_src_path(src_dir, namespace)
+            else:
+                source = root_src_path(src_dir, namespace)
 
+            if not source:
+                continue
+            source_paths.add(source)
+    source_paths.add(arc_root)
     return sorted(source_paths)
 
 

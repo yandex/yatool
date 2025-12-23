@@ -8,6 +8,9 @@ PY_SRCS(
     maven/pom_parser.py
     maven/version_filter.py
     maven/maven_import.py
+    maven/legacy.py
+    maven/unified.py
+    maven/utils.py
 )
 
 PEERDIR(

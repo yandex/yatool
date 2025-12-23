@@ -125,12 +125,15 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('stdin_line_provider', default_value=None),
         yarg.Param('targets_from_evlog', default_value=False),
         yarg.Param('transition_source', default_value=None),
+        yarg.Param('platform_id', default_value=None),
         yarg.Param('report_pic_nopic', default_value=None),
         yarg.Param('descend_into_foreign', default_value=None),
         yarg.Param('drop_foreign_start_modules', default_value=None),
         yarg.Param('multiconfig', default_value=False),
         yarg.Param('order', default_value=None),
         yarg.Param('dont_check_transitive_requirements', default_value=None),
+        yarg.Param('parallel_rendering', default_value=False),
+        yarg.Param('use_subinterpreters', default_value=False),
     ]
 
 
@@ -174,7 +177,7 @@ def _gen_graph_params():
 
 def _sem_graph_params():
     return _build_params() + [
-        yarg.Param('dump_sem_graph', default_value=None),
+        yarg.Param('dump_sem_graph', default_value=True),
         yarg.Param('dump_raw_graph', default_value=None),
         yarg.Param('foreign_on_nosem', default_value=None),
         yarg.Param(
@@ -183,6 +186,8 @@ def _sem_graph_params():
             + consts.YmakeEvents.PROGRESS.value
             + consts.YmakeEvents.TOOLS.value,
         ),
+        yarg.Param('patch_path', default_value=None),
+        yarg.Param('changelist_generator', default_value=None),
     ]
 
 
@@ -300,6 +305,10 @@ def _cons_ymake_args(**kwargs):
     if transition_source:
         ret += ['--transition-source', transition_source]
 
+    platform_id = kwargs.pop('platform_id', None)
+    if platform_id:
+        ret += ['--platform-id', platform_id]
+
     report_pic_nopic = kwargs.pop('report_pic_nopic', None)
     if report_pic_nopic is not None:
         ret += ['--report-pic-nopic', report_pic_nopic]
@@ -416,6 +425,15 @@ def _cons_ymake_args(**kwargs):
     if classpaths:
         for target in classpaths:
             ret += ['--managed-deps', target]
+
+    # JSON RENDERING PARAMS
+    parallel_rendering = kwargs.pop('parallel_rendering', False)
+    if parallel_rendering:
+        ret += ['--parallel-rendering']
+
+    use_subinterpraters = kwargs.pop('use_subinterpreters', False)
+    if use_subinterpraters:
+        ret += ['--use-subinterpreters']
 
     # TODO: remove these unused options
     kwargs.pop('flags', None)
@@ -749,11 +767,18 @@ def _run_ymake(**kwargs):
     return YMakeResult(exit_code, stdout, stderr, meta_data), events
 
 
-def run_ymake_scheduled(count):
+def run_ymake_scheduled(count, threads, check_error_fn):
     # it's crucial to call run_ymake.run_scheduled in a separate thread
     # to ensure that main thread is not blocked in "hard" way
     # and signal handlers continue to work
-    thread = threading.Thread(target=run_ymake.run_scheduled, args=(count,))
+    thread = threading.Thread(
+        target=run_ymake.run_scheduled,
+        args=(
+            count,
+            threads,
+            check_error_fn,
+        ),
+    )
     thread.start()
     thread.join()
 

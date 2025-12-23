@@ -106,13 +106,14 @@ namespace {
     }
 }
 
-TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget>& startDirs)
+TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget> startDirs)
     : TBaseVisitor{restoreContext, TDependencyFilter{TDependencyFilter::SkipRecurses}}
     , Loops(TGraphLoops::Find(restoreContext.Graph, startDirs, false))
     , LoopCnt(Loops.Ids())
 {
     CacheStats.Set(NStats::EUidsCacheStats::ReallyAllNoRendered, 1); // by default all nodes really no rendered
 }
+
 
 void TUidsData::SaveCache(IOutputStream* output, const TDepGraph& graph) {
     TVector<ui8> rawBuffer;
@@ -289,6 +290,33 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     }
 }
 
+TJSONVisitor::TJSONVisitor(TUidsData&& uidsData, const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs)
+    : TUidsData(std::move(uidsData))
+    , Commands(commands)
+    , CmdConf(cmdConf)
+    , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
+    , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
+    , GlobalVarsCollector(restoreContext)
+    , Edge(restoreContext.Graph.GetInvalidEdge())
+    , CurrNode(restoreContext.Graph.GetInvalidNode())
+    , Graph(restoreContext.Graph)
+    , ErrorShower(restoreContext.Conf.ExpressionErrorDetails.value_or(TDebugOptions::EShowExpressionErrors::None))
+{
+    if (JsonDepsFromMainOutputEnabled_) {
+        YDebug() << "Passing JSON dependencies from main to additional outputs enabled" << Endl;
+    }
+
+    for (TTarget target : startDirs) {
+        if (target.IsModuleTarget) {
+            StartModules.insert(target);
+        }
+    }
+
+    if (restoreContext.Conf.CheckForIncorrectLoops()) {
+        CheckLoops(restoreContext.Graph, MainOutputAsExtra, Loops);
+    }
+}
+
 bool TJSONVisitor::AcceptDep(TState& state) {
     const TStateItem& currState = state.Top();
     const auto dep = state.NextDep();
@@ -404,8 +432,6 @@ bool TJSONVisitor::AcceptDep(TState& state) {
 // 2. Do not re-subscan built file nodes.
 // 3. Always re-subscan all other nodes, unless they have no built nodes up ahead.
 bool TJSONVisitor::Enter(TState& state) {
-    NStats::StackDepthStats.SetMax(NStats::EStackDepthStats::JsonVisitorMaxStackDepth, state.Size());
-
     bool fresh = TBaseVisitor::Enter(state);
 
     UpdateReferences(state);
@@ -418,12 +444,6 @@ bool TJSONVisitor::Enter(TState& state) {
     }
 
     CurrData->WasVisited = true;
-
-    if (CurrType == EMNT_BuildCommand && HasParent && *Edge == EDT_BuildCommand) {
-        if (CurrState->GetCmdName().IsNewFormat()) {
-            PrntData->StructCmdDetected = true;
-        }
-    }
 
     if (fresh) {
         TNodeDebugOnly nodeDebug{Graph, CurrNode.Id()};
@@ -493,6 +513,7 @@ void TJSONVisitor::Leave(TState& state) {
 
     if (CurrData->WasFresh && !CurrData->Fake && CurrData->HasBuildCmd) {
         SortedNodesForRendering.push_back(state.TopNode().Id());
+        TopoGenerations[CurrData->Generation].push_back(state.TopNode().Id());
         if (IsModuleType(state.TopNode()->NodeType)) {
             ++NumModuleNodesForRendering;
         }
@@ -543,6 +564,8 @@ void TJSONVisitor::Left(TState& state) {
     if (currData.WasFresh && currData.IsGlobalVarsCollectorStarted && IsDirectPeerdirDep(currState.CurDep())) {
         GlobalVarsCollector.Collect(currState, currState.CurDep().To());
     }
+
+    currData.Generation = std::max(currData.Generation, chldData->Generation + 1);
 }
 
 THashMap<TString, TMd5Sig> TJSONVisitor::GetInputs(const TDepGraph& graph) const {
@@ -650,6 +673,10 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                     PrntData->NodeToolDeps.Add(tool);
                 }
                 prntDestSet.Add(tool);  // Note: this ensures tools in regular deps
+            } else {
+                if (!bundle && (!PrntData->NodeToolDeps || !PrntData->NodeToolDeps->has(tool))) {
+                    YDebug() << "JSON: PrepareLeaving: cannot add tool dep " << Graph.ToTargetStringBuf(tool) << " for completed parent " << PrntState->Print() << Endl;
+                }
             }
         } else {
             if (!prntDone) {
@@ -735,8 +762,33 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
         }
 
 
-        if (!prntDone && IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep)) {
+        if (!prntDone && (IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep))) {
             PrntData->NodeToolDeps.Add(CurrData->NodeToolDeps);
+        }
+
+        if (prntDone && (IsInnerCommandDep(incDep) || IsBuildCommandDep(incDep))) {
+            if (CurrData->NodeToolDeps && CurrData->NodeToolDeps->size() > 0) {
+                bool enough_deps = true;
+                if (!PrntData->NodeToolDeps) {
+                    enough_deps = false;
+                }
+                if (enough_deps) {
+                    if (PrntData->NodeToolDeps->size() < CurrData->NodeToolDeps->size()) {
+                        enough_deps = false;
+                    }
+                }
+                if (enough_deps) {
+                    for (auto toolDep : *CurrData->NodeToolDeps) {
+                        if (!PrntData->NodeToolDeps->has(toolDep)) {
+                            enough_deps = false;
+                            break;
+                        }
+                    }
+                }
+                if (!enough_deps) {
+                    YDebug() << "JSON: PrepareLeaving: cannot add tool deps for completed parent " << PrntState->Print() << Endl;
+                }
+            }
         }
 
         if (tool == TNodeId::Invalid && RestoreContext.Conf.DumpInputsInJSON && NeedToPassInputs(incDep)) {
@@ -810,7 +862,11 @@ void TJSONVisitor::PrepareCurrent(TState& state) {
 void TJSONVisitor::FinishCurrent(TState& state) {
     if (CurrNode->NodeType == EMNT_BuildCommand || CurrNode->NodeType == EMNT_BuildVariable) {
         auto name = CurrState->GetCmdName();
-        if (!PrntData->StructCmdDetected) {
+        auto isCmdOrCtxVar = HasParent && (
+            *Edge == EDT_Include && CurrType == EMNT_BuildCommand || // TODO get rid of old-school context variables
+            *Edge == EDT_BuildCommand // && (CurrType == EMNT_BuildCommand || CurrType == EMNT_BuildVariable)
+        );
+        if (!isCmdOrCtxVar) {
             Y_ASSERT(!name.IsNewFormat());
             auto str = name.GetStr();
             TStringBuf val = GetCmdValue(str);
@@ -993,6 +1049,14 @@ void TJSONVisitor::FinishCurrent(TState& state) {
         if (IsFileType(CurrNode->NodeType)) {
             TStringBuf nodeName = Graph.ToTargetStringBuf(CurrNode);
             UpdateCurrent(state, nodeName, "Include node name to current structure hash");
+
+            // include module_tag to non-module nodes and if module if from multimodule
+            if (!IsModuleType(CurrNode->NodeType)) {
+                const auto moduleIt = FindModule(state);
+                if (moduleIt != state.end() && moduleIt->Module->IsFromMultimodule()) {
+                    UpdateCurrent(state, moduleIt->Module->GetTag(), "Include module tag to current structure hash");
+                }
+            }
         }
     }
 
@@ -1168,7 +1232,7 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
                 }
 
                 for (const auto& varItem : varValue) {
-                    if (varItem.StructCmd) {
+                    if (varItem.StructCmdForVars) {
                         Y_DEBUG_ABORT_UNLESS(!varItem.HasPrefix);
                         auto expr = Commands.Get(varItem.Name, &CmdConf);
                         Y_ASSERT(expr);

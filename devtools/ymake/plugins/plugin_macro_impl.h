@@ -10,10 +10,10 @@ namespace NYMake {
     namespace NPlugins {
         class TPluginMacroImpl: public TMacroImpl, private TNonCopyable {
         private:
-            PyObject* Obj_;
+            PyObject* Obj_ = nullptr;
 
         public:
-            void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) override;
+            void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) override;
 
             TPluginMacroImpl(PyObject*);
 

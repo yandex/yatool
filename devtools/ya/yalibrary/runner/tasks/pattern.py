@@ -5,14 +5,13 @@ import base64
 import tempfile
 import time
 
-import six
-
 import devtools.ya.core.error
 
 from devtools.ya.yalibrary.active_state import Cancelled
 from yalibrary.fetcher import resource_fetcher
 from yalibrary.runner.tasks.enums import WorkerPoolType
 import yalibrary.worker_threads as worker_threads
+import exts.deepget as deepget
 
 import yalibrary.fetcher.progress_info as progress_info_lib
 
@@ -45,6 +44,8 @@ class PreparePattern(object):
         self._execution_log = execution_log
         self._shloud_use_universal_fetcher = getattr(ctx.opts, 'use_universal_fetcher_everywhere', False)
 
+        self._download_transport = "unknown"
+
     @property
     def exit_code(self):
         return self._exit_code
@@ -58,6 +59,7 @@ class PreparePattern(object):
                 'timing': (start_time, finish_time),
                 'prepare': '',
                 'type': 'tools',
+                'transport': self._download_transport,
             }
         except Cancelled:
             logging.debug("Fetching of the %s resource was cancelled", self._pattern)
@@ -96,24 +98,28 @@ class PreparePattern(object):
                 self._progress_info.set_total(total_size)
                 self._progress_info.update_downloaded(downloaded)
 
-            return os.path.abspath(
-                self._fetch_resource_if_need(
-                    self._legacy_sandbox_fetcher,
-                    self._res_dir,
-                    resource,
-                    progress_callback,
-                    self._ctx.state,
-                    strip_prefix=strip_prefix,
-                    force_universal_fetcher=self._shloud_use_universal_fetcher,
-                )
+            res = self._fetch_resource_if_need(
+                self._legacy_sandbox_fetcher,
+                self._res_dir,
+                resource,
+                progress_callback,
+                self._ctx.state,
+                strip_prefix=strip_prefix,
+                force_universal_fetcher=self._shloud_use_universal_fetcher,
             )
+
+            transport_history = deepget.deepget(res.install_stat, ("last_attempt", "result", "transport_history"))
+            if transport_history:
+                self._download_transport = transport_history[-1]["transport"]
+
+            return os.path.abspath(res.where)
         elif resource_type == 'file':
             return os.path.abspath(resource_id)
         elif resource_type == 'base64':
             dir_name = tempfile.mkdtemp(prefix="base64_resource-", dir=self._build_root)
             base_name, contents = resource_id.split(':', 1)
-            with open(os.path.join(dir_name, base_name), 'w') as c:
-                c.write(six.ensure_str(base64.b64decode(contents)))
+            with open(os.path.join(dir_name, base_name), 'wb') as c:
+                c.write(base64.b64decode(contents))
             return dir_name
         else:
             raise RuntimeError(f"Unexpected resource type: {resource_type}")

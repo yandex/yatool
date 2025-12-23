@@ -2,10 +2,13 @@ PY3_LIBRARY()
 
 PEERDIR(
     build/config/tests/cpp_style
+    build/config/tests/json_style
     build/config/tests/py_style
     build/config/tests/ruff
+    build/config/tests/yaml_style
     contrib/python/coloredlogs
     contrib/python/marisa-trie
+    contrib/python/PyYAML
     devtools/ya/app
     devtools/ya/build/build_opts
     devtools/ya/core/common_opts
@@ -32,6 +35,7 @@ PY_SRCS(
     style.py
     styler.py
     target.py
+    validate.py
 )
 
 END()

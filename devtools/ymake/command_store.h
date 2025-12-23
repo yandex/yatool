@@ -64,8 +64,8 @@ struct TErrorShowerState {
 };
 
 struct TToolsAndResults {
-    TVector<TStringBuf> Tools;
-    TVector<TStringBuf> Results;
+    TVector<std::string> Tools;
+    TVector<std::string> Results;
 };
 
 class TCommands {
@@ -108,7 +108,7 @@ public:
 
 public:
     ui32 EngineTag() const {
-        return 0;
+        return 1;
     }
 
     const NPolexpr::TExpression* Get(ECmdId id) const {
@@ -136,6 +136,20 @@ public:
         }
         return &Commands[static_cast<ui32>(fres->second)];
     }
+    NCommands::TCompiledCommand Compile(
+        const NCommands::TSyntax& cmd,
+        const TBuildConfiguration& conf,
+        const TVars& vars,
+        bool preevaluate,
+        TCompilationIODesc io
+    );
+    NCommands::TCompiledCommand Compile(
+        const TYVar& cmd,
+        const TBuildConfiguration& conf,
+        const TVars& vars,
+        bool preevaluate,
+        TCompilationIODesc io
+    );
     NCommands::TCompiledCommand Compile(
         TStringBuf cmd,
         const TBuildConfiguration& conf,
@@ -191,6 +205,7 @@ private:
     TString PrintRawCmdNode(NPolexpr::EVarId node) const;
     void PrintCmd(const NCommands::TSyntax::TCommand& cmd, IOutputStream& os) const;
     TString PrintConst(NPolexpr::TConstId id) const;
+    TString PrintValue(const TMacroValues::TValue& val) const;
 
     const NCommands::TSyntax& Parse(const TBuildConfiguration& conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src);
 

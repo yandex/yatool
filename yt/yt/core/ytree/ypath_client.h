@@ -34,7 +34,7 @@ public:
     NRpc::TRealmId GetRealmId() const override;
     std::string GetMethod() const override;
     std::string GetService() const override;
-    const std::optional<std::string>& GetRequestInfo() const override;
+    const std::string& GetRequestInfo() const override;
 
     using NRpc::IClientRequest::DeclareClientFeature;
     using NRpc::IClientRequest::RequireServerFeature;
@@ -62,6 +62,8 @@ public:
     NRpc::NProto::TRequestHeader& Header() override;
 
     bool IsAttachmentCompressionEnabled() const override;
+
+    bool HasAttachments() const override;
 
     bool IsStreamingEnabled() const override;
 
@@ -214,6 +216,7 @@ const google::protobuf::RepeatedPtrField<TProtobufString>& GetRequestAdditionalP
 const google::protobuf::RepeatedPtrField<TProtobufString>& GetOriginalRequestAdditionalPaths(const NRpc::NProto::TRequestHeader& header);
 
 void SetRequestTargetYPath(NRpc::NProto::TRequestHeader* header, TYPathBuf path);
+bool MaybeRewriteRequestTargetYPath(NRpc::NProto::TRequestHeader* header, TYPathBuf path);
 
 bool IsRequestMutating(const NRpc::NProto::TRequestHeader& header);
 

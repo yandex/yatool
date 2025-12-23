@@ -2,11 +2,13 @@
 
 #include "module_resolver.h"
 
+#include <devtools/ymake/macro_processor.h>
 #include <devtools/ymake/lang/plugin_facade.h>
 
 #include <util/generic/vector.h>
 #include <util/generic/string.h>
 #include <util/generic/strbuf.h>
+#include <util/string/strip.h>
 
 struct TInclude;
 
@@ -23,6 +25,13 @@ public:
 
     TStringBuf Get(TStringBuf name) const override {
         return Module.Get(name);
+    }
+    std::variant<TStringBuf, TString> GetSubst(TStringBuf name) const override {
+        const auto value = Module.Get(name);
+        if (!value.IsInited() || !Module.Vars.Base || !value.contains('$')) {
+            return value; // !IsInited() - return None in Python
+        }
+        return Strip(TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(name, Module.Vars));
     }
     void Set(TStringBuf name, TStringBuf value) override {
         return Module.Set(name, value);

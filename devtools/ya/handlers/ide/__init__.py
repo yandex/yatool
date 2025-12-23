@@ -10,8 +10,6 @@ import devtools.ya.build.compilation_database as bcd
 import devtools.ya.ide.ide_common
 import devtools.ya.ide.clion2016
 import devtools.ya.ide.idea
-import devtools.ya.ide.qt
-import devtools.ya.ide.remote_ide_qt
 import devtools.ya.ide.goland
 import devtools.ya.ide.pycharm
 import devtools.ya.ide.venv
@@ -371,37 +369,59 @@ class GradleOptions(yarg.Options):
     OPT_GRADLE_NAME = '--gradle-name'
     OPT_SETTINGS_ROOT = '--settings-root'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
+    OPT_DISABLE_TEST_ERRORPRONE = '--disable-test-errorprone'
     OPT_DISABLE_LOMBOK_PLUGIN = '--disable-lombok-plugin'
+    OPT_DISABLE_GENERATED_SYMLINKS = '--disable-generated-symlinks'  # IGNORED IN CODE, only for backward compatibility
     OPT_FORCE_JDK_VERSION = '--force-jdk-version'
+    OPT_GRADLE_JDK_VERSION = '--gradle-jdk-version'
     OPT_REMOVE = '--remove'
-    OPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
+    OPT_EXCLUDE = '--exclude'
+    OPT_GRADLE_DAEMON_JVMARGS = '--gradle-daemon-jvmargs'
+    OPT_KOTLIN_DAEMON_JVMARGS = '--kotlin-daemon-jvmargs'
+    OPT_SETTINGS_ROOT_AS_HASH_BASE = '--settings-root-as-hash-base'  # IGNORED IN CODE, only for backward compatibility
+    OPT_JDK11_COMPATIBILITY_MODE = '--jdk11-compatibility-mode'
 
     # Advanced options
+    ADVOPT_NO_COLLECT_CONTRIBS = '--no-collect-contribs'
     ADVOPT_NO_BUILD_FOREIGN = '--no-build-foreign'
     ADVOPT_REEXPORT = '--reexport'
 
     # Expert options
     EXPOPT_YEXPORT_BIN = '--yexport-bin'
+    EXPOPT_YEXPORT_TOML = '--yexport-toml'
     EXPOPT_DUMP_YMAKE_STDERR = '--dump-ymake-stderr'
     EXPOPT_YEXPORT_DEBUG_MODE = '--yexport-debug-mode'
+    EXPOPT_EXCLUSIVE_LOCK_BUILD = '--exclusive-lock-build'
 
-    AVAILABLE_JDK_VERSIONS = ('11', '17', '20', '21', '22', '23', '24')
+    AVAILABLE_JDK_VERSIONS = ('11', '17', '21', '22', '23', '24', '25')
+    # Gradle >= 9 require JDK17 or above
+    GRADLE_JDK_VERSIONS = list(filter(lambda v: int(v) >= 17, AVAILABLE_JDK_VERSIONS))
 
     def __init__(self):
-        self.gradle_name = None
-        self.settings_root = None
-        self.disable_errorprone = False
-        self.disable_lombok_plugin = False
-        self.force_jdk_version = None
-        self.remove = None
+        self.gradle_name: str = None
+        self.settings_root: str = None
+        self.disable_errorprone: bool = False
+        self.disable_test_errorprone: bool = False
+        self.disable_lombok_plugin: bool = False
+        self.disable_generated_symlinks: bool = False  # IGNORED IN CODE, only for backward compatibility
+        self.force_jdk_version: str = None
+        self.gradle_jdk_version: str = None
+        self.remove: bool = False
+        self.exclude: list[str] = []
+        self.gradle_daemon_jvmargs: str = None
+        self.kotlin_daemon_jvmargs: str = None
+        self.settings_root_as_hash_base: bool = True  # IGNORED IN CODE, only for backward compatibility
+        self.jdk11_compatibility_mode = False
 
-        self.collect_contribs = True
-        self.build_foreign = True
-        self.reexport = None
+        self.collect_contribs: bool = True
+        self.build_foreign: bool = True
+        self.reexport: bool = False
 
-        self.yexport_bin = None
-        self.dump_ymake_stderr = None
-        self.yexport_debug_mode = None
+        self.yexport_bin: str = None
+        self.yexport_toml: list[str] = []
+        self.dump_ymake_stderr: str = None
+        self.yexport_debug_mode: str = None
+        self.exclusive_lock_build: bool = False
 
     @staticmethod
     def consumer():
@@ -425,15 +445,33 @@ class GradleOptions(yarg.Options):
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
+                [GradleOptions.OPT_DISABLE_TEST_ERRORPRONE],
+                help='Disable errorprone only in tests in Gradle project',
+                hook=yarg.SetConstValueHook('disable_test_errorprone', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
                 [GradleOptions.OPT_DISABLE_LOMBOK_PLUGIN],
                 help='Disable lombok plugin in Gradle project',
                 hook=yarg.SetConstValueHook('disable_lombok_plugin', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
+            yarg.ArgConsumer(  # IGNORED IN CODE, only for backward compatibility
+                [GradleOptions.OPT_DISABLE_GENERATED_SYMLINKS],
+                help='Disable make symlinks to generated sources (ENABLED BY DEFAULT - ONLY FOR BACKWARD COMPATIBILITY)',
+                hook=yarg.SetConstValueHook('disable_generated_symlinks', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
             yarg.ArgConsumer(
                 [GradleOptions.OPT_FORCE_JDK_VERSION],
-                help=f"Force JDK version in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
+                help=f"Force JDK version for build/test in exported project, one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}",
                 hook=yarg.SetValueHook('force_jdk_version'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_GRADLE_JDK_VERSION],
+                help=f"Force JDK version for Gradle only in exported project, one of {', '.join(GradleOptions.GRADLE_JDK_VERSIONS)}",
+                hook=yarg.SetValueHook('gradle_jdk_version'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
@@ -443,7 +481,37 @@ class GradleOptions(yarg.Options):
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(
-                [GradleOptions.OPT_NO_COLLECT_CONTRIBS],
+                [GradleOptions.OPT_EXCLUDE],
+                help='Exclude module and submodules from gradle project',
+                hook=yarg.SetAppendHook('exclude'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_GRADLE_DAEMON_JVMARGS],
+                help='Set org.gradle.jvmargs value for gradle.properties',
+                hook=yarg.SetValueHook('gradle_daemon_jvmargs'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_KOTLIN_DAEMON_JVMARGS],
+                help='Set kotlin.daemon.jvmargs value for gradle.properties',
+                hook=yarg.SetValueHook('kotlin_daemon_jvmargs'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_SETTINGS_ROOT_AS_HASH_BASE],
+                help='Use settings root as base for hashed export directory name (ignore export targets for hashed directory name) (ENABLED BY DEFAULT - ONLY FOR BACKWARD COMPATIBILITY)',
+                hook=yarg.SetConstValueHook('settings_root_as_hash_base', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_JDK11_COMPATIBILITY_MODE],
+                help='JDK11 compatibility mode',
+                hook=yarg.SetConstValueHook('jdk11_compatibility_mode', True),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.ADVOPT_NO_COLLECT_CONTRIBS],
                 help='Export without collect contribs from Arcadia to jar files',
                 hook=yarg.SetConstValueHook('collect_contribs', False),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
@@ -471,6 +539,13 @@ class GradleOptions(yarg.Options):
                 visible=HelpLevel.EXPERT,
             ),
             yarg.ArgConsumer(
+                [GradleOptions.EXPOPT_YEXPORT_TOML],
+                help='Global key=value for put to yexport.toml',
+                hook=yarg.SetAppendHook('yexport_toml'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            yarg.ArgConsumer(
                 [GradleOptions.EXPOPT_DUMP_YMAKE_STDERR],
                 help='Dump stderr of YMake call to file (or to console if set to "log")',
                 hook=yarg.SetValueHook('dump_ymake_stderr'),
@@ -481,6 +556,13 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.EXPOPT_YEXPORT_DEBUG_MODE],
                 help='Debug mode for yexport',
                 hook=yarg.SetValueHook('yexport_debug_mode'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.EXPOPT_EXCLUSIVE_LOCK_BUILD],
+                help='Exclusive lock during prebuild depends (recommended for few parallel ya ide gradle)',
+                hook=yarg.SetConstValueHook('exclusive_lock_build', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
@@ -500,6 +582,11 @@ class GradleOptions(yarg.Options):
                 raise yarg.ArgsValidatingException(
                     f"Invalid JDK version {self.force_jdk_version} in {GradleOptions.OPT_FORCE_JDK_VERSION}, must be one of {', '.join(GradleOptions.AVAILABLE_JDK_VERSIONS)}."
                 )
+        if self.gradle_jdk_version is not None:
+            if self.gradle_jdk_version not in GradleOptions.GRADLE_JDK_VERSIONS:
+                raise yarg.ArgsValidatingException(
+                    f"Invalid JDK version {self.gradle_jdk_version} in {GradleOptions.OPT_GRADLE_JDK_VERSION}, must be one of {', '.join(GradleOptions.GRADLE_JDK_VERSIONS)}."
+                )
 
 
 class PycharmOptions(yarg.Options):
@@ -511,6 +598,7 @@ class PycharmOptions(yarg.Options):
         self.wrapper_name = PycharmOptions.PYTHON_WRAPPER_NAME
         self.list_ide = False
         self.ide_version = None
+        self.do_codegen = True
 
     @staticmethod
     def consumer():
@@ -540,6 +628,11 @@ class PycharmOptions(yarg.Options):
                 ),
                 hook=yarg.SetValueHook('ide_version'),
                 group=PycharmOptions.PYCHARM_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                ['--no-codegen'],
+                help='Disable codegen',
+                hook=yarg.SetConstValueHook('do_codegen', False),
             ),
         ]
 
@@ -603,31 +696,12 @@ class IdeYaHandler(yarg.CompositeHandler):
         self['gradle'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.gradle.do_gradle),
             description='Generate gradle for project with yexport',
-            opts=devtools.ya.ide.ide_common.ide_minimal_opts(targets_free=True)
+            opts=devtools.ya.build.build_opts.ya_make_options(build_type='release', free_build_targets=True)
             + [
-                devtools.ya.ide.ide_common.IdeYaMakeOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 GradleOptions(),
-                build_opts.YMakeBinOptions(),
-                build_opts.FlagsOptions(),
-                build_opts.CustomFetcherOptions(),
-                build_opts.SandboxAuthOptions(),
-                devtools.ya.core.common_opts.CrossCompilationOptions(),
-                build_opts.ToolsOptions(),
-                build_opts.BuildTypeOptions('release'),
-                build_opts.JavaSpecificOptions(),
-                build_opts.YMakeDebugOptions(),
-                build_opts.YWarnModeOptions(),
-                build_opts.BuildThreadsOptions(build_threads=None),
-                build_opts.DistCacheOptions(),
-                build_opts.OutputOptions(),
-                build_opts.CreateSymlinksOptions(),
             ],
-        )
-        self['qt'] = yarg.OptsHandler(
-            action=devtools.ya.app.execute(self._choose_qt_handler),
-            description='[[imp]]ya ide qt[[rst]] is deprecated, please use clangd-based tooling instead',
-            opts=devtools.ya.ide.qt.QT_OPTS + [devtools.ya.core.common_opts.YaBin3Options()],
+            unknown_args_as_free=True,
         )
         self['goland'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.goland.do_goland),
@@ -759,12 +833,3 @@ class IdeYaHandler(yarg.CompositeHandler):
                     devtools.ya.core.common_opts.YaBin3Options(),
                 ],
             )
-
-    @staticmethod
-    def _choose_qt_handler(params):
-        if params.run:
-            devtools.ya.ide.qt.run_qtcreator(params)
-        elif params.remote_host:
-            devtools.ya.ide.remote_ide_qt.generate_remote_project(params)
-        else:
-            devtools.ya.ide.qt.gen_qt_project(params)

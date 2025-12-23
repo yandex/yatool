@@ -9,7 +9,10 @@ machine CppIncludes;
 
 action ClearInclude { include.resize(0); }
 action AddChar { include.append(*p); }
-action AddInclude { includes.push_back(include); }
+action AddInclude {
+    if (!include.StartsWith('$'))
+        includes.push_back(include);
+}
 action RemoveInclude { includes.pop_back(); }
 
 action Include { fgoto Include; }
@@ -25,8 +28,8 @@ wsc = ([ \t\v\f\r] | ("/*" (any* -- "*/") "*/"));
 ws = wsc*;
 
 incl = (
-    (ws ('"' ^'\n'* :> '"') $AddChar) |
-    (ws ('<' ^'\n'* :> '>') $AddChar) |
+    (ws ('"' ^('\n'|'$')* :> '"') $AddChar) |
+    (ws ('<' ^('\n'|'$')* :> '>') $AddChar) |
     (wsc+ <: (^('"'|'<') any*) $AddChar $eof(AddInclude) :> space $Undo)
 ) >ClearInclude @AddInclude;
 

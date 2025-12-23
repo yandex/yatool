@@ -11,6 +11,7 @@
 
 #include <yt/yt/core/concurrency/delayed_executor.h>
 #include <yt/yt/core/concurrency/thread_affinity.h>
+#include <yt/yt/core/concurrency/context_switch.h>
 
 #include <library/cpp/yt/threading/event_count.h>
 #include <library/cpp/yt/threading/spin_lock.h>
@@ -26,8 +27,8 @@ namespace NYT {
 
 namespace NConcurrency {
 
-// Forward declaration from scheduler.h
-TCallback<void(const NYT::TError&)> GetCurrentFiberCanceler();
+// Forward declaration from scheduler_api.h
+TCallback<void(const TError&)> GetCurrentFiberCanceler();
 
 //! Thrown when a fiber is being terminated by an external event.
 class TFiberCanceledException
@@ -41,6 +42,18 @@ IInvokerPtr GetSyncInvoker();
 namespace NDetail {
 
 ////////////////////////////////////////////////////////////////////////////////
+
+template <class F, class... As>
+auto RunFutureHandler(F&& functor, As&&... args) noexcept -> decltype(functor(std::forward<As>(args)...))
+{
+#ifndef NDEBUG
+    std::optional<NConcurrency::TForbidContextSwitchGuard> guard;
+    if (IsContextSwitchInFutureHandlerForbidden()) {
+        guard.emplace();
+    }
+#endif
+    return functor(std::forward<As>(args)...);
+}
 
 inline TError WrapIntoCancelationError(const TError& error)
 {
@@ -125,7 +138,7 @@ public:
     {
         for (const auto& callback : Callbacks_) {
             if (callback) {
-                RunNoExcept(callback, std::forward<As>(args)...);
+                RunFutureHandler(callback, std::forward<As>(args)...);
             }
         }
         Callbacks_.clear();
@@ -156,7 +169,7 @@ public:
 
     virtual ~TCancelableStateBase() noexcept = default;
 
-    virtual bool Cancel(const NYT::TError& error) noexcept = 0;
+    virtual bool Cancel(const TError& error) noexcept = 0;
 
     void RefCancelable()
     {
@@ -215,10 +228,12 @@ class TFutureState<void>
     : public TCancelableStateBase
 {
 public:
-    using TVoidResultHandler = TCallback<void(const NYT::TError&)>;
+    using TVoidResultHandler = TCallback<void(const TError&)>;
     using TVoidResultHandlers = TFutureCallbackList<TVoidResultHandler, 0, (1ULL << 30) - 1>;
 
-    using TCancelHandler = TCallback<void(const NYT::TError&)>;
+    using TUniqueVoidResultHandler = TCallback<void(TError&&)>;
+
+    using TCancelHandler = TCallback<void(const TError&)>;
     using TCancelHandlers = TCompactVector<TCancelHandler, 8>;
 
     void RefFuture()
@@ -276,13 +291,13 @@ public:
         }
     }
 
-    const NYT::TError& Get() const
+    const TError& Get() const
     {
         WaitUntilSet();
         return ResultError_;
     }
 
-    NYT::TError GetUnique()
+    TError GetUnique()
     {
         return Get();
     }
@@ -300,12 +315,12 @@ public:
         return TryGet();
     }
 
-    void Set(const NYT::TError& error)
+    void Set(const TError& error)
     {
-        DoTrySet<true>(error);
+        DoTrySet<true>(error, Guard(SpinLock_));
     }
 
-    bool TrySet(const NYT::TError& error)
+    bool TrySet(const TError& error)
     {
         // Fast path.
         if (Set_) {
@@ -313,13 +328,20 @@ public:
         }
 
         // Slow path.
-        return DoTrySet<false>(error);
+        return DoTrySet<false>(error, Guard(SpinLock_));
     }
 
     TFutureCallbackCookie Subscribe(TVoidResultHandler handler);
+    TFutureCallbackCookie SubscribeUnique(TUniqueVoidResultHandler handler);
+
     void Unsubscribe(TFutureCallbackCookie cookie);
 
-    bool Cancel(const NYT::TError& error) noexcept override;
+    TCancelable AsCancelable()
+    {
+        return TCancelable(this);
+    }
+
+    bool Cancel(const TError& error) noexcept override;
 
     bool OnCanceled(TCancelHandler handler);
 
@@ -351,10 +373,10 @@ protected:
     //! Protects the following section of members.
     YT_DECLARE_SPIN_LOCK(NThreading::TSpinLock, SpinLock_);
     std::atomic<bool> Canceled_ = false;
-    NYT::TError CancelationError_;
+    TError CancelationError_;
     std::atomic<bool> Set_;
     std::atomic<bool> AbandonedUnset_ = false;
-    NYT::TError ResultError_;
+    TError ResultError_;
     bool HasHandlers_ = false;
     TVoidResultHandlers VoidResultHandlers_;
     TCancelHandlers CancelHandlers_;
@@ -367,7 +389,7 @@ protected:
         , Set_(false)
     { }
 
-    TFutureState(bool wellKnown, int promiseRefCount, int futureRefCount, int cancelableRefCount, NYT::TError&& error)
+    TFutureState(bool wellKnown, int promiseRefCount, int futureRefCount, int cancelableRefCount, TError&& error)
         : TCancelableStateBase(wellKnown, cancelableRefCount)
         , PromiseRefCount_(promiseRefCount)
         , FutureRefCount_(futureRefCount)
@@ -379,27 +401,27 @@ protected:
     void InstallAbandonedError() const;
 
     virtual void ResetResult();
-    virtual void SetResultError(const NYT::TError& error);
-    virtual bool TrySetError(const NYT::TError& error);
+    virtual void SetResultError(const TError& error);
+    virtual bool TrySetError(const TError& error);
+    virtual void SetErrorGuarded(const TError& error, TGuard<NThreading::TSpinLock>&& guard);
 
     template <bool MustSet, class F>
-    bool DoRunSetter(F setter)
+    bool DoRunSetter(F setter, TGuard<NThreading::TSpinLock>&& guard)
     {
-        NThreading::TEvent* readyEvent = nullptr;
-        bool canceled;
-        {
-            auto guard = Guard(SpinLock_);
-            YT_ASSERT(!AbandonedUnset_);
-            if (MustSet && !Canceled_) {
-                YT_VERIFY(!Set_);
-            } else if (Set_) {
-                return false;
-            }
-            RunNoExcept(setter);
-            Set_ = true;
-            canceled = Canceled_;
-            readyEvent = ReadyEvent_.get();
+        YT_ASSERT_SPINLOCK_AFFINITY(*guard.GetMutex());
+        YT_ASSERT(!AbandonedUnset_);
+        if (MustSet && !Canceled_) {
+            YT_VERIFY(!Set_);
+        } else if (Set_) {
+            return false;
         }
+        RunFutureHandler(setter);
+        Set_ = true;
+
+        bool canceled = Canceled_;
+        NThreading::TEvent* readyEvent = ReadyEvent_.get();
+
+        guard.Release();
 
         if (readyEvent) {
             readyEvent->NotifyAll();
@@ -415,14 +437,16 @@ protected:
     }
 
     template <bool MustSet>
-    bool DoTrySet(const NYT::TError& error)
+    bool DoTrySet(const TError& error, TGuard<NThreading::TSpinLock>&& guard)
     {
         // Calling subscribers may release the last reference to this.
         TIntrusivePtr<TFutureState<void>> this_(this);
 
-        return DoRunSetter<MustSet>([&] {
-            SetResultError(error);
-        });
+        return DoRunSetter<MustSet>(
+            [&] {
+                SetResultError(error);
+            },
+            std::move(guard));
     }
 
     virtual bool DoUnsubscribe(TFutureCallbackCookie cookie, TGuard<NThreading::TSpinLock>* guard);
@@ -442,33 +466,54 @@ class TFutureState
     : public TFutureState<void>
 {
 public:
-    using TResultHandler = TCallback<void(const NYT::TErrorOr<T>&)>;
+    using TResultHandler = TCallback<void(const TErrorOr<T>&)>;
     using TResultHandlers = TFutureCallbackList<TResultHandler, (1ULL << 30), (1ULL << 31) - 1>;
 
-    using TUniqueResultHandler = TCallback<void(NYT::TErrorOr<T>&&)>;
+    using TUniqueResultHandler = TCallback<void(TErrorOr<T>&&)>;
 
 private:
     std::optional<TErrorOr<T>> Result_;
-#ifndef NDEBUG
-    mutable std::atomic<bool> ResultMovedOut_ = false;
-#endif
-
     TResultHandlers ResultHandlers_;
     TUniqueResultHandler UniqueResultHandler_;
 
+#ifndef NDEBUG
+    static constexpr ui8 GetInvokedFlag = 0x1;
+    static constexpr ui8 GetUniqueInvokedFlag = 0x2;
+    mutable std::atomic<ui8> ResultFlags_;
+#endif
+
+    void BeforeGetResult() const
+    {
+#ifndef NDEBUG
+        auto prevFlags = ResultFlags_.fetch_or(GetInvokedFlag);
+        // Check that no GetUnique calls were previously made.
+        YT_ASSERT((prevFlags & GetUniqueInvokedFlag) == 0);
+#endif
+    }
+
+    void BeforeGetUniqueResult() const
+    {
+#ifndef NDEBUG
+        auto prevFlags = ResultFlags_.fetch_or(GetUniqueInvokedFlag);
+        // Check that no Get or GetUnique calls were previously made.
+        YT_ASSERT(prevFlags == 0);
+#endif
+    }
 
     template <bool MustSet, class U>
-    bool DoTrySet(U&& value) noexcept
+    bool DoTrySet(U&& value, TGuard<NThreading::TSpinLock>&& guard) noexcept
     {
         // Calling subscribers may release the last reference to this.
         TIntrusivePtr<TFutureState<void>> this_(this);
 
-        if (!DoRunSetter<MustSet>([&] {
-            Result_.emplace(std::forward<U>(value));
-            if (!Result_->IsOK()) {
-                ResultError_ = *Result_;
-            }
-        }))
+        if (!DoRunSetter<MustSet>(
+            [&] {
+                Result_.emplace(std::forward<U>(value));
+                if (!Result_->IsOK()) {
+                    ResultError_ = *Result_;
+                }
+            },
+            std::move(guard)))
         {
             return false;
         }
@@ -480,7 +525,7 @@ private:
         }
 
         if (UniqueResultHandler_) {
-            RunNoExcept(UniqueResultHandler_, GetUniqueResult());
+            RunFutureHandler(UniqueResultHandler_, GetUniqueResult());
             UniqueResultHandler_ = {};
         }
 
@@ -488,37 +533,34 @@ private:
     }
 
 
-    const NYT::TErrorOr<T>& GetResult() const
+    const TErrorOr<T>& GetResult() const
     {
-#ifndef NDEBUG
-        YT_ASSERT(!ResultMovedOut_);
-#endif
+        BeforeGetResult();
         YT_ASSERT(Result_);
         return *Result_;
     }
 
     const std::optional<TErrorOr<T>>& GetOptionalResult() const
     {
-#ifndef NDEBUG
-        YT_ASSERT(!ResultMovedOut_);
-#endif
+        BeforeGetResult();
         return Result_;
     }
 
-    NYT::TErrorOr<T> GetUniqueResult()
+    TErrorOr<T> GetUniqueResult()
     {
-#ifndef NDEBUG
-        YT_ASSERT(!ResultMovedOut_.exchange(true));
-#endif
-        auto result = std::move(*Result_);
-        Result_.reset();
-        return result;
+        BeforeGetUniqueResult();
+        return std::move(*Result_);
     }
 
 
-    bool TrySetError(const NYT::TError& error) override
+    bool TrySetError(const TError& error) override
     {
         return TrySet(error);
+    }
+
+    void SetErrorGuarded(const TError& error, TGuard<NThreading::TSpinLock>&& guard) override
+    {
+        DoTrySet<true>(error, std::move(guard));
     }
 
     void ResetResult() override
@@ -526,7 +568,7 @@ private:
         Result_.reset();
     }
 
-    void SetResultError(const NYT::TError& error) override
+    void SetResultError(const TError& error) override
     {
         YT_ASSERT_SPINLOCK_AFFINITY(SpinLock_);
         TFutureState<void>::SetResultError(error);
@@ -546,24 +588,24 @@ protected:
         : TFutureState<void>(promiseRefCount, futureRefCount, cancelableRefCount)
     { }
 
-    TFutureState(bool wellKnown, int promiseRefCount, int futureRefCount, int cancelableRefCount, NYT::TErrorOr<T>&& value)
-        : TFutureState<void>(wellKnown, promiseRefCount, futureRefCount, cancelableRefCount, NYT::TError(static_cast<const NYT::TError&>(value)))
+    TFutureState(bool wellKnown, int promiseRefCount, int futureRefCount, int cancelableRefCount, TErrorOr<T>&& value)
+        : TFutureState<void>(wellKnown, promiseRefCount, futureRefCount, cancelableRefCount, TError(static_cast<const TError&>(value)))
         , Result_(std::move(value))
     { }
 
     TFutureState(bool wellKnown, int promiseRefCount, int futureRefCount, int cancelableRefCount, T&& value)
-        : TFutureState<void>(wellKnown, promiseRefCount, futureRefCount, cancelableRefCount, NYT::TError())
+        : TFutureState<void>(wellKnown, promiseRefCount, futureRefCount, cancelableRefCount, TError())
         , Result_(std::move(value))
     { }
 
 public:
-    const NYT::TErrorOr<T>& Get() const
+    const TErrorOr<T>& Get() const
     {
         WaitUntilSet();
         return GetResult();
     }
 
-    NYT::TErrorOr<T> GetUnique()
+    TErrorOr<T> GetUnique()
     {
         // Fast path.
         if (Set_) {
@@ -606,7 +648,7 @@ public:
     template <class U>
     void Set(U&& value)
     {
-        DoTrySet<true>(std::forward<U>(value));
+        DoTrySet<true>(std::forward<U>(value), Guard(SpinLock_));
     }
 
     template <class U>
@@ -618,14 +660,14 @@ public:
         }
 
         // Slow path.
-        return DoTrySet<false>(std::forward<U>(value));
+        return DoTrySet<false>(std::forward<U>(value), Guard(SpinLock_));
     }
 
     TFutureCallbackCookie Subscribe(TResultHandler handler)
     {
         // Fast path.
         if (Set_) {
-            RunNoExcept(handler, GetResult());
+            RunFutureHandler(handler, GetResult());
             return NullFutureCallbackCookie;
         }
 
@@ -635,7 +677,7 @@ public:
             InstallAbandonedError();
             if (Set_) {
                 guard.Release();
-                RunNoExcept(handler, GetResult());
+                RunFutureHandler(handler, GetResult());
                 return NullFutureCallbackCookie;
             } else {
                 HasHandlers_ = true;
@@ -648,7 +690,7 @@ public:
     {
         // Fast path.
         if (Set_) {
-            RunNoExcept(handler, GetUniqueResult());
+            RunFutureHandler(handler, GetUniqueResult());
             return;
         }
 
@@ -658,7 +700,7 @@ public:
             InstallAbandonedError();
             if (Set_) {
                 guard.Release();
-                RunNoExcept(handler, GetUniqueResult());
+                RunFutureHandler(handler, GetUniqueResult());
             } else {
                 YT_ASSERT(!UniqueResultHandler_);
                 YT_ASSERT(ResultHandlers_.IsEmpty());
@@ -721,11 +763,11 @@ void InterceptExceptions(const TPromise<T>& promise, const F& func)
     try {
         auto guard = MakeFutureCurrentTokenGuard(promise.Impl_.Get());
         func();
-    } catch (const NYT::TErrorException& ex) {
+    } catch (const TErrorException& ex) {
         // Create error explicitly from exception so that FromExceptionEnricher is called.
-        promise.Set(NYT::TError(ex));
+        promise.Set(TError(ex));
     } catch (const std::exception& ex) {
-        promise.Set(NYT::TError(ex));
+        promise.Set(TError(ex));
     } catch (const NConcurrency::TFiberCanceledException&) {
         if (auto error = promise.GetCancelationError(); !error.IsOK()) {
             promise.Set(std::move(error));
@@ -736,6 +778,7 @@ void InterceptExceptions(const TPromise<T>& promise, const F& func)
 }
 
 template <class R, class T, class... TArgs>
+    requires (!NDetail::IsFuture<R>)
 struct TPromiseSetter<T, R(TArgs...)>
 {
     template <class... TCallArgs>
@@ -750,10 +793,10 @@ struct TPromiseSetter<T, R(TArgs...)>
 };
 
 template <class R, class T, class... TArgs>
-struct TPromiseSetter<T, NYT::TErrorOr<R>(TArgs...)>
+struct TPromiseSetter<T, TErrorOr<R>(TArgs...)>
 {
     template <class... TCallArgs>
-    static void Do(const TPromise<T>& promise, const TCallback<TErrorOr<T>(TArgs...)>& callback, TCallArgs&&... args)
+    static void Do(const TPromise<T>& promise, const TCallback<TErrorOr<R>(TArgs...)>& callback, TCallArgs&&... args)
     {
         InterceptExceptions(
             promise,
@@ -778,11 +821,12 @@ struct TPromiseSetter<void, void(TArgs...)>
     }
 };
 
-template <class T, class... TArgs>
-struct TPromiseSetter<T, TFuture<T>(TArgs...)>
+template <class F, class T, class... TArgs>
+    requires NDetail::IsFuture<F>
+struct TPromiseSetter<T, F(TArgs...)>
 {
     template <class... TCallArgs>
-    static void Do(const TPromise<T>& promise, const TCallback<TFuture<T>(TArgs...)>& callback, TCallArgs&&... args)
+    static void Do(const TPromise<T>& promise, const TCallback<F(TArgs...)>& callback, TCallArgs&&... args)
     {
         InterceptExceptions(
             promise,
@@ -792,11 +836,12 @@ struct TPromiseSetter<T, TFuture<T>(TArgs...)>
     }
 };
 
-template <class T, class... TArgs>
-struct TPromiseSetter<T, NYT::TErrorOr<TFuture<T>>(TArgs...)>
+template <class F, class T, class... TArgs>
+    requires NDetail::IsFuture<F>
+struct TPromiseSetter<T, TErrorOr<F>(TArgs...)>
 {
     template <class... TCallArgs>
-    static void Do(const TPromise<T>& promise, const TCallback<TFuture<T>(TArgs...)>& callback, TCallArgs&&... args)
+    static void Do(const TPromise<T>& promise, const TCallback<F(TArgs...)>& callback, TCallArgs&&... args)
     {
         InterceptExceptions(
             promise,
@@ -805,50 +850,50 @@ struct TPromiseSetter<T, NYT::TErrorOr<TFuture<T>>(TArgs...)>
                 if (result.IsOK()) {
                     promise.SetFrom(std::move(result));
                 } else {
-                    promise.Set(NYT::TError(result));
+                    promise.Set(TError(result));
                 }
             });
     }
 };
 
 template <class R, class T>
-void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R()>& callback, const NYT::TError& value)
+void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R()>& callback, const TError& value)
 {
     if (value.IsOK()) {
         TPromiseSetter<T, R()>::Do(promise, callback);
     } else {
-        promise.Set(NYT::TError(value));
+        promise.Set(TError(value));
     }
 }
 
 template <class R, class T, class U>
-void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(const U&)>& callback, const NYT::TErrorOr<U>& value)
+void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(const U&)>& callback, const TErrorOr<U>& value)
 {
     if (value.IsOK()) {
         TPromiseSetter<T, R(const U&)>::Do(promise, callback, value.Value());
     } else {
-        promise.Set(NYT::TError(value));
+        promise.Set(TError(value));
     }
 }
 
 template <class R, class T, class U>
-void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(const NYT::TErrorOr<U>&)>& callback, const NYT::TErrorOr<U>& value)
+void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(const TErrorOr<U>&)>& callback, const TErrorOr<U>& value)
 {
-    TPromiseSetter<T, R(const NYT::TErrorOr<U>&)>::Do(promise, callback, value);
+    TPromiseSetter<T, R(const TErrorOr<U>&)>::Do(promise, callback, value);
 }
 
 template <class R, class T, class S>
-TFuture<R> ApplyHelper(TFutureBase<T> this_, TCallback<S> callback)
+TFuture<R> ApplyHelper(const TIntrusivePtr<TFutureState<T>>& impl, TCallback<S> callback)
 {
-    YT_ASSERT(this_);
+    YT_ASSERT(impl);
 
     auto promise = NewPromise<R>();
 
-    this_.Subscribe(BIND_NO_PROPAGATE([=, callback = std::move(callback)] (const NYT::TErrorOr<T>& value) {
+    impl->Subscribe(BIND_NO_PROPAGATE([=, callback = std::move(callback)] (const TErrorOr<T>& value) {
         ApplyHelperHandler(promise, callback, value);
     }));
 
-    promise.OnCanceled(BIND_NO_PROPAGATE([cancelable = this_.AsCancelable()] (const NYT::TError& error) {
+    promise.OnCanceled(BIND_NO_PROPAGATE([cancelable = impl->AsCancelable()] (const TError& error) {
         cancelable.Cancel(error);
     }));
 
@@ -856,33 +901,33 @@ TFuture<R> ApplyHelper(TFutureBase<T> this_, TCallback<S> callback)
 }
 
 template <class R, class T, class U>
-void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(U&&)>& callback, NYT::TErrorOr<U>&& value)
+void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(U&&)>& callback, TErrorOr<U>&& value)
 {
     if (value.IsOK()) {
         TPromiseSetter<T, R(U&&)>::Do(promise, callback, std::move(value.Value()));
     } else {
-        promise.Set(NYT::TError(value));
+        promise.Set(TError(value));
     }
 }
 
 template <class R, class T, class U>
-void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(NYT::TErrorOr<U>&&)>& callback, NYT::TErrorOr<U>&& value)
+void ApplyHelperHandler(const TPromise<T>& promise, const TCallback<R(TErrorOr<U>&&)>& callback, TErrorOr<U>&& value)
 {
-    TPromiseSetter<T, R(NYT::TErrorOr<U>&&)>::Do(promise, callback, std::move(value));
+    TPromiseSetter<T, R(TErrorOr<U>&&)>::Do(promise, callback, std::move(value));
 }
 
 template <class R, class T, class S>
-TFuture<R> ApplyUniqueHelper(TFutureBase<T> this_, TCallback<S> callback)
+TFuture<R> ApplyUniqueHelper(const TIntrusivePtr<TFutureState<T>>& impl, TCallback<S> callback)
 {
-    YT_ASSERT(this_);
+    YT_ASSERT(impl);
 
     auto promise = NewPromise<R>();
 
-    this_.SubscribeUnique(BIND_NO_PROPAGATE([=, callback = std::move(callback)] (NYT::TErrorOr<T>&& value) {
+    impl->SubscribeUnique(BIND_NO_PROPAGATE([=, callback = std::move(callback)] (TErrorOr<T>&& value) {
         ApplyHelperHandler(promise, callback, std::move(value));
     }));
 
-    promise.OnCanceled(BIND_NO_PROPAGATE([cancelable = this_.AsCancelable()] (const NYT::TError& error) {
+    promise.OnCanceled(BIND_NO_PROPAGATE([cancelable = impl->AsCancelable()] (const TError& error) {
         cancelable.Cancel(error);
     }));
 
@@ -891,7 +936,7 @@ TFuture<R> ApplyUniqueHelper(TFutureBase<T> this_, TCallback<S> callback)
 
 template <class T, class D>
 TFuture<T> ApplyTimeoutHelper(
-    TFutureBase<T> this_,
+    const TFutureBase<T>& this_,
     D timeoutOrDeadline,
     TFutureTimeoutOptions options)
 {
@@ -899,16 +944,16 @@ TFuture<T> ApplyTimeoutHelper(
 
     auto cookie = NConcurrency::TDelayedExecutor::Submit(
         BIND_NO_PROPAGATE([=, cancelable = this_.AsCancelable()] (bool aborted) {
-            NYT::TError error;
+            TError error;
             if (aborted) {
-                error = NYT::TError(NYT::EErrorCode::Canceled, "Operation aborted");
+                error = TError(NYT::EErrorCode::Canceled, "Operation aborted");
             } else {
-                error = NYT::TError(NYT::EErrorCode::Timeout, "Operation timed out");
+                error = TError(NYT::EErrorCode::Timeout, "Operation timed out");
                 if constexpr (std::is_same_v<D, TDuration>) {
-                    error = error << NYT::TErrorAttribute("timeout", timeoutOrDeadline);
+                    error = error << TErrorAttribute("timeout", timeoutOrDeadline);
                 }
                 if constexpr (std::is_same_v<D, TInstant>) {
-                    error = error << NYT::TErrorAttribute("deadline", timeoutOrDeadline);
+                    error = error << TErrorAttribute("deadline", timeoutOrDeadline);
                 }
             }
             if (!options.Error.IsOK()) {
@@ -920,18 +965,19 @@ TFuture<T> ApplyTimeoutHelper(
         timeoutOrDeadline,
         options.Invoker);
 
-    this_.Subscribe(BIND_NO_PROPAGATE([=] (const NYT::TErrorOr<T>& value) {
+    this_.Subscribe(BIND_NO_PROPAGATE([=] (const TErrorOr<T>& value) {
         NConcurrency::TDelayedExecutor::Cancel(cookie);
         promise.TrySet(value);
     }));
 
-    promise.OnCanceled(BIND_NO_PROPAGATE([=, cancelable = this_.AsCancelable()] (const NYT::TError& error) {
+    promise.OnCanceled(BIND_NO_PROPAGATE([=, cancelable = this_.AsCancelable()] (const TError& error) {
         NConcurrency::TDelayedExecutor::Cancel(cookie);
         cancelable.Cancel(error);
     }));
 
     return promise;
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 
 } // namespace NDetail
@@ -945,7 +991,7 @@ TPromise<T> NewPromise()
 }
 
 template <class T>
-TPromise<T> MakePromise(NYT::TErrorOr<T> value)
+TPromise<T> MakePromise(TErrorOr<T> value)
 {
     return TPromise<T>(New<NYT::NDetail::TPromiseState<T>>(false, 1, 1, 1, std::move(value)));
 }
@@ -957,7 +1003,7 @@ TPromise<T> MakePromise(T value)
 }
 
 template <class T>
-TFuture<T> MakeFuture(NYT::TErrorOr<T> value)
+TFuture<T> MakeFuture(TErrorOr<T> value)
 {
     return TFuture<T>(New<NYT::NDetail::TPromiseState<T>>(false, 0, 1, 1, std::move(value)));
 }
@@ -1019,7 +1065,7 @@ inline void TCancelable::Reset()
     Impl_.Reset();
 }
 
-inline bool TCancelable::Cancel(const NYT::TError& error) const
+inline bool TCancelable::Cancel(const TError& error) const
 {
     YT_ASSERT(Impl_);
     return Impl_->Cancel(error);
@@ -1051,17 +1097,10 @@ bool TFutureBase<T>::IsSet() const
 }
 
 template <class T>
-const NYT::TErrorOr<T>& TFutureBase<T>::Get() const
+const TErrorOr<T>& TFutureBase<T>::Get() const
 {
     YT_ASSERT(Impl_);
     return Impl_->Get();
-}
-
-template <class T>
-TErrorOr<T> TFutureBase<T>::GetUnique() const
-{
-    YT_ASSERT(Impl_);
-    return Impl_->GetUnique();
 }
 
 template <class T>
@@ -1086,14 +1125,7 @@ std::optional<TErrorOr<T>> TFutureBase<T>::TryGet() const
 }
 
 template <class T>
-std::optional<TErrorOr<T>> TFutureBase<T>::TryGetUnique() const
-{
-    YT_ASSERT(Impl_);
-    return Impl_->TryGetUnique();
-}
-
-template <class T>
-TFutureCallbackCookie TFutureBase<T>::Subscribe(TCallback<void(const NYT::TErrorOr<T>&)> handler) const
+TFutureCallbackCookie TFutureBase<T>::Subscribe(TCallback<void(const TErrorOr<T>&)> handler) const
 {
     YT_ASSERT(Impl_);
     return Impl_->Subscribe(std::move(handler));
@@ -1107,14 +1139,7 @@ void TFutureBase<T>::Unsubscribe(TFutureCallbackCookie cookie) const
 }
 
 template <class T>
-void TFutureBase<T>::SubscribeUnique(TCallback<void(NYT::TErrorOr<T>&&)> handler) const
-{
-    YT_ASSERT(Impl_);
-    Impl_->SubscribeUnique(std::move(handler));
-}
-
-template <class T>
-bool TFutureBase<T>::Cancel(const NYT::TError& error) const
+bool TFutureBase<T>::Cancel(const TError& error) const
 {
     YT_ASSERT(Impl_);
     return Impl_->Cancel(error);
@@ -1129,18 +1154,18 @@ TFuture<T> TFutureBase<T>::ToUncancelable() const
 
     auto promise = NewPromise<T>();
 
-    this->Subscribe(BIND_NO_PROPAGATE([=] (const NYT::TErrorOr<T>& value) {
+    this->Subscribe(BIND_NO_PROPAGATE([=] (const TErrorOr<T>& value) {
         promise.Set(value);
     }));
 
-    static const auto NoopHandler = BIND_NO_PROPAGATE([] (const NYT::TError&) { });
+    static const auto NoopHandler = BIND_NO_PROPAGATE([] (const TError&) { });
     promise.OnCanceled(NoopHandler);
 
     return promise;
 }
 
 template <class T>
-TFuture<T> TFutureBase<T>::ToImmediatelyCancelable() const
+TFuture<T> TFutureBase<T>::ToImmediatelyCancelable(bool propagateCancelation) const
 {
     if (!Impl_) {
         return TFuture<T>();
@@ -1148,12 +1173,14 @@ TFuture<T> TFutureBase<T>::ToImmediatelyCancelable() const
 
     auto promise = NewPromise<T>();
 
-    this->Subscribe(BIND_NO_PROPAGATE([=] (const NYT::TErrorOr<T>& value) {
+    this->Subscribe(BIND_NO_PROPAGATE([=] (const TErrorOr<T>& value) {
         promise.TrySet(value);
     }));
 
-    promise.OnCanceled(BIND_NO_PROPAGATE([=, cancelable = AsCancelable()] (const NYT::TError& error) {
-        cancelable.Cancel(error);
+    promise.OnCanceled(BIND_NO_PROPAGATE([=, cancelable = propagateCancelation ? AsCancelable() : TCancelable()] (const TError& error) {
+        if (propagateCancelation) {
+            cancelable.Cancel(error);
+        }
         promise.TrySet(NYT::NDetail::WrapIntoCancelationError(error));
     }));
 
@@ -1198,44 +1225,23 @@ TFuture<T> TFutureBase<T>::WithTimeout(
 
 template <class T>
 template <class R>
-TFuture<R> TFutureBase<T>::Apply(TCallback<R(const NYT::TErrorOr<T>&)> callback) const
+TFuture<R> TFutureBase<T>::Apply(TCallback<R(const TErrorOr<T>&)> callback) const
 {
-    return NYT::NDetail::ApplyHelper<R>(*this, std::move(callback));
+    return NYT::NDetail::ApplyHelper<R>(Impl_, std::move(callback));
 }
 
 template <class T>
 template <class R>
-TFuture<R> TFutureBase<T>::Apply(TCallback<TErrorOr<R>(const NYT::TErrorOr<T>&)> callback) const
+TFuture<R> TFutureBase<T>::Apply(TCallback<TErrorOr<R>(const TErrorOr<T>&)> callback) const
 {
-    return NYT::NDetail::ApplyHelper<R>(*this, std::move(callback));
+    return NYT::NDetail::ApplyHelper<R>(Impl_, std::move(callback));
 }
 
 template <class T>
 template <class R>
-TFuture<R> TFutureBase<T>::Apply(TCallback<TFuture<R>(const NYT::TErrorOr<T>&)> callback) const
+TFuture<R> TFutureBase<T>::Apply(TCallback<TFuture<R>(const TErrorOr<T>&)> callback) const
 {
-    return NYT::NDetail::ApplyHelper<R>(*this, std::move(callback));
-}
-
-template <class T>
-template <class R>
-TFuture<R> TFutureBase<T>::ApplyUnique(TCallback<R(NYT::TErrorOr<T>&&)> callback) const
-{
-    return NYT::NDetail::ApplyUniqueHelper<R>(*this, std::move(callback));
-}
-
-template <class T>
-template <class R>
-TFuture<R> TFutureBase<T>::ApplyUnique(TCallback<TErrorOr<R>(NYT::TErrorOr<T>&&)> callback) const
-{
-    return NYT::NDetail::ApplyUniqueHelper<R>(*this, std::move(callback));
-}
-
-template <class T>
-template <class R>
-TFuture<R> TFutureBase<T>::ApplyUnique(TCallback<TFuture<R>(NYT::TErrorOr<T>&&)> callback) const
-{
-    return NYT::NDetail::ApplyUniqueHelper<R>(*this, std::move(callback));
+    return NYT::NDetail::ApplyHelper<R>(Impl_, std::move(callback));
 }
 
 template <class T>
@@ -1252,11 +1258,11 @@ TFuture<U> TFutureBase<T>::As() const
 
     auto promise = NewPromise<U>();
 
-    Subscribe(BIND_NO_PROPAGATE([=] (const NYT::TErrorOr<T>& value) {
-        promise.Set(NYT::TErrorOr<U>(value));
+    Subscribe(BIND_NO_PROPAGATE([=] (const TErrorOr<T>& value) {
+        promise.Set(TErrorOr<U>(value));
     }));
 
-    promise.OnCanceled(BIND_NO_PROPAGATE([cancelable = AsCancelable()] (const NYT::TError& error) {
+    promise.OnCanceled(BIND_NO_PROPAGATE([cancelable = AsCancelable()] (const TError& error) {
         cancelable.Cancel(error);
     }));
 
@@ -1264,15 +1270,36 @@ TFuture<U> TFutureBase<T>::As() const
 }
 
 template <class T>
-TFuture<void> TFutureBase<T>::AsVoid() const
+TFuture<void> TFutureBase<T>::AsVoid() const&
 {
     return TFuture<void>(Impl_);
 }
 
 template <class T>
+TFuture<void> TFutureBase<T>::AsVoid() &&
+{
+    return TFuture<void>(std::move(Impl_));
+}
+
+// NB: In contrast to AsVoid, one cannot add (a more efficent) &&-overload
+// here as future-to-cancelable conversion must involve toggling ref-counters.
+// See TCancelableStateBase.
+template <class T>
 TCancelable TFutureBase<T>::AsCancelable() const
 {
     return TCancelable(Impl_);
+}
+
+template <class T>
+TUniqueFuture<T> TFutureBase<T>::AsUnique() const&
+{
+    return TUniqueFuture<T>(this->Impl_);
+}
+
+template <class T>
+TUniqueFuture<T> TFutureBase<T>::AsUnique() &&
+{
+    return TUniqueFuture<T>(std::move(this->Impl_));
 }
 
 template <class T>
@@ -1290,7 +1317,7 @@ template <class T>
 template <class R>
 TFuture<R> TFuture<T>::Apply(TCallback<R(const T&)> callback) const
 {
-    return NYT::NDetail::ApplyHelper<R>(*this, callback);
+    return NYT::NDetail::ApplyHelper<R>(this->Impl_, callback);
 }
 
 template <class T>
@@ -1304,7 +1331,14 @@ template <class T>
 template <class R>
 TFuture<R> TFuture<T>::Apply(TCallback<TFuture<R>(const T&)> callback) const
 {
-    return NYT::NDetail::ApplyHelper<R>(*this, callback);
+    return NYT::NDetail::ApplyHelper<R>(this->Impl_, callback);
+}
+
+template <class T>
+template <class R>
+TFuture<R> TFuture<T>::Apply(TCallback<TUniqueFuture<R>(const T&)> callback) const
+{
+    return NYT::NDetail::ApplyHelper<R>(this->Impl_, callback);
 }
 
 template <class T>
@@ -1316,16 +1350,9 @@ TFuture<R> TFuture<T>::Apply(TCallback<TFuture<R>(T)> callback) const
 
 template <class T>
 template <class R>
-TFuture<R> TFuture<T>::ApplyUnique(TCallback<R(T&&)> callback) const
+TFuture<R> TFuture<T>::Apply(TCallback<TUniqueFuture<R>(T)> callback) const
 {
-    return NYT::NDetail::ApplyUniqueHelper<R>(*this, callback);
-}
-
-template <class T>
-template <class R>
-TFuture<R> TFuture<T>::ApplyUnique(TCallback<TFuture<R>(T&&)> callback) const
-{
-    return NYT::NDetail::ApplyUniqueHelper<R>(*this, callback);
+    return this->Apply(TCallback<TUniqueFuture<R>(const T&)>(callback));
 }
 
 template <class T>
@@ -1341,18 +1368,118 @@ inline TFuture<void>::TFuture(std::nullopt_t)
 template <class R>
 TFuture<R> TFuture<void>::Apply(TCallback<R()> callback) const
 {
-    return NYT::NDetail::ApplyHelper<R>(*this, callback);
+    return NYT::NDetail::ApplyHelper<R>(this->Impl_, callback);
 }
 
 template <class R>
 TFuture<R> TFuture<void>::Apply(TCallback<TFuture<R>()> callback) const
 {
-    return NYT::NDetail::ApplyHelper<R>(*this, callback);
+    return NYT::NDetail::ApplyHelper<R>(this->Impl_, callback);
+}
+
+template <class R>
+TFuture<R> TFuture<void>::Apply(TCallback<TUniqueFuture<R>()> callback) const
+{
+    return NYT::NDetail::ApplyHelper<R>(this->Impl_, callback);
 }
 
 inline TFuture<void>::TFuture(TIntrusivePtr<NYT::NDetail::TFutureState<void>> impl)
     : TFutureBase<void>(std::move(impl))
 { }
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <class T>
+TErrorOr<T> TUniqueFutureBase<T>::Get() const
+{
+    YT_ASSERT(this->Impl_);
+    return this->Impl_->GetUnique();
+}
+
+template <class T>
+std::optional<TErrorOr<T>> TUniqueFutureBase<T>::TryGet() const
+{
+    YT_ASSERT(this->Impl_);
+    return this->Impl_->TryGetUnique();
+}
+
+template <class T>
+void TUniqueFutureBase<T>::Subscribe(TCallback<void(TErrorOr<T>&&)> handler) const
+{
+    YT_ASSERT(this->Impl_);
+    this->Impl_->SubscribeUnique(std::move(handler));
+}
+
+template <class T>
+template <class R>
+TFuture<R> TUniqueFutureBase<T>::Apply(TCallback<R(TErrorOr<T>&&)> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, std::move(callback));
+}
+
+template <class T>
+template <class R>
+TFuture<R> TUniqueFutureBase<T>::Apply(TCallback<TErrorOr<R>(TErrorOr<T>&&)> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, std::move(callback));
+}
+
+template <class T>
+template <class R>
+TFuture<R> TUniqueFutureBase<T>::Apply(TCallback<TFuture<R>(TErrorOr<T>&&)> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, std::move(callback));
+}
+
+template <class T>
+template <class R>
+TFuture<R> TUniqueFutureBase<T>::Apply(TCallback<TUniqueFuture<R>(TErrorOr<T>&&)> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, std::move(callback));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <class T>
+template <class R>
+TFuture<R> TUniqueFuture<T>::Apply(TCallback<R(T&&)> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, callback);
+}
+
+template <class T>
+template <class R>
+TFuture<R> TUniqueFuture<T>::Apply(TCallback<TFuture<R>(T&&)> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, callback);
+}
+
+template <class T>
+template <class R>
+TFuture<R> TUniqueFuture<T>::Apply(TCallback<TUniqueFuture<R>(T&&)> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, callback);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <class R>
+TFuture<R> TUniqueFuture<void>::Apply(TCallback<R()> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, callback);
+}
+
+template <class R>
+TFuture<R> TUniqueFuture<void>::Apply(TCallback<TFuture<R>()> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, callback);
+}
+
+template <class R>
+TFuture<R> TUniqueFuture<void>::Apply(TCallback<TUniqueFuture<R>()> callback) const
+{
+    return NYT::NDetail::ApplyUniqueHelper<R>(this->Impl_, callback);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1376,14 +1503,14 @@ bool TPromiseBase<T>::IsSet() const
 }
 
 template <class T>
-void TPromiseBase<T>::Set(const NYT::TErrorOr<T>& value) const
+void TPromiseBase<T>::Set(const TErrorOr<T>& value) const
 {
     YT_ASSERT(Impl_);
     Impl_->Set(value);
 }
 
 template <class T>
-void TPromiseBase<T>::Set(NYT::TErrorOr<T>&& value) const
+void TPromiseBase<T>::Set(TErrorOr<T>&& value) const
 {
     YT_ASSERT(Impl_);
     Impl_->Set(std::move(value));
@@ -1394,27 +1521,36 @@ template <class U>
 void TPromiseBase<T>::SetFrom(const TFuture<U>& another) const
 {
     YT_ASSERT(Impl_);
-
-    auto this_ = *this;
-
-    another.Subscribe(BIND_NO_PROPAGATE([this_] (const NYT::TErrorOr<U>& value)   {
+    another.Subscribe(BIND_NO_PROPAGATE([this_ = *this] (const TErrorOr<U>& value)   {
         this_.Set(value);
     }));
-
-    OnCanceled(BIND_NO_PROPAGATE([anotherCancelable = another.AsCancelable()] (const NYT::TError& error) {
+    OnCanceled(BIND_NO_PROPAGATE([anotherCancelable = another.AsCancelable()] (const TError& error) {
         anotherCancelable.Cancel(error);
     }));
 }
 
 template <class T>
-bool TPromiseBase<T>::TrySet(const NYT::TErrorOr<T>& value) const
+template <class U>
+void TPromiseBase<T>::SetFrom(const TUniqueFuture<U>& another) const
+{
+    YT_ASSERT(Impl_);
+    another.Subscribe(BIND_NO_PROPAGATE([this_ = *this] (TErrorOr<U>&& value)   {
+        this_.Set(std::move(value));
+    }));
+    OnCanceled(BIND_NO_PROPAGATE([anotherCancelable = another.AsCancelable()] (const TError& error) {
+        anotherCancelable.Cancel(error);
+    }));
+}
+
+template <class T>
+bool TPromiseBase<T>::TrySet(const TErrorOr<T>& value) const
 {
     YT_ASSERT(Impl_);
     return Impl_->TrySet(value);
 }
 
 template <class T>
-bool TPromiseBase<T>::TrySet(NYT::TErrorOr<T>&& value) const
+bool TPromiseBase<T>::TrySet(TErrorOr<T>&& value) const
 {
     YT_ASSERT(Impl_);
     return Impl_->TrySet(std::move(value));
@@ -1425,20 +1561,16 @@ template <class U>
 inline void TPromiseBase<T>::TrySetFrom(const TFuture<U>& another) const
 {
     YT_ASSERT(Impl_);
-
-    auto this_ = *this;
-
-    another.Subscribe(BIND_NO_PROPAGATE([this_] (const NYT::TErrorOr<U>& value) {
+    another.Subscribe(BIND_NO_PROPAGATE([this_ = *this] (const TErrorOr<U>& value) {
         this_.TrySet(value);
     }));
-
-    OnCanceled(BIND_NO_PROPAGATE([anotherCancelable = another.AsCancelable()] (const NYT::TError& error) {
+    OnCanceled(BIND_NO_PROPAGATE([anotherCancelable = another.AsCancelable()] (const TError& error) {
         anotherCancelable.Cancel(error);
     }));
 }
 
 template <class T>
-const NYT::TErrorOr<T>& TPromiseBase<T>::Get() const
+const TErrorOr<T>& TPromiseBase<T>::Get() const
 {
     YT_ASSERT(Impl_);
     return Impl_->Get();
@@ -1458,16 +1590,16 @@ bool TPromiseBase<T>::IsCanceled() const
 }
 
 template <class T>
-NYT::TError TPromiseBase<T>::GetCancelationError() const
+TError TPromiseBase<T>::GetCancelationError() const
 {
     if (!IsCanceled()) {
-        return NYT::TError{};
+        return TError{};
     }
     return Impl_->GetCancelationError();
 }
 
 template <class T>
-bool TPromiseBase<T>::OnCanceled(TCallback<void(const NYT::TError&)> handler) const
+bool TPromiseBase<T>::OnCanceled(TCallback<void(const TError&)> handler) const
 {
     YT_ASSERT(Impl_);
     return Impl_->OnCanceled(std::move(handler));
@@ -1511,15 +1643,15 @@ void TPromise<T>::Set(T&& value) const
 }
 
 template <class T>
-void TPromise<T>::Set(const NYT::TError& error) const
+void TPromise<T>::Set(const TError& error) const
 {
-    Set(NYT::TErrorOr<T>(error));
+    Set(TErrorOr<T>(error));
 }
 
 template <class T>
-void TPromise<T>::Set(NYT::TError&& error) const
+void TPromise<T>::Set(TError&& error) const
 {
-    Set(NYT::TErrorOr<T>(std::move(error)));
+    Set(TErrorOr<T>(std::move(error)));
 }
 
 template <class T>
@@ -1537,15 +1669,15 @@ bool TPromise<T>::TrySet(T&& value) const
 }
 
 template <class T>
-bool TPromise<T>::TrySet(const NYT::TError& error) const
+bool TPromise<T>::TrySet(const TError& error) const
 {
-    return TrySet(NYT::TErrorOr<T>(error));
+    return TrySet(TErrorOr<T>(error));
 }
 
 template <class T>
-bool TPromise<T>::TrySet(NYT::TError&& error) const
+bool TPromise<T>::TrySet(TError&& error) const
 {
-    return TrySet(NYT::TErrorOr<T>(std::move(error)));
+    return TrySet(TErrorOr<T>(std::move(error)));
 }
 
 template <class T>
@@ -1561,13 +1693,13 @@ inline TPromise<void>::TPromise(std::nullopt_t)
 inline void TPromise<void>::Set() const
 {
     YT_ASSERT(this->Impl_);
-    this->Impl_->Set(NYT::TError());
+    this->Impl_->Set(TError());
 }
 
 inline bool TPromise<void>::TrySet() const
 {
     YT_ASSERT(this->Impl_);
-    return this->Impl_->TrySet(NYT::TError());
+    return this->Impl_->TrySet(TError());
 }
 
 inline TPromise<void>::TPromise(TIntrusivePtr<NYT::NDetail::TPromiseState<void>> impl)
@@ -1599,7 +1731,7 @@ struct TAsyncViaHelper<R(TArgs...)>
         }
 
         if (promise.IsCanceled()) {
-            promise.Set(NYT::TError(
+            promise.Set(TError(
                 NYT::EErrorCode::Canceled,
                 "Computation was canceled before it was started"));
             return;
@@ -1643,7 +1775,7 @@ struct TAsyncViaHelper<R(TArgs...)>
     static TFuture<TUnderlying> OuterGuarded(
         TSourceCallback this_,
         const IInvokerPtr& invoker,
-        NYT::TError cancellationError,
+        TError cancellationError,
         TArgs... args)
     {
         auto promise = NewPromise<TUnderlying>();
@@ -1680,7 +1812,7 @@ struct TAsyncViaHelper<R(TArgs...)>
     static TTargetCallback DoGuarded(
         TSourceCallback this_,
         IInvokerPtr invoker,
-        NYT::TError cancellationError)
+        TError cancellationError)
     {
         return BIND_NO_PROPAGATE(
             &OuterGuarded,
@@ -1708,14 +1840,14 @@ TExtendedCallback<R(TArgs...)>::AsyncVia(IInvokerPtr invoker) &&
 
 template <class R, class... TArgs>
 TExtendedCallback<typename TFutureTraits<R>::TWrapped(TArgs...)>
-TExtendedCallback<R(TArgs...)>::AsyncViaGuarded(IInvokerPtr invoker, NYT::TError cancellationError) const &
+TExtendedCallback<R(TArgs...)>::AsyncViaGuarded(IInvokerPtr invoker, TError cancellationError) const &
 {
     return NYT::NDetail::TAsyncViaHelper<R(TArgs...)>::DoGuarded(*this, std::move(invoker), std::move(cancellationError));
 }
 
 template <class R, class... TArgs>
 TExtendedCallback<typename TFutureTraits<R>::TWrapped(TArgs...)>
-TExtendedCallback<R(TArgs...)>::AsyncViaGuarded(IInvokerPtr invoker, NYT::TError cancellationError) &&
+TExtendedCallback<R(TArgs...)>::AsyncViaGuarded(IInvokerPtr invoker, TError cancellationError) &&
 {
     return NYT::NDetail::TAsyncViaHelper<R(TArgs...)>::DoGuarded(std::move(*this), std::move(invoker), std::move(cancellationError));
 }
@@ -1734,8 +1866,8 @@ TFutureHolder<T>::TFutureHolder(TFuture<T> future)
 template <class T>
 TFutureHolder<T>::~TFutureHolder()
 {
-    if (Future_) {
-        Future_.Cancel(NYT::TError("Future holder destroyed"));
+    if (Future_ && !Future_.IsSet()) {
+        Future_.Cancel(TError("Future holder destroyed"));
     }
 }
 
@@ -1862,7 +1994,7 @@ public:
         : Result_(size)
     { }
 
-    bool TrySetResult(int index, const NYT::TErrorOr<T>& errorOrValue)
+    bool TrySetResult(int index, const TErrorOr<T>& errorOrValue)
     {
         if (errorOrValue.IsOK()) {
             Result_.ConstructAt(index, errorOrValue.Value());
@@ -1892,7 +2024,7 @@ public:
         : Result_(size)
     { }
 
-    bool TrySetResult(int index, const NYT::TErrorOr<T>& errorOrValue)
+    bool TrySetResult(int index, const TErrorOr<T>& errorOrValue)
     {
         Result_.ConstructAt(index, errorOrValue);
         return true;
@@ -1916,7 +2048,7 @@ public:
     explicit TFutureCombinerResultHolder(int /*size*/)
     { }
 
-    bool TrySetResult(int /*index*/, const NYT::TError& error)
+    bool TrySetResult(int /*index*/, const TError& error)
     {
         return error.IsOK();
     }
@@ -1938,7 +2070,7 @@ protected:
         : Futures_(std::move(futures))
     { }
 
-    void CancelFutures(const NYT::TError& error)
+    void CancelFutures(const TError& error)
     {
         for (const auto& future : Futures_) {
             future.Cancel(error);
@@ -1950,7 +2082,7 @@ protected:
         return !FuturesCancelLatch_.exchange(true);
     }
 
-    void OnCanceled(const NYT::TError& error)
+    void OnCanceled(const TError& error)
     {
         if (TryAcquireFuturesCancelLatch()) {
             CancelFutures(error);
@@ -2012,7 +2144,7 @@ public:
     TFuture<T> Run()
     {
         if (this->Futures_.empty()) {
-            return MakeFuture<T>(NYT::TError(
+            return MakeFuture<T>(TError(
                 NYT::EErrorCode::FutureCombinerFailure,
                 "Any-of combiner failure: empty input"));
         }
@@ -2046,7 +2178,7 @@ private:
     YT_DECLARE_SPIN_LOCK(NThreading::TSpinLock, ErrorsLock_);
     std::vector<TError> Errors_;
 
-    void OnFutureSet(const NYT::TErrorOr<T>& result)
+    void OnFutureSet(const TErrorOr<T>& result)
     {
         if (SkipErrors_ && !result.IsOK()) {
             RegisterError(result);
@@ -2061,13 +2193,13 @@ private:
             this->Futures_.size() > 1 &&
             this->TryAcquireFuturesCancelLatch())
         {
-            this->CancelFutures(NYT::TError(
+            this->CancelFutures(TError(
                 NYT::EErrorCode::FutureCombinerShortcut,
                 "Any-of combiner shortcut: some response received"));
         }
     }
 
-    void RegisterError(const NYT::TError& error)
+    void RegisterError(const TError& error)
     {
         auto guard = Guard(ErrorsLock_);
 
@@ -2077,7 +2209,7 @@ private:
             return;
         }
 
-        auto combinerError = NYT::TError(
+        auto combinerError = TError(
             NYT::EErrorCode::FutureCombinerFailure,
             "Any-of combiner failure: all responses have failed")
             << Errors_;
@@ -2133,17 +2265,17 @@ private:
 
     std::atomic<int> ResponseCount_ = 0;
 
-    void OnFutureSet(int index, const NYT::TErrorOr<T>& result)
+    void OnFutureSet(int index, const TErrorOr<T>& result)
     {
         if (!ResultHolder_.TrySetResult(index, result)) {
-            NYT::TError error(result);
+            TError error(result);
             Promise_.TrySet(error);
 
             if (Options_.CancelInputOnShortcut &&
                 this->Futures_.size() > 1 &&
                 this->TryAcquireFuturesCancelLatch())
             {
-                this->CancelFutures(NYT::TError(
+                this->CancelFutures(TError(
                     NYT::EErrorCode::FutureCombinerShortcut,
                     "All-of combiner shortcut: some response failed")
                     << error);
@@ -2181,7 +2313,7 @@ public:
     {
         if (N_ == 0) {
             if (Options_.CancelInputOnShortcut && !this->Futures_.empty()) {
-                this->CancelFutures(NYT::TError(
+                this->CancelFutures(TError(
                     NYT::EErrorCode::FutureCombinerShortcut,
                     "Any-N-of combiner shortcut: no responses needed"));
             }
@@ -2191,12 +2323,12 @@ public:
 
         if (std::ssize(this->Futures_) < N_) {
             if (Options_.CancelInputOnShortcut) {
-                this->CancelFutures(NYT::TError(
+                this->CancelFutures(TError(
                     NYT::EErrorCode::FutureCombinerShortcut,
                     "Any-N-of combiner shortcut: too few inputs given"));
             }
 
-            return MakeFuture<typename TResultHolder::TResult>(NYT::TError(
+            return MakeFuture<typename TResultHolder::TResult>(TError(
                 NYT::EErrorCode::FutureCombinerFailure,
                 "Any-N-of combiner failure: %v responses needed, %v inputs given",
                 N_,
@@ -2237,9 +2369,9 @@ private:
     std::atomic<int> ResponseCount_ = 0;
 
     YT_DECLARE_SPIN_LOCK(NThreading::TSpinLock, ErrorsLock_);
-    std::vector<NYT::TError> Errors_;
+    std::vector<TError> Errors_;
 
-    void OnFutureSet(int /*index*/, const NYT::TErrorOr<T>& result)
+    void OnFutureSet(int /*index*/, const TErrorOr<T>& result)
     {
         if (SkipErrors_ && !result.IsOK()) {
             RegisterError(result);
@@ -2252,7 +2384,7 @@ private:
         }
 
         if (!ResultHolder_.TrySetResult(responseIndex, result)) {
-            NYT::TError error(result);
+            TError error(result);
             if (Promise_.TrySet(error)) {
                 this->OnCombinerFinished();
             }
@@ -2261,7 +2393,7 @@ private:
                 this->Futures_.size() > 1 &&
                 this->TryAcquireFuturesCancelLatch())
             {
-                this->CancelFutures(NYT::TError(
+                this->CancelFutures(TError(
                     NYT::EErrorCode::FutureCombinerShortcut,
                     "Any-N-of combiner shortcut: some input failed"));
             }
@@ -2277,14 +2409,14 @@ private:
                 responseIndex < std::ssize(this->Futures_) - 1 &&
                 this->TryAcquireFuturesCancelLatch())
             {
-                this->CancelFutures(NYT::TError(
+                this->CancelFutures(TError(
                     NYT::EErrorCode::FutureCombinerShortcut,
                     "Any-N-of combiner shortcut: enough responses received"));
             }
         }
     }
 
-    void RegisterError(const NYT::TError& error)
+    void RegisterError(const TError& error)
     {
         auto guard = Guard(ErrorsLock_);
 
@@ -2296,7 +2428,7 @@ private:
             return;
         }
 
-        auto combinerError = NYT::TError(
+        auto combinerError = TError(
             NYT::EErrorCode::FutureCombinerFailure,
             "Any-N-of combiner failure: %v responses needed, %v failed, %v inputs given",
             N_,
@@ -2313,7 +2445,7 @@ private:
         if (Options_.CancelInputOnShortcut &&
             this->TryAcquireFuturesCancelLatch())
         {
-            this->CancelFutures(NYT::TError(
+            this->CancelFutures(TError(
                 NYT::EErrorCode::FutureCombinerShortcut,
                 "Any-N-of combiner shortcut: one of responses failed")
                 << error);
@@ -2383,10 +2515,10 @@ TFuture<std::vector<TErrorOr<T>>> AllSetWithTimeout(
     std::vector<TPromise<T>> promises(futures.size());
     for (int index = 0; index < std::ssize(futures); ++index) {
         auto promise = NewPromise<T>();
-        futures[index].Subscribe(BIND_NO_PROPAGATE([promise] (const NYT::TErrorOr<T>& value) {
+        futures[index].Subscribe(BIND_NO_PROPAGATE([promise] (const TErrorOr<T>& value) {
             promise.TrySet(value);
         }));
-        promise.OnCanceled(BIND_NO_PROPAGATE([future = futures[index]] (const NYT::TError& error) {
+        promise.OnCanceled(BIND_NO_PROPAGATE([future = futures[index]] (const TError& error) {
             future.Cancel(error);
         }));
         promises[index] = promise;
@@ -2402,7 +2534,7 @@ TFuture<std::vector<TErrorOr<T>>> AllSetWithTimeout(
     auto cookie = NConcurrency::TDelayedExecutor::Submit(
         BIND_NO_PROPAGATE([promises, futures] {
             for (int index = 0; index < std::ssize(futures); ++index) {
-                auto error = NYT::TError(NYT::EErrorCode::Timeout, "Operation timed out");
+                auto error = TError(NYT::EErrorCode::Timeout, "Operation timed out");
                 promises[index].TrySet(error);
                 futures[index].Cancel(error);
             }
@@ -2410,7 +2542,7 @@ TFuture<std::vector<TErrorOr<T>>> AllSetWithTimeout(
         timeout,
         std::move(invoker));
 
-    combinedFuture.AsVoid().Subscribe(BIND_NO_PROPAGATE([cookie] (const NYT::TError& /*error*/) {
+    combinedFuture.AsVoid().Subscribe(BIND_NO_PROPAGATE([cookie] (const TError& /*error*/) {
         NConcurrency::TDelayedExecutor::Cancel(cookie);
     }));
 
@@ -2567,7 +2699,7 @@ private:
         }
     }
 
-    void OnError(const NYT::TError& error)
+    void OnError(const TError& error)
     {
         {
             auto guard = Guard(SpinLock_);
@@ -2585,9 +2717,9 @@ private:
         Promise_.TrySet(error);
     }
 
-    void OnCanceled(const NYT::TError& error)
+    void OnCanceled(const TError& error)
     {
-        auto wrappedError = NYT::TError(NYT::EErrorCode::Canceled, "Canceled")
+        auto wrappedError = TError(NYT::EErrorCode::Canceled, "Canceled")
             << error;
 
         OnError(wrappedError);

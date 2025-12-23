@@ -7,7 +7,6 @@ import devtools.ya.test.const as test_const
 import devtools.ya.test.system.process as process
 import devtools.ya.test.test_types.common as test_types
 import devtools.ya.test.util.shared as util_shared
-import devtools.ya.test.util.tools as tools
 import devtools.ya.test.filter
 import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
 
@@ -80,7 +79,7 @@ def prepare_files(args):
     src_path = os.path.join(args.source_root, test_for_project_path)
     dst_path = args.test_for_path
 
-    tools.copy_dir_contents(
+    ts_utils.copy_dir_contents(
         src_path,
         dst_path,
         ignore_list=[

@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.71.0)
+VERSION(v1.73.0)
 
 SRCS(
     channel.go
@@ -33,6 +33,14 @@ IF (OS_WINDOWS)
     SRCS(
         syscall_nonlinux.go
     )
+ENDIF()
+
+IF (OS_ANDROID)
+    SRCS(
+        syscall_linux.go
+    )
+
+    GO_XTEST_SRCS(syscall_test.go)
 ENDIF()
 
 END()

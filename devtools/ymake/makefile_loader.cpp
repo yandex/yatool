@@ -224,7 +224,7 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
                     if (TFsPath(Conf.RealPathEx(LintersMake)).Exists()) {
                         auto includeCtr = OnInclude(LintersMake, Makefile);
                         Y_ASSERT(!includeCtr.Ignored());
-                        Vars().SetStoreOriginals(NVariableDefs::VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::Parent(LintersMake)), OrigVars());
+                        Vars().SetStoreOriginals(NVariableDefs::VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::CutType(NPath::Parent(LintersMake))), OrigVars());
                         ReadMakeFile(LintersMake);
                     } else {
                         TRACE(P, NEvent::TInvalidFile(LintersMake, {Dir}, TString{"File not found"}));

@@ -6,8 +6,11 @@
 #include <yt/yt/core/ypath/token.h>
 #include <yt/yt/core/ypath/tokenizer.h>
 
+#include <yt/yt/core/ytree/helpers.h>
+
 #include <yt/yt/core/yson/tokenizer.h>
 #include <yt/yt/core/yson/async_writer.h>
+#include <yt/yt/core/yson/protobuf_helpers.h>
 
 #include <library/cpp/yt/memory/leaky_ref_counted_singleton.h>
 
@@ -18,6 +21,7 @@ using namespace NYPath;
 using namespace NYson;
 
 using NYT::FromProto;
+using NYT::ToProto;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -65,7 +69,7 @@ void TNodeBase::GetSelf(
     writer.Finish()
         .Subscribe(BIND([=] (const TErrorOr<TYsonString>& resultOrError) {
             if (resultOrError.IsOK()) {
-                response->set_value(resultOrError.Value().ToString());
+                response->set_value(ToProto(resultOrError.Value()));
                 context->Reply();
             } else {
                 context->Reply(resultOrError);
@@ -102,7 +106,7 @@ void TNodeBase::GetKeySelf(
     }
 
     context->SetResponseInfo("Key: %v", key);
-    response->set_value(ConvertToYsonString(key).ToString());
+    response->set_value(ToProto(ConvertToYsonString(key)));
 
     context->Reply();
 }
@@ -243,16 +247,9 @@ int TCompositeNodeMixin::GetMaxChildCount() const
     return std::numeric_limits<int>::max();
 }
 
-void TCompositeNodeMixin::ValidateChildCount(const TYPath& path, int childCount) const
+void TCompositeNodeMixin::ValidateChildCount(TYPathBuf path, int childCount) const
 {
-    int maxChildCount = GetMaxChildCount();
-    if (childCount >= maxChildCount) {
-        THROW_ERROR_EXCEPTION(
-            NYTree::EErrorCode::MaxChildCountViolation,
-            "Composite node %v is not allowed to contain more than %v items",
-            path,
-            maxChildCount);
-    }
+    NYTree::ValidateYTreeChildCount(path, childCount, GetMaxChildCount());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -357,7 +354,7 @@ void TMapNodeMixin::ListSelf(
     writer.Finish()
         .Subscribe(BIND([=] (const TErrorOr<TYsonString>& resultOrError) {
             if (resultOrError.IsOK()) {
-                response->set_value(resultOrError.Value().ToString());
+                response->set_value(ToProto(resultOrError.Value()));
                 context->Reply();
             } else {
                 context->Reply(resultOrError);
@@ -395,13 +392,10 @@ std::pair<TString, INodePtr> TMapNodeMixin::PrepareSetChildOrChildValue(
             tokenizer.Advance();
             tokenizer.Expect(NYPath::ETokenType::Literal);
             auto key = tokenizer.GetLiteralValue();
-
             int maxKeyLength = GetMaxKeyLength();
-            if (std::ssize(key) > maxKeyLength) {
-                ThrowMaxKeyLengthViolated();
-            }
-
+            NYTree::ValidateYTreeKey(key, maxKeyLength);
             tokenizer.Advance();
+            tokenizer.Skip(NYPath::ETokenType::Ampersand);
 
             bool lastStep = (tokenizer.GetType() == NYPath::ETokenType::EndOfStream);
             if (!recursive && !lastStep) {
@@ -475,15 +469,6 @@ void TMapNodeMixin::SetChildValue(
 int TMapNodeMixin::GetMaxKeyLength() const
 {
     return std::numeric_limits<int>::max();
-}
-
-void TMapNodeMixin::ThrowMaxKeyLengthViolated() const
-{
-    THROW_ERROR_EXCEPTION(
-        NYTree::EErrorCode::MaxKeyLengthViolation,
-        "Map node %v is not allowed to contain items with keys longer than %v symbols",
-        GetPath(),
-        GetMaxKeyLength());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

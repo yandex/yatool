@@ -31,6 +31,9 @@ public:
     void SetLimit(i64 /*size*/) override
     { }
 
+    void AdjustLimit(i64 /*adjustedLimit*/) override
+    { }
+
     i64 GetLimit()  const override
     {
         return std::numeric_limits<i64>::max();
@@ -371,17 +374,6 @@ TErrorOr<TSharedRef> TryTrackMemory(
         return reference;
     }
     return tracker->TryTrack(std::move(reference), keepExistingTracking);
-}
-
-TSharedRef TrackMemory(
-    const IMemoryUsageTrackerPtr& tracker,
-    TSharedRef reference,
-    bool keepExistingTracking)
-{
-    if (!tracker || !reference) {
-        return reference;
-    }
-    return tracker->Track(std::move(reference), keepExistingTracking);
 }
 
 TSharedRefArray TrackMemory(

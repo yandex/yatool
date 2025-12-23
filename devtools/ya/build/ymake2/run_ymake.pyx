@@ -34,7 +34,7 @@ cdef extern from "devtools/ya/build/ymake2/run_ymake.h":
         const THashMap[TString, TString]& env,
         object stderrLineReader,
         object stdinLineProvider
-    ) nogil except +
+    ) except+ nogil
 
     cdef cppclass TRunYmakeParams:
         TString Binary
@@ -46,12 +46,14 @@ cdef extern from "devtools/ya/build/ymake2/run_ymake.h":
     ctypedef TAtomicSharedPtr[THashMap[int, TRunYMakeResultPtr]] TRunYmakeMulticonfigResultPtr
 
     TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(
-        const TList[TRunYmakeParams]& params
-    ) nogil except +
+        const TList[TRunYmakeParams]& params,
+        size_t threads
+    ) except+ nogil
 
 arg_collection = dict()
 result_ready_event = threading.Event()
 cdef THashMap[int, TRunYMakeResultPtr] results
+exception = dict()  # it is mandatory to have a container type here to sync between threads
 
 def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_provider=None, multiconfig=False, order=None):
     cdef TString binary_c = six.ensure_binary(binary)
@@ -82,7 +84,11 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
             'stdin_line_provider': stdin_line_provider,
         }
         result_ready_event.wait()
+        if exception:
+            raise exception['e']
         res = results[order]
+        # it's important to reset global objects since some handlers run this function multiple times
+        results.erase(results.find(order))
     else:
         with nogil:
             res = RunYMake(binary_c, args_c, env_c, stderr_line_reader, stdin_line_provider)
@@ -100,27 +106,38 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
     return res.Get().ExitCode, output, six.ensure_str(res.Get().Stderr)
 
 
-def run_scheduled(count):
+def run_scheduled(count, threads, check_error_fn):
     cdef TList[TRunYmakeParams] params
     cdef TRunYmakeParams param
     cdef TRunYmakeMulticonfigResultPtr results_c
+    cdef size_t threads_c
 
-    while len(arg_collection) < count:
-        time.sleep(0.1)
-    for _, v in sorted(arg_collection.items()):
-        param.Binary = six.ensure_binary(v['binary'])
-        param.Args.clear()
-        for arg in v['args']:
-            param.Args.push_back(six.ensure_binary(arg))
-        # TODO: check env is used at all
-        # param.Env.clear()
-        # for k, v in v['env'].items():
-        #     param.Env[six.ensure_binary(k)] = six.ensure_binary(v)
-        param.StderrLineReader = <PyObject*>v['stderr_line_reader']
-        param.StdinLineProvider = <PyObject*>v['stdin_line_provider']
-        params.push_back(param)
-    with nogil:
-        results_c = RunYMakeMulticonfig(params)
-    for k in arg_collection:
-        results[k] = results_c.Get().at(k)
+    try:
+        while len(arg_collection) < count:
+            if check_error_fn():
+                arg_collection.clear()
+                return
+            time.sleep(0.005)
+        for _, v in sorted(arg_collection.items()):
+            param.Binary = six.ensure_binary(v['binary'])
+            param.Args.clear()
+            for arg in v['args']:
+                param.Args.push_back(six.ensure_binary(arg))
+            # TODO: check env is used at all
+            # param.Env.clear()
+            # for k, v in v['env'].items():
+            #     param.Env[six.ensure_binary(k)] = six.ensure_binary(v)
+            param.StderrLineReader = <PyObject*>v['stderr_line_reader']
+            param.StdinLineProvider = <PyObject*>v['stdin_line_provider']
+            params.push_back(param)
+        threads_c = threads
+        with nogil:
+            results_c = RunYMakeMulticonfig(params, threads_c)
+        for k in arg_collection:
+            results[k] = results_c.Get().at(k)
+    except Exception as e:
+        exception['e'] = e
     result_ready_event.set()
+    # it's important to reset global objects since some handlers run this function multiple times
+    result_ready_event.clear()
+    arg_collection.clear()

@@ -9,12 +9,19 @@ from devtools.ya.test.test_types import common as common_types
 CLANG_TIDY_TEST_TYPE = "clang_tidy"
 
 
-class ClangTidySuite(common_types.AbstractTestSuite):
+class ClangTidySuite(common_types.SemanticLinterSuite):
     def __init__(self, *args, **kwargs):
         super(ClangTidySuite, self).__init__(*args, **kwargs)
         self.clang_tidy_inputs = []
         self.library_path = None
         self.global_library_path = None
+
+    @property
+    def semantic_linter_inputs(self):
+        """
+        Property that returns tuple of semantic linter input files for ClangTidySuite.
+        """
+        return tuple(self.clang_tidy_inputs)
 
     def support_splitting(self, opts=None):
         """
@@ -121,5 +128,5 @@ class ClangTidySuite(common_types.AbstractTestSuite):
         return devtools.ya.test.const.SuiteClassType.STYLE
 
     def global_tidy_library(self):
-        library_path = self.meta.global_library_path.replace("$B", "$(BUILD_ROOT)")
-        return library_path if library_path.endswith(".tidyjson") else ""
+        library_path = self.meta.global_library_path
+        return library_path.replace("$B", "$(BUILD_ROOT)") if library_path.endswith(".tidyjson") else ""

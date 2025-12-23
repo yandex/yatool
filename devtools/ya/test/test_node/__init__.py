@@ -38,6 +38,7 @@ import exts.windows
 
 import devtools.ya.test.canon.data as canon_data
 import devtools.ya.test.common as test_common
+from devtools.ya.test.test_types.common import AbstractTestSuite
 import devtools.ya.test.common.ytest_common_tools as ytest_common_tools
 import devtools.ya.test.const
 import devtools.ya.test.filter as test_filter
@@ -345,7 +346,7 @@ class TestFramer(object):
                 'cmds': [
                     {
                         'cmd_args': [
-                            '$(PYTHON)/python',
+                            test_common.get_python_cmd()[0],
                             SCRIPT_APPEND_FILE,
                             output,
                         ]
@@ -736,7 +737,10 @@ def create_test_node(
                 'uid': uid,
                 'broadcast': False,
                 'cmds': [
-                    {'cmd_args': ['$(PYTHON)/python', '$(SOURCE_ROOT)/build/scripts/fs_tools.py', 'copy', src, dst]}
+                    {
+                        'cmd_args': test_common.get_python_cmd(opts=opts)
+                        + ['$(SOURCE_ROOT)/build/scripts/fs_tools.py', 'copy', src, dst]
+                    }
                 ],
                 'deps': [],
                 'inputs': [src],
@@ -790,7 +794,7 @@ def create_test_node(
             if nparts > devtools.ya.test.const.MAX_CORPUS_RESOURCES_ALLOWED * 2:
                 suite.corpus_parts_limit_exceeded = nparts
 
-            if app_config.have_sandbox_fetcher:
+            if app_config.in_house:
                 for field in corpus_data.keys():
                     for n, resource_id in enumerate(corpus_data[field]):
                         target_path = "{}/{}".format(field, n)
@@ -1071,6 +1075,10 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
 
         # TODO DEVTOOLS-5416
         # Transfer requirements from node to the YT operation
+        preserved_requirement_keys = {"test_output_limit"}
+        preserved_requirements = {
+            k: v for k, v in node.get("requirements", {}).items() if k in preserved_requirement_keys
+        }
         node.update(
             {
                 "inputs": testdeps.unique(node["inputs"] + inputs),
@@ -1082,7 +1090,8 @@ def wrap_test_node(node, suite, test_out_dir, opts, platform_descriptor, split_i
                     "cpu": "{}m".format(opts.ytexec_wrapper_m_cpu),
                     "network": "full",
                     "ram": 8,
-                },
+                }
+                | preserved_requirements,
             }
         )
 
@@ -1552,7 +1561,7 @@ def get_merger_root_path(suites):
     return os.path.join(suites[0].project_path, "tests_merger")
 
 
-def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
+def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_to_remote_store):
     test_uids = [node["uid"] for node in test_nodes]
     uid = suite.uid
     out_dir = suite.work_dir()
@@ -1620,7 +1629,7 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup):
         },
         "backup": backup,
         "broadcast": False,
-        "upload": True,
+        "upload": upload_to_remote_store,
         "inputs": testdeps.unique(node_inputs),
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -1659,7 +1668,7 @@ def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_
         )
     for i in range(tests_retries):
         retry = i + 1 if tests_retries > 1 else None
-        node = create_test_node(
+        node = create_test_node(  # TODO(nechda): need host_resolver
             arc_root,
             suite,
             graph,
@@ -1671,7 +1680,8 @@ def inject_single_test_node(arc_root, graph, suite, custom_deps, opts, platform_
 
         add_to_result = tests_retries < 2
 
-        node['upload'] = add_to_result
+        if opts is not None and getattr(opts, 'upload_to_remote_store', False):  # TODO YA-316
+            node['upload'] = add_to_result
 
         graph.append_node(node, add_to_result=add_to_result)
         test_nodes.append(node)
@@ -1694,7 +1704,7 @@ def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_
         orig_split_params = suite.get_split_params()
         for chunk in suite.chunks:
             suite.set_split_params(chunk.nchunks, chunk.chunk_index, chunk.filename)
-            test_node = create_test_node(
+            test_node = create_test_node(  # TODO(nechda): need host_resolver
                 arc_root,
                 suite,
                 graph,
@@ -1719,7 +1729,8 @@ def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_
         )
 
         add_to_result = tests_retries < 2
-        acc_node['upload'] = add_to_result
+        if opts is not None and getattr(opts, 'upload_to_remote_store', False):  # TODO YA-316
+            acc_node['upload'] = add_to_result
 
         acc_nodes.append(acc_node)
         graph.append_node(acc_node, add_to_result=add_to_result)
@@ -1735,7 +1746,8 @@ def make_test_merge_chunks(tests):
     return chunks.values()
 
 
-def filter_last_failed(tests, opts):
+def filter_last_failed(tests: list[AbstractTestSuite], opts) -> list[AbstractTestSuite]:
+    logger.debug("Going to apply `last_failed` filter from last run for %d suites", len(tests))
     store_path = last_failed.get_tests_restart_cache_dir(opts.bld_dir)
     status_storage = last_failed.StatusStore(store_path)
     is_all_empty = True
@@ -1743,12 +1755,21 @@ def filter_last_failed(tests, opts):
     for suite in tests:
         suite_hash = suite.get_state_hash()
         failed_tests = status_storage.get(suite_hash)
+
         if failed_tests:
             is_all_empty = False
             suites_to_rerun.append(suite)
             if suite_hash not in failed_tests:
                 # if a suite is not marked as failed we add filters to run only failed tests
                 suite.insert_additional_filters([ytest_common_tools.to_utf8(k) for k in failed_tests.keys()])
+                logger.debug("Found %d failed tests for suite %s (%s)", len(failed_tests), suite, suite_hash)
+            else:
+                logger.debug(
+                    "Full suite will be restarted due status `%s`: %s (%s)", failed_tests[suite_hash], suite, suite_hash
+                )
+        else:
+            logger.debug("Removing suite %s (%s)", suite, suite_hash)
+
     status_storage.flush()
     if is_all_empty or opts.tests_filters:
         return tests
@@ -1831,7 +1852,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
                     suite,
                     test_deps,
                     opts,
-                    platform_descriptor,
+                    platform_descriptor,  # need host_resolver
                 )
             else:
                 test_nodes = inject_single_test_node(
@@ -1840,7 +1861,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
                     suite,
                     test_deps,
                     opts,
-                    platform_descriptor,
+                    platform_descriptor,  # need host_resolver
                 )
         except _DependencyException:
             logger.warning("Skipping test '%s (%s)' due to unresolved dependencies", suite.project_path, suite.name)
@@ -1851,7 +1872,8 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
         assert test_nodes
         if len(test_nodes) > 1:
             backup = opts is not None and getattr(opts, 'backup_test_results', False)
-            suite_run_node = create_merge_test_runs_node(graph, test_nodes, suite, opts, backup)
+            upload_to_remote_store = opts is not None and getattr(opts, 'upload_to_remote_store', False)
+            suite_run_node = create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_to_remote_store)
         else:
             suite_run_node = test_nodes[0]
 
@@ -1904,7 +1926,7 @@ def in_fuzzing_mode(test_opts):  # XXX
     return False
 
 
-def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
+def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_tool_resolver):
     if not suites:
         return []
 
@@ -1923,7 +1945,9 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor):
         injected_tests = inject_test_list_nodes(arc_root, plan, suites, test_opts, custom_deps, platform_descriptor)
         timer.show_step('inject test list nodes')
     else:
-        injected_tests = inject_test_nodes(arc_root, plan, suites, platform_descriptor, custom_deps, opts=test_opts)
+        injected_tests = inject_test_nodes(
+            arc_root, plan, suites, platform_descriptor, custom_deps, opts=test_opts
+        )  # nedd host_resolver
         if in_canonize_mode(test_opts):
             canonization_nodes = []
             for suite in suites:
@@ -2592,6 +2616,9 @@ def inject_list_result_node(graph, tests, opts, tests_filter_descr):
 
     if opts.report_skipped_suites or opts.report_skipped_suites_only:
         show_list_cmd += ["--report-skipped-suites"]
+
+    if opts.list_tests_output_file:
+        show_list_cmd += ["--output", opts.list_tests_output_file]
 
     for tf in getattr(opts, 'tests_filters', []) + getattr(opts, 'test_files_filter', []):
         show_list_cmd.extend(["--test-name-filter", tf])

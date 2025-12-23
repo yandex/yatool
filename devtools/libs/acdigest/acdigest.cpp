@@ -1,5 +1,7 @@
 #include "acdigest.h"
 
+#include <util/generic/buffer.h>
+#include <util/stream/buffer.h>
 #include <util/stream/file.h>
 #include <util/stream/format.h>
 #include <util/stream/str.h>
@@ -74,5 +76,11 @@ namespace NACDigest {
         ss << contentDigest;
         ss << "mode: " << Hex(stat.Mode);
         return {contentDigest, GetStreamDigest(ss).AsHexString(), size};
+    }
+
+    TString GetBufferDigest(const char* ptr, size_t size) {
+        TBuffer buffer{ptr, size};
+        TBufferInput input{buffer};
+        return NACDigest::GetStreamDigest(input).AsHexString();
     }
 }

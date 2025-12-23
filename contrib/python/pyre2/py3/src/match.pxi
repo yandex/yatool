@@ -1,8 +1,8 @@
 cdef class Match:
     cdef readonly Pattern re
     cdef readonly object string
-    cdef readonly Py_ssize_t pos
-    cdef readonly Py_ssize_t endpos
+    cdef readonly int pos
+    cdef readonly int endpos
     cdef readonly tuple regs
 
     cdef StringPiece * matches
@@ -244,8 +244,8 @@ cdef class Match:
                         % (group, list(self.re.groupindex)))
             return self.regs[self.re.groupindex[group]]
 
-    cdef _make_spans(self, char * cstring, Py_ssize_t size, Py_ssize_t *cpos, Py_ssize_t* upos):
-        cdef Py_ssize_t start, end
+    cdef _make_spans(self, char * cstring, int size, int * cpos, int * upos):
+        cdef int start, end
         cdef StringPiece * piece
 
         spans = []
@@ -266,9 +266,9 @@ cdef class Match:
         self.regs = tuple(spans)
 
     cdef list _convert_spans(self, spans,
-            char * cstring, Py_ssize_t size, Py_ssize_t * cpos, Py_ssize_t * upos):
-        cdef map[Py_ssize_t, Py_ssize_t] positions
-        cdef Py_ssize_t x, y
+            char * cstring, int size, int * cpos, int * upos):
+        cdef map[int, int] positions
+        cdef int x, y
         for x, y in spans:
             positions[x] = x
             positions[y] = y

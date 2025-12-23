@@ -4,17 +4,18 @@ import logging
 import os
 
 import build.plugins.lib.nots.package_manager.base.constants as pm_const
+import build.plugins.lib.nots.package_manager.base.utils as pm_utils
 import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
-import build.plugins.lib.nots.typescript as nots_typescript
-
-import devtools.ya.test
-import devtools.ya.test.const
-import devtools.ya.test.system.process
-import devtools.ya.test.test_types.common
-import devtools.ya.test.util
+import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
+from devtools.ya.test.const import Status
+from devtools.ya.test.facility import TestCase
+from devtools.ya.test.system.process import execute
+from devtools.ya.test.test_types.common import PerformedTestSuite
 
 
 logger = logging.getLogger(__name__)
+
+report_name = 'stylelint.report.json'
 
 
 def parse_args(argv=None):
@@ -40,7 +41,24 @@ def get_stylelint_cmd(args):
         args.test_config,
         '--formatter',
         'json',
+        '--output-file',
+        report_name,
     ] + args.files
+
+
+def get_env(args):
+    build_dir = os.path.join(args.build_root, args.project_path)
+    bindir_node_modules_path = os.path.join(build_dir, pm_const.NODE_MODULES_DIRNAME)
+    node_path = [
+        os.path.join(pm_utils.build_vs_store_path(args.build_root, args.project_path), pm_const.NODE_MODULES_DIRNAME),
+        # TODO: remove - no longer needed
+        os.path.join(bindir_node_modules_path, pnpm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+        bindir_node_modules_path,
+    ]
+    env = os.environ.copy()
+    env.update({"NODE_PATH": os.pathsep.join(node_path)})
+
+    return env
 
 
 def format_error(records: list[dict]):
@@ -76,7 +94,7 @@ def format_error(records: list[dict]):
 
 
 def fill_suite(build_dir, report_json, trace):
-    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
+    suite = PerformedTestSuite(None, None, None)
     suite.set_work_dir(build_dir)
     suite.register_chunk()
 
@@ -86,9 +104,9 @@ def fill_suite(build_dir, report_json, trace):
         warnings_ = case['warnings']
         errors = [w for w in warnings_ if w['severity'] == 'error']
         has_errors = len(errors) > 0
-        status = devtools.ya.test.const.Status.FAIL if has_errors else devtools.ya.test.const.Status.GOOD
+        status = Status.FAIL if has_errors else Status.GOOD
 
-        test_case = devtools.ya.test.facility.TestCase(
+        test_case = TestCase(
             f"{file}::ts_stylelint",
             status,
             format_error(warnings_),
@@ -100,14 +118,12 @@ def fill_suite(build_dir, report_json, trace):
 
 
 def main():
-    # devtools.ya.test.util.shared.setup_logging("DEBUG", "")
-
     args = parse_args()
 
     src_dir = os.path.join(args.source_root, args.project_path)
     build_dir = os.path.join(args.build_root, args.project_path)
 
-    devtools.ya.test.util.tools.copy_dir_contents(
+    ts_utils.copy_dir_contents(
         src_dir,
         build_dir,
         ignore_list=[
@@ -118,21 +134,23 @@ def main():
             pm_const.OUTPUT_TAR_UUID_FILENAME,
             pm_const.PACKAGE_JSON_FILENAME,
             pnpm_const.PNPM_LOCKFILE_FILENAME,
-            nots_typescript.DEFAULT_TS_CONFIG_FILE,
         ],
     )
 
-    exec_result = devtools.ya.test.system.process.execute(get_stylelint_cmd(args), cwd=build_dir, check_exit_code=False)
+    exec_result = execute(get_stylelint_cmd(args), cwd=build_dir, env=get_env(args), check_exit_code=False)
     if exec_result.exit_code < 0:
         logger.error("stylelint was terminated by signal: %s", exec_result.exit_code)
         return 1
 
+    if exec_result.std_err:
+        logger.warning(exec_result.std_err)
+
+    # Parse the file specified with the --output-file option, as this is the most reliable way to read the report.
+    # https://stylelint.io/migration-guide/to-16#changed-cli-to-print-problems-to-stderr
     try:
-        # https://stylelint.io/migration-guide/to-16#changed-cli-to-print-problems-to-stderr
-        output = exec_result.std_err if exec_result.std_err else exec_result.std_out
-        report_json = json.loads(output)
-    except json.decoder.JSONDecodeError:
-        logger.error("stylelint failed with the error:\n%s", exec_result.std_out + exec_result.std_err)
+        with open(os.path.join(build_dir, report_name)) as f:
+            report_json = json.load(f)
+    except BaseException:
         return 1
 
     fill_suite(build_dir, report_json, args.trace)

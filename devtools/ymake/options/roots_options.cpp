@@ -136,10 +136,11 @@ TString TRootsOptions::RealPathEx(TStringBuf path, std::optional<ui64> elemId) c
 }
 
 void TRootsOptions::EnableRealPathCache(TFileConf* refNames) {
-    PathsCache.clear();
+    auto& cache = PathsCache.Get();
+    cache.clear();
     RefNames = refNames;
     if (RefNames != nullptr) {
-        PathsCache.resize(RefNames->Size());
+        cache.resize(RefNames->Size());
     }
 }
 

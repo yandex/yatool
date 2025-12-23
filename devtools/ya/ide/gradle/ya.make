@@ -2,6 +2,15 @@ PY3_LIBRARY()
 
 PY_SRCS(
     __init__.py
+    build.py
+    common.py
+    config.py
+    export.py
+    graph.py
+    remove.py
+    stat.py
+    symlinks.py
+    ya_settings.py
 )
 
 PEERDIR(
@@ -13,6 +22,8 @@ PEERDIR(
     devtools/ya/core/yarg
     devtools/ya/exts
     devtools/ya/yalibrary/platform_matcher
+    devtools/ya/yalibrary/sjson
+    devtools/ya/yalibrary/tools
 )
 
 END()

@@ -34,6 +34,7 @@ def get_options():
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     parser.add_option("--fail-exit-code", dest="fail_exit_code", help="exit code on fail", action='store', default='1')
+    parser.add_option("--output", help="specifies the path to the file with test information")
     return parser.parse_args()
 
 
@@ -106,6 +107,12 @@ def main():
     if filter_message:
         display.emit_message(filter_message)
         display.emit_message()
+
+    if options.output:
+        with open(options.output, "w") as afile:
+            for data in projects:
+                json.dump(data, afile)
+                afile.write("\n")
 
     failed = False
     test_count = 0

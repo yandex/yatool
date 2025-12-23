@@ -87,7 +87,7 @@ def md5_file(filename, hash_md5=None):
     return file_hash(filename, hash_md5 or hashlib.md5())
 
 
-def md5_path(path):
+def md5_path(path, include_dir_layout=False):
     """
     Calculate md5 for path
     """
@@ -102,6 +102,8 @@ def md5_path(path):
             for file_name in files:
                 abs_file = os.path.join(root, file_name)
                 md5_file(abs_file, res)
+                if include_dir_layout:
+                    res.update(six.ensure_binary(os.path.relpath(abs_file, path)))
 
     return six.ensure_str(res.hexdigest())
 

@@ -24,7 +24,7 @@
 #include <util/system/fstat.h>
 
 namespace {
-    const ui64 ImageVersion = 50;
+    const ui64 ImageVersion = 55;
     const ui64 DMCacheVersion = 1;
 
     template <size_t HashSize>
@@ -718,6 +718,9 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         } else {
             return false;
         }
+    } else {
+        // related: TInternalCacheSaver::CompactSymbols games
+        Names.CommandConf.Clear();
     }
 
     TimeStamps.InitSession(Graph.GetFileNodeData());
@@ -886,7 +889,6 @@ bool TYMake::TryLoadUids(TUidsCachable* cachable) {
         }
 
         cachable->LoadCache(&input, Graph);
-
         YDebug() << "Uids cache has been loaded..." << Endl;
         return true;
     }
@@ -953,7 +955,7 @@ void TYMake::Compact() {
 
 void TYMake::SaveUids(TUidsCachable* uidsCachable) {
     if (Conf.WriteUidsCache && !CurrDepsFingerprint.empty()) {
-        FORCE_TRACE(U, NEvent::TStageStarted("Save Uids cache"));
+        NYMake::TTraceStage stage("Save Uids cache");
 
         UidsCacheTempFile = MakeTempFilename(Conf.YmakeUidsCache.GetPath());
         TFileOutput uidsOutput{TFile{UidsCacheTempFile.GetPath(), CreateAlways | WrOnly}};
@@ -964,8 +966,6 @@ void TYMake::SaveUids(TUidsCachable* uidsCachable) {
 
         uidsCachable->SaveCache(&uidsOutput, Graph);
         YDebug() << "Uids cache has been saved..." << Endl;
-
-        FORCE_TRACE(U, NEvent::TStageFinished("Save Uids cache"));
     }
 }
 

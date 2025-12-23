@@ -25,6 +25,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.ruff_formatter_enabled = False
         self.write_pyright_config = True
         self.python_index_enabled = True
+        self.python_new_extra_paths = False
         self.build_venv = False
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
@@ -220,6 +221,13 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 help="Do not let pylance to index whole project",
                 hook=devtools.ya.core.yarg.SetConstValueHook("python_index_enabled", False),
                 group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--python-new-extra-paths"],
+                help="Use new logic for adding source paths to PYTHONPATH",
+                hook=devtools.ya.core.yarg.SetConstValueHook("python_new_extra_paths", True),
+                group=cls.GROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--build-venv"],

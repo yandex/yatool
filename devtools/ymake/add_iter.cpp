@@ -2,13 +2,14 @@
 
 #include "add_iter.h"
 #include "add_iter_debug.h"
-#include "module_loader.h"
+#include "glob_helper.h"
 #include "module_dir.h"
 #include "module_builder.h"
 #include "module_state.h"
 #include "prop_names.h"
 #include "ymake.h"
 
+#include <devtools/ymake/builtin_macro_consts.h>
 #include <devtools/ymake/module_state.h>
 #include <devtools/ymake/common/string.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
@@ -32,16 +33,16 @@ namespace {
         return node.IsValid() ? node->ElemId : 0;
     }
 
-    struct GlobNodeInfo {
+    struct TGlobPatternInfo {
         TStringBuf GlobHash;
         TUniqVector<ui32> WatchDirs;
-        TUniqVector<ui32> Refferers;
+        TUniqVector<ui32> VarElemIds;
         TUniqVector<ui32> Excludes;
         TExcludeMatcher ExcludesMatcher;
     };
 
-    GlobNodeInfo ExtractGlobInfo(const TDGIterAddable& st, TFileView dirName) {
-        GlobNodeInfo res;
+    TGlobPatternInfo ExtractGlobInfo(const TDGIterAddable& st, TFileView dirName) {
+        TGlobPatternInfo res;
         const auto node = st.Graph.Get(st.NodeStart);
         for (const auto& edge : node.Edges()) {
             if (edge.Value() == EDT_Property && edge.To()->NodeType == EMNT_Property) {
@@ -50,7 +51,7 @@ namespace {
                 if (propName == NProps::GLOB_HASH) {
                     res.GlobHash = GetPropertyValue(prop);
                 } else if (propName == NProps::REFERENCED_BY) {
-                    res.Refferers.Push(edge.To()->ElemId);
+                    res.VarElemIds.Push(edge.To()->ElemId);
                 } else if (propName == NProps::GLOB_EXCLUDE) {
                     if (res.Excludes.Push(edge.To()->ElemId)) {
                         res.ExcludesMatcher.AddExcludePattern(dirName, GetPropertyValue(prop));
@@ -63,15 +64,31 @@ namespace {
         return res;
     }
 
-    void UpdateGlobNode(TUpdIter& updIter, TDGIterAddable& st, TStringBuf pattern, TFileView dirName) {
+    void OnChangeGlobPatternStat(TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId, TGlobStat&& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TStringBuf& pattern) {
+        TGlobHelper::SaveGlobPatternStat(moduleGlobsData, globPatternElemId, std::move(globPatternStat));
+        for (const auto globVarElemId: globInfo.VarElemIds) {
+            const auto& globRestrictions = TGlobHelper::GetGlobRestrictions(moduleGlobsData, globVarElemId);
+            const auto& globPatternElemIds = TGlobHelper::GetGlobPatternElemIds(moduleGlobsData, globVarElemId);
+            TGlobStat globStat;
+            for (const auto globPatternElemId: globPatternElemIds) {
+                globStat += TGlobHelper::GetGlobPatternStat(moduleGlobsData, globPatternElemId);
+            }
+            globRestrictions.Check(name, pattern, globStat);
+        }
+    }
+
+    void UpdateGlobNode(TUpdIter& updIter, TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module) {
         auto globInfo = ExtractGlobInfo(st, dirName);
-        if (!TGlob::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
+        if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return;
         }
 
         try {
-            TGlob glob{st.Graph.Names().FileConf, pattern, dirName};
-            const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher);
+            TGlobPattern glob{st.Graph.Names().FileConf, pattern, dirName};
+            const auto globPatternElemId = st.Node.ElemId;
+            const auto prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->ModuleGlobsData, globPatternElemId);
+            TGlobStat globPatternStat;
+            const auto matchedFiles = glob.Apply(globInfo.ExcludesMatcher, &globPatternStat);
             if (glob.GetMatchesHash() == globInfo.GlobHash && glob.GetWatchDirs().Data() == globInfo.WatchDirs.Data()) {
                 return;
             }
@@ -83,26 +100,42 @@ namespace {
                 matchIds.Push(st.Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, match).GetElemId());
             }
             const auto globHash = st.Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()));
-            TModuleGlobInfo globModuleInfo{static_cast<ui32>(st.Add->ElemId), globHash, glob.GetWatchDirs().Data(), matchIds.Take(), globInfo.Excludes.Data(), 0};
+            TModuleGlobInfo globModuleInfo{
+                .GlobPatternId = static_cast<ui32>(st.Add->ElemId),
+                .GlobPatternHash = globHash,
+                .WatchedDirs = glob.GetWatchDirs().Data(),
+                .MatchedFiles = matchIds.Take(),
+                .Excludes = globInfo.Excludes.Data(),
+                .ReferencedByVar = 0,
+            };
             PopulateGlobNode(*st.Add, globModuleInfo);
-            for (ui32 reffererId: globInfo.Refferers.Data()) {
-                st.Add->AddDep(EDT_Property, EMNT_Property, reffererId);
+            for (const auto globVarElemId: globInfo.VarElemIds) {
+                st.Add->AddDep(EDT_Property, EMNT_Property, globVarElemId);
+            }
+            if (prevGlobPatternStat != globPatternStat) {
+                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern);
             }
         } catch (const yexception&) {
             // Invalid pattern error was reported earlier
         }
     }
 
-    bool GlobNeedUpdate(const TDGIterAddable& st, TStringBuf pattern, TFileView dirName) {
+    bool GlobNeedUpdate(const TDGIterAddable& st, TStringBuf pattern, TFileView dirName, TModule* module) {
         auto globInfo = ExtractGlobInfo(st, dirName);
-        if (!TGlob::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
+        if (!TGlobPattern::WatchDirsUpdated(st.Graph.Names().FileConf, globInfo.WatchDirs)) {
             return false;
         }
 
         bool result;
         try {
-            TGlob glob{st.Graph.Names().FileConf, dirName, pattern, globInfo.GlobHash, std::move(globInfo.WatchDirs)};
-            result = glob.NeedUpdate(globInfo.ExcludesMatcher);
+            TGlobPattern glob{st.Graph.Names().FileConf, dirName, pattern, globInfo.GlobHash, std::move(globInfo.WatchDirs)};
+            const auto globPatternElemId = st.Node.ElemId;
+            const auto prevGlobPatternStat = TGlobHelper::LoadGlobPatternStat(module->ModuleGlobsData, globPatternElemId);
+            TGlobStat globPatternStat;
+            result = glob.NeedUpdate(globInfo.ExcludesMatcher, &globPatternStat);
+            if (result && globPatternStat != prevGlobPatternStat) {
+                OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern);
+            }
         } catch (const yexception&) {
             result = false;
         }
@@ -970,21 +1003,7 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
                 if (const auto* propValues = props.FindValues(TPropertyType{symbols, EVI_CommandProps, "CfgVars"})) {
                     auto& modData = Add->GetModuleData();
                     if (modData.CmdInfo) {
-                        Y_ABORT_UNLESS(!IsFile(modData.CmdInfo->Cmd.EntryPtr->first));
-                        bool structCmd = TVersionedCmdId(ElemId(modData.CmdInfo->Cmd.EntryPtr->first)).IsNewFormat();
-                        // TODO: handle a case when EntryPtr is null (is it possible at all?)
-                        auto dst = structCmd ? Add.Get() : modData.CmdInfo->Cmd.EntryPtr->second.AddCtx;
-                        if (!dst) {
-                            Y_ABORT_UNLESS(!structCmd);
-                            // as of this writing, we may end up here
-                            // after entering the shared command node for the second time;
-                            // the command node may be shared due to the (legacy) command builder
-                            // ignoring the source path and, for example,
-                            // making a node like "###:SRCSin=(build_info.cpp.in)"
-                            // for both `build_info.cpp.in` and `foobar/build_info.cpp.in`
-                            ythrow TError() << "Cannot add CFG_VARS to an unedi(ta)ble node " << modData.CmdInfo->Cmd;
-                        }
-                        modData.CmdInfo->AddCfgVars(propValues->Data(), Node.ElemId, *dst, structCmd);
+                        modData.CmdInfo->AddCfgVars(propValues->Data(), *Add);
                     }
                 }
                 //if (LeftType == EMNT_BuildCommand && !Add->Module->Incomplete()) {
@@ -1117,7 +1136,6 @@ inline bool TUpdIter::Enter(TState& state) {
     TDGIterAddable& st = state.back();
     TDGIterAddable* prev = GetStateByDepth(1);
     BINARY_LOG(Iter, NIter::TEnterEvent, Graph, st.Node, prev ? prev->Dep.DepType : EDT_Last, EIterType::MainIter);
-    NStats::StackDepthStats.SetMax(NStats::EStackDepthStats::UpdIterMaxStackDepth, state.size());
 
     if (st.Node.NodeType == EMNT_Deleted)
         return false;
@@ -1304,7 +1322,7 @@ inline bool TUpdIter::Enter(TState& state) {
                     if (name == NProps::LATE_GLOB && !val.empty()) {
                         auto* module = YMake.Modules.Get(prev->Node.ElemId);
                         Y_ASSERT(module);
-                        UpdateGlobNode(*this, st, val, Graph.GetFileName(module->GetDirId()));
+                        UpdateGlobNode(*this, st, val, Graph.GetFileName(module->GetDirId()), module);
                     }
                 }
             }
@@ -1351,9 +1369,9 @@ inline bool TUpdIter::Enter(TState& state) {
         if (YMake.Conf.TransitionSource != ETransition::None && module->Transition != ETransition::None && module->Transition != YMake.Conf.TransitionSource) {
             if (YMake.Conf.ReportPicNoPic) {
                 if (module->Transition == ETransition::Pic) {
-                    FORCE_UNIQ_CONFIGURE_TRACE(module->GetDir(), T, PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::PIC));
+                    YMake.Conf.ForeignTargetWriter->WriteLineUniq(module->GetDir(), NYMake::EventToStr(PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::PIC)));
                 } else if (module->Transition == ETransition::NoPic) {
-                    FORCE_UNIQ_CONFIGURE_TRACE(module->GetDir(), T, PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::NOPIC));
+                    YMake.Conf.ForeignTargetWriter->WriteLineUniq(module->GetDir(), NYMake::EventToStr(PossibleForeignPlatformEvent(module->GetDir(), NEvent::TForeignPlatformTarget::NOPIC)));
                 }
             }
             if (!YMake.Conf.DescendIntoForeignPlatform) {
@@ -1413,7 +1431,9 @@ inline void TUpdIter::Leave(TState& state) {
                     prev.Entry().DepsToInducedProps(propType, deps, sourceDebug);
 
                 } else if (propName == NProps::GLOB) {
-                    if (GlobNeedUpdate(st, propValue, Graph.GetFileName(pprev.Node))) {
+                    auto* module = YMake.Modules.Get(propId);
+                    Y_ASSERT(module);
+                    if (GlobNeedUpdate(st, propValue, Graph.GetFileName(pprev.Node), module)) {
                         prev.Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
                         st.Entry().SetOnceEntered(false);
                         st.ForceReassemble();
@@ -1679,7 +1699,7 @@ inline void TUpdIter::Left(TState& state) {
         if (!Graph.Names().CommandConf.GetById(TVersionedCmdId(st.Node.ElemId).CmdId()).KeepTargetPlatform) {
             const auto dirNode = Graph.GetNodeById(LastType, LastElem);
             const auto toolDir = Graph.GetFileName(dirNode);
-            FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL));
+            YMake.Conf.ForeignTargetWriter->WriteLineUniq(toolDir, NYMake::EventToStr(PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL)));
         }
     }
 
@@ -1775,20 +1795,20 @@ inline void TUpdIter::Left(TState& state) {
                         break;
                     case EPeerSearchStatus::DeprecatedByTags:
                         YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] from module tagged [[alt1]]" << node->Module->GetTag()
-                                         << "[[rst]] to [[imp]]" << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited: tags are incompatible" << Endl;
+                                         << "[[rst]] to [[imp]]" << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited by incompatible tags and skipped" << Endl;
                         break;
                     case EPeerSearchStatus::DeprecatedByRules:
                         YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] from [[imp]]" << node->Module->GetDir() << "[[rst]] to [[imp]]"
-                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited by peerdir policy." << Endl
+                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited by peerdir policy and skipped." << Endl
                                          << "See https://docs.yandex-team.ru/ya-make/manual/common/peerdir_rules#policy for details" << Endl;
                         break;
                     case EPeerSearchStatus::DeprecatedByInternal:
                         YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] from [[imp]]" << node->Module->GetDir() << "[[rst]] to [[imp]]"
-                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited since latter is `internal` and former is not its sibling." << Endl
+                                         << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is prohibited and skipped since latter is `internal` and former is not its sibling." << Endl
                                          << "See https://docs.yandex-team.ru/ya-make/manual/common/peerdir_rules#internal for details" << Endl;
                         break;
                     case EPeerSearchStatus::DeprecatedByFilter:
-                        YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] to [[imp]]" << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is not allowed: module types are incompatible" << Endl;
+                        YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] to [[imp]]" << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] is not allowed and skipped: module types are incompatible" << Endl;
                         break;
                     case EPeerSearchStatus::NoModules:
                         YConfErr(BadDir) << "No modules for [[alt1]]PEERDIR[[rst]] in [[imp]]" << Graph.ToString(Graph.GetNodeById(LastType, LastElem)) << "[[rst]] " << Endl;
@@ -1811,7 +1831,7 @@ inline void TUpdIter::Left(TState& state) {
                     node->AddUniqueDep(st.Dep.DepType, libNode.Node.Value().NodeType, libNode.Node.Value().ElemId);
                     if (!Graph.Names().CommandConf.GetById(TVersionedCmdId(st.Node.ElemId).CmdId()).KeepTargetPlatform) {
                         const auto toolDir = Graph.GetFileName(dirNode);
-                        FORCE_UNIQ_CONFIGURE_TRACE(toolDir, T, PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL));
+                        YMake.Conf.ForeignTargetWriter->WriteLineUniq(toolDir, NYMake::EventToStr(PossibleForeignPlatformEvent(toolDir, NEvent::TForeignPlatformTarget::TOOL)));
                     }
                 }
                 else if (libNode.Status == EPeerSearchStatus::NoModules) {
@@ -1821,6 +1841,7 @@ inline void TUpdIter::Left(TState& state) {
                 }
             } else if (LastType == EMNT_BuildCommand && Graph.Names().CommandConf.GetById(LastElem).KeepTargetPlatform) { // IsInnerCommandDep
                 Graph.Names().CommandConf.GetById(node->ElemId).KeepTargetPlatform = true;
+                YDebug() << "TUpdIter::left: KeepTargetPlatform is set in for " << node->GetEntry().DumpDebugNode() << Endl;
             }
         }
     }
@@ -1839,7 +1860,7 @@ inline void TUpdIter::Left(TState& state) {
 }
 
 void TUpdIter::NukeModuleDir(TState& state) {
-    TStringBuf modName = state.back().Add ? state.back().Add->Module->GetFileName() : Graph.GetFileName(state.back().Node).GetTargetStr();
+    TString modName = state.back().Add ? state.back().Add->Module->GetFileName() : TString{Graph.GetFileName(state.back().Node).GetTargetStr()};
     while (!state.empty()) { // there may be Dir -> Test Module -> Main module case
         if (!IsModuleType(state.back().Node.NodeType))
             break;
@@ -1999,7 +2020,6 @@ inline TUpdReiter::TUpdReiter(TUpdIter& parentIter)
 inline bool TUpdReiter::Enter(TState& state) {
     TUpdReIterSt& st = state.back();
     BINARY_LOG(Iter, NIter::TEnterEvent, Graph, st.Node, state.size() < 2 ? EDT_Last : (state.end() - 2)->Dep.DepType, EIterType::ReIter);
-    NStats::StackDepthStats.SetMax(NStats::EStackDepthStats::UpdReIterMaxStackDepth, state.size());
     if (st.Node.NodeType == EMNT_Deleted)
         return false;
 

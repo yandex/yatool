@@ -15,6 +15,7 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/test/programs/test_tool/populate_token_to_sandbox_vault
         devtools/ya/test/programs/test_tool/resolve_sancov_coverage
         devtools/ya/test/programs/test_tool/run_clang_tidy
+        devtools/ya/test/programs/test_tool/run_iwyu
         devtools/ya/test/programs/test_tool/run_detekt_report_check
         devtools/ya/test/programs/test_tool/run_diff_test
         devtools/ya/test/programs/test_tool/sandbox_run_test
@@ -60,6 +61,7 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_coverage_extractor
     devtools/ya/test/programs/test_tool/run_custom_lint
     devtools/ya/test/programs/test_tool/run_eslint
+    devtools/ya/test/programs/test_tool/run_biome
     devtools/ya/test/programs/test_tool/run_exectest
     devtools/ya/test/programs/test_tool/run_fuzz
     devtools/ya/test/programs/test_tool/run_fuzz_result_node
@@ -74,10 +76,12 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_playwright
     devtools/ya/test/programs/test_tool/run_playwright_large
     devtools/ya/test/programs/test_tool/run_pyimports
+    devtools/ya/test/programs/test_tool/run_pytest
     devtools/ya/test/programs/test_tool/run_skipped_test
     devtools/ya/test/programs/test_tool/run_stylelint
     devtools/ya/test/programs/test_tool/run_test
     devtools/ya/test/programs/test_tool/run_tsc_typecheck
+    devtools/ya/test/programs/test_tool/run_vitest
     devtools/ya/test/programs/test_tool/run_ut
     devtools/ya/test/programs/test_tool/run_y_benchmark
     devtools/ya/test/programs/test_tool/unify_clang_coverage

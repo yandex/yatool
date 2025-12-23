@@ -18,7 +18,7 @@ namespace NCache {
         TOriginal,
         TVector<TOriginal>
     >;
-    struct TConversionContext;
+    class TConversionContext;
 }
 
 template <typename T>

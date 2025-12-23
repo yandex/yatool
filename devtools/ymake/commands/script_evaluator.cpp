@@ -157,7 +157,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTermAsCommand(const NPolexpr::T
             bool hasNoPeerDirTags = false;
             for (auto& varStr : *var) {
                 auto val = varStr.HasPrefix ? GetCmdValue(varStr.Name) : varStr.Name;
-                if (!varStr.StructCmd) {
+                if (!varStr.StructCmdForVars) {
                     auto finalVal = CmdInfo->SubstMacroDeeply(nullptr, val, *Vars, false);
                     auto args = SplitArgs(finalVal);
                     for (auto& arg : args)
@@ -269,7 +269,7 @@ TScriptEvaluator::TSubResult TScriptEvaluator::DoTerm(
             auto error = false;
             for (auto& varStr : *var) {
                 auto val = varStr.HasPrefix ? GetCmdValue(varStr.Name) : varStr.Name;
-                if (!varStr.StructCmd) {
+                if (!varStr.StructCmdForVars) {
                     // apparently, we get post-substitution values here,
                     // so all that's left is to split the results
                     for (auto&& s : SplitArgs(TString(val))) // TODO avoid making a TString
@@ -325,7 +325,7 @@ const NPolexpr::TExpression* TScriptEvaluator::AsSubexpression(const TStringBuf&
 }
 
 const NPolexpr::TExpression* TScriptEvaluator::AsSubexpression(const TYVar* var) {
-    if (CmdConf && var && var->size() >= 1 && var->front().StructCmd) {
+    if (CmdConf && var && var->size() >= 1 && var->front().StructCmdForVars) {
         auto val = Eval1(var);
         return AsSubexpression(val);
     }

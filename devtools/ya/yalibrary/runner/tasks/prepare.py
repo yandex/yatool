@@ -192,6 +192,7 @@ class PrepareAllDistNodesTask(UniqueTask):
         self._results = results
 
     def __call__(self, *args, **kwargs):
+        logger.debug("PrepareAllDistNodesTask: started")
         if not self._download_artifacts:
             self._ctx.signal_ready()
             return
@@ -206,6 +207,7 @@ class PrepareAllDistNodesTask(UniqueTask):
                 )
 
         self._ctx.signal_ready()
+        logger.debug("PrepareAllDistNodesTask: ended")
 
     def __str__(self):
         return 'PrepareAllDistNodes'

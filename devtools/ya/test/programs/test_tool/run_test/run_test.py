@@ -98,6 +98,10 @@ class RecipeTearDownError(RecipeError):
     pass
 
 
+class RecipeTimeoutError(RecipeError):
+    pass
+
+
 def log_stage(name):
     logger.debug("%s", "{s:{c}^{n}}".format(s=" {} ".format(name.upper()), n=80, c="="))
 
@@ -743,7 +747,11 @@ def get_recipes_env(env_file):
             data = json.loads(line)
 
             for k, v in data.items():
-                env[test_common.to_utf8(k)] = test_common.to_utf8(v)
+                if v is None:
+                    env[test_common.to_utf8(k)] = None
+                else:
+                    env[test_common.to_utf8(k)] = test_common.to_utf8(v)
+
     return env
 
 
@@ -1168,7 +1176,7 @@ def get_chunk_timeout_msg(user_timeout, actual_timeout, startup_delay):
     if user_timeout == actual_timeout:
         return "[[bad]]Chunk exceeded [[imp]]{}s[[bad]] timeout".format(actual_timeout)
     else:
-        return "[[bad]]Chunk exceeded [[imp]]{}s[[bad]] timeout (user timeout: [[imp]]{}s[[bad]], YT op startup delay: [[imp]]{}s[[bad]])".format(
+        return "[[bad]]Chunk exceeded [[imp]]{}s[[bad]] timeout (user timeout: [[imp]]{}s[[bad]], startup delay: [[imp]]{}s[[bad]])".format(
             actual_timeout, user_timeout, startup_delay
         )
 
@@ -1186,6 +1194,14 @@ def use_arg_file_if_possible(cmd, out_dir):
 
 def pstree_cmdline_limit(options):
     return None if const.YaTestTags.NoPstreeTrim in options.test_tags else PSTREE_CMDLINE_LIMIT
+
+
+def get_time_from_node_startup():
+    # NOTE: bin_exec_ts is a timestamp when a runner (local or distbuild) starts executing a node
+    # These env variables are retained when run_test is executed on YT,
+    # see devtools/ya/test/programs/test_tool/ytexec_run_test/ytexec_run_test.py::get_environ
+    bin_exec_ts = os.getenv('_BINARY_EXEC_TIMESTAMP') or os.getenv('DISTBUILD_RUNNER_BINARY_START_TIMESTAMP')
+    return int(time.time()) - int(float(bin_exec_ts) / 1e6) if bin_exec_ts else 0
 
 
 def main():
@@ -1227,12 +1243,7 @@ def main():
         options.split_file,
     )
 
-    startup_delay = (
-        int(time.time()) - int(os.environ.get("TEST_NODE_START_TIMESTAMP", 0))
-        if "TEST_NODE_START_TIMESTAMP" in os.environ
-        else 0
-    )
-
+    startup_delay = get_time_from_node_startup()
     if options.node_timeout and not exts.windows.on_win():
         timeout = options.node_timeout - 10
         if startup_delay:
@@ -1518,15 +1529,25 @@ def main():
         wrapper_stderr_tail = None
 
         test_command_retry_num = 0
-        if options.node_timeout and startup_delay:
-            test_timeout = min(options.node_timeout - startup_delay - 30, options.timeout)
+        # 1. chunk_time_left is a time left for the whole start_recipe-run_test-stop_recipe cycle (including retries).
+        # It's set to chunk_timeout and updated after every step (except for recipes when there is no node timeout)
+        # 2. chunk_timeout is a timeout of a node (if one is set)
+        # 3. test_time_left is a time left for the test to run (including retries). It doesn't account for time spent on recipes.
+        # It's set to test_timeout and updated after every test step.
+        # 4. test_timeout is a timeout alloted specifically to the test, without recipes
+        if options.node_timeout:
+            # 30s reserved for overhead to make sure we won't get killed
+            chunk_time_left = chunk_timeout = options.node_timeout - startup_delay - 30
+            test_time_left = test_timeout = min(chunk_timeout, options.timeout)
+            enable_recipe_timeout = True
             if test_timeout <= 0:
                 raise TestRunTimeExhausted(
                     "No time left for testing - chunk run is aborted (startup delay: {}s)".format(startup_delay)
                 )
         else:
-            test_timeout = options.timeout
-        run_timeout = test_timeout
+            test_time_left = test_timeout = chunk_time_left = chunk_timeout = options.timeout
+            # wait for recipes indefinitely and don't update chunk_time_left with time spent on recipes
+            enable_recipe_timeout = False
         test_run_dirs = []
         timeout_callback = None
 
@@ -1599,17 +1620,17 @@ def main():
                 if test_command_retry_num > 0:
                     stages.stage("retry_preparations")
                     logger.debug("Running %d test attempt", test_command_retry_num + 1)
-                    run_timeout = int(main_start_timestamp + test_timeout - time.time() + 0.5)
-                    if run_timeout <= 0:
-                        # no time left for run
+                    # Check time left just in case
+                    if chunk_time_left <= 1 or test_time_left <= 1:
                         break
                     renamed_work_dir = "{}_try_{}".format(work_dir, test_command_retry_num - 1)
                     move_test_work_dir(work_dir, renamed_work_dir, cmd)
                     test_run_dirs.append(renamed_work_dir)
 
                     logger.info(
-                        "Test will be restarted with timeout %s, logs of the previous retry are saved to %s",
-                        run_timeout,
+                        "Test will be restarted with chunk timeout %s, test timeout %s, logs of the previous retry are saved to %s",
+                        chunk_time_left,
+                        test_time_left,
                         renamed_work_dir,
                     )
 
@@ -1667,15 +1688,16 @@ def main():
                             recipe_name = get_recipe_name(recipe_cmd, i)
                             recipe_err_filename = os.path.join(out_dir, "recipe_start_{}.err".format(recipe_name))
                             recipe_out_filename = os.path.join(out_dir, "recipe_start_{}.out".format(recipe_name))
+                            recipe_start = time.time()
                             try:
                                 with reserve_disk_space(options.space_to_reserve, stages):
-                                    process_execute(
+                                    res = process_execute(
                                         options.test_tags,
                                         RunStages.TST_START_RECP,
                                         rs,
                                         command=recipe_cmd,
                                         env=env.dump(),
-                                        wait=True,
+                                        wait=False,
                                         cwd=command_cwd,
                                         stderr=recipe_err_filename,
                                         stdout=recipe_out_filename,
@@ -1683,19 +1705,30 @@ def main():
                                         create_new_process_group=(not options.same_process_group),
                                         stdout_to_stderr=options.test_stdout,
                                     )
+                                    if enable_recipe_timeout:
+                                        res.wait(timeout=chunk_time_left)
+                                    else:
+                                        res.wait()
                             except Exception as e:
                                 logger.exception("Recipe %s start up exception: %s", recipe_name, e)
                                 with open(recipe_err_filename, 'a') as afile:
                                     afile.write("\nRecipe start up exception:\n")
                                     traceback.print_exc(file=afile)
+                                if isinstance(e, process.ExecutionTimeoutError):
+                                    raise RecipeTimeoutError(recipe_name, recipe_err_filename, recipe_out_filename)
                                 raise RecipeStartUpError(recipe_name, recipe_err_filename, recipe_out_filename)
 
                             env.update(get_recipes_env(recipes_env_file))
+                            if enable_recipe_timeout:
+                                chunk_time_left -= int(time.time() - recipe_start)
 
+                    # we use min because we don't want the test to be killed the hard way if node timeout expires
+                    # and at the same time we want the test to use only that time given specifically for the test
+                    current_run_test_timeout = min(chunk_time_left, test_time_left)
                     logger.debug(
                         "Executing test cmd: '%s' with timeout %d, with env: %s",
                         " ".join(cmd),
-                        run_timeout,
+                        current_run_test_timeout,
                         json.dumps(env.dump(safe=True), indent=4, sort_keys=True),
                     )
 
@@ -1714,6 +1747,7 @@ def main():
                         exec_func = run_with_gdb(options.gdb_path, "/dev/tty", process_execute, source_root)
                     else:
                         exec_func = process_execute
+                    test_start = time.time()
                     with reserve_disk_space(options.space_to_reserve, stages):
                         stages.stage("wrapper_execution")
                         modded_cmd = use_arg_file_if_possible(cmd, out_dir)
@@ -1735,7 +1769,10 @@ def main():
                         if options.show_test_pid:
                             trace_watcher.pid = res.process.pid
 
-                        res.wait(check_exit_code=False, timeout=run_timeout, on_timeout=timeout_callback)
+                        res.wait(check_exit_code=False, timeout=current_run_test_timeout, on_timeout=timeout_callback)
+                    test_time = int(time.time() - test_start)
+                    chunk_time_left -= test_time
+                    test_time_left -= test_time
                     exit_code = res.exit_code
                     exit_status = exit_code
 
@@ -1773,15 +1810,16 @@ def main():
                             recipe_name = get_recipe_name(recipe_cmd, i)
                             recipe_err_filename = os.path.join(out_dir, "recipe_stop_{}.err".format(recipe_name))
                             recipe_out_filename = os.path.join(out_dir, "recipe_stop_{}.out".format(recipe_name))
+                            recipe_stop = time.time()
                             try:
                                 with reserve_disk_space(options.space_to_reserve, stages):
-                                    process_execute(
+                                    res = process_execute(
                                         options.test_tags,
                                         RunStages.TST_STOP_RECP,
                                         rs,
                                         command=recipe_cmd,
                                         env=env.dump(),
-                                        wait=True,
+                                        wait=False,
                                         cwd=command_cwd,
                                         stderr=recipe_err_filename,
                                         stdout=recipe_out_filename,
@@ -1789,16 +1827,27 @@ def main():
                                         create_new_process_group=(not options.same_process_group),
                                         stdout_to_stderr=options.test_stdout,
                                     )
+                                    if enable_recipe_timeout:
+                                        res.wait(timeout=chunk_time_left)
+                                    else:
+                                        res.wait()
                             except Exception as e:
                                 logger.exception("Recipe %s tear down exception: %s", recipe_name, e)
                                 with open(recipe_err_filename, 'a') as afile:
                                     afile.write("\nRecipe tear down exception:\n")
                                     traceback.print_exc(file=afile)
-                                failed_recipes.append(
-                                    RecipeTearDownError(recipe_name, recipe_err_filename, recipe_out_filename)
-                                )
+                                if isinstance(e, process.ExecutionTimeoutError):
+                                    failed_recipes.append(
+                                        RecipeTimeoutError(recipe_name, recipe_err_filename, recipe_out_filename)
+                                    )
+                                else:
+                                    failed_recipes.append(
+                                        RecipeTearDownError(recipe_name, recipe_err_filename, recipe_out_filename)
+                                    )
 
                             env.update(get_recipes_env(recipes_env_file))
+                            if enable_recipe_timeout:
+                                chunk_time_left -= int(time.time() - recipe_stop)
 
                     wrapper_stdout.close()
                     wrapper_stderr.close()
@@ -1842,6 +1891,7 @@ def main():
                 shutil.copyfileobj(src, dst)
 
         stages.stage("load_results")
+
         suite.load_run_results(trace_report)
         if suite.get_status == const.Status.GOOD and not suite.tests:
             logger.debug("Test wrapper didn't execute any test")
@@ -1895,7 +1945,8 @@ def main():
             suite,
             exit_status,
             testing_finished,
-            run_timeout,
+            # chunk_time_left < test_time_left means that recipes have consumed more than (chunk_timeout - test_timeout)
+            chunk_timeout if enable_recipe_timeout and chunk_time_left < test_time_left else test_timeout,
             test_command_retry_num,
             stdout,
             stderr,
@@ -2047,7 +2098,10 @@ def main():
             error_msg = traceback.format_exc()
             is_user_error = False
 
-        if is_user_error:
+        if isinstance(exc, RecipeTimeoutError):
+            status = const.Status.TIMEOUT
+            test_rc = const.TestRunExitCode.TimeOut
+        elif is_user_error:
             status = const.Status.FAIL
             test_rc = const.TestRunExitCode.Failed
         else:

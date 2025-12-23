@@ -56,8 +56,8 @@ namespace NCommands {
 
         TMacroValues::TValue EvalTerm(const TSyntax::TTerm& term) {
             return std::visit(TOverloaded{
-                [&](NPolexpr::TConstId id) -> TMacroValues::TValue {
-                    return Evaluate(id);
+                [&](TMacroValues::TValue val) -> TMacroValues::TValue {
+                    return val;
                 },
                 [&](NPolexpr::EVarId id) -> TMacroValues::TValue {
                     return Evaluate(id);
@@ -111,13 +111,12 @@ namespace NCommands {
                 // this is a Very Special Case that is supposed to handle things like `${input:FOOBAR}` / `FOOBAR=$ARCADIA_ROOT/foobar`;
                 // note that the extra braces in the result are significant:
                 // the pattern should match whatever `TPathResolver::ResolveAsKnown` may expect to see
-                auto result = TString(fmt::format("${{{}}}", name));
-                return Values.GetValue(Values.InsertStr(result));
+                return TMacroValues::TXString{fmt::format("${{{}}}", name)};
             }
-            return Eval1(var);
+            return TMacroValues::TXString{std::string(Eval1(var))};
         }
 
-        TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, const TVector<TMacroValues::TValue>& args) {
+        TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<TMacroValues::TValue> args) {
             TCompiledCommand sink;
             auto fnIdx = static_cast<EMacroFunction>(id.GetIdx());
             auto mod = Mods.At(fnIdx);

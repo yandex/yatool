@@ -12,7 +12,7 @@ using namespace std::literals;
 
 TCmdProperty::TCmdProperty(const TVector<TString>& cmd, TKeywords&& kw)
     : Keywords_{std::move(kw).Take()}
-    , NumUsrArgs_{std::max<size_t>(Keywords_.empty() ? 0 : 1, cmd.size())}
+    , NumUsrArgs_{cmd.size()}
 {
     std::ranges::sort(Keywords_, std::less<>{}, &std::pair<TString, TKeyword>::first);
     size_t cnt = 0;

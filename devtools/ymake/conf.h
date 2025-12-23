@@ -38,12 +38,13 @@ constexpr TStringBuf MODULE_MANGLING_DELIM = "__from__";
 
 class TFileConf;
 struct IMemoryPool;
+struct _is;
+typedef struct _is PyInterpreterState;
 
 /// required directories - source, build, svn and path operations only
 // build configuration operates local-formatted paths
 class TBuildConfiguration: public TStartUpOptions, public TYmakeConfig, public TDebugOptions, public TCommandLineOptions {
 public:
-    TString Events;
     TString CustomData;
     TVector<TFsPath> PluginsRoots;
     TVector<TString> WarnFlags;
@@ -52,8 +53,9 @@ public:
     THashMap<TString, TFsPath> CustomDataGen;
     TParsersList ParserPlugins;
 
-    TVector<TString> Plugins;
+    TVector<TFsPath> Plugins;
     THashMap<TString, THashSet<TString>> PluginDeps;
+    bool PluginsInitilized = false;
 
     TSysinclResolver Sysincl;
     THashMap<TString, TLicenseGroup> Licenses;
@@ -67,23 +69,29 @@ public:
     TCompactTrieBuilder<char, TString> AutoincludePathsTrie;
     TVector<TString> AutoincludeJsonPaths;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
+    THashSet<TStringBuf> GlobRestrictionExtends{};
+    bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
+
+    PyInterpreterState* SubState = nullptr;
+    std::function<PyInterpreterState*()> SubinterpreterStateGetter;
 
 public:
     TBuildConfiguration();
     ~TBuildConfiguration() = default;
 
-    void InvokePluginMacro(TPluginUnit& unit, TStringBuf name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out = nullptr) const {
-        MacroFacade.InvokeMacro(unit, name, params, out);
+    TMacroImpl* FindPluginMacro(TStringBuf name) const {
+        return MacroFacade.FindMacro(name);
     }
-    bool ContainsPluginMacro(TStringBuf name) const {
-        return MacroFacade.ContainsMacro(name);
-    }
+
     void RegisterPluginMacro(const TString& name, TSimpleSharedPtr<TMacroImpl> action) {
         MacroFacade.RegisterMacro(*this, name, action);
     }
     void RegisterPluginParser(const TString& ext, TSimpleSharedPtr<TParser> parser) {
         MacroFacade.RegisterParser(*this, ext, parser);
     }
+    void ClearPlugins();
+
+    void LoadPlugins();
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
@@ -212,6 +220,26 @@ public:
         return LoadGraph_;
     }
 
+    bool ShouldLoadDartCaches() const noexcept {
+        return LoadDartCaches_;
+    }
+
+    bool ShouldSaveDartCaches() const noexcept {
+        return SaveDartCaches_;
+    }
+
+    bool ShouldLoadJsonCacheEarly() const noexcept {
+        return LoadJsonCacheEarly_;
+    }
+
+    bool ShouldLoadUidsCacheEarly() const noexcept {
+        return LoadUidsCacheEarly_;
+    }
+
+    bool ShouldLoadPLuginsLazily() const noexcept {
+        return LoadPLuginsLazily_;
+    }
+
 public:
     static const bool Workaround_AddGlobalVarsToFileNodes = true; // FIXME make it false forevermore
     IMemoryPool* GetStringPool() const { return StrPool.Get(); }
@@ -249,6 +277,11 @@ private:
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
     bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
     bool YmakeSaveAllCachesWhenBadLoops_ = false;
+    bool LoadDartCaches_ = true;
+    bool SaveDartCaches_ = true;
+    bool LoadJsonCacheEarly_ = false;
+    bool LoadUidsCacheEarly_ = false;
+    bool LoadPLuginsLazily_ = false;
 
     bool UseOnlyYmakeCache_ = false;
     bool LoadGraph_ = false;

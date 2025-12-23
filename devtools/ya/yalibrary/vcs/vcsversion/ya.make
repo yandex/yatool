@@ -1,25 +1,21 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 PY_SRCS(
     NAMESPACE yalibrary.vcs.vcsversion
     __init__.py
-    standalone.py
 )
 
 PEERDIR(
     contrib/python/six
+    devtools/ya/yalibrary/find_root
+    devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
 )
 
-IF (PYTHON2)
+IF (NOT YA_OPENSOURCE)
     PEERDIR(
-        vcs/svn/run
+        devtools/ya/yalibrary/svn
     )
-    IF (NOT YA_OPENSOURCE)
-        PEERDIR(
-            devtools/ya/yalibrary/svn
-        )
-    ENDIF()
 ENDIF()
 
 END()

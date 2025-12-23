@@ -80,6 +80,9 @@ enum class EMacroFunction: ui32 {
     CutAllExt,
     NoTransformRelativeBuildDir,
     AddToModOutputs,
+    DirAllowed,
+    SkipByExtFilter,
+    NoBuildRoot,
     //
     Count
 };
@@ -93,19 +96,34 @@ struct std::formatter<EMacroFunction>: std::formatter<std::string_view> {
 };
 
 class TMacroValues {
+
 public:
+
+    // the "X" in "TXString[s]" is there mostly to increase visibility and greppability;
+    // but one may also think that it stands for "eXpression"
+    struct TXString {
+        std::string Data;
+        bool operator==(const TXString&) const = default;
+    };
+    struct TXStrings {
+        std::vector<std::string> Data;
+        bool operator==(const TXStrings&) const = default;
+    };
+
     struct TTool {
-        std::string_view Data;
+        std::string Data;
         bool operator==(const TTool&) const = default;
     };
     struct TTools {
-        std::vector<std::string_view> Data;
+        std::vector<std::string> Data;
         bool operator==(const TTools&) const = default;
     };
+
     struct TResult {
-        std::string_view Data;
+        std::string Data;
         bool operator==(const TResult&) const = default;
     };
+
     struct TInput {
         ui32 Coord;
         bool operator==(const TInput&) const = default;
@@ -114,6 +132,7 @@ public:
         TVector<ui32> Coords;
         bool operator==(const TInputs&) const = default;
     };
+
     struct TOutput {
         ui32 Coord;
         bool operator==(const TOutput&) const = default;
@@ -122,19 +141,21 @@ public:
         TVector<ui32> Coords;
         bool operator==(const TOutputs&) const = default;
     };
+
     struct TGlobPattern {
-        TVector<TString> Data;
+        TVector<std::string> Data;
         bool operator==(const TGlobPattern&) const = default;
     };
     struct TLegacyLateGlobPatterns {
-        TVector<TString> Data;
+        TVector<std::string> Data;
         bool operator==(const TLegacyLateGlobPatterns&) const = default;
     };
+
     using TValue = std::variant<
         std::monostate,
         bool,
-        std::string_view,
-        std::vector<std::string_view>,
+        TXString,
+        TXStrings,
         TTool, TTools,
         TResult,
         TInput, TInputs,
@@ -160,20 +181,23 @@ public:
     };
     static_assert(ST_COUNT <= (1 << NPolexpr::TConstId::STORAGE_BITS));
 
-    NPolexpr::TConstId InsertStr(std::string_view val) { return NPolexpr::TConstId(ST_LITERALS, Strings.Add(val)); }
-    NPolexpr::EVarId InsertVar(std::string_view name) { return static_cast<NPolexpr::EVarId>(Vars.Add(name)); }
+public:
 
+    NPolexpr::EVarId InsertVar(std::string_view name) { return static_cast<NPolexpr::EVarId>(Vars.Add(name)); }
     std::string_view GetVarName(NPolexpr::EVarId id) const;
 
     NPolexpr::TConstId InsertValue(const TValue& value);
     TValue GetValue(NPolexpr::TConstId id) const;
+    TStringBuf Internalize(TStringBuf s);
 
     void Save(TMultiBlobBuilder& builder) const;
     void Load(TBlob& multi);
 
 private:
+
     TNameStore CmdPattern;
     TNameStore Strings;
     TNameStore Refs;
     TNameStore Vars;
+
 };

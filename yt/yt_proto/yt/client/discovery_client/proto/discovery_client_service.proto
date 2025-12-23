@@ -1,0 +1,83 @@
+package NYT.NDiscoveryClient.NProto;
+
+import "yt_proto/yt/core/ytree/proto/attributes.proto";
+
+option java_package = "tech.ytsaurus";
+option java_outer_classname = "DiscoveryClientProtos";
+option java_multiple_files = true;
+
+option go_package = "a.yandex-team.ru/yt/go/proto/client/discovery_client";
+
+////////////////////////////////////////////////////////////////////////////////
+
+message TMemberInfo
+{
+    required string id = 1;
+    required int64 priority = 2;
+    required int64 revision = 3;
+    optional NYT.NYTree.NProto.TAttributeDictionary attributes = 4;
+}
+
+message TGroupMeta
+{
+    required int32 member_count = 1;
+}
+
+message TListMembersOptions
+{
+    required int32 limit = 1;
+    repeated string attribute_keys = 2;
+}
+
+message TListGroupsOptions
+{
+    required int32 limit = 1;
+}
+
+message TReqListMembers
+{
+    required string group_id = 1;
+    required TListMembersOptions options = 2;
+}
+
+message TRspListMembers
+{
+    repeated TMemberInfo members = 1;
+}
+
+message TReqListGroups
+{
+    required string prefix = 1;
+    required TListGroupsOptions options = 2;
+}
+
+message TRspListGroups
+{
+    repeated string group_ids = 1;
+    required bool incomplete = 2;
+}
+
+message TReqGetGroupMeta
+{
+    required string group_id = 1;
+}
+
+message TRspGetGroupMeta
+{
+    required TGroupMeta meta = 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+message TReqHeartbeat
+{
+    required string group_id = 1;
+    required TMemberInfo member_info = 2;
+    required int64 lease_timeout = 3;
+}
+
+message TRspHeartbeat
+{ }
+
+////////////////////////////////////////////////////////////////////////////////
+

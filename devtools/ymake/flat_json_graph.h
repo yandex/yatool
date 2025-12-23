@@ -102,10 +102,10 @@ namespace NFlatJsonGraph {
         ~TWriter();
 
         TNodeWriter AddNode(TConstDepNodeRef node);
-        TNodeWriter AddNode(EMakeNodeType type, ui32 id, TStringBuf name, EIDFormat format);
+        TNodeWriter AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name, const EIDFormat format);
 
         TNodeWriter AddLink(TConstDepRef dep);
-        TNodeWriter AddLink(ui32 fromId, EMakeNodeType fromType, ui32 toId, EMakeNodeType toType, EDepType type, EIDFormat format);
+        TNodeWriter AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const EIDFormat format, const ELogicalDepType logicalDepType = ELDT_FromDepType);
 
     private:
         void FinishNode(bool reopen);

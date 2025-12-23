@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(Apache-2.0)
 
-VERSION(v1.71.0)
+VERSION(v1.73.0)
 
 SRCS(
     experimental.go
@@ -24,6 +24,12 @@ ENDIF()
 IF (OS_WINDOWS)
     SRCS(
         tcp_keepalive_windows.go
+    )
+ENDIF()
+
+IF (OS_ANDROID)
+    SRCS(
+        tcp_keepalive_unix.go
     )
 ENDIF()
 
@@ -55,6 +61,7 @@ RECURSE(
     proto
     proxyattributes
     resolver
+    ringhash
     serviceconfig
     stats
     status
@@ -66,12 +73,6 @@ RECURSE(
     # yo
 )
 
-IF (OS_LINUX)
-    RECURSE(
-        syscall
-    )
-ENDIF()
-
 IF (OS_DARWIN)
     RECURSE(
         syscall
@@ -79,6 +80,12 @@ IF (OS_DARWIN)
 ENDIF()
 
 IF (OS_WINDOWS)
+    RECURSE(
+        syscall
+    )
+ENDIF()
+
+IF (OS_LINUX OR OS_ANDROID)
     RECURSE(
         syscall
     )

@@ -114,7 +114,6 @@ public:
 
     void RemoveIncludeDeps(ui64 startFrom);
 
-    bool CheckInputsChange() const;
     TCreateParsedInclsResult CreateParsedIncls(TStringBuf type, const TVector<TResolveFile>& files);
     static TCreateParsedInclsResult CreateParsedIncls(
         TModule* module, TDepGraph& graph, TUpdIter& updIter, TYMake& yMake,
@@ -134,6 +133,7 @@ public:
     inline TAddDepAdaptor& AddOutput(ui64 fileId, EMakeNodeType defaultType, bool addToOwn = true) final;
 
     void UpdCmdStamp(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
+    void UpdCmdStampForNewCmdNode(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
 
     TNodeId Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool lastTry = false);
     void LeaveModule();

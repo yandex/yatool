@@ -248,11 +248,4 @@ namespace NStats {
         event.SetSavedLoops(Get(EUidsCacheStats::SkippedLoops));
         FORCE_TRACE(U, event);
     }
-
-    TStackDepthStats StackDepthStats{"StackDepthStats"};
-
-    template<>
-    void TStats<EStackDepthStats>::Report() const {
-        TStatsBase::Report();
-    }
 }

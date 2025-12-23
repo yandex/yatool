@@ -4,6 +4,7 @@ SRCDIR(devtools/ya)
 
 PEERDIR(
     devtools/ya/handlers/buf
+    devtools/ya/handlers/cache
     devtools/ya/handlers/dump
     devtools/ya/handlers/gc
     devtools/ya/handlers/gen_config
@@ -26,7 +27,7 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/__trace__
         devtools/ya/handlers/addremove
         devtools/ya/handlers/clang_tidy
-        devtools/ya/handlers/clone
+        devtools/ya/handlers/code
         devtools/ya/handlers/completion
         devtools/ya/handlers/dctl
         devtools/ya/handlers/download
@@ -63,8 +64,8 @@ RECURSE(
     analyze_make
     autocheck
     buf
+    cache
     clang_tidy
-    clone
     completion
     curl
     dctl
@@ -111,4 +112,8 @@ RECURSE(
     wine
     ydb
     yql
+)
+
+RECURSE_FOR_TESTS(
+    tests
 )

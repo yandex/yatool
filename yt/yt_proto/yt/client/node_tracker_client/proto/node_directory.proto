@@ -1,0 +1,22 @@
+package NYT.NNodeTrackerClient.NProto;
+
+import "yt_proto/yt/client/node_tracker_client/proto/node.proto";
+
+option go_package = "a.yandex-team.ru/yt/go/proto/client/node_tracker_client";
+
+////////////////////////////////////////////////////////////////////////////////
+
+// Provides a mapping from node ids to descriptors.
+// Used for unpacking replica information.
+message TNodeDirectory
+{
+    message TItem
+    {
+        required uint32 node_id = 1;
+        required TNodeDescriptor node_descriptor = 2;
+    }
+
+    repeated TItem items = 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////

@@ -89,6 +89,11 @@ namespace NYMake::NResourcePacker {
             Unit_.CallMacro(macro, view);
         }
 
+        void RunMacro(TStringBuf macro, const TVector<TString>& args, TVars extraVars) {
+            TVector<TStringBuf> view = TVector<TStringBuf>(args.begin(), args.end());
+            Unit_.CallMacro(macro, view, std::move(extraVars));
+        }
+
     protected:
         static constexpr int MAX_CMD_LEN = 8000;
         static constexpr int ROOT_CMD_LEN = 200;

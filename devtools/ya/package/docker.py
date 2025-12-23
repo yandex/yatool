@@ -63,11 +63,15 @@ def create_package(
     docker_no_cache,
     docker_use_remote_cache,
     docker_remote_image_version,
+    docker_export_cache_to_registry,
+    docker_dest_remote_image_version,
     platform,
     add_host,
     target,
     docker_secret,
-    labels=None,
+    docker_use_buildx,
+    docker_pull,
+    labels,
 ):
     package_name = package_context.package_name
     package_version = package_context.version
@@ -82,6 +86,9 @@ def create_package(
     if docker_no_cache:
         build_command += ['--no-cache']
 
+    if docker_pull:
+        build_command += ['--pull']
+
     if add_host:
         build_command += ["--add-host={}".format(x) for x in add_host]
 
@@ -93,6 +100,16 @@ def create_package(
         if docker_remote_image_version:
             remote_name = get_image_name(registry, repository, image_name, package_name, docker_remote_image_version)
         build_command += ['--cache-from', remote_name]
+
+    if docker_export_cache_to_registry:
+        if docker_dest_remote_image_version:
+            remote_name = get_image_name(
+                registry, repository, image_name, package_name, docker_dest_remote_image_version
+            )
+            build_command += ['--cache-to', remote_name]
+        else:
+            build_command += ['--cache-to', 'type=inline']
+        buildx_required = True
 
     if platform:
         build_command += ["--platform={}".format(platform)]
@@ -110,11 +127,12 @@ def create_package(
             else:
                 build_command += ["--build-arg", "{}={}".format(k, v)]
 
-    if labels:
-        for k, v in labels.items():
-            build_command += ["--label", "{}={}".format(k, v)]
+    for label in labels:
+        build_command += ["--label", label]
+    for k, v in package_context.context.items():
+        build_command += ["--label", "{}={}".format(k, v)]
 
-    if buildx_required:
+    if buildx_required or docker_use_buildx:
         build_command = ["buildx"] + build_command
 
     build_out, _ = package.process.run_process(

@@ -20,12 +20,14 @@ def parse_args():
     parser.add_argument("--srclist-path", help="Path to kotlin sources")
     parser.add_argument("--trace-path", help="Path to trace file")
     parser.add_argument("--source-root", help="Path to source root ")
+    parser.add_argument("--build-root", help="Path to build root ")
     parser.add_argument("--project-path", help="Path to source root ")
     parser.add_argument("--output-dir", help="Path to source root ")
     parser.add_argument("--tests-filter", help="Path to source root ")
     parser.add_argument("--test-list", help="Is test required for listing only", action="store_true")
     parser.add_argument("--editorconfig", help="Use editorconfig ktlint folder name")
     parser.add_argument("--baseline", help="Path to baseline for ktlint test")
+    parser.add_argument("--ruleset", help="Path to ktlint ruleset")
 
     args = parser.parse_args()
     return args
@@ -74,6 +76,8 @@ def run_ktlint(suite, tests_to_run, args):
     cmd += list(tests_to_run.keys())
     if args.baseline:
         cmd += ["--baseline=" + args.baseline]
+    if args.ruleset:
+        cmd += ["--ruleset=" + os.path.join(args.build_root, args.ruleset)]
     os.chdir(args.source_root)
     shared.tee_execute(cmd, ktlint_stdout, ktlint_stderr, strip_ansi_codes=True)
     errors = {}

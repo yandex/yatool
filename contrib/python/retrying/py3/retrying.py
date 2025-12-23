@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
 import random
-import six
 import sys
 import time
 import traceback
-
+from functools import wraps
 
 # sys.maxint / 2, since Python 3.2 doesn't have a sys.maxint...
 MAX_WAIT = 1073741823
@@ -40,7 +39,7 @@ def retry(*dargs, **dkw):
     if len(dargs) == 1 and callable(dargs[0]):
 
         def wrap_simple(f):
-            @six.wraps(f)
+            @wraps(f)
             def wrapped_f(*args, **kw):
                 return Retrying().call(f, *args, **kw)
 
@@ -51,13 +50,33 @@ def retry(*dargs, **dkw):
     else:
 
         def wrap(f):
-            @six.wraps(f)
+            @wraps(f)
             def wrapped_f(*args, **kw):
                 return Retrying(*dargs, **dkw).call(f, *args, **kw)
 
             return wrapped_f
 
         return wrap
+
+_default_logger = None
+_configured_null_logger = False
+
+def _pick_logger(logger=None):
+    # Factor this logic out into a smaller function so that `global` only needs to be here,
+    # not the large __init__ function.
+    global _default_logger, _configured_null_logger
+
+    if logger in (True, None):
+        if _default_logger is None:
+            _default_logger = logging.getLogger(__name__)
+        # Only add the null handler once, not every time we get the logger
+        if logger is None and not _configured_null_logger:
+            _configured_null_logger = True
+            _default_logger.addHandler(logging.NullHandler())
+            _default_logger.propagate = False
+        return _default_logger
+    else:  # Not None (and not True) -> must have supplied a logger. Just use that.
+        return logger
 
 
 class Retrying(object):
@@ -83,6 +102,7 @@ class Retrying(object):
         wait_jitter_max=None,
         before_attempts=None,
         after_attempts=None,
+        logger=None,
     ):
 
         self._stop_max_attempt_number = (
@@ -110,6 +130,8 @@ class Retrying(object):
         self._wait_jitter_max = 0 if wait_jitter_max is None else wait_jitter_max
         self._before_attempts = before_attempts
         self._after_attempts = after_attempts
+
+        self._logger = _pick_logger(logger)
 
         # TODO add chaining of stop behaviors
         # stop behavior
@@ -167,7 +189,7 @@ class Retrying(object):
             # this allows for providing a tuple of exception types that
             # should be allowed to retry on, and avoids having to create
             # a callback that does the same thing
-            if isinstance(retry_on_exception, (tuple)):
+            if isinstance(retry_on_exception, (tuple, Exception)):
                 retry_on_exception = _retry_if_exception_of_type(retry_on_exception)
             self._retry_on_exception = retry_on_exception
 
@@ -249,13 +271,14 @@ class Retrying(object):
 
             try:
                 attempt = Attempt(fn(*args, **kwargs), attempt_number, False)
-            except:
+            except Exception:
                 tb = sys.exc_info()
                 attempt = Attempt(tb, attempt_number, True)
 
             if not self.should_reject(attempt):
                 return attempt.get(self._wrap_exception)
 
+            self._logger.warning(attempt)
             if self._after_attempts:
                 self._after_attempts(attempt_number)
 
@@ -271,6 +294,7 @@ class Retrying(object):
                 if self._wait_jitter_max:
                     jitter = random.random() * self._wait_jitter_max
                     sleep = sleep + max(0, jitter)
+                self._logger.info(f"Retrying in {sleep / 1000.0:.2f} seconds.")
                 time.sleep(sleep / 1000.0)
 
             attempt_number += 1
@@ -298,17 +322,16 @@ class Attempt(object):
             if wrap_exception:
                 raise RetryError(self)
             else:
-                six.reraise(self.value[0], self.value[1], self.value[2])
+                exc_type, exc, tb = self.value
+                raise exc.with_traceback(tb)
         else:
             return self.value
 
     def __repr__(self):
         if self.has_exception:
-            return "Attempts: {0}, Error:\n{1}".format(
-                self.attempt_number, "".join(traceback.format_tb(self.value[2]))
-            )
+            return f"Attempts: {self.attempt_number}, Error:\n{''.join(traceback.format_tb(self.value[2]))}"
         else:
-            return "Attempts: {0}, Value: {1}".format(self.attempt_number, self.value)
+            return f"Attempts: {self.attempt_number}, Value: {self.value}"
 
 
 class RetryError(Exception):
@@ -320,4 +343,4 @@ class RetryError(Exception):
         self.last_attempt = last_attempt
 
     def __str__(self):
-        return "RetryError[{0}]".format(self.last_attempt)
+        return f"RetryError[{self.last_attempt}]"

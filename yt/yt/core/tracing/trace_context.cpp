@@ -12,6 +12,8 @@
 #include <yt/yt/core/ytree/convert.h>
 #include <yt/yt/core/ytree/helpers.h>
 
+#include <yt/yt/core/yson/protobuf_helpers.h>
+
 #include <yt/yt_proto/yt/core/tracing/proto/tracing_ext.pb.h>
 
 #include <yt/yt/library/tracing/tracer.h>
@@ -80,7 +82,7 @@ void SetGlobalTracer(const ITracerPtr& tracer)
     }
 
     if (oldTracer) {
-        oldTracer->Stop();
+        GetFinalizerInvoker()->Invoke(BIND(&ITracer::Stop, oldTracer));
     }
 }
 
@@ -611,7 +613,7 @@ void ToProto(
 
     if (sendBaggage) {
         if (auto baggage = context->GetBaggage()) {
-            ext->set_baggage(baggage.ToString());
+            ext->set_baggage(ToProto(baggage));
         }
     }
 }

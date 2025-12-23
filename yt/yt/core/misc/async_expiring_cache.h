@@ -3,7 +3,6 @@
 #include "public.h"
 #include "cache_config.h"
 
-#include <type_traits>
 #include <yt/yt/core/actions/future.h>
 
 #include <yt/yt/core/logging/log.h>
@@ -20,7 +19,7 @@ namespace NYT {
 
 /*!
  *  \note
- *  Thread affinity: delayed executor's thread
+ *  Thread affinity: user defined invoker
  */
 template <class TKey, class TValue>
 class TAsyncExpiringCache
@@ -36,8 +35,9 @@ public:
         bool RequestInitialized;
     };
 
-    explicit TAsyncExpiringCache(
+    TAsyncExpiringCache(
         TAsyncExpiringCacheConfigPtr config,
+        const IInvokerPtr& invoker,
         NLogging::TLogger logger = {},
         NProfiling::TProfiler profiler = {});
 
@@ -72,6 +72,8 @@ public:
         ForcedUpdate,
     };
 
+    int GetSize() const;
+
 protected:
     TAsyncExpiringCacheConfigPtr GetConfig() const;
 
@@ -101,6 +103,17 @@ protected:
 
 private:
     const NLogging::TLogger Logger_;
+    const NConcurrency::TPeriodicExecutorPtr ExpirationExecutor_;
+    const NConcurrency::TPeriodicExecutorPtr RefreshExecutor_;
+    const int ShardCount_ = 1;
+    const IInvokerPtr Invoker_;
+    //! Hash for determining shard index for each key.
+    //!
+    //! \note We use a hash separate from that of TEntry's hash map to ensure that for a random key, its shard index is independent
+    //! from the bucket index in the shard's hash map.
+    const TRandomizedHash<TKey> ShardKeyHash_;
+
+    std::atomic<bool> Started_ = false;
 
     struct TEntry
         : public TRefCounted
@@ -109,7 +122,7 @@ private:
         std::atomic<NProfiling::TCpuInstant> AccessDeadline;
 
         //! When this entry must be evicted with respect to update timeout.
-        NProfiling::TCpuInstant UpdateDeadline;
+        std::atomic<NProfiling::TCpuInstant> UpdateDeadline;
 
         //! Some latest known value (possibly not yet set).
         TPromise<TValue> Promise;
@@ -117,8 +130,11 @@ private:
         //! Uncancelable version of #Promise.
         TFuture<TValue> Future;
 
-        //! Corresponds to a future probation request.
-        NConcurrency::TDelayedExecutorCookie ProbationCookie;
+        //! Corresponds to a future refresh request.
+        NConcurrency::TDelayedExecutorCookie RefreshCookie;
+
+        //! Corresponds to a future expiration request.
+        NConcurrency::TDelayedExecutorCookie ExpirationCookie;
 
         //! Constructs a fresh entry.
         explicit TEntry(NProfiling::TCpuInstant accessDeadline);
@@ -128,46 +144,94 @@ private:
     };
 
     using TEntryPtr = TIntrusivePtr<TEntry>;
+    using TEntryMap = THashMap<TKey, TEntryPtr>;
 
-    YT_DECLARE_SPIN_LOCK(NThreading::TReaderWriterSpinLock, SpinLock_);
-    THashMap<TKey, TEntryPtr> Map_;
-    TAsyncExpiringCacheConfigPtr Config_;
+    struct TShard
+    {
+        YT_DECLARE_SPIN_LOCK(NThreading::TReaderWriterSpinLock, EntryMapSpinLock);
+        TEntryMap EntryMap;
+
+        TShard() = default;
+        TShard(TShard&& other) = default;
+        TShard(const TShard& other);
+    };
+
+    std::vector<TShard> MapShards_;
+    std::atomic<int> EntryCount_ = 0;
+
+    TAtomicIntrusivePtr<TAsyncExpiringCacheConfig> Config_;
 
     NProfiling::TCounter HitCounter_;
     NProfiling::TCounter MissedCounter_;
     NProfiling::TGauge SizeCounter_;
 
+    void EnsureStarted();
+
     void SetResult(
-        const TWeakPtr<TEntry>& entry,
+        const TWeakPtr<TEntry>& weakEntry,
         const TKey& key,
         const TErrorOr<TValue>& valueOrError,
         bool isPeriodicUpdate);
 
     void InvokeGetMany(
-        const std::vector<TWeakPtr<TEntry>>& entries,
+        const std::vector<TWeakPtr<TEntry>>& weakEntries,
         const std::vector<TKey>& keys,
         std::optional<TDuration> periodicRefreshTime);
 
     void InvokeGet(
-        const TEntryPtr& entry,
+        TWeakPtr<TEntry> weakEntry,
         const TKey& key);
+
+    enum EEraseReason
+    {
+        Refresh,
+        Expiration,
+    };
 
     bool TryEraseExpired(
         const TEntryPtr& Entry,
-        const TKey& key);
+        const TKey& key,
+        EEraseReason reason);
 
-    void Erase(THashMap<TKey, TEntryPtr>::iterator it);
+    void Add(TEntryMap& mapShard, const TKey& key, const TEntryPtr& entry);
+    void Erase(TEntryMap& mapShard, TEntryMap::iterator it);
 
-    void UpdateAll();
+    void DeleteExpiredItems();
+    void RefreshAllItems();
 
+    void ScheduleAllEntriesUpdate(const TAsyncExpiringCacheConfigPtr& config);
+
+    // Schedules entry expiration and refresh.
+    void ScheduleEntryUpdate(
+        const TEntryPtr& entry,
+        const TKey& key,
+        const TAsyncExpiringCacheConfigPtr& config);
     void ScheduleEntryRefresh(
         const TEntryPtr& entry,
         const TKey& key,
-        std::optional<TDuration> refreshTime);
+        const TAsyncExpiringCacheConfigPtr& config);
+    void ScheduleEntryExpiration(
+        const TEntryPtr& entry,
+        const TKey& key,
+        const TAsyncExpiringCacheConfigPtr& config);
 
-    TPromise<TValue> GetPromise(const TEntryPtr& entry) noexcept;
+    TPromise<TValue> GetPromise(const TKey& key, const TEntryPtr& entry) noexcept;
 
-    const TAsyncExpiringCacheConfigPtr& Config() const;
+    struct TItem
+    {
+        const TKey* Key;
+        int RequestIndex;
+    };
+    std::vector<std::vector<TItem>> SortKeysByShards(const std::vector<TKey>& keys) const;
+    int GetShardIndex(const TKey& key) const;
+
+    NThreading::TReaderGuard<NThreading::TReaderWriterSpinLock> MakeReaderGuardForKey(const TKey& key);
+
+    std::pair<NThreading::TReaderGuard<NThreading::TReaderWriterSpinLock>, const TEntryMap&> LockAndGetReadableShard(int shardIndex);
+    std::pair<NThreading::TReaderGuard<NThreading::TReaderWriterSpinLock>, const TEntryMap&> LockAndGetReadableShardForKey(const TKey& key);
+
+    std::pair<NThreading::TWriterGuard<NThreading::TReaderWriterSpinLock>, TEntryMap&> LockAndGetWritableShard(int shardIndex);
+    std::pair<NThreading::TWriterGuard<NThreading::TReaderWriterSpinLock>, TEntryMap&> LockAndGetWritableShardForKey(const TKey& key);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -177,4 +241,3 @@ private:
 #define EXPIRING_CACHE_INL_H_
 #include "async_expiring_cache-inl.h"
 #undef EXPIRING_CACHE_INL_H_
-

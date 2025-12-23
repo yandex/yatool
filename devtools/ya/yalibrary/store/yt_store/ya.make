@@ -1,15 +1,13 @@
 PY3_LIBRARY()
 
-SRCS(xx_client.cpp)
+SRCS(
+    mem_sem.cpp
+    xx_client.cpp
+)
 
 PY_SRCS(
     NAMESPACE yalibrary.store.yt_store
-    CYTHON_CPP
     yt_store.py
-    client.py
-    consts.py
-    utils.py
-    retries.py
     xx_client.pyx
 )
 
@@ -18,16 +16,20 @@ PEERDIR(
     contrib/python/humanfriendly
     contrib/python/retrying
     contrib/python/six
+
     devtools/ya/core/gsid
     devtools/ya/core/report
     devtools/ya/core/monitoring
     devtools/ya/yalibrary/store
+
+    library/cpp/regex/pcre
+    library/cpp/retry
+    library/cpp/threading/cancellation
+    library/cpp/threading/future/subscription
     library/cpp/ucompress
-    library/python/retry
+
     yt/cpp/mapreduce/client
-    yt/python/client_lite
-    yt/python/yt/yson
-    yt/yt/python/yt_yson_bindings
+    yt/cpp/mapreduce/util
 )
 
 CHECK_DEPENDENT_DIRS(
@@ -46,6 +48,7 @@ CHECK_DEPENDENT_DIRS(
 
     yt/python
     yt/yt/build
+    yt/yt/client
     yt/yt/core
     yt/yt/library
     yt/yt/python
@@ -69,4 +72,5 @@ RECURSE(opts_helper)
 
 RECURSE_FOR_TESTS(
     tests
+    ut
 )

@@ -262,6 +262,12 @@ public:
     //! The memory is marked with a given tag.
     static TSharedMutableRef AllocatePageAligned(size_t size, TSharedMutableRefAllocateOptions options, TRefCountedTypeCookie tagCookie);
 
+    //! Allocates a new aligned shared block of memory.
+    //! #size must be divisible by alignment size.
+    //! The memory is marked with a given tag.
+    //! Unlike AllocatePageAligned, this method also stores size_t inside holder.
+    static TSharedMutableRef AllocateAligned(size_t size, size_t alignment, TSharedMutableRefAllocateOptions options, TRefCountedTypeCookie tagCookie);
+
     //! Creates a TSharedMutableRef for the whole blob taking ownership of its content.
     static TSharedMutableRef FromBlob(TBlob&& blob);
 
@@ -328,6 +334,9 @@ public:
     //! Creates a copy of a given TSharedRefArray.
     //! The memory is marked with a given tag.
     static TSharedRefArray MakeCopy(const TSharedRefArray& array, TRefCountedTypeCookie tagCookie);
+
+    //! Checks if #lhs and #rhs consist of the same number of bitwise-equal parts.
+    static bool AreBitwiseEqual(const TSharedRefArray& lhs, const TSharedRefArray& rhs);
 
 private:
     friend class TSharedRefArrayBuilder;

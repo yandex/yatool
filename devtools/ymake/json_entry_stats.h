@@ -175,6 +175,7 @@ public:
     }
 
     size_t EnterDepth = 0;
+    size_t Generation = 0;
     bool Finished = false;
     bool Stored = false;
 

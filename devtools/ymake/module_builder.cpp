@@ -2,6 +2,7 @@
 
 #include "args_converter.h"
 #include "builtin_macro_consts.h"
+#include "glob_helper.h"
 #include "makefile_loader.h"
 #include "macro_string.h"
 #include "out.h"
@@ -91,8 +92,19 @@ void TModuleBuilder::RecursiveAddInputs() {
         TCommandInfo::ECmdInfoState state = cmdInfo->CheckInputs(*this, Node, lastTryMode);
         if (state == TCommandInfo::SKIPPED) {
             TStringBuf cmd, cmdName;
-            ui64 id;
-            ParseLegacyCommandOrSubst(Get1(&cmdInfo->Cmd), id, cmdName, cmd);
+            auto tryParse = [&](const TYVar& var, TStringBuf& cmdName, TStringBuf* cmdArgs) {
+                if (var.size() != 1 || var[0].StructCmdForVars)
+                    return false;
+                ui64 id;
+                TStringBuf cmd;
+                ParseLegacyCommandOrSubst(Get1(&var), id, cmdName, cmd);
+                if (cmdArgs)
+                    *cmdArgs = cmd;
+                return true;
+            };
+            if (!tryParse(cmdInfo->Cmd, cmdName, &cmd))
+                if (!cmdInfo->Cmd.BaseVal || !tryParse(*cmdInfo->Cmd.BaseVal, cmdName, nullptr))
+                    cmdName = "[unspecified macro]";
             YConfErr(BadInput) << Module.GetDir() << ": skip processing macro " << cmdName << cmd << " due to unallowed input." << Endl;
             continue;
         }
@@ -263,12 +275,6 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
     return false;
 }
 
-void TModuleBuilder::AddPluginCustomCmd(TMacroCmd& macroCmd) {
-    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
-    cmdInfo->GetCommandInfoFromPluginCmd(macroCmd, Vars, Module);
-    CmdAddQueue.push_back(std::move(cmdInfo));
-}
-
 void TModuleBuilder::AddDep(TVarStrEx& curSrc, TAddDepAdaptor& inputNode, bool isInput, ui64 groupId) {
     YDIAG(DG) << "SRCS dep for module: " << curSrc.Name << " " << curSrc.ElemId << Endl;
     EMakeNodeType nType = NodeTypeForVarEx(curSrc);
@@ -338,26 +344,20 @@ void TModuleBuilder::AddInputVarDep(TVarStrEx& input, TAddDepAdaptor& inputNode)
     inputNode.AddDepIface(EDT_BuildFrom, nType, input.ElemId);
 }
 
-void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node, bool structCmd) {
+void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node) {
     if (Vars.Get1(varName).size() && GetCmdValue(Vars.Get1(varName)).size()) {
         ui64 id;
         TStringBuf cmdName;
         TStringBuf cmdValue;
         ParseCommandLikeVariable(Vars.Get1(varName), id, cmdName, cmdValue);
         const TString res = [&]() {
-            if (structCmd) {
-                auto compiled = Commands.Compile(cmdValue, Conf, Vars, false, {});
-                // TODO: there's no point in allocating cmdElemId for expressions
-                // that do _not_ have directly corresponding nodes
-                // (and are linked as "0:VARNAME=S:123" instead)
-                auto cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
-                auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
-                return FormatCmd(id, cmdName, value);
-            } else {
-                TCommandInfo cmd(Conf, &Graph, &UpdIter);
-                auto value = cmd.SubstVarDeeply(varName, Vars);
-                return FormatCmd(id, cmdName, value);
-            }
+            auto compiled = Commands.Compile(cmdValue, Conf, Vars, false, {});
+            // TODO: there's no point in allocating cmdElemId for expressions
+            // that do _not_ have directly corresponding nodes
+            // (and are linked as "0:VARNAME=S:123" instead)
+            auto cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
+            auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
+            return FormatCmd(id, cmdName, value);
         }();
         if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
             // duplication comes from adding locally referenced vars
@@ -369,90 +369,44 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
     }
 }
 
-void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node, bool structCmd) {
+void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node) {
     for (const auto& var : GetModuleConf().Globals) {
         const TString depName = TString::Join(var, "_GLOBAL");
-        AddGlobalVarDep(depName, node, structCmd);
+        AddGlobalVarDep(depName, node);
     }
     for (const auto& resource : Module.ExternalResources) {
-        AddGlobalVarDep(resource, node, structCmd);
+        AddGlobalVarDep(resource, node);
     }
 }
 
 void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind) {
     YDIAG(Dev) << "Add LinkDep for: " << name << node.NodeType << Endl;
 
-    if (GetModuleConf().StructCmd && (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global)) {
-        auto mainOutputFile = Graph.GetFileName(node.ElemId);
-        auto mainOutputName = mainOutputFile.Basename();
-        auto compiled = [&]() {
+    auto mainOutputFile = Graph.GetFileName(node.ElemId);
+    auto mainOutputName = mainOutputFile.Basename();
+    auto compiled = [&]() {
+        if (cmdKind != EModuleCmdKind::Fail) {
             try {
                 return Commands.Compile(command, Conf, Vars, true, {.MainOutput = mainOutputName});
             } catch (const std::exception& e) {
                 YConfErr(Details) << "Command processing error (module " << Module.GetUserType() << "): " << e.what() << Endl;
-                return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {.MainOutput = mainOutputName});
-            }
-        }();
-        const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
-
-        TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
-        cmdInfo->InitFromModule(Module);
-
-        cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled, true, Vars);
-
-        if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
-            AddGlobalVarDeps(node, true);
-            node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
-        } else {
-            YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
-            if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {
-                YDIAG(Dev) << "... will try to add FAIL_MODULE_CMD" << Endl;
-                AddLinkDep(name, command, node, EModuleCmdKind::Fail);
             }
         }
-
-        return;
-    }
-
-    if (cmdKind == EModuleCmdKind::Default) {
-        AddGlobalVarDeps(node, false);
-    }
-
-    TStringBuf cmdName;
-    TVector<TStringBuf> modArgs;
-    bool isMacroCall = false;
-
-    if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {
-        isMacroCall = ParseMacroCall(command, cmdName, modArgs);
-        TStringBuf cmd = Vars.Get1(cmdName);
-        if (cmd.empty()) {
-            if (!Conf.RenderSemantics || !Module.IsSemIgnore()) {
-                if (cmdKind == EModuleCmdKind::Global) {
-                    YConfErr(NoCmd) << "No valid command to link global srcs " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
-                } else {
-                    YConfErr(NoCmd) << "No valid command to link " << name << ", check your config for " << Module.GetUserType() << " [" << command << "]"<< Endl;
-                }
-            }
-            cmdKind = EModuleCmdKind::Fail;
-        }
-    }
-    if (cmdKind == EModuleCmdKind::Fail) {
-        // Add fake command instead of bad one (it will fail at link time)
-        isMacroCall = ParseMacroCall(TStringBuf("FAIL_MODULE_CMD"), cmdName, modArgs);
-    }
+        return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {.MainOutput = mainOutputName});
+    }();
+    const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
     TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->InitFromModule(Module);
 
-    // can not fail, we've checked `cmd' already
-    cmdInfo->GetCommandInfoFromMacro(cmdName, isMacroCall ? EMT_MacroCall : EMT_Usual, modArgs, Vars, Module.GetId());
-    cmdInfo->SetCmdType(TCommandInfo::MacroImplInp);
+    cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled, true, Vars);
 
     if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
+        AddGlobalVarDeps(node);
         node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
     } else {
         YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
-        if (cmdKind == EModuleCmdKind::Default || cmdKind == EModuleCmdKind::Global) {
+        if (cmdKind != EModuleCmdKind::Fail) {
             YDIAG(Dev) << "... will try to add FAIL_MODULE_CMD" << Endl;
             AddLinkDep(name, command, node, EModuleCmdKind::Fail);
         }
@@ -899,6 +853,7 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
         TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
         TVarStrEx cmd(name);
         cmd.IsMacro = true;
+        cmdInfo->SetCommandSink(&Commands);
         cmdInfo->Init("SRCS", cmd, &args, *this);
 
         FileGroupCmds.emplace_back(varId, cmdInfo);
@@ -916,15 +871,11 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
 }
 
 bool TModuleBuilder::PluginStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (Conf.ContainsPluginMacro(name)) {
-        TVector<TSimpleSharedPtr<TMacroCmd>> cmds;
-        Conf.InvokePluginMacro(*this, name, args, &cmds);
-        for (size_t i = 0; i < cmds.size(); ++i) {
-            AddPluginCustomCmd(*cmds[i]);
-        }
-        return true;
-    }
-    return false;
+    auto* macro = Conf.FindPluginMacro(name);
+    if (!macro)
+        return false;
+    macro->Execute(*this, args);
+    return true;
 }
 
 bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
@@ -938,7 +889,15 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
 
     TStringBuf varName = args.front();
-    const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::EXCLUDE);
+    const auto [globsWithExcludes, restrictions] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::RESTRICTIONS);
+    TGlobRestrictions globRestrictions;
+    if (!restrictions.empty()) {
+        globRestrictions = TGlobHelper::ParseGlobRestrictions(restrictions.subspan(1), NMacro::_LATE_GLOB);
+    }
+    if (ModuleDef && ModuleDef->IsExtendGlobRestriction()) {
+        globRestrictions.Extend();
+    }
+    const auto [globs, excludes] = SplitBy(globsWithExcludes, NArgs::EXCLUDE);
 
     TUniqVector<ui32> excludeIds;
     TExcludeMatcher excludeMatcher;
@@ -955,11 +914,13 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     lateExpansionVar->IsReservedName = true;
 
     auto CreateGlobNode = [this, &lateExpansionVar](const TModuleGlobInfo& globInfo, const TString& globCmd) {
-        Node.AddUniqueDep(EDT_Property, EMNT_BuildCommand, globInfo.GlobId);
-        auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, globInfo.GlobId), &UpdIter.YMake, &Module);
+        const auto globId = globInfo.GlobPatternId;
+        const auto emnt = EMNT_BuildCommand;
+        Node.AddUniqueDep(EDT_Property, emnt, globId);
+        auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(emnt, globId), &UpdIter.YMake, &Module);
         auto& globNode = entryStats.GetAddCtx(&Module, UpdIter.YMake);
-        globNode.NodeType = EMNT_BuildCommand;
-        globNode.ElemId = globInfo.GlobId;
+        globNode.NodeType = emnt;
+        globNode.ElemId = globId;
         entryStats.SetOnceEntered(false);
         entryStats.SetReassemble(true);
         PopulateGlobNode(globNode, globInfo);
@@ -968,42 +929,74 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         // not setting .HasPrefix even though there is one, because we want to pass it through to input processing as is
         lateExpansionVar->back().IsMacro = true;
     };
+
+    const auto moduleElemId = Module.GetName().GetElemId();
+    ui32 globVarElemId = 0;
+    TVector<ui32> globPatternElemIds;
+    TGlobStat globStat;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
-            TGlob glob(Graph.Names().FileConf, globStr, Module.GetDir());
-            for (const auto& result : glob.Apply(excludeMatcher)) {
+            TGlobPattern globPattern(Graph.Names().FileConf, globStr, Module.GetDir());
+            TGlobStat globPatternStat;
+            for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {
                 matches.Push(Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
             }
+            globStat += globPatternStat;
 
-            const TString globCmd = FormatCmd(Module.GetName().GetElemId(), NProps::LATE_GLOB, globStr);
+            if (!globVarElemId) {
+                globVarElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+            }
+            const TString globCmd = FormatCmd(moduleElemId, NProps::LATE_GLOB, globStr);
+            const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
+            globPatternElemIds.push_back(globPatternElemId);
+            TGlobHelper::SaveGlobPatternStat(Module.ModuleGlobsData, globPatternElemId, std::move(globPatternStat));
             TModuleGlobInfo globInfo = {
-                Graph.Names().AddName(EMNT_BuildCommand, globCmd),
-                Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
-                glob.GetWatchDirs().Data(),
-                matches.Take(),
-                excludeIds.Data(),
-                Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName))
+                .GlobPatternId = globPatternElemId,
+                .GlobPatternHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())),
+                .WatchedDirs = globPattern.GetWatchDirs().Data(),
+                .MatchedFiles = matches.Take(),
+                .Excludes = excludeIds.Data(),
+                .ReferencedByVar = globVarElemId,
             };
             CreateGlobNode(globInfo, globCmd);
-        } catch (const yexception& error){
+        } catch (const yexception& error) {
             YConfErr(Syntax) << "Invalid pattern in [[alt1]]" << name << "[[rst]]: " << error.what() << Endl;
         }
+    }
+
+    TStringBuilder patterns;
+    for (auto pattern : globs) {
+        if (!patterns.empty()) patterns << ", ";
+        patterns << pattern;
+    }
+    globRestrictions.Check(name, patterns, globStat);
+    if (globVarElemId) {
+        TGlobHelper::SaveGlobRestrictions(Module.ModuleGlobsData, globVarElemId, std::move(globRestrictions));
     }
 
     if (globs.empty()) {
         // Add fake glob property in order to be able to reference variable created with _LATE_GLOB
         // without patterns from command subgraph
-        const TString globCmd = FormatCmd(Module.GetName().GetElemId(), NProps::LATE_GLOB, "");
+        if (!globVarElemId) {
+            globVarElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+        }
+        const TString globCmd = FormatCmd(moduleElemId, NProps::LATE_GLOB, "");
+        const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
+        globPatternElemIds.push_back(globPatternElemId);
         TModuleGlobInfo globInfo = {
-            Graph.Names().AddName(EMNT_BuildCommand, globCmd),
-            Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, "")),
-            {},
-            {},
-            excludeIds.Data(),
-            Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName))
+            .GlobPatternId = globPatternElemId,
+            .GlobPatternHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, "")),
+            .WatchedDirs = {},
+            .MatchedFiles = {},
+            .Excludes = excludeIds.Data(),
+            .ReferencedByVar = globVarElemId,
         };
         CreateGlobNode(globInfo, globCmd);
+    }
+
+    if (globVarElemId) {
+        TGlobHelper::SaveGlobPatternElemIds(Module.ModuleGlobsData, globVarElemId, std::move(globPatternElemIds));
     }
     return true;
 }
@@ -1011,6 +1004,30 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
 void TModuleBuilder::CallMacro(TStringBuf name, const TVector<TStringBuf>& args) {
     ProcessConfigMacroCalls(name, args);
     ProcessStatement(name, args);
+}
+
+void TModuleBuilder::CallMacro(TStringBuf name, const TVector<TStringBuf>& args, TVars extraVars) {
+    // this is basically the original `CallMacro`
+    // (1) without the `ProcessConfigMacroCalls` part,
+    // (2) with the shortcut through `ProcessStatement` -> `GenStatement` -> `if(IsUserMacro)` taken,
+    // (3) with `extraVars` directly supplied to the invoker
+    auto i = Conf.BlockData.find(name);
+    if (!(i && i->second.IsUserMacro))
+        return;
+
+    if (HasNamedArgs(&i->second)) {
+        ConvertArgsToPositionalArrays(*i->second.CmdProps, const_cast<TVector<TStringBuf>&>(args), *ModuleDef->GetMakeFileMap().Pool);
+    }
+    TVarStrEx cmd(name);
+    cmd.IsMacro = true;
+
+    // copied from the relevant section of `AddSource(/*for outputs*/ "SRCS", cmd, &args)`:
+    TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
+    cmdInfo->SetCommandSink(&Commands);
+    if (!cmdInfo->Init("SRCS", cmd, &args, *this, &extraVars))
+        return;
+    CmdAddQueue.push_back(std::move(cmdInfo));
+
 }
 
 bool TModuleBuilder::SkipStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {

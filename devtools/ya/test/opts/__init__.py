@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import shlex
+import sys
 
 import devtools.ya.core.yarg
 from devtools.ya.core import error
@@ -204,6 +205,7 @@ class ListingOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.list_tests = False
         self.list_before_test = False
+        self.list_tests_output_file = None
 
     def consumer(self):
         return [
@@ -218,6 +220,13 @@ class ListingOptions(devtools.ya.core.yarg.Options):
                 ['--list-before-test'],
                 help='pass list of tests before tests run',
                 hook=devtools.ya.core.yarg.SetConstValueHook('list_before_test', True),
+                subgroup=RUN_TEST_SUBGROUP,
+                visible=help_level.HelpLevel.INTERNAL,
+            ),
+            TestArgConsumer(
+                ['--list-tests-output-file'],
+                help='specifies the path to the file with test information',
+                hook=devtools.ya.core.yarg.SetValueHook('list_tests_output_file'),
                 subgroup=RUN_TEST_SUBGROUP,
                 visible=help_level.HelpLevel.INTERNAL,
             ),
@@ -945,7 +954,6 @@ class FileReportsOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.allure_report = None
         self.junit_path = None
-        self.use_junit_report_v2 = False
 
     def consumer(self):
         return [
@@ -965,14 +973,6 @@ class FileReportsOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.BASIC,
             ),
             devtools.ya.core.yarg.ConfigConsumer('junit_path'),
-            TestArgConsumer(
-                ['--use-junit-report-v2'],
-                help='Use junit report v2',
-                hook=devtools.ya.core.yarg.SetConstValueHook('use_junit_report_v2', True),
-                subgroup=FILE_REPORTS_SUBGROUP,
-                visible=help_level.HelpLevel.BASIC,
-            ),
-            devtools.ya.core.yarg.ConfigConsumer('use_junit_report_v2'),
         ]
 
     def postprocess(self):
@@ -1238,6 +1238,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.build_coverage_report = False
         self.clang_coverage = False
+        self.clang_mcdc_coverage = False
         self.coverage = False
         self.coverage_direct_upload_yt = True
         self.coverage_exclude_regexp = None
@@ -1248,7 +1249,9 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.coverage_upload_snapshot_name = None
         self.coverage_verbose_resolve = False
         self.coverage_yt_token_path = None
+        self.cython_coverage = False
         self.enable_contrib_coverage = False
+        self.enable_contrib_ydb_coverage = False
         self.enable_java_contrib_coverage = False
         self.fast_clang_coverage_merge = False
         self.go_coverage = False
@@ -1256,10 +1259,11 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.merge_coverage = False
         self.nlg_coverage = False
         self.python_coverage = False
-        self.cython_coverage = False
         self.sancov_coverage = False
         self.ts_coverage = False
         self.upload_coverage_report = False
+        self.upload_coverage_yt_path = ""
+        self.upload_coverage_yt_proxy = "hahn"
 
     def consumer(self):
         return [
@@ -1381,6 +1385,20 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.EXPERT,
             ),
             TestArgConsumer(
+                ['--upload-coverage-path'],
+                help='Specifies YT path to upload coverage',
+                hook=devtools.ya.core.yarg.SetValueHook('upload_coverage_yt_path'),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            TestArgConsumer(
+                ['--upload-coverage-proxy'],
+                help='Specifies YT proxy to upload coverage',
+                hook=devtools.ya.core.yarg.SetValueHook('upload_coverage_yt_proxy'),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            TestArgConsumer(
                 ['--coverage-upload-snapshot-name'],
                 help='Use specified name for snapshot instead of svn revision',
                 hook=devtools.ya.core.yarg.SetValueHook('coverage_upload_snapshot_name'),
@@ -1427,6 +1445,19 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.ADVANCED,
             ),
             TestArgConsumer(
+                ['--enable-contrib-ydb-coverage'],
+                help='Enable contrib ydb coverage',
+                hook=devtools.ya.core.yarg.SetConstValueHook('enable_contrib_ydb_coverage', True),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_ENABLE_CONTRIB_YDB_COVERAGE',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'enable_contrib_ydb_coverage', devtools.ya.core.yarg.return_true_if_enabled
+                ),
+            ),
+            TestArgConsumer(
                 ['--nlg-coverage'],
                 help='Collect Alice\'s NLG coverage information',
                 hook=devtools.ya.core.yarg.SetConstValueHook('nlg_coverage', True),
@@ -1440,6 +1471,20 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.EXPERT,
             ),
+            TestArgConsumer(
+                ['--clang-mcdc-coverage'],
+                help='Enabled MC/DC coverage',
+                hook=devtools.ya.core.yarg.SetConstValueHook('clang_mcdc_coverage', True),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.INTERNAL,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_CLANG_MCDC_COVERAGE',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'clang_mcdc_coverage', devtools.ya.core.yarg.return_true_if_enabled
+                ),
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('clang_mcdc_coverage'),
         ]
 
     def postprocess(self):
@@ -1469,6 +1514,9 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
             )
 
     def postprocess2(self, params):
+        if params.clang_coverage and getattr(params, 'pgo_add', False):
+            raise devtools.ya.core.yarg.ArgsValidatingException("--pgo-add is not compatible with --clang-coverage")
+
         coverage_requested = False
 
         if params.go_coverage:
@@ -1489,6 +1537,8 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         if params.clang_coverage:
             params.flags['CLANG_COVERAGE'] = 'yes'
             coverage_requested = True
+            if params.clang_mcdc_coverage:
+                params.flags['CLANG_MCDC_COVERAGE'] = 'yes'
 
         if params.java_coverage:
             params.flags['JAVA_COVERAGE'] = 'yes'
@@ -1501,6 +1551,9 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         if params.enable_contrib_coverage:
             params.enable_java_contrib_coverage = True
             params.flags['ENABLE_CONTRIB_COVERAGE'] = 'yes'
+
+        if params.enable_contrib_ydb_coverage:
+            params.flags['ENABLE_CONTRIB_YDB_COVERAGE'] = 'yes'
 
         if params.sancov_coverage:
             params.sanitize_coverage = params.sanitize_coverage or 'trace-pc-guard,no-prune'
@@ -2013,6 +2066,11 @@ class InterimOptions(devtools.ya.core.yarg.Options):
             devtools.ya.core.yarg.ConfigConsumer('no_tests_is_error'),
             devtools.ya.core.yarg.ConfigConsumer('tests_limit_in_suite'),
         ]
+
+    def postprocess(self):
+        # XXX: YA-273
+        if sys.platform == 'win32':
+            self.use_jstyle_server = False
 
     def postprocess2(self, params):
         if (

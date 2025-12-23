@@ -4,13 +4,15 @@
 
 #include <devtools/ymake/diag/debug_log.h>
 
+#include <atomic>
+
 class TNodeValueDebug {
 private:
     TMaybe<TNodeDebug> Node_;
     TStringBuf Name_;
     size_t Index_;
 
-    static size_t GlobalIndex_;
+    static std::atomic<size_t> GlobalIndex_;
 
     TNodeValueDebug() : Index_(0) {}
 

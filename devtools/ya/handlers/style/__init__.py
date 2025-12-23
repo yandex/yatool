@@ -1,14 +1,10 @@
+import devtools.ya.app
 import devtools.ya.core.common_opts
 import devtools.ya.core.yarg
-
+import devtools.ya.handlers.style.styler as stlr
+import devtools.ya.handlers.style.target as trgt
+import devtools.ya.handlers.style.style as stl
 from devtools.ya.build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, BuildThreadsOptions
-import devtools.ya.core.yarg.consumers
-
-from .style import run_style
-from .styler import StylerKind
-from .target import STDIN_FILENAME
-
-import devtools.ya.app
 
 
 class StyleOptions(devtools.ya.core.yarg.Options):
@@ -17,7 +13,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.dry_run = False
         self.check = False
         self.full_output = False
-        self.stdin_filename = STDIN_FILENAME
+        self.stdin_filename = trgt.STDIN_FILENAME
         self.py2 = False
         self.force = False
         self.validate = False
@@ -25,6 +21,8 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.use_clang_format_yt = False
         self.use_clang_format_15 = False
         self.use_clang_format_18_vanilla = False
+        self.internal_enable_implicit_taxi_formatters = False
+        self.internal_paths_with_integrations: list[str] = []
 
     @staticmethod
     def consumer():
@@ -98,6 +96,8 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_18_vanilla', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
+            devtools.ya.core.yarg.ConfigConsumer('internal_enable_implicit_taxi_formatters'),
+            devtools.ya.core.yarg.ConfigConsumer('internal_paths_with_integrations'),
         ]
 
 
@@ -107,7 +107,9 @@ class FilterOptions(devtools.ya.core.yarg.Options):
 
     @staticmethod
     def consumer():
-        checks = list(StylerKind)
+        checks = list(stlr.StylerKind)
+        # temporary until stylua support for all platform is added
+        checks_without_lua = [kind for kind in checks if kind != stlr.StylerKind.LUA]
 
         return [
             devtools.ya.core.yarg.ArgConsumer(
@@ -120,8 +122,8 @@ class FilterOptions(devtools.ya.core.yarg.Options):
         ] + [
             devtools.ya.core.yarg.ArgConsumer(
                 ['--all'],
-                help='Run all checks: {}'.format(', '.join(checks)),
-                hook=devtools.ya.core.yarg.SetConstValueHook('file_types', checks),
+                help='Run all checks: {}'.format(', '.join(checks_without_lua)),
+                hook=devtools.ya.core.yarg.SetConstValueHook('file_types', checks_without_lua),
                 group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             ),
         ]
@@ -149,7 +151,7 @@ class StyleYaHandler(devtools.ya.core.yarg.OptsHandler):
     def __init__(self):
         devtools.ya.core.yarg.OptsHandler.__init__(
             self,
-            action=devtools.ya.app.execute(action=run_style, respawn=devtools.ya.app.RespawnType.OPTIONAL),
+            action=devtools.ya.app.execute(action=stl.run_style, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description,
             opts=[
                 StyleOptions(),

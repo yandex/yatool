@@ -27,7 +27,7 @@
 
 namespace {
     void PrintException(TLog& log, const std::exception& exc) {
-        if (auto sysErr = dynamic_cast<const TSystemError*>(&exc)) {
+        if (/* auto sysErr = */ dynamic_cast<const TSystemError*>(&exc)) {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_CRIT, "CRIT[SERV]") << "TSystemError: " << exc.what() << ". Shutting down.." << Endl;
         } else {
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_CRIT, "CRIT[SERV]") << "std::exception :" << exc.what() << ". Shutting down.." << Endl;
@@ -567,15 +567,15 @@ namespace NUserService {
             } else if (e->Status() == ENOMEM) {
                 return NoMemEC;
             }
-            if (auto* e = dynamic_cast<const TIoException*>(&ex)) {
+            if (/* auto* e = */ dynamic_cast<const TIoException*>(&ex)) {
                 return IOEC;
             }
             return GenericExceptionEC;
-        } else if (auto* e = dynamic_cast<const TGrpcException*>(&ex)) {
+        } else if (/* auto* e = */ dynamic_cast<const TGrpcException*>(&ex)) {
             return GrpcClientExceptionEC;
-        } else if (auto* e = dynamic_cast<const yexception*>(&ex)) {
+        } else if (/* auto* e = */ dynamic_cast<const yexception*>(&ex)) {
             return GenericExceptionEC;
-        } else if (auto* e = dynamic_cast<const std::bad_alloc*>(&ex)) {
+        } else if (/* auto* e = */ dynamic_cast<const std::bad_alloc*>(&ex)) {
             return NoMemEC;
         } else {
             return GenericExceptionEC;

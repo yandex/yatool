@@ -504,8 +504,13 @@ public:
         }
     }
 
-    /// @brief comapct graph and save it
+    /// @brief save the graph
     void Save(TMultiBlobBuilder& builder) {
+        // TBD/FIXME: we do not save the "changed" tag,
+        // so saving a non-compacted graph then loading it back
+        // basically breaks an invariant represented by that tag;
+        // it seems that we should MarkUnchanged() or at least Y_ASSERT(!HasAnythingDeleted()) here,
+        // but this somehow breaks expectations of some tests
         TString graphData;
         {
             TStringOutput graphOutput(graphData);

@@ -65,9 +65,9 @@ concept DerivedFromSpecializationOf = requires(const TDerived& instance)
 ////////////////////////////////////////////////////////////////////////////////
 
 // Inspired by https://stackoverflow.com/questions/51032671/idiomatic-way-to-write-concept-that-says-that-type-is-a-stdvector
-template<class, template<class...> class>
+template <class, template <class...> class>
 inline constexpr bool IsSpecialization = false;
-template<template<class...> class T, class... Args>
+template <template <class...> class T, class... Args>
 inline constexpr bool IsSpecialization<T<Args...>, T> = true;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,6 +89,19 @@ inline constexpr bool DistinctImpl<T, Ts...> = DistinctImpl<Ts...> && !COneOf<T,
 
 template <typename... Ts>
 concept CDistinct = NDetail::DistinctImpl<Ts...>;
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <class T>
+concept CAssociative = requires(T) {
+    typename T::key_type;
+};
+
+template <class T>
+concept CMapping = requires(T) {
+    CAssociative<T>;
+    typename T::mapped_type;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 

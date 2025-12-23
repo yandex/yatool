@@ -63,15 +63,13 @@ class TSubst2Json: public TJsonCmdAcceptor {
 
     bool IsFake = false;
     TMakeNode* MakeNode = nullptr;
+    bool FillModule2Nodes;
+    const TModule* Module_ = nullptr;
 
 public:
-    TSubst2Json(const TJSONVisitor&, TDumpInfoUID&, TMakeNode* makeNode);
+    TSubst2Json(const TJSONVisitor&, TDumpInfoUID&, TMakeNode* makeNode, bool fillModule2Nodes = false, const TModule* module = nullptr);
 
     void GenerateJsonTargetProperties(const TConstDepNodeRef&, const TModule* mod, bool isGlobalNode);
-
-    // For node refresh in case of partial rendering
-    void FakeFinish(TCommandInfo& cmdInfo);
-    void CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars);
 
     void UpdateInputs();
 

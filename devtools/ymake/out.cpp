@@ -52,11 +52,6 @@ void Out<TInclude>(IOutputStream& os, TTypeTraits<TInclude>::TFuncParam i) {
 }
 
 template <>
-void Out<TDbgPadHelper>(IOutputStream& os, TTypeTraits<TDbgPadHelper>::TFuncParam i) {
-    os << i.MsgPad();
-}
-
-template <>
 void Out<EMacroType>(IOutputStream& os, TTypeTraits<EMacroType>::TFuncParam i) {
     os << (i == EMT_Usual ? "Usual" : i == EMT_MacroDef ? "MacroDef" : i == EMT_MacroCall ? "MacroCall" : "WTF");
 }

@@ -46,7 +46,6 @@
 #include <util/generic/hash_set.h>
 #include <util/generic/maybe.h>
 #include <util/generic/ptr.h>
-#include <util/generic/scope.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/stream/file.h>
@@ -63,10 +62,13 @@
 #include <asio/thread_pool.hpp>
 #include <asio/use_awaitable.hpp>
 #include <asio/detached.hpp>
+#include <asio/experimental/awaitable_operators.hpp>
 
 #include <fmt/format.h>
 
 #include <Python.h>
+
+using namespace asio::experimental::awaitable_operators;
 
 namespace {
     void MakeUnique(TVector<TTarget>& targets) {
@@ -419,7 +421,7 @@ void TYMake::AddModulesToStartTargets() {
     for (const auto& target : startTargetsModules) {
         auto mod = Modules.Get(Graph.GetFileName(Graph.Get(target.Id)).GetElemId());
         Y_ASSERT(mod);
-        if (target.IsDependsTarget || mod->IsStartTarget() && langFilter(*mod) && tagFilter(*mod, target)) {
+        if (target.IsDependsTarget || ((shouldCheckLanguages || mod->IsStartTarget()) && langFilter(*mod) && tagFilter(*mod, target))) {
             StartTargets.push_back(target);
             ModuleStartTargets.insert(target);
         }
@@ -523,24 +525,29 @@ private:
 };
 
 void TYMake::ComputeDependsToModulesClosure() {
+    if (DependsToModulesClosureCollected) {
+        return;
+    }
+    // This records extra outputs for UNIONs listed in DEPENDS
+    // It is currently impossible to record these as actual module outputs,
+    // so we just associate it with a StartTarget and use to fill results
     NYMake::TTraceStage scopeTracer{"Compute DEPENDS to modules closure"};
-
-    if (Conf.DependsLikeRecurse) {
-        // This records extra outputs for UNIONs listed in DEPENDS
-        // It is currently impossible to record these as actual module outputs,
-        // so we just associate it with a StartTarget and use to fill results
-        TDependsToModulesCollector collector(GetRestoreContext(), DependsToModulesClosure);
-        for (const auto& t : StartTargets) {
-            if (t.IsModuleTarget) {
-                continue;
-            }
-            if (t.IsDependsTarget) {
-                IterateAll(Graph, t, collector);
-                collector.Reset();
-            }
+    TDependsToModulesCollector collector(GetRestoreContext(), DependsToModulesClosure);
+    for (const auto& t : StartTargets) {
+        if (t.IsModuleTarget || !t.IsDependsTarget) {
+            continue;
         }
-        // Remove empty closures
-        EraseNodesIf(DependsToModulesClosure, [](const auto& item) {return item.second.empty();});
+        IterateAll(Graph, t, collector);
+        collector.Reset();
+    }
+    // Remove empty closures
+    EraseNodesIf(DependsToModulesClosure, [](const auto& item) {return item.second.empty();});
+    DependsToModulesClosureCollected = true;
+}
+
+void TYMake::GetDependsToModulesClosure() {
+    if (Conf.DependsLikeRecurse) {
+        ComputeDependsToModulesClosure();
     }
 }
 
@@ -566,7 +573,7 @@ void TYMake::DumpMetaData() {
 
 //TODO: move to appropriate place
 bool TYMake::DumpLoops() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Detect loops"));
+    NYMake::TTraceStage stage("Detect loops");
     const auto Loops = TGraphLoops::Find(Graph, StartTargets, false);
     if (Conf.ShowLoops) {
         Loops.DumpAllLoops(Graph, Conf.Cmsg());
@@ -590,7 +597,6 @@ bool TYMake::DumpLoops() {
 
     PropagateChangeFlags(Graph, Loops, StartTargets);
 
-    FORCE_TRACE(U, NEvent::TStageFinished("Detect loops"));
     return Loops.HasBadLoops();
 }
 
@@ -598,17 +604,17 @@ void TraceBypassEvent(const TBuildConfiguration& conf, const TYMake& yMake) {
     NEvent::TBypassConfigure bypassEvent;
     bypassEvent.SetMaybeEnabled(conf.ShouldUseGrandBypass());
     bypassEvent.SetEnabled(yMake.CanBypassConfigure());
-    FORCE_TRACE(C, bypassEvent);
+    conf.ForeignTargetWriter->WriteBypassLine(NYMake::EventToStr(bypassEvent));
 };
 
 asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBuildConfiguration& conf, TConfigurationExecutor exec) {
     TBuildGraphScope scope(*yMake.Get());
 
     if (conf.ReadStartTargetsFromEvlog) {
-        co_await ProcessEvlogAsync(yMake, conf, *conf.InputStream, exec);
+        co_await ProcessEvlogAsync(yMake, conf, *conf.ForeignTargetReader, exec);
 
         if (conf.StartDirs.empty()) {
-            FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
+            conf.ForeignTargetWriter->WriteLine(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
             FORCE_TRACE(U,  NEvent::TCacheIsExpectedToBeEmpty{conf.YmakeCache.GetPath()});
             co_return BR_OK;
         }
@@ -696,9 +702,6 @@ TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& c
     // This should be called after cache loading because all errors including top level errors restore from cache
     ConfMsgManager()->EnableDelay();
 
-    Y_DEFER {
-        NStats::StackDepthStats.Report();
-    };
     return TMaybe<EBuildResult>();
 }
 
@@ -768,7 +771,7 @@ asio::awaitable<void> SaveCaches(TBuildConfiguration& conf, THolder<TYMake>& yMa
     co_return;
 }
 
-asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
+asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THolder<TYMake>& yMake, asio::any_io_executor exec) {
     if (conf.RenderSemantics) {
         const auto* sourceRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_SOURCE_ROOT);
         const auto* buildRootVar = yMake->Conf.CommandConf.Lookup(NVariableDefs::VAR_EXPORTED_BUILD_SYSTEM_BUILD_ROOT);
@@ -795,7 +798,7 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
     }
 
     if (!conf.WriteJSON.empty()) {
-        ExportJSON(*yMake);
+        co_await ExportJSON(*yMake, exec);
     }
 
     co_return TMaybe<EBuildResult>();
@@ -806,29 +809,34 @@ void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
 
     yMake->Conf.SourceRoot = "$(SOURCE_ROOT)";
     yMake->Conf.BuildRoot = "$(BUILD_ROOT)";
+
+    TDartManager dartManager(*yMake);
+
     if (!conf.WriteTestDart.empty()) {
-        THolder<IOutputStream> dartOut;
-        dartOut.Reset(new TFileOutput(conf.WriteTestDart));
-        yMake->DumpTestDart(*dartOut);
-        dartOut->Finish();
+        dartManager.Dump(TDartManager::EDartType::Test, conf.WriteTestDart);
     }
 
     if (!conf.WriteJavaDart.empty()) {
-        THolder<IOutputStream> dartOut;
-        dartOut.Reset(new TFileOutput(conf.WriteJavaDart));
-        yMake->DumpJavaDart(*dartOut);
-        dartOut->Finish();
+        dartManager.Dump(TDartManager::EDartType::Java, conf.WriteJavaDart);
     }
 
     if (!conf.WriteMakeFilesDart.empty()) {
-        THolder<IOutputStream> dartOut;
-        dartOut.Reset(new TFileOutput(conf.WriteMakeFilesDart));
-        yMake->DumpMakeFilesDart(*dartOut);
-        dartOut->Finish();
+        dartManager.Dump(TDartManager::EDartType::Makefiles, conf.WriteMakeFilesDart);
     }
+
     yMake->Modules.ResetTransitiveInfo();
 
     yMake->DumpMetaData();
+}
+
+template<typename T>
+auto GetOrEmptyAwaitable(std::optional<asio::experimental::promise<void(std::exception_ptr, T)>>& promise) {
+    if (promise) {
+        return promise.value()(asio::use_awaitable);
+    }
+    return []() -> asio::awaitable<T> {
+        co_return T{};
+    }();
 }
 
 asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<TExecContext> exec) {
@@ -852,24 +860,41 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
 
     bool hasBadLoops = PostConfigureStage(conf, yMake);
 
-    result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
-    if (result.Defined()) {
-        co_return result.GetRef();
-    }
+    auto mainFlow = asio::co_spawn(exec, [exec, &conf, &yMake, hasBadLoops]() -> asio::awaitable<TMaybe<EBuildResult>> {
+        auto result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
+        if (result.Defined()) {
+            co_return result.GetRef();
+        }
 
-    co_await asio::co_spawn(exec, [&conf, &yMake]() -> asio::awaitable<void> {
-        PerformDumps(conf, *yMake);
-        co_return;
+        co_await asio::co_spawn(exec, [&conf, &yMake]() -> asio::awaitable<void> {
+            PerformDumps(conf, *yMake);
+            co_return;
+        }, asio::use_awaitable);
+
+        co_await asio::co_spawn(exec, ReportConfigureErrors(yMake), asio::use_awaitable);
+
+        if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
+            co_return BR_CONFIGURE_FAILED;
+        }
+
+        co_await (asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable)
+            && asio::co_spawn(exec, [&result, &conf, &yMake, &exec]() -> asio::awaitable<void> {
+                result = co_await RenderGraph(conf, yMake, exec);
+                co_return;
+            }, asio::use_awaitable));
+        if (result.Defined()) {
+            auto r = result.GetRef();
+            if (BR_OK == r) {
+                yMake->CommitCaches();
+            }
+            co_return r;
+        }
+        co_return Nothing();
     }, asio::use_awaitable);
 
-    co_await asio::co_spawn(exec, ReportConfigureErrors(yMake), asio::use_awaitable);
-    co_await asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable);
+    YDebug() << "main: waiting for main flow" << Endl;
+    result = co_await std::move(mainFlow);
 
-    if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
-        co_return BR_CONFIGURE_FAILED;
-    }
-
-    result = co_await asio::co_spawn(exec, RenderGraph(conf, yMake), asio::use_awaitable);
     if (result.Defined()) {
         co_return result.GetRef();
     }

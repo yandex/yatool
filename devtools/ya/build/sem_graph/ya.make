@@ -10,6 +10,13 @@ PEERDIR(
     devtools/ya/build/ymake2
     devtools/ya/yalibrary/sjson
     devtools/ya/yalibrary/tools
+    devtools/ya/exts
 )
+
+IF (NOT YA_OPENSOURCE)
+    PEERDIR(
+        devtools/ya/yalibrary/build_graph_cache
+    )
+ENDIF()
 
 END()

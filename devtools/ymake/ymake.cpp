@@ -1,5 +1,6 @@
 #include "ymake.h"
 
+#include "json_visitor.h"
 #include "mkcmd.h"
 #include "blacklist_checker.h"
 
@@ -11,9 +12,15 @@
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/compute_reachability.h>
 #include <devtools/ymake/propagate_change_flags.h>
+#include <devtools/ymake/python_runtime.h>
 
 #include <asio/co_spawn.hpp>
+#include <asio/detached.hpp>
+#include <asio/experimental/promise.hpp>
+#include <asio/experimental/use_promise.hpp>
 #include <asio/use_awaitable.hpp>
+
+#include <util/generic/ptr.h>
 
 namespace {
     enum class ESortPriority {
@@ -169,6 +176,7 @@ void TYMake::ReportMakeCommandStats() {
 
 asio::awaitable<void> TYMake::AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag, bool followRecurses) {
     return asio::co_spawn(exec, [dir, tag, followRecurses, this] () -> asio::awaitable<void> {
+        NYMake::TPythonThreadStateScope st{(PyInterpreterState*)Conf.SubState};
         TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
         auto elemId = Names.AddName(EMNT_Directory, dirPath);
         TNodeId nodeId = TNodeId::Invalid;
@@ -186,6 +194,7 @@ asio::awaitable<void> TYMake::AddStartTarget(TConfigurationExecutor exec, const 
 
 asio::awaitable<void> TYMake::AddTarget(TConfigurationExecutor exec, const TString& dir) {
     return asio::co_spawn(exec, [dir, this] () -> asio::awaitable<void> {
+        NYMake::TPythonThreadStateScope st{(PyInterpreterState*)Conf.SubState};
         TString dirPath = NPath::ConstructPath(NPath::FromLocal(TStringBuf{dir}), NPath::Source);
         auto elemId = Names.AddName(EMNT_Directory, dirPath);
         UpdIter->RecursiveAddNode(EMNT_Directory, elemId, &Modules.GetRootModule());
@@ -246,4 +255,39 @@ void TYMake::UpdateUnreachableExternalFileChanges() {
             }
         }
     }
+}
+
+asio::awaitable<THolder<TMakePlanCache>> TYMake::LoadJsonCacheAsync(asio::any_io_executor exec) {
+    return asio::co_spawn(exec, [this]() -> asio::awaitable<THolder<TMakePlanCache>> {
+        try {
+            auto JSONCache = MakeHolder<TMakePlanCache>(Conf);
+            JSONCacheLoaded(JSONCache->LoadFromFile());
+            co_return JSONCache;
+        } catch (const std::exception& e) {
+            YDebug() << "JSON cache failed to be loaded: " << e.what() << Endl;
+            co_return nullptr;
+        }
+    }, asio::use_awaitable);
+}
+
+asio::awaitable<THolder<TUidsData>> TYMake::LoadUidsAsync(asio::any_io_executor exec) {
+    return asio::co_spawn(exec, [this]() -> asio::awaitable<THolder<TUidsData>> {
+        try {
+            auto UidsCache = MakeHolder<TUidsData>(GetRestoreContext(), StartTargets);
+            LoadUids(UidsCache.Get());
+            co_return UidsCache;
+        } catch (const std::exception& e) {
+            YDebug() << "Uids cache failed to be loaded: " << e.what() << Endl;
+            co_return nullptr;
+        }
+    }, asio::use_awaitable);
+}
+
+void TYMake::InitPluginsAndParsers() {
+    if (Conf.PluginsInitilized) {
+        return;
+    }
+    Conf.LoadPlugins();
+    IncParserManager.AddParsers(Conf.ParserPlugins);
+    Conf.PluginsInitilized = true;
 }

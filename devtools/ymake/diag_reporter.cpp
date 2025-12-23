@@ -41,9 +41,9 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
         auto module = Modules.Get(node->ElemId);
         if (module->Transition != ETransition::None && module->Transition != TransitionSource) {
             if (module->Transition == ETransition::Pic) {
-                FORCE_TRACE(T, RequiredPicEvent(*Modules.Get(node->ElemId)));
+                Writer.WriteLine(NYMake::EventToStr(RequiredPicEvent(*Modules.Get(node->ElemId))));
             } else if (module->Transition == ETransition::NoPic) {
-                FORCE_TRACE(T, RequiredNoPicEvent(*Modules.Get(node->ElemId)));
+                Writer.WriteLine(NYMake::EventToStr(RequiredNoPicEvent(*Modules.Get(node->ElemId))));
             }
         }
     }
@@ -72,7 +72,7 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
     // We should report tool even if we visited node by non-tool edge first
     if (!CurEnt->ToolReported && state.HasIncomingDep() && IsModule(state.Top()) && IsDirectToolDep(state.IncomingDep())) {
         if (!TDepGraph::Graph(node).Names().CommandConf.GetById(TVersionedCmdId(state.IncomingDep().From()->ElemId).CmdId()).KeepTargetPlatform) {
-            FORCE_TRACE(T, RequiredToolEvent(*Modules.Get(node->ElemId)));
+            Writer.WriteLine(NYMake::EventToStr(RequiredToolEvent(*Modules.Get(node->ElemId))));
             CurEnt->ToolReported = true;
         }
     }
@@ -146,11 +146,11 @@ void TDupSrcReporter::Leave(TState& state) {
 
 void TYMake::ReportForeignPlatformEvents() {
     NYMake::TTraceStage scopeTracer{"Report Foreign Platform Events"};
-    TForeignPlatformEventsReporter eventReporter(Names, Modules, Conf.RenderSemantics, Conf.TransitionSource, Conf.ReportPicNoPic);
+    TForeignPlatformEventsReporter eventReporter(Names, Modules, Conf.RenderSemantics, Conf.TransitionSource, Conf.ReportPicNoPic, *Conf.ForeignTargetWriter);
     IterateAll(Graph, StartTargets, eventReporter, [](const TTarget& t) -> bool {
         return t.IsModuleTarget;
     });
-    FORCE_TRACE(T, NEvent::TAllForeignPlatformsReported{});
+    Conf.ForeignTargetWriter->WriteLine(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
 }
 
 void FlushModuleNode(TConstDepNodeRef modNode) {

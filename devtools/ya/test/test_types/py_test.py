@@ -12,10 +12,10 @@ import exts.yjson as json
 
 from devtools.ya.test.system import process
 from devtools.ya.test import common as test_common
+from devtools.ya.test import facility
 from devtools.ya.test.test_types import common
 import devtools.ya.core.config
 import devtools.ya.test.const
-import devtools.ya.test.util.shared
 import devtools.ya.test.util.tools
 import devtools.ya.test.test_node.cmdline as cmdline
 
@@ -28,6 +28,46 @@ IMPORT_TEST_TYPE = "import_test"
 GOFMT_TEST_TYPE = "gofmt"
 GOVET_TEST_TYPE = "govet"
 CLASSPATH_CLASH_TYPE = "classpath.clash"
+
+
+class PytestSubtestInfo(test_common.SubtestInfo):
+    @classmethod
+    def from_json(cls, d):
+        return cls(d["test"], d.get("subtest", ""), skipped=d.get("skipped", False), tags=d.get("tags", []))
+
+    def __init__(
+        self,
+        test,
+        subtest="",
+        skipped=False,
+        tags=None,
+        nodeid=None,
+        path=None,
+        line=None,
+        params=None,
+        pytest_class=None,
+    ):
+        self.test = test
+        self.subtest = test_common.normalize_utf8(subtest)
+        self.skipped = skipped
+        self.tags = tags
+        self.nodeid = nodeid
+        self.path = path
+        self.line = line
+        self.params = params
+        self.pytest_class = pytest_class
+
+    def to_json(self):
+        return {
+            "test": self.test,
+            "subtest": self.subtest,
+            "skipped": self.skipped,
+            "tags": getattr(self, "tags", []),
+            "nodeid": getattr(self, "nodeid"),
+            "path": getattr(self, "path"),
+            "line": getattr(self, "line"),
+            "params": getattr(self, "params"),
+        }
 
 
 class PyTestSuite(common.PythonTestSuite):
@@ -95,8 +135,8 @@ class PyTestSuite(common.PythonTestSuite):
     def _get_ini_file_path():
         return "pkg:library.python.pytest:pytest.yatest.ini"
 
-    def get_run_cmd_args(self, opts, retry, for_dist_build):
-        work_dir = test_common.get_test_suite_work_dir(
+    def get_work_dir(self, retry, remove_tos=False):
+        return test_common.get_test_suite_work_dir(
             '$(BUILD_ROOT)',
             self.project_path,
             self.name,
@@ -106,8 +146,11 @@ class PyTestSuite(common.PythonTestSuite):
             target_platform_descriptor=self.target_platform_descriptor,
             split_file=self._split_file_name,
             multi_target_platform_run=self.multi_target_platform_run,
-            remove_tos=opts.remove_tos,
+            remove_tos=remove_tos,
         )
+
+    def get_run_cmd_args(self, opts, retry, for_dist_build):
+        work_dir = self.get_work_dir(retry, opts.remove_tos)
         output_dir = os.path.join(work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME)
         cmd = [
             "--basetemp",
@@ -281,16 +324,27 @@ class PyTestBinSuite(PyTestSuite):
     def __init__(self, meta, *args, **kwargs):
         super(PyTestBinSuite, self).__init__(meta, *args, **kwargs)
         if self.meta.binary_path:
-            # FIXME meta must be read only
-            self.meta.test_name = self.get_type()
+            # FIXME: Meta must be read only
+            self.meta = facility.meta_dart_replace_test_name(self.meta, self.get_type())
 
     def binary_path(self, root):
         return common.AbstractTestSuite.binary_path(self, root)
 
-    def get_run_cmd(self, opts, retry=None, for_dist_build=False):
+    def get_run_cmd(self, opts, retry=None, for_dist_build=False, for_listing=False):
         cmd = [
             self.binary_path('$(BUILD_ROOT)'),
         ] + self.get_run_cmd_args(opts, retry, for_dist_build)
+
+        if not for_listing and self.get_parallel_tests_within_node_workers():
+            if not for_dist_build and self.get_parallel_tests_within_node_workers() > 1:
+                test_tool = devtools.ya.test.util.tools.get_test_tool_cmd(
+                    opts, 'run_pytest', self.global_resources, wrapper=True, run_on_target_platform=True
+                )
+                cmd = test_tool + ["--binary"] + cmd
+                cmd += ["--worker-count", str(self.get_parallel_tests_within_node_workers())]
+                cmd += ["--temp-tracefile-dir", self.get_temp_tracefile_dir(retry, opts.remove_tos)]
+            elif for_dist_build:
+                logger.info("Parallel tests execution is not available in distbuild")
 
         if self._split_file_name:
             cmd += ["--test-file-filter", self._split_file_name]
@@ -352,7 +406,7 @@ class PyTestBinSuite(PyTestSuite):
 
     def get_list_cmd(self, arc_root, build_root, opts):
         # -qqq gives the needed for parsing test list output
-        return self.get_run_cmd(opts) + ["--collect-only", "--mode", "list", "-qqq"]
+        return self.get_run_cmd(opts, for_listing=True) + ["--collect-only", "--mode", "list", "-qqq"]
 
     @classmethod
     def _get_subtests_info(cls, list_cmd_result, filename):
@@ -362,10 +416,15 @@ class PyTestBinSuite(PyTestSuite):
                 tests = json.load(afile)
             for t in tests:
                 result.append(
-                    test_common.SubtestInfo(
-                        test_common.strings_to_utf8(t["class"]),
-                        test_common.strings_to_utf8(t["test"]),
-                        tags=t.get("tags", []),
+                    PytestSubtestInfo(
+                        test=test_common.strings_to_utf8(t["class"]),
+                        subtest=test_common.strings_to_utf8(t["test"]),
+                        tags=test_common.strings_to_utf8(t.get("tags", [])),
+                        nodeid=test_common.strings_to_utf8(t.get("nodeid")),
+                        path=test_common.strings_to_utf8(t.get("path")),
+                        line=test_common.strings_to_utf8(t.get("line")),
+                        params=test_common.strings_to_utf8(t.get("params")),
+                        pytest_class=test_common.strings_to_utf8(t.get("pytest_class")),
                     )
                 )
             return result
@@ -376,6 +435,11 @@ class PyTestBinSuite(PyTestSuite):
                 "{}\nListing output: {}".format(str(e), list_cmd_result.std_err or list_cmd_result.std_out),
                 ei[2],
             )
+
+    def get_temp_tracefile_dir(self, retry, remove_tos):
+        # Slightly trimmed call for now.
+        test_work_dir = self.get_work_dir(retry, remove_tos=remove_tos)
+        return os.path.join(test_work_dir, devtools.ya.test.const.TEMPORARY_TRACE_DIR_NAME)
 
 
 class Py3TestBinSuite(PyTestBinSuite):
@@ -411,7 +475,7 @@ class ExecTest(PyTestBinSuite):
         dep_dirs = {"$(BUILD_ROOT)/{}".format(os.path.dirname(dep)) for dep in self._custom_dependencies}
         env["PATH"] = os.path.pathsep.join(sorted(dep_dirs))
 
-    def get_run_cmd(self, opts, retry=None, for_dist_build=False):
+    def get_run_cmd(self, opts, retry=None, for_dist_build=False, for_listing=False):
         cmd = ["--test-param", "commands={}".format(self.meta.blob)]
         cmd += devtools.ya.test.util.tools.get_test_tool_cmd(
             opts, 'run_exectest', self.global_resources, wrapper=True, run_on_target_platform=True
@@ -427,8 +491,7 @@ class ExecTest(PyTestBinSuite):
 
 class LintTestSuite(common.StyleTestSuite):
     def get_suite_files(self):
-        files = [f.replace("$S", "$(SOURCE_ROOT)") for f in [_f for _f in self.meta.files if _f]]
-        return sorted(files)
+        return sorted(f.replace("$S", "$(SOURCE_ROOT)") for f in self.meta.test_files if f)
 
     def support_retries(self):
         return False

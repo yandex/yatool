@@ -25,7 +25,6 @@ def _gen(
     flags=None,
     warn_mode=None,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
     grab_stderr=True,
@@ -58,7 +57,6 @@ def _gen(
         warn_mode=warn_mode,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         grab_stderr=grab_stderr,
         custom_conf=generation_conf,
         evlog=evlog,
@@ -124,7 +122,6 @@ def gen_dependencies(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -135,7 +132,6 @@ def gen_dependencies(
         debug_options=['z'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -148,7 +144,6 @@ def gen_graph(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -159,7 +154,6 @@ def gen_graph(
         debug_options=['g'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -172,7 +166,6 @@ def gen_modules(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -183,7 +176,6 @@ def gen_modules(
         debug_options=['g', 'm'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -196,7 +188,6 @@ def gen_module_info(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
     modules_info_file=None,
@@ -209,7 +200,6 @@ def gen_module_info(
         debug_options=['h'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
         modules_info_file=modules_info_file,
@@ -224,7 +214,6 @@ def gen_licenses_list(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
     lic_link_type=None,
@@ -237,7 +226,6 @@ def gen_licenses_list(
         debug_options=debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
         lic_link_type=lic_link_type,
@@ -252,7 +240,6 @@ def gen_forced_deps_list(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -263,7 +250,6 @@ def gen_forced_deps_list(
         debug_options=debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -276,7 +262,6 @@ def gen_srcdeps(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -287,7 +272,6 @@ def gen_srcdeps(
         debug_options=['src-deps'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -300,7 +284,6 @@ def gen_json_graph(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
     custom_conf_dir=None,
@@ -312,7 +295,6 @@ def gen_json_graph(
         debug_options=['g', 'J'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
         custom_conf_dir=custom_conf_dir,
@@ -326,7 +308,6 @@ def gen_include_targets(
     debug_options=None,
     flags=None,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -339,7 +320,6 @@ def gen_include_targets(
         debug_options=['B', 'x'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -352,7 +332,6 @@ def gen_managed_dep_tree(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -364,7 +343,6 @@ def gen_managed_dep_tree(
         flags=flags,
         managed_dep_tree=build_targets,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
         evlog=True,
@@ -378,7 +356,6 @@ def gen_targets_classpath(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -390,7 +367,6 @@ def gen_targets_classpath(
         flags=flags,
         classpaths=build_targets,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
         evlog=True,
@@ -406,7 +382,6 @@ def gen_relation(
     find_path_from,
     find_path_to,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -429,7 +404,6 @@ def gen_relation(
         find_path_from=normalize_targets(find_path_from),
         find_path_to=normalize_targets(find_path_to),
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -442,7 +416,6 @@ def gen_all_loops(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -454,7 +427,6 @@ def gen_all_loops(
         warn_mode=['allloops'],
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -467,7 +439,6 @@ def gen_dir_loops(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -479,7 +450,6 @@ def gen_dir_loops(
         warn_mode=['dirloops'],
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -492,7 +462,6 @@ def gen_build_targets(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -503,7 +472,6 @@ def gen_build_targets(
         debug_options=['a'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -516,7 +484,6 @@ def gen_owners(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -527,7 +494,6 @@ def gen_owners(
         debug_options=['O'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -540,7 +506,6 @@ def gen_filelist(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     host_platform=None,
     target_platforms=None,
 ):
@@ -551,7 +516,6 @@ def gen_filelist(
         debug_options=['g', 'f'] + debug_options,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         host_platform=host_platform,
         target_platforms=target_platforms,
     )
@@ -565,7 +529,6 @@ def gen_plan_options(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     no_ymake_resource=False,
     custom_conf=None,
     strict_inputs=False,
@@ -585,7 +548,6 @@ def gen_plan_options(
         clear_build=False,
         flags=flags,
         ymake_bin=ymake_bin,
-        platform=platform,
         no_ymake_resource=no_ymake_resource,
         custom_conf=custom_conf,
         strict_inputs=strict_inputs,
@@ -602,7 +564,6 @@ def gen_plan(
     debug_options,
     flags,
     ymake_bin=None,
-    platform=None,
     no_ymake_resource=False,
     vcs_file=None,
 ):
@@ -615,7 +576,6 @@ def gen_plan(
             debug_options=debug_options,
             flags=flags,
             ymake_bin=ymake_bin,
-            platform=platform,
             no_ymake_resource=no_ymake_resource,
             vcs_file=vcs_file,
         )
@@ -670,7 +630,27 @@ def _extract_uids(build_plan):
     return target_uid_map
 
 
-def gen_uids(arc_root, build_root, build_type, build_targets, debug_options, flags, ymake_bin=None, platform=None):
+def gen_uids(
+    arc_root,
+    build_root,
+    build_type,
+    build_targets,
+    debug_options,
+    flags,
+    ymake_bin=None,
+    host_platform=None,
+    target_platforms=None,
+):
+    generation_conf = gen_conf(
+        arc_root=arc_root,
+        build_root=build_root,
+        build_type=build_type,
+        build_targets=build_targets,
+        flags=flags,
+        host_platform=host_platform,
+        target_platforms=target_platforms,
+    )
+
     return _extract_uids(
         devtools.ya.build.gen_plan.gen_plan(
             gen_plan_options(
@@ -681,7 +661,7 @@ def gen_uids(arc_root, build_root, build_type, build_targets, debug_options, fla
                 debug_options=debug_options,
                 flags=flags,
                 ymake_bin=ymake_bin,
-                platform=platform,
+                custom_conf=generation_conf,
             )
         )
     )

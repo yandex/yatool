@@ -24,27 +24,16 @@ struct TCmdDescription {
 
 typedef TMap<TString, TVector<TString>> TPyDictReflection;
 
-class TMacroCmd: private TNonCopyable {
-public:
-    virtual ~TMacroCmd() {
-    }
-
-    virtual void Output(TSpecFileList& res) const = 0;
-
-    virtual void OutputInclude(TSpecFileList& res) const = 0;
-
-    virtual void Input(TSpecFileList& res) const = 0;
-
-    virtual void Tools(TVector<TString>& res) const = 0;
-
-    virtual TString ToString() const  = 0;
-};
-
 class TPluginUnit: private TNonCopyable {
 public:
     virtual void CallMacro(TStringBuf name, const TVector<TStringBuf>& args) = 0;
+    virtual void CallMacro(TStringBuf name, const TVector<TStringBuf>& args, [[maybe_unused]] TVars extraVars) {
+        CallMacro(name, args);
+    }
 
     virtual TStringBuf Get(TStringBuf name) const = 0;
+
+    virtual std::variant<TStringBuf, TString> GetSubst(TStringBuf name) const = 0;
 
     virtual void Set(TStringBuf name, TStringBuf value) = 0;
 
@@ -76,9 +65,9 @@ public:
 
 class TMacroImpl {
 public:
-    virtual void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* result = nullptr) = 0;
+    virtual void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) = 0;
 
-    virtual ~TMacroImpl();
+    virtual ~TMacroImpl() noexcept = default;
 
     struct TDefinition {
         TString DocText;
@@ -106,16 +95,19 @@ private:
     THashMap<TString, TSimpleSharedPtr<TMacroImpl>> Name2Macro_;
 
 public:
-    void InvokeMacro(TPluginUnit& unit, const TStringBuf& name, const TVector<TStringBuf>& params, TVector<TSimpleSharedPtr<TMacroCmd>>* out = nullptr) const;
-    bool ContainsMacro(const TStringBuf& name) const;
+    TMacroImpl* FindMacro(TStringBuf name) const;
 
     void RegisterMacro(TBuildConfiguration& conf, const TString& name, TSimpleSharedPtr<TMacroImpl> action);
     void RegisterParser(TBuildConfiguration& conf, const TString& ext, TSimpleSharedPtr<TParser> parser);
+
+    void Clear();
 };
 
 // functions below implemented outside
 
-void LoadPlugins(const TVector<TFsPath> &sourceRoot, TBuildConfiguration *conf);
+void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &pluginFiles, const TFsPath& pycache, TBuildConfiguration *conf);
+
+std::pair<TVector<TFsPath>, TVector<TFsPath>> DiscoverPlugins(const TVector<TFsPath> &pluginsRoots);
 
 void RegisterPluginFilename(TBuildConfiguration& conf, const char* fileName);
 
@@ -123,13 +115,3 @@ void OnPluginLoadFail(const char* fileName, const char* msg);
 
 void OnConfigureError(const char* msg);
 void OnBadDirError(const char* msg, const char* dir);
-
-struct TPyThreadLock {
-    TPyThreadLock() noexcept;
-    ~TPyThreadLock() noexcept;
-};
-
-struct TPyRuntime {
-    TPyRuntime();
-    ~TPyRuntime();
-};

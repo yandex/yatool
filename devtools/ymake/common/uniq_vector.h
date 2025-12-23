@@ -10,6 +10,8 @@
 #include <util/generic/ptr.h>
 #include <util/generic/vector.h>
 
+#include <util/system/yassert.h>
+
 #include <type_traits>
 
 /*
@@ -42,6 +44,7 @@
 */
 template <class T, class TRef, size_t HashTh, class TContainer = TVector<T>, bool IsIndexed = false>
 class TUniqContainerImpl {
+protected:
     using TUtilUniqMap = typename std::conditional_t<IsIndexed, THashMap<TRef, size_t>, THashSet<TRef>>;
     using TAbslUniqMap = typename std::conditional_t<IsIndexed, absl::flat_hash_map<TRef, size_t, THash<TRef>, TEqualTo<TRef>>, absl::flat_hash_set<TRef, THash<TRef>, TEqualTo<TRef>>>;
     static constexpr bool UseAbseil = sizeof(T) <= 8;
@@ -254,7 +257,21 @@ public:
 
     void swap(TUniqContainerImpl& other) {
         Container.swap(other.Container);
-        UniqMap.Swap(other.UniqMap);
+        if (UniqMap) {
+            if (other.UniqMap)
+                UniqMap->swap(*other.UniqMap);
+            else {
+                other.CreateEmptyUniqMap();
+                UniqMap->swap(*other.UniqMap);
+                UniqMap.Reset();
+            }
+        } else {
+            if (other.UniqMap) {
+                CreateEmptyUniqMap();
+                UniqMap->swap(*other.UniqMap);
+                other.UniqMap.Reset();
+            }
+        }
     }
 
     bool IsSubsetOf(const TUniqContainerImpl& of) const {
@@ -313,37 +330,46 @@ private:
     }
 
     void CreateUniqMapIfNeeded() {
-        if (size() > HashTh) {
-            if constexpr (IsIndexed) {
-                if constexpr (IsSimpleRef) {
-                    UniqMap = MakeHolder<TUniqMap>(size());
-                    size_t i = 0;
-                    for (const auto& val : Container)
-                        UniqMap->emplace(val, i++);
-                } else {
-                    UniqMap = MakeHolder<TUniqMap>(size(), THash<TRef>(Container), TEqualTo<TRef>(Container));
-                    for (size_t i = 0; i < size(); ++i) {
-                        UniqMap->emplace(i, i);
-                    }
-                }
+        if (size() <= HashTh)
+            return;
+        if constexpr (IsIndexed) {
+            if constexpr (IsSimpleRef) {
+                UniqMap = MakeHolder<TUniqMap>(size());
+                size_t i = 0;
+                for (const auto& val : Container)
+                    UniqMap->emplace(val, i++);
             } else {
-                if constexpr (IsSimpleRef) {
-                    UniqMap = MakeHolder<TUniqMap>(cbegin(), cend(), size());
-                } else {
-                    UniqMap = MakeHolder<TUniqMap>(size(), THash<TRef>(Container), TEqualTo<TRef>(Container));
-                    size_t i = 0;
-                    for (const auto& val : Container) {
-                        if constexpr (UseAbseil) {
-                            UniqMap->lazy_emplace(val, [&](const auto& ctor) {
-                                ctor(i);
-                            });
-                        } else {
-                            UniqMap->emplace(i);
-                        }
-                        ++i;
-                    }
+                UniqMap = MakeHolder<TUniqMap>(size(), THash<TRef>(Container), TEqualTo<TRef>(Container));
+                for (size_t i = 0; i < size(); ++i) {
+                    UniqMap->emplace(i, i);
                 }
             }
+        } else {
+            if constexpr (IsSimpleRef) {
+                UniqMap = MakeHolder<TUniqMap>(cbegin(), cend(), size());
+            } else {
+                UniqMap = MakeHolder<TUniqMap>(size(), THash<TRef>(Container), TEqualTo<TRef>(Container));
+                size_t i = 0;
+                for (const auto& val : Container) {
+                    if constexpr (UseAbseil) {
+                        UniqMap->lazy_emplace(val, [&](const auto& ctor) {
+                            ctor(i);
+                        });
+                    } else {
+                        UniqMap->emplace(i);
+                    }
+                    ++i;
+                }
+            }
+        }
+    }
+
+    void CreateEmptyUniqMap() {
+        Y_DEBUG_ABORT_UNLESS(!UniqMap);
+        if constexpr (IsSimpleRef) {
+            UniqMap = MakeHolder<TUniqMap>(0);
+        } else {
+            UniqMap = MakeHolder<TUniqMap>(0, THash<TRef>(Container), TEqualTo<TRef>(Container));
         }
     }
 
@@ -475,6 +501,10 @@ struct THash<NUniqContainer::TRefWithIndex<T>> {
         return hash(t);
     }
 
+    void swap(THash<NUniqContainer::TRefWithIndex<T>>&) {
+        // do NOT swap container references
+    }
+
     const TVector<T>& vector_ref;
 };
 
@@ -490,6 +520,10 @@ struct TEqualTo<NUniqContainer::TRefWithIndex<T>> {
     inline bool operator()(const NUniqContainer::TRefWithIndex<T>& ref, const U& t) const {
         Y_ASSERT(ref.index < vector_ref.size());
         return t == vector_ref[ref.index];
+    }
+
+    void swap(TEqualTo<NUniqContainer::TRefWithIndex<T>>&) {
+        // do NOT swap container references
     }
 
     const TVector<T>& vector_ref;

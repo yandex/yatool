@@ -5,7 +5,6 @@ import os
 import re
 
 import devtools.ya.test.system.process
-from build.plugins.lib.nots.typescript import DEFAULT_TS_CONFIG_FILE
 from build.plugins.lib.nots.package_manager.base.constants import (
     BUILD_DIRNAME,
     BUNDLE_DIRNAME,
@@ -13,13 +12,19 @@ from build.plugins.lib.nots.package_manager.base.constants import (
     NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
     PACKAGE_JSON_FILENAME,
 )
-from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME
+from build.plugins.lib.nots.package_manager.pnpm.constants import (
+    PNPM_LOCKFILE_FILENAME,
+    VIRTUAL_STORE_DIRNAME,
+)
+from build.plugins.lib.nots.package_manager.base.utils import (
+    build_vs_store_path,
+)
 from build.plugins.lib.nots.test_utils import ts_utils
 
 from devtools.ya.test import facility
 from devtools.ya.test.const import Status
 from devtools.ya.test.test_types.common import PerformedTestSuite
-from devtools.ya.test.util import shared, tools
+from devtools.ya.test.util import shared
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +40,19 @@ def main():
     build_dir = os.path.join(args.build_root, args.source_folder_path)
     cwd = build_dir
 
+    bindir_node_modules_path = os.path.join(build_dir, NODE_MODULES_DIRNAME)
     node_path = [
-        os.path.join(build_dir, "node_modules"),
+        os.path.join(build_vs_store_path(args.build_root, args.source_folder_path), NODE_MODULES_DIRNAME),
+        # TODO: remove - no longer needed
+        os.path.join(bindir_node_modules_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
+        bindir_node_modules_path,
     ]
 
     suite = PerformedTestSuite(None, None, None)
     suite.set_work_dir(cwd)
     suite.register_chunk()
 
-    tools.copy_dir_contents(
+    ts_utils.copy_dir_contents(
         src_dir,
         build_dir,
         ignore_list=[
@@ -53,7 +62,7 @@ def main():
             NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             PACKAGE_JSON_FILENAME,
             PNPM_LOCKFILE_FILENAME,
-            DEFAULT_TS_CONFIG_FILE,
+            args.ts_config_path,
         ],
     )
 
@@ -61,6 +70,7 @@ def main():
         module_arc_path=args.source_folder_path,
         source_root=args.source_root,
         bin_root=args.build_root,
+        ts_config_path=args.ts_config_path,
     )
 
     cmd = get_cmd(args, args.files)
@@ -95,6 +105,7 @@ def parse_args():
     parser.add_argument("--build-root", dest="build_root", help="Build root", required=True)
     parser.add_argument("--source-folder-path", dest="source_folder_path", required=True)
     parser.add_argument("--nodejs", dest="nodejs", help="Path to the Node.JS resource", required=True)
+    parser.add_argument("--ts-config-path", dest="ts_config_path", help="tsconfig.json path", required=True)
     parser.add_argument("--eslint-config-path", dest="eslint_config_path", help="ESLint config path", required=True)
     parser.add_argument("--tracefile", help="Path to the output trace log")
     parser.add_argument("--log-path", dest="log_path", help="Log file path")

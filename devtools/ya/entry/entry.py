@@ -5,14 +5,11 @@ import six
 import sys
 import time
 import signal
-import devtools.ya.core.config
 import logging
 import argparse
 
 import app_config
 
-import devtools.ya.core.error
-import devtools.ya.core.respawn
 import devtools.ya.core.sec as sec
 import devtools.ya.core.sig_handler
 import devtools.ya.core.stage_tracer as stage_tracer
@@ -168,7 +165,7 @@ def main(args):
         const=True,
         default=True if os.environ.get('YA_NO_TMP_DIR') in ("1", "yes") else False,
     )
-    p.add_argument('--no-respawn', action='store_const', const=True, default=False, help=argparse.SUPPRESS)
+    p.add_argument('--no-respawn', action='store_const', const=True, default=False)
     p.add_argument('--print-path', action='store_const', const=True, default=False)
     p.add_argument('--version', action='store_const', const=True, default=False)
     p.add_argument(
@@ -178,6 +175,7 @@ def main(args):
         const=logging.DEBUG,
         default=logging.DEBUG if os.environ.get('YA_VERBOSE') else logging.INFO,
     )
+    p.add_argument('--mcp', action='store_const', const=True, default=False)
     if not opensource:
         p.add_argument('--diag', action='store_const', const=True, default=False)
 
@@ -202,6 +200,9 @@ def main(args):
 
     init_logger(a.verbose_level)
 
+    if a.no_respawn:
+        os.environ["YA_NO_RESPAWN"] = "1"
+
     if a.precise:
         start = time.time()
 
@@ -225,6 +226,14 @@ def main(args):
                 sys.stderr.write("{}: {}\n".format(str(ts - start)[:10], sec.cleanup(msg, replacements)))
 
         logging.root.addHandler(Handler())
+
+    if a.mcp:
+        gsid = os.environ.get("GSID", "")
+        if gsid:
+            gsid += " "
+
+        gsid += "YA_MCP:1"
+        os.environ["GSID"] = gsid
 
     def format_help():
         s = p.format_help().replace('[--diag]', '[--diag] [--help] <SUBCOMMAND> [OPTION]...').strip()

@@ -13,7 +13,7 @@ namespace NPolexpr {
         constexpr TConstId(ui32 storage, ui32 idx) noexcept
             : Val{(storage << IDX_BITS) | idx}
         {
-            Y_ASSERT(idx < (1 << IDX_BITS));
+            Y_ABORT_UNLESS(idx < (1 << IDX_BITS));
             Y_ASSERT(storage < (1 << STORAGE_BITS));
         }
 
@@ -38,8 +38,8 @@ namespace NPolexpr {
         }
 
     public:
-        constexpr static ui32 IDX_BITS = 24;
-        constexpr static ui32 STORAGE_BITS = 5;
+        constexpr static ui32 IDX_BITS = 25;
+        constexpr static ui32 STORAGE_BITS = 4;
 
     private:
         ui32 Val;

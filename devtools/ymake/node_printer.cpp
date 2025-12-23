@@ -48,6 +48,7 @@
 #include <util/system/types.h>
 
 #include <algorithm>
+#include <fmt/format.h>
 #include <utility>
 
 namespace {
@@ -77,10 +78,7 @@ namespace {
         }
     }
 
-    TString FormatBuildCommandName(const TCmdView& name, const TCommands& commands, const TCmdConf& cmdConf, bool structCmd) {
-        if (Y_UNLIKELY(!structCmd)) {
-            return static_cast<TString>(name.GetStr());
-        }
+    TString FormatBuildCommandName(const TCmdView& name, const TCommands& commands, const TCmdConf& cmdConf) {
         if (name.IsNewFormat()) {
             auto expr = commands.Get(commands.IdByElemId(name.GetElemId()));
             Y_ASSERT(expr);
@@ -108,22 +106,33 @@ namespace {
     }
 }
 
-class TJsonFormat {
+class TFormatInterface {
+public:
+    virtual void AddHeader() {}
+    virtual void AddTail() {}
+
+    virtual void BeginNode() {}
+    virtual void EndNode() {}
+
+    virtual void BeginChildren() {}
+    virtual void EndChildren() {}
+
+    virtual void EmitDep(const ui32 /*fromId*/, const EMakeNodeType /*fromType*/, const ui32 /*toId*/, const EMakeNodeType /*toType*/, const EDepType /*depType*/, bool /*isFirst*/, const ELogicalDepType /*logicalDepType*/ = ELDT_FromDepType) {}
+
+    virtual void EmitName(const TStringBuf& /*parentName*/, const TStringBuf& /*name*/) {}
+
+    virtual void EmitNode(const EMakeNodeType /*type*/, const ui32 /*id*/, const TStringBuf& /*parentName*/, const TStringBuf& /*name*/, const TStringBuf& /*flags*/) {}
+
+    virtual void EmitPad(const TStringBuf& /*pad*/) {}
+
+    virtual void EmitModule(EMakeNodeType /*type*/, const TStringBuf& /*moduleName*/, const TStringBuf& /*name*/) {}
+
+    virtual void EmitPos(int /*id*/, int /*of*/) {}
+};
+
+class TJsonFormat : public TFormatInterface {
 private:
     NJsonWriter::TBuf Writer;
-
-    template <class Enum>
-    void EmitEnum(const TStringBuf& key, Enum e) {
-        TStringStream ss;
-        ss << e;
-        TString str = ss.Str();
-        Writer.WriteKey(key);
-        Writer.WriteString(str);
-    }
-
-    void EmitNodeType(const EMakeNodeType nodeType) {
-        EmitEnum("node-type", nodeType);
-    }
 
     void EmitId(int id) {
         Writer.WriteKey("id");
@@ -139,65 +148,65 @@ public:
         Writer.SetIndentSpaces(2);
     }
 
-    void AddHeader() {
+    void AddHeader() override {
         Writer.BeginObject();
         Writer.WriteKey("graph");
         Writer.BeginList();
     }
 
-    void AddTail() {
+    void AddTail() override {
         Writer.EndList();
         Writer.EndObject();
     }
 
-    void BeginNode() {
+    void BeginNode() override {
         Writer.BeginObject();
     }
 
-    void EndNode() {
+    void EndNode() override {
         Writer.EndObject();
     }
 
-    void BeginChildren() {
+    void BeginChildren() override {
         Writer.WriteKey("deps");
         Writer.BeginList();
     }
 
-    void EndChildren() {
+    void EndChildren() override {
         Writer.EndList();
     }
 
-    void EmitPad(const TStringBuf&) {
-    }
-
-    void EmitPos(int, int) {
-    }
-
-    void EmitName(const TStringBuf&, const TStringBuf& name) {
+    void EmitName(const TStringBuf& /*parentName*/, const TStringBuf& name) override {
         Writer.WriteKey("name");
         Writer.WriteString(name);
     }
 
-    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf parentName, const TStringBuf name) {
-        EmitNodeType(type);
+    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& parentName, const TStringBuf& name, const TStringBuf&) override {
+        Writer.WriteKey("node-type");
+        Writer.WriteString(TStringBuilder() << type);
         EmitId(id);
         EmitName(parentName, name);
         BeginChildren();
     }
 
-    void EmitDep(const ui32, const EMakeNodeType, const ui32, const EMakeNodeType, const EDepType depType, bool isFirst) {
-        EmitEnum("dep-type", depType);
+    void EmitDep(const ui32, const EMakeNodeType, const ui32, const EMakeNodeType, const EDepType depType, bool isFirst, const ELogicalDepType logicalDepType = ELDT_FromDepType) override {
+        Writer.WriteKey("dep-type");
+        if (logicalDepType == ELDT_FromDepType) {
+            Writer.WriteString(TStringBuilder() << depType);
+        } else {
+            Writer.WriteString(TStringBuilder() << logicalDepType);
+        }
         Writer.WriteKey("is-first");
         Writer.WriteBool(isFirst);
     }
 
     // flat output
-    void EmitModule(EMakeNodeType, const TStringBuf&, const TStringBuf&) {
+    void EmitModule(EMakeNodeType /*type*/, const TStringBuf& /*modName*/, const TStringBuf& /*name*/) override {
         ythrow TNotImplemented() << "TJsonFormat::EmitModule is not available yet";
     }
 };
 
-class THumanReadableFormat {
+class THumanReadableFormat : public TFormatInterface {
 private:
     IOutputStream* Stream_;
 
@@ -208,6 +217,11 @@ private:
     void EmitId(int id) {
         *Stream_ << "Id: " << id << ", ";
     }
+
+    void EmitFlags(const TStringBuf& flags) {
+        if (!flags.empty())
+            *Stream_ << "Flags: [" << flags << "], ";
+    }
 public:
     static const bool NeedParentName = false;
     static const bool PrintChildren = true; // for sorted output only
@@ -216,56 +230,46 @@ public:
     {
     }
 
-    void EmitPad(const TStringBuf& pad) {
+    void EmitPad(const TStringBuf& pad) override {
         *Stream_ << pad;
     }
 
-    void EmitPos(int id, int of) {
+    void EmitPos(int id, int of) override {
         *Stream_ << "[" << id << " of " << of << "] ";
     }
 
-    void EmitName(const TStringBuf&, const TStringBuf& name) {
+    void EmitName(const TStringBuf& /*parentName*/, const TStringBuf& name) override {
         *Stream_ << "Name: " << name;
     }
 
-    void EmitDep(const ui32, const EMakeNodeType, const ui32, const EMakeNodeType, const EDepType depType, bool isFirst) {
-        *Stream_ << "Dep: " << depType << (isFirst ? "" : "*") << ", ";
+    void EmitDep(const ui32 /*fromId*/, const EMakeNodeType /*fromType*/, const ui32 /*toId*/, const EMakeNodeType /*toType*/, const EDepType depType, bool isFirst, const ELogicalDepType logicalDepType = ELDT_FromDepType) override {
+        if (logicalDepType == ELDT_FromDepType) {
+            *Stream_ << "Dep: " << depType << (isFirst ? "" : "*") << ", ";
+        } else {
+            *Stream_ << "Dep: " << logicalDepType << (isFirst ? "" : "*") << ", ";
+        }
     }
 
-    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf parentName, const TStringBuf name) {
+    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& parentName, const TStringBuf& name, const TStringBuf& flags) override {
         EmitNodeType(type);
         EmitId(id);
+        EmitFlags(flags);
         EmitName(parentName, name);
         BeginChildren();
     }
 
-    void AddHeader() {
-    }
-
-    void AddTail() {
-    }
-
-    void BeginNode() {
-    }
-
-    void EndNode() {
-    }
-
-    void BeginChildren() {
+    void BeginChildren() override {
         *Stream_ << Endl;
     }
 
-    void EndChildren() {
-    }
-
     // flat output
-    void EmitModule(EMakeNodeType nodeType, const TStringBuf& modname, const TStringBuf& name) {
-        *Stream_ << "module: " << nodeType << " " << modname << " " << name << Endl;
+    void EmitModule(EMakeNodeType nodeType, const TStringBuf& modName, const TStringBuf& name) override {
+        *Stream_ << "module: " << nodeType << " " << modName << " " << name << Endl;
     }
 };
 
 template <bool PrintDeps>
-class TDotFormat {
+class TDotFormat : public TFormatInterface {
 private:
     IOutputStream* Stream_;
 
@@ -274,61 +278,36 @@ public:
     static const bool PrintChildren = PrintDeps; // for sorted output only
     TDotFormat(IOutputStream* stream)
         : Stream_(stream)
-    {
-    }
+    {}
 
-    void AddHeader() {
-    }
-
-    void AddTail() {
-    }
-
-    void BeginNode() {
-    }
-
-    void EndNode() {
-    }
-
-    void BeginChildren() {
+    void BeginChildren() override {
         *Stream_ << Endl;
     }
 
-    void EndChildren() {
-    }
-
-    void EmitPad(const TStringBuf&) {
+    void EmitPad(const TStringBuf&) override {
         *Stream_ << "    ";
     }
 
-    void EmitPos(int, int) {
-    }
-
-    void EmitName(const TStringBuf& pname, const TStringBuf& name) {
+    void EmitName(const TStringBuf& parentName, const TStringBuf& name) override {
         // TODO: quote symbols
         if (!NeedParentName)
             *Stream_ << "\"" << EscapeC(name) << "\";";
-        else if (pname.size())
-            *Stream_ << "\"" << EscapeC(pname) << "\" -> \"" << EscapeC(name) << "\";";
+        else if (parentName.size())
+            *Stream_ << "\"" << EscapeC(parentName) << "\" -> \"" << EscapeC(name) << "\";";
     }
 
-    void EmitNode(const EMakeNodeType, const ui32, const TStringBuf parentName, const TStringBuf name) {
+    void EmitNode(const EMakeNodeType /*type*/, const ui32 /*id*/, const TStringBuf& parentName, const TStringBuf& name, const TStringBuf&) override {
         EmitName(parentName, name);
         BeginChildren();
     }
 
-    void EmitDep(const ui32, const EMakeNodeType, const ui32, const EMakeNodeType, const EDepType, bool) {
-    }
-
     // flat output
-    void EmitModule(EMakeNodeType, const TStringBuf&, const TStringBuf& name) {
+    void EmitModule(EMakeNodeType /*type*/, const TStringBuf& /*modName*/, const TStringBuf& name) override {
         *Stream_ << "    \"" << EscapeC(NPath::CutType(name)) << "\" [label=\"" << EscapeC(NPath::Parent(NPath::CutType(name))) << "\"];" << Endl;
     }
 };
 
-class TFlatJsonFormat : public NFlatJsonGraph::TWriter {
-
-private:
-
+class TFlatJsonFormat : public TFormatInterface, public NFlatJsonGraph::TWriter {
 public:
     static const bool NeedParentName = true;
     static const bool PrintChildren = false;
@@ -336,42 +315,12 @@ public:
     TFlatJsonFormat(IOutputStream* stream)
     : NFlatJsonGraph::TWriter(*stream) {}
 
-    void AddHeader() {
+    void EmitDep(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType  depType, bool /*isFirst*/, const ELogicalDepType logicalDepType = ELDT_FromDepType) override {
+        AddLink(fromId, fromType, toId, toType, depType, NFlatJsonGraph::EIDFormat::Complex, logicalDepType);
     }
 
-    void AddTail() {
-    }
-
-    void BeginNode() {
-    }
-
-    void EndNode() {
-    }
-
-    void BeginChildren() {
-    }
-
-    void EndChildren() {
-    }
-
-    void EmitDep(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType type, bool) {
-        AddLink(fromId, fromType, toId, toType, type, NFlatJsonGraph::EIDFormat::Complex);
-    }
-
-    void EmitName(const TStringBuf&, const TStringBuf&) {
-    }
-
-    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf, const TStringBuf name) {
+    void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& /*parentName*/, const TStringBuf& name, const TStringBuf&) override {
         AddNode(type, id, name, NFlatJsonGraph::EIDFormat::Complex);
-    }
-
-    void EmitPad(const TStringBuf&) {
-    }
-
-    void EmitModule(EMakeNodeType, const TStringBuf&, const TStringBuf&) {
-    }
-
-    void EmitPos(int, int) {
     }
 };
 
@@ -390,6 +339,7 @@ private:
     TDependencyFilter SubGraphFilter;
     TToolMiner ToolMiner;
     const TCommands& Commands;
+    bool DumpDepends = false;
 
     const TFoldersTree* FoldersTree;
     THashSet<ui32> SeenDataPaths;
@@ -432,6 +382,7 @@ public:
         , DepFilter(PrepareSkipFlags(cf))
         , SubGraphFilter(PrepareSubGraphSkipFlags(cf))
         , Commands(commands)
+        , DumpDepends(cf.DumpDepends)
         , FoldersTree(foldersTree)
         , WithData(cf.DumpData)
         , WithYaMake(cf.WithYaMake)
@@ -468,7 +419,6 @@ public:
     const TFormatter& Formatter() const {
         return Formatter_;
     }
-
 };
 
 template <class TFormatter>
@@ -497,11 +447,13 @@ bool TNodePrinter<TFormatter>::AcceptDep(TState& state) {
 template <class TFormatter>
 bool TNodePrinter<TFormatter>::Enter(TState& state) {
     bool fresh = TBase::Enter(state);
-    TStateItem& st = state.Top();
-    EMakeNodeType nodeType = st.Node()->NodeType;
+    auto& top = state.Top();
+    const auto topNode = top.Node();
+    const auto nodeType = topNode->NodeType;
+    const auto elemId = topNode->ElemId;
 
     if (fresh && IsModuleType(nodeType)) {
-        const TModule* module = RestoreContext.Modules.Get(st.Node()->ElemId);
+        const TModule* module = RestoreContext.Modules.Get(elemId);
         if (module->GetAttrs().RequireDepManagement) {
             for (TNodeId peerId: RestoreContext.Modules.GetModuleNodeLists(module->GetId()).UniqPeers()) {
                 const TModule* peer = RestoreContext.Modules.Get(RestoreContext.Graph.Get(peerId)->ElemId);
@@ -510,27 +462,20 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
         }
     }
 
-    if (fresh && state.HasIncomingDep() && !SubGraphFilter(state.IncomingDep())) {
+    auto hasIncDep = state.HasIncomingDep();
+    const auto incDep = state.IncomingDep();
+    if (fresh && hasIncDep && !SubGraphFilter(incDep)) {
         fresh = false;
         CurEnt->RejectedByIncomingDep = true;
-    } else if (CurEnt && CurEnt->RejectedByIncomingDep && (!state.HasIncomingDep() || SubGraphFilter(state.IncomingDep()))) {
+    } else if (CurEnt && CurEnt->RejectedByIncomingDep && (!hasIncDep || SubGraphFilter(incDep))) {
         fresh = true;
         CurEnt->RejectedByIncomingDep = false;
     }
 
     if (!fresh) {
-        st.Depth = CurEnt->Depth;
+        top.Depth = CurEnt->Depth;
     }
     Formatter().BeginNode();
-
-    if (nodeType == EMNT_BuildCommand && state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildCommand) {
-        if (state.Top().GetCmdName().IsNewFormat()) {
-            VisitorEntry(*state.Parent())->StructCmdDetected = true;
-        }
-    }
-
-    auto parent = state.Parent();
-    auto currNode = state.Top().Node();
 
     auto resolveNodeName = [] (auto& graph, auto node, bool resolveLinks) {
         if (UseFileId(node->NodeType)) {
@@ -546,38 +491,41 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
         }
     };
 
-    TString name = resolveNodeName(RestoreContext.Graph, currNode, NeedResolveLinks);
+    TString name = resolveNodeName(RestoreContext.Graph, topNode, NeedResolveLinks);
+
     TString parentName;
     ui32 parentId = 0;
-    bool parentStructCmdDetected = false;
-    EMakeNodeType parentType = EMakeNodeType::EMNT_Last;
+    EMakeNodeType parentType = EMakeNodeType::EMNT_Deleted;
+    auto parent = state.Parent();
     if (parent != state.end()) {
         if (TFormatter::NeedParentName) {
             parentName = resolveNodeName(RestoreContext.Graph, parent->Node(), NeedResolveLinks);
             parentId = parent->Node()->ElemId;
             parentType = parent->Node()->NodeType;
         }
-        parentStructCmdDetected = VisitorEntry(*parent)->StructCmdDetected;
     }
     if (Pad.size() < state.Size()) {
         Pad.append(state.Size() - Pad.size(), ' ');
     }
-    TConstDepRef incDep = state.IncomingDep();
     TStringStream ss;
     auto maybeEmitStructCmd = [&]() {
-        if (!parentStructCmdDetected)
-            return false;
         auto isStructCommand = incDep.IsValid() && (*incDep == EDT_Include || *incDep == EDT_BuildCommand) && nodeType == EMNT_BuildCommand;
         auto isStructVariable = incDep.IsValid() && *incDep == EDT_BuildCommand && nodeType == EMNT_BuildVariable;
         if (isStructCommand || isStructVariable) {
-            Formatter().EmitNode(nodeType, Names.CmdNameById(st.Node()->ElemId).GetCmdId(), parentName, FormatBuildCommandName(st.GetCmdName(), Commands, Names.CommandConf, true));
+            Formatter().EmitNode(
+                nodeType,
+                Names.CmdNameById(elemId).GetCmdId(),
+                parentName,
+                FormatBuildCommandName(top.GetCmdName(), Commands, Names.CommandConf),
+                DumpNodeFlags(elemId, nodeType, Names)
+            );
             return true;
         }
         return false;
     };
     switch (Mode) {
         case DM_MakeFiles: {
-            bool isIncFile = state.HasIncomingDep() && IsMakeFileIncludeDep(incDep.From()->NodeType, *incDep, incDep.To()->NodeType);
+            bool isIncFile = hasIncDep && IsMakeFileIncludeDep(incDep.From()->NodeType, *incDep, incDep.To()->NodeType);
             if (fresh && (nodeType == EMNT_MakeFile || isIncFile)) {
                 Cmsg << NPath::CutType(NPath::ResolveLink(name)) << Endl;
             }
@@ -585,7 +533,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
         }
         case DM_Files:
             if (IsFileType(nodeType)) {
-                bool isIncMakeFile = state.HasIncomingDep() && IsMakeFileIncludeDep(incDep.From()->NodeType, *incDep, incDep.To()->NodeType);
+                bool isIncMakeFile = hasIncDep && IsMakeFileIncludeDep(incDep.From()->NodeType, *incDep, incDep.To()->NodeType);
                 bool printAsMakeFile = MarkMakeFiles && (isIncMakeFile || nodeType == EMNT_MakeFile) && !CurEnt->WasPrintedAsMakeFile;
                 bool printAsFile = fresh || MarkMakeFiles && !isIncMakeFile && !CurEnt->WasPrintedAsFile;
                 if (printAsMakeFile) {
@@ -594,7 +542,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 } else if (printAsFile) {
                     Cmsg << "file: " << (EMakeNodeType)nodeType << ' ' << name << Endl;
                     if (WithData && IsModuleType(nodeType)) {
-                        auto mod = RestoreContext.Modules.Get(st.Node()->ElemId);
+                        auto mod = RestoreContext.Modules.Get(elemId);
                         Y_ASSERT(mod);
                         if (mod->DataPaths) {
                             for(auto dataPath: *mod->DataPaths) {
@@ -626,7 +574,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
             break;
         case DM_Modules:
             if (TFormatter::NeedParentName) {
-                if (IsModule(st) && state.HasIncomingDep()) {
+                if (IsModule(top) && hasIncDep) {
                     if (IsDirectPeerdirDep(incDep)) {
                         TFileView pModName = state.Parent()->GetFileName();
                         Formatter().EmitPad(TStringBuf());
@@ -635,7 +583,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                     }
                 }
             } else {
-                if (fresh && IsModule(st)) {
+                if (fresh && IsModule(top)) {
                     TStringBuf modname = NPath::CutType(NPath::Parent(name));
                     Formatter().EmitModule(nodeType, modname, name);
                 }
@@ -646,7 +594,7 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
                 if (IsMakeFileType(nodeType) && WithYaMake) {
                     Cmsg << "Makefile: " << name << Endl;
                 } else if (nodeType == EMNT_File) {
-                    if(SeenDataPaths.contains(st.GetFileName().GetElemId())) {
+                    if(SeenDataPaths.contains(top.GetFileName().GetElemId())) {
                         break;
                     }
                     Y_ASSERT(FoldersTree != nullptr);
@@ -658,18 +606,39 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
             break;
         case DM_DGraphFlatJsonWithCmds:
         case DM_DGraphFlatJson:
-            if (Mode == DM_DGraphFlatJsonWithCmds || UseFileId(parentType) && UseFileId(st.Node()->NodeType)) {
-                Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
+            if (Mode == DM_DGraphFlatJsonWithCmds || UseFileId(parentType) && UseFileId(nodeType)) {
+                Formatter().EmitDep(parentId, parentType, elemId, nodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
             }
             if (fresh && (Mode == DM_DGraphFlatJsonWithCmds || UseFileId(nodeType))) {
                 if (!maybeEmitStructCmd()) {
-                    Formatter().EmitNode(nodeType, st.Node()->ElemId, parentName, (nodeType == EMNT_BuildCommand ? SkipId(name) : name));
+                    Formatter().EmitNode(
+                        nodeType,
+                        elemId,
+                        parentName,
+                        (nodeType == EMNT_BuildCommand ? SkipId(name) : name),
+                        DumpNodeFlags(elemId, nodeType, Names)
+                    );
                 }
             }
             if (Mode == DM_DGraphFlatJson && IsOutputType(nodeType)) {
                 const auto tools = ToolMiner.MineTools(state.TopNode());
                 for (ui32 toolId : tools) {
-                    Formatter().EmitDep(st.Node()->ElemId, nodeType, toolId, TDepGraph::Graph(st.Node()).GetFileNodeById(toolId)->NodeType, EDepType::EDT_Include, fresh);
+                    Formatter().EmitDep(elemId, nodeType, toolId, TDepGraph::Graph(topNode).GetFileNodeById(toolId)->NodeType, EDepType::EDT_Include, fresh);
+                }
+            }
+            if (DumpDepends && hasIncDep && parentType == EMNT_BuildCommand && parent != state.end() && IsPropToDirSearchDep(incDep) && parentName.EndsWith("DEPENDS=")) {
+                // emit deps to modules closure of depend
+                auto propParent = parent + 1;
+                if (propParent != state.end()) {
+                    for (const auto topEdge: topNode.Edges()) {
+                        if (IsDirToModuleDep(topEdge)) {
+                            const auto modRef = topEdge.To();
+                            const TModule* mod = RestoreContext.Modules.Get(modRef->ElemId);
+                            if (mod && !mod->IsFakeModule() && (!mod->IsFromMultimodule() || mod->IsFinalTarget())) {
+                                Formatter().EmitDep(propParent->Node()->ElemId, propParent->Node()->NodeType, modRef->ElemId, modRef->NodeType, EDT_Include, fresh, ELDT_Depend);
+                            }
+                        }
+                    }
                 }
             }
             break;
@@ -680,10 +649,16 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
             if (Mode != DM_DraphNoPosNoId) {
                 Formatter().EmitPos(incDep.IsValid() ? parent->DepIndex() + 1 : 0, incDep.IsValid() ? parent->NumDeps() : 0);
             }
-            Formatter().EmitDep(parentId, parentType, st.Node()->ElemId, st.Node()->NodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
+            Formatter().EmitDep(parentId, parentType, elemId, nodeType, incDep.IsValid() ? *incDep : EDT_Search, fresh);
             {
                 if (!maybeEmitStructCmd()) {
-                    Formatter().EmitNode(nodeType, UseFileId(nodeType) ? TDepGraph::GetFileName(st.Node()).GetTargetId() : st.Node()->ElemId, parentName, (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)));
+                    Formatter().EmitNode(
+                        nodeType,
+                        UseFileId(nodeType) ? TDepGraph::GetFileName(topNode).GetTargetId() : elemId,
+                        parentName,
+                        (Mode == DM_Draph || nodeType != EMNT_BuildCommand ? name : SkipId(name)),
+                        DumpNodeFlags(elemId, nodeType, Names)
+                    );
                 }
             }
             break;
@@ -767,14 +742,14 @@ static void DumpGraphInternal(TYMake& yMake) {
         NodesByDepth.emplace_back(i.second.Depth, i.first);
     }
     std::sort(NodesByDepth.begin(), NodesByDepth.end());
-    TMakeModuleStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
+    TMakeModuleSequentialStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
     for (auto&& i : NodesByDepth) {
         if (renderCmd) {
             TSubst2Shell cmdImage;
             TMakeCommand mkCmd(modulesStatesCache, yMake);
             mkCmd.CmdInfo.MkCmdAcceptor = &cmdImage;
             try {
-                mkCmd.GetFromGraph(i.second, printer.Node2Module[i.second], ECF_Make);
+                mkCmd.GetFromGraph(i.second, printer.Node2Module[i.second]);
                 cmdImage.PrintAsLine(yMake.Conf.Cmsg()) << Endl;
             } catch (yexception& e) {
                 yMake.Conf.Cmsg() << "#Error: " << yMake.Graph.ToString(yMake.Graph.Get(i.second)) << ": " << e.what() << "\n";
@@ -824,20 +799,6 @@ public:
             return false;
         }
         return DepFilter(dep, !state.HasIncomingDep());
-    }
-    bool Enter(TState& state) {
-        bool fresh = TBase::Enter(state);
-        if (state.Top().Node()->NodeType == EMNT_BuildCommand && state.HasIncomingDep() && *state.IncomingDep() == EDT_BuildCommand) {
-            if (state.Top().GetCmdName().IsNewFormat()) {
-                VisitorEntry(*state.Parent())->StructCmdDetected = true;
-            }
-        }
-        return fresh;
-    }
-
-public:
-    bool StructCmdDetected(const TStateItem& stateItem) {
-        return VisitorEntry(stateItem)->StructCmdDetected;
     }
 };
 
@@ -1149,7 +1110,6 @@ namespace {
         EDepType DepType;
         ui32 ElemId;
         TString NodeName;
-        bool StructCmdDetected;
     };
 
     TVector<TRelationItem> GetPath(const TVector<TNodeId>& startTargets, const TRestoreContext& restoreContext, const TDebugOptions& cf, const TDestinationData& destData) {
@@ -1187,8 +1147,7 @@ namespace {
                             .NodeType=st.Node()->NodeType,
                             .DepType=(!prev ? EDepType::EDT_Include : *prev->CurDep()),
                             .ElemId=st.Node()->ElemId,
-                            .NodeName=st.Print(),
-                            .StructCmdDetected=!prev ? false : filter.StructCmdDetected(*prev)
+                            .NodeName=st.Print()
                         });
                         prev = st;
                     }
@@ -1224,8 +1183,7 @@ namespace {
                             .NodeType=st.Node()->NodeType,
                             .DepType=(!prev ? EDepType::EDT_Last : *prev->CurDep()),
                             .ElemId=st.Node()->ElemId,
-                            .NodeName=st.Print(),
-                            .StructCmdDetected=false // we do not expect commands in recurse graphs, so whatever is fine
+                            .NodeName=st.Print()
                         });
                         prev = st;
                     }
@@ -1258,8 +1216,7 @@ void DumpFirstRelation(const TRestoreContext& restoreContext, const TTraverseSta
                 name = FormatBuildCommandName(
                     yMake.Graph.GetCmdName(it->ElemId),
                     yMake.Commands,
-                    yMake.Graph.Names().CommandConf,
-                    it->StructCmdDetected
+                    yMake.Graph.Names().CommandConf
                 );
             }
             if (isFirst) {
@@ -1732,7 +1689,7 @@ public:
                                 }
                             }
                             if (!inPeerdirs) {
-                                guess += TString("\n[[unimp]][ Guess][[rst]]: [[alt1]]PEERDIR[[rst]] is probably missing: ")
+                                guess += TString("\n[[unimp]][ Guess][[rst]]: [[alt1]]PEERDIR[[rst]] is either missing or forbidden by peerdir policy: ")
                                       + graph.GetFileName(graph.Get(*prev)).GetTargetStr()
                                       + " -> "
                                       + graph.GetFileName(graph.Get(*cur)).GetTargetStr();
@@ -1791,7 +1748,7 @@ private:
 };
 
 void TYMake::FindMissingPeerdirs() {
-    FORCE_TRACE(U, NEvent::TStageStarted("Find missing peerdirs"));
+    NYMake::TTraceStage stage("Find missing peerdirs");
     TDirAssignPeerdirProc assignProc(GetRestoreContext());
     IterateAll(Graph, StartTargets, assignProc, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
 
@@ -1800,7 +1757,6 @@ void TYMake::FindMissingPeerdirs() {
     if (detectProc.HasMissingPeerdirs()) {
         YInfo() << "More information about missing peerdirs can be found on https://wiki.yandex-team.ru/Development/Poisk/arcadia/ymake/manual/missing_peerdirs" << Endl;
     }
-    FORCE_TRACE(U, NEvent::TStageFinished("Find missing peerdirs"));
 }
 
 
@@ -2407,5 +2363,71 @@ void DumpModulesInfo(IOutputStream& out, const TRestoreContext& restoreContext, 
     if (restoreContext.Conf.DumpAsJson) {
         json.EndList();
         out << Endl;
+    }
+}
+
+TString DumpNodeFlags(ui32 elemId, EMakeNodeType nodeType, const TSymbols& names) {
+    TString result;
+    if (!UseFileId(nodeType)) {
+        auto& data = names.CommandConf.GetById(TVersionedCmdId(elemId).CmdId());
+        if (data.KeepTargetPlatform)
+            result = "KTP";
+    }
+    return result;
+}
+
+template <>
+void Out<TDartManager::EDartType>(IOutputStream& out, TDartManager::EDartType dartType) {
+    switch (dartType) {
+    case TDartManager::EDartType::None:
+        out << "NoneDart";
+        break;
+    case TDartManager::EDartType::Test:
+        out << "TestDart";
+        break;
+    case TDartManager::EDartType::Java:
+        out << "JavaDart";
+        break;
+    case TDartManager::EDartType::Makefiles:
+        out << "MakefilesDart";
+        break;
+    default:
+        out << "UnknownDart";
+        break;
+    }
+}
+
+void TDartManager::Dump(EDartType dartType, const TString& dartName) {
+    TFsPath dartPath{dartName};
+    TFsPath cachePath = YMake_.Conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache");
+    TString dartTypeStr = ToString(dartType);
+    Y_ASSERT(cachePath != dartPath);
+    if (YMake_.Conf.ShouldLoadDartCaches() && YMake_.CanBypassConfigure() && cachePath.Exists()) {
+        NYMake::TTraceStage trace{fmt::format("Load {} from cache", dartTypeStr)};
+        cachePath.CopyTo(dartName, true);
+        return;
+    } else {
+        NYMake::TTraceStage trace{fmt::format("Render {}", dartTypeStr)};
+        THolder<IOutputStream> dartOut;
+        dartOut.Reset(new TFileOutput(dartName));
+        switch (dartType) {
+        case EDartType::Test:
+            YMake_.DumpTestDart(*dartOut);
+            break;
+        case EDartType::Java:
+            YMake_.DumpJavaDart(*dartOut);
+            break;
+        case EDartType::Makefiles:
+            YMake_.DumpMakeFilesDart(*dartOut);
+            break;
+        default:
+            // Unreachable code
+            Y_ASSERT(0);
+        }
+        dartOut->Finish();
+    }
+    if (YMake_.Conf.ShouldSaveDartCaches()) {
+        NYMake::TTraceStage trace{fmt::format("Save {} to cache", dartTypeStr)};
+        TFsPath{dartName}.CopyTo(cachePath, true);
     }
 }

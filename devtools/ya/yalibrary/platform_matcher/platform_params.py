@@ -148,7 +148,7 @@ def get_target_platform_alias(toolchain_string, toolchain_transforms):
         if not chunk.startswith(('test', 'regular-tests')):
             toolchain_chunks.append(chunk)
 
-    if toolchain_chunks[1] not in ('release', 'debug', 'relwithdebinfo', 'minsizerel'):
+    if len(toolchain_chunks) == 1 or toolchain_chunks[1] not in ('release', 'debug', 'relwithdebinfo', 'minsizerel'):
         toolchain_chunks.insert(1, 'release')
 
     for chunk in list(toolchain_chunks):

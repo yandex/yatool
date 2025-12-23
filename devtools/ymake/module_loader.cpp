@@ -3,6 +3,7 @@
 
 #include "args2locals.h"
 #include "builtin_macro_consts.h"
+#include "glob_helper.h"
 #include "makefile_loader.h"
 #include "prop_names.h"
 #include "ymake.h"
@@ -11,6 +12,8 @@
 
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/trace.h>
+
+#include <util/string/cast.h>
 
 #include <library/cpp/iterator/mapped.h>
 
@@ -83,12 +86,20 @@ const TModuleDef::TMacroCalls* TModuleDef::PrepareMacroBody(const TStringBuf& na
         return nullptr;
     }
     const auto& props = *pi->second.CmdProps;
-    AddMacroArgsToLocals(props, args, locals, *MakeFileMap.Pool);
+    AddMacroArgsToLocals(props, args, locals).or_else([&](const TMapMacroVarsErr& err) -> TMapMacroVarsResult {
+        err.Report(name, JoinStrings(args.begin(), args.end(), ", "));
+        return {};
+    }).value();
     return &props.GetMacroCalls();
 }
 
 TStringBuf TModuleDef::PrepareMacroCall(const TMacroCall& macroCall, const TVars& locals, TSplitString& callArgs, const TStringBuf& name) {
-    callArgs = TCommandInfo(Conf, nullptr, nullptr).SubstMacroDeeply(nullptr, macroCall.second, locals);
+    TCommandInfo cmdInfo(Conf, nullptr, nullptr);
+    cmdInfo.DisableStructCmd =
+        macroCall.first == NMacro::SET ||
+        macroCall.first == NMacro::SET_APPEND ||
+        macroCall.first == NMacro::SET_APPEND_WITH_GLOBAL;
+    callArgs = cmdInfo.SubstMacroDeeply(nullptr, macroCall.second, locals);
     callArgs.Split(' ');
     // Take appropriate macro specialization name
     TStringBuf macroName = Conf.GetSpecMacroName(macroCall.first, callArgs);
@@ -159,9 +170,7 @@ void TModuleDef::InitModule(const TStringBuf& name, TArrayRef<const TStringBuf> 
     Vars.AssignFilterGlobalVarsFunc([&moduleConf](const TStringBuf &varName) -> bool { return moduleConf.Globals.contains(varName); });
     OrigVars = orig;
     InitModuleSpecConditions();
-    ModuleConf.ParseModuleArgs(&Module, args);
-    ModuleConf.SetModuleBasename(&Module);
-    ProcessModuleMacroCalls(name, args);
+    ProcessModuleCall(name, args);
     InitFromConf();
     //TODO: set this variable only for DLL and derivatives or add common variable to store FileName
     Vars.SetValue(NVariableDefs::VAR_SONAME, Module.GetFileName());
@@ -186,7 +195,7 @@ bool TModuleDef::IsMulti(const TStringBuf& name) const {
            || name == TStringBuf("DECLARE_EXTERNAL_HOST_RESOURCES_BUNDLE")
            || name == TStringBuf("DECLARE_EXTERNAL_HOST_RESOURCES_PACK")
            || name == NMacro::_LATE_GLOB
-           || IsUserMacro(name) || Conf.ContainsPluginMacro(name);
+           || IsUserMacro(name) || Conf.FindPluginMacro(name) != nullptr;
 }
 
 TDepsCacheId TModuleDef::Commit() {
@@ -240,15 +249,21 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         return false;
     }
 
-    TStringBuf globPropName = NProps::GLOB;
-
     if (args.empty()) {
         YConfErrPrecise(Syntax, location.first, location.second) << "empty argument in [[alt1]]" << name << "[[rst]]" << Endl;
         return true;
     }
 
     TStringBuf varName = args.front();
-    const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::EXCLUDE);
+    const auto [globsWithExcludes, restrictions] = SplitBy(TArrayRef<const TStringBuf>{args}.subspan(1), NArgs::RESTRICTIONS);
+    TGlobRestrictions globRestrictions;
+    if (!restrictions.empty()) {
+        globRestrictions = TGlobHelper::ParseGlobRestrictions(restrictions.subspan(1), NMacro::_GLOB);
+    }
+    if (IsExtendGlobRestriction()) {
+        globRestrictions.Extend();
+    }
+    const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{globsWithExcludes}, NArgs::EXCLUDE);
 
     TUniqVector<ui32> excludeIds;
     TExcludeMatcher excludeMatcher;
@@ -261,23 +276,49 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
+    const auto moduleElemId = Module.GetName().GetElemId();
+    ui32 globVarElemId = 0;
+    TGlobStat globStat;
     TUniqVector<TFileView> values;
     for (auto globStr : globs) {
         try {
             TUniqVector<ui32> matches;
-            TGlob glob(Names.FileConf, globStr, Module.GetDir());
-            for (const auto& result : glob.Apply(excludeMatcher)) {
+            TGlobPattern globPattern(Names.FileConf, globStr, Module.GetDir());
+            TGlobStat globPatternStat;
+            for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {
                 values.Push(result);
             }
+            globStat += globPatternStat;
 
-            const auto globCmd = FormatCmd(Module.GetName().GetElemId(), globPropName, globStr);
-            const auto globId = Names.AddName(EMNT_BuildCommand, globCmd);
-            const auto globHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()));
-            const auto refferer = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
-            ModuleGlobs.push_back(TModuleGlobInfo{globId, globHash, glob.GetWatchDirs().Data(), matches.Take(), excludeIds.Data(), refferer});
-        } catch (const yexception& error){
+            if (!globVarElemId) {
+                globVarElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+            }
+            const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
+            const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);
+            TGlobHelper::SaveGlobPatternStat(GetModuleGlobsData(), globPatternId, std::move(globPatternStat));
+            ModuleGlobs.push_back(
+                TModuleGlobInfo {
+                    .GlobPatternId = globPatternId,
+                    .GlobPatternHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())),
+                    .WatchedDirs = globPattern.GetWatchDirs().Data(),
+                    .MatchedFiles = matches.Take(),
+                    .Excludes = excludeIds.Data(),
+                    .ReferencedByVar = globVarElemId,
+                }
+            );
+        } catch (const yexception& error) {
             YConfErrPrecise(Syntax, location.first, location.second) << "Invalid pattern in [[alt1]]" << name << "[[rst]]: " << error.what() << Endl;
         }
+    }
+
+    TStringBuilder patterns;
+    for (auto pattern : globs) {
+        if (!patterns.empty()) patterns << ", ";
+        patterns << pattern;
+    }
+    globRestrictions.Check(name, patterns, globStat);
+    if (globVarElemId) {
+        TGlobHelper::SaveGlobRestrictions(GetModuleGlobsData(), globVarElemId, std::move(globRestrictions));
     }
 
     auto&& range = MakeMappedRange(values, [](auto x) {
@@ -290,6 +331,10 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     return true;
 }
 
-TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() {
+bool TModuleDef::IsExtendGlobRestriction() const {
+    return !Conf.GlobRestrictionExtends.empty() && Conf.GlobRestrictionExtends.contains(Module.GetDir().CutType());
+}
+
+const TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() const {
     return ModuleGlobs;
 }

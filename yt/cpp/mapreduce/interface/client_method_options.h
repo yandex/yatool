@@ -20,24 +20,25 @@ namespace NYT {
 /// Type of the cypress node.
 enum ENodeType : int
 {
-    NT_STRING               /* "string_node" */,
-    NT_INT64                /* "int64_node" */,
-    NT_UINT64               /* "uint64_node" */,
-    NT_DOUBLE               /* "double_node" */,
-    NT_BOOLEAN              /* "boolean_node" */,
-    NT_MAP                  /* "map_node" */,
-    NT_LIST                 /* "list_node" */,
-    NT_FILE                 /* "file" */,
-    NT_TABLE                /* "table" */,
-    NT_DOCUMENT             /* "document" */,
-    NT_REPLICATED_TABLE     /* "replicated_table" */,
-    NT_TABLE_REPLICA        /* "table_replica" */,
-    NT_USER                 /* "user" */,
-    NT_SCHEDULER_POOL       /* "scheduler_pool" */,
-    NT_LINK                 /* "link" */,
-    NT_GROUP                /* "group" */,
-    NT_PORTAL               /* "portal_entrance" */,
-    NT_CHAOS_TABLE_REPLICA  /* "chaos_table_replica" */,
+    NT_STRING              =  0  /* "string_node" */,
+    NT_INT64               =  1  /* "int64_node" */,
+    NT_UINT64              =  2  /* "uint64_node" */,
+    NT_DOUBLE              =  3  /* "double_node" */,
+    NT_BOOLEAN             =  4  /* "boolean_node" */,
+    NT_MAP                 =  5  /* "map_node" */,
+    NT_LIST                =  6  /* DEPRECATED */,
+    NT_FILE                =  7  /* "file" */,
+    NT_TABLE               =  8  /* "table" */,
+    NT_DOCUMENT            =  9  /* "document" */,
+    NT_REPLICATED_TABLE    = 10  /* "replicated_table" */,
+    NT_TABLE_REPLICA       = 11  /* "table_replica" */,
+    NT_USER                = 12  /* "user" */,
+    NT_SCHEDULER_POOL      = 13  /* "scheduler_pool" */,
+    NT_LINK                = 14  /* "link" */,
+    NT_GROUP               = 15  /* "group" */,
+    NT_PORTAL              = 16  /* "portal_entrance" */,
+    NT_CHAOS_TABLE_REPLICA = 17  /* "chaos_table_replica" */,
+    NT_TABLE_COLLOCATION   = 18  /* "table_collocation" */,
 };
 
 ///
@@ -591,6 +592,13 @@ struct TFileWriterOptions
     FLUENT_FIELD_OPTION(TWriterOptions, WriterOptions);
 };
 
+///
+/// @brief Options for writing file fragment in distributed session.
+///
+/// @see NYT::IIOClient::CreateFileFragmentWriter
+struct TFileFragmentWriterOptions
+{ };
+
 class TSkiffRowHints
 {
 public:
@@ -774,6 +782,13 @@ struct TTableWriterOptions
     /// @see NYT::TWriterOptions
     FLUENT_FIELD_OPTION(TWriterOptions, WriterOptions);
 };
+
+///
+/// @brief Options for writing table fragment in distributed session.
+///
+/// @see NYT::IIOClient::CreateTableFragmentWriter
+struct TTableFragmentWriterOptions
+{ };
 
 ///
 /// @brief Options for @ref NYT::IClient::StartTransaction
@@ -1158,16 +1173,9 @@ struct TCreateClientOptions
     /// @brief Proxy Address to be used for connection
     FLUENT_FIELD_OPTION(TString, ProxyAddress);
 
-    /// @brief Use unix domain socket for connection.
+    /// @brief Job proxy unix domain socket used for connection.
     /// Typically you will need this option when the RPC proxy is enabled within the job proxy.
-    FLUENT_FIELD_DEFAULT(bool, UseProxyUnixDomainSocket, false);
-
-    /// @brief Defines which cluster should handle incoming RPC requests.
-    ///
-    /// @note Multiproxy mode must be activated on the server side.
-    /// This mode allows a proxy from one cluster to forward requests to another.
-    /// Availability and specific usage might vary based on server configuration.
-    FLUENT_FIELD_OPTION(TString, MultiproxyTargetCluster);
+    FLUENT_FIELD_OPTION(TString, JobProxySocketPath);
 };
 
 ///

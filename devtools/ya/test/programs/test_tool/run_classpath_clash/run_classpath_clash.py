@@ -4,10 +4,9 @@ import functools
 import os
 import re
 import sys
-import six
 import time
 import zipfile
-from six.moves import xrange
+import traceback
 
 import exts.hashing as hashing
 
@@ -64,7 +63,7 @@ def build_classnames_map(files, ignored):
 
 
 def get_classnames_count(classmap):
-    return sum(len(x) for x in six.itervalues(classmap))
+    return sum(len(x) for x in classmap.values())
 
 
 @timeit
@@ -72,12 +71,12 @@ def strip_unique_jars(classmap):
     log('Original number of classnames: {}'.format(get_classnames_count(classmap)))
 
     tr = collections.defaultdict(list)
-    for filename, names in six.iteritems(classmap):
+    for filename, names in classmap.items():
         for x in names:
             tr[x].append(filename)
 
     classmap = collections.defaultdict(set)
-    for name, files in six.iteritems(tr):
+    for name, files in tr.items():
         if len(files) != 1:
             for filename in files:
                 classmap[filename].add(name)
@@ -95,7 +94,7 @@ def get_clashed_classes(build_root, jar_files, ignored, strict):
 
     duplicate_classes_jars = collections.defaultdict(list)
     classlist = []
-    for jar, names in six.iteritems(classmap):
+    for jar, names in classmap.items():
         my_classes = set()
         jar_info = {'name': jar, 'classes': {}}
         with zipfile.ZipFile(jar) as jf:
@@ -110,8 +109,8 @@ def get_clashed_classes(build_root, jar_files, ignored, strict):
                     duplicate_classes_jars[jar].append(entry.filename)
         classlist.append(jar_info)
     clashmap = collections.defaultdict(list)
-    for c1 in xrange(len(classlist)):
-        for c2 in xrange(c1 + 1, len(classlist)):
+    for c1 in range(len(classlist)):
+        for c2 in range(c1 + 1, len(classlist)):
             fst = classlist[c1]
             snd = classlist[c2]
             intersect = [
@@ -131,7 +130,7 @@ def classname(cls):
 def pretty_print_clashed_classes(root, clashed_map, snippet_classes_limit=None):
     err_msg = []
     snippet_msg = []
-    for files, classes in six.iteritems(clashed_map):
+    for files, classes in clashed_map.items():
         classes = sorted(classes)
         msg = '\n'.join(['[[bad]]{}[[rst]]'.format(os.path.relpath(i, root)) for i in files])
         msg += '\nConflicted classes:\n'
@@ -148,7 +147,7 @@ def pretty_print_clashed_classes(root, clashed_map, snippet_classes_limit=None):
 def pretty_print_duplicated_classes(root, duplicate_jars, snippet_classes_limit=None):
     err_msg = []
     snippet_msg = []
-    for jar, classes in six.iteritems(duplicate_jars):
+    for jar, classes in duplicate_jars.items():
         classes = sorted(classes)
         msg = '[[bad]]{}[[rst]]'.format(os.path.relpath(jar, root))
         msg += '\nDuplicated classes:\n'
@@ -189,7 +188,15 @@ def main():
     VERBOSE[0] = is_enabled("--verbose")
 
     ignored, jars = parse_input(sys.argv[2:])
-    clashed_classes, duplicated_classes = get_clashed_classes(build_root, jars, ignored, strict)
+
+    try:
+        clashed_classes, duplicated_classes = get_clashed_classes(build_root, jars, ignored, strict)
+    except Exception:
+        comment = "[[bad]]Couldn't get clashed classes due to: {}".format(traceback.format_exc())
+        print(comment, file=sys.stderr)
+        print(comment)
+        return 1
+
     if not clashed_classes and not duplicated_classes:
         return 0
     if clashed_classes:

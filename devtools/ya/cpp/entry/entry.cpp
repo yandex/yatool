@@ -9,6 +9,9 @@
 #include <util/system/env.h>
 
 namespace NYa {
+    __attribute__((weak)) void InitYt(int, char**) {
+    }
+
     namespace {
         using TMain = int (*)(int argc, char** argv);
 
@@ -57,6 +60,7 @@ namespace NYa {
         }
 
         int Entry(int argc, char** argv) {
+            ::NYa::InitYt(argc, argv);
             auto newPgid = SetOwnProcessGroupId(argc, argv);
             InitWatchdogFromEnv();
 

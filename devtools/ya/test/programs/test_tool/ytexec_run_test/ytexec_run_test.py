@@ -50,8 +50,10 @@ DIRS_TO_UPLOAD = {"sandbox-storage", "yt_run_test"}
 DIRS_TO_SKIP = {"environment"}
 FILES_TO_SKIP = {"yt_run_test.log"}
 CPU_LIMIT = 1
-TIMEOUT_DELAY = 60
-TIMEOUT_SIGKILL_DELAY = 45
+RESULTS_PROCESSING_OVERHEAD = 10
+# - 60s for the operation to start up including artifacts upload
+# - 5s for the operation to shut down
+CREATE_OPERATION_OVERHEAD = 65
 
 
 def parse_args():
@@ -272,8 +274,6 @@ def get_environ(user_yt_spec):
     for key in env_copy.keys():
         if key in ["TMP", "TMPDIR", "TEMPDIR", "TEMP"]:
             env_copy[key] = "/var/tmp"
-    node_start_timestamp = os.environ.get("TEST_NODE_START_TIMESTAMP", None) or int(time.time())
-    env_copy["TEST_NODE_START_TIMESTAMP"] = str(node_start_timestamp)
     env_copy = ["{}={}".format(k, v) for k, v in six.iteritems(env_copy) if k not in ENV_SKIP]
     return env_copy
 
@@ -388,9 +388,6 @@ def generate_config_sections(args):
         args=args.run_test_command,
         cwd=os.getcwd(),
         environ=env_copy,
-        sigkill_timeout=(args.timeout + TIMEOUT_SIGKILL_DELAY) * 1000**3,
-        sigquit_timeout=(args.timeout + TIMEOUT_DELAY) * 1000**3,
-        sigusr2_timeout=(args.timeout + TIMEOUT_DELAY) * 1000**3,
     )
 
     # filling exec section
@@ -405,6 +402,22 @@ def generate_config_sections(args):
     )
 
     # filling operation section
+    if args.node_timeout:
+        # 10s in `max` doesn't carry any meaning, it's there to prevent
+        # negative timeout which normally should not occur, operation will most
+        # certainly time out
+        timeout = (
+            max(
+                args.node_timeout
+                - run_test.get_time_from_node_startup()
+                - CREATE_OPERATION_OVERHEAD
+                - RESULTS_PROCESSING_OVERHEAD,
+                10,
+            )
+            * 1000**3
+        )
+    else:
+        timeout = DEFAULT_TIMEOUT
     operation_fields = YtexecConfig.Operation(
         pool=DEFAULT_POOL,
         title=args.description,
@@ -417,8 +430,7 @@ def generate_config_sections(args):
         enable_porto=True,
         memory_limit=args.ram * 1 << 30,
         tmpfs_size=args.ram_disk * 1 << 30 or DEFAULT_MEMORY_LIMIT,
-        # real timeout = timeout + 5 minutes https://a.yandex-team.ru/arc/trunk/arcadia/yt/go/ytrecipe/internal/job/config.go?rev=7242841&blame=true#L12
-        timeout=args.timeout * 1000**3,
+        timeout=timeout,
         output_ttl=OUTPUT_TTL,
         spec_patch=user_yt_spec.get('operation_spec'),
         task_patch=user_yt_spec.get('task_spec'),
@@ -637,16 +649,27 @@ def get_upload_size(ytexec_config):
     return total_size
 
 
-def process_test_results(args, ytexec_config, exit_code, start_time):
+def process_test_results(args, ytexec_config: YtexecConfig, exit_code, start_time, yt_exec_timeout: int | None):
     stderr_path = ytexec_config.fs_fields.stderr_file
     result_path = ytexec_config.exec_fields.result_file
 
     print_file(stderr_path)
     yt_metrics = {
-        "ytexec_upload_files_count": len(ytexec_config.fs_fields.upload_tar) + len(ytexec_config.fs_fields.upload_file)
+        "ytexec_upload_files_count": len(ytexec_config.fs_fields.upload_tar) + len(ytexec_config.fs_fields.upload_file),
+        "ytexec_upload_size_mb": get_upload_size(ytexec_config) / 2**20,
     }
 
+    task_patch = getattr(ytexec_config.operation_fields, 'task_patch', None) or {}
+    if gpu_limit := task_patch.get('gpu_limit', None):
+        yt_metrics["ytexec_gpu_limit"] = gpu_limit
+
+    op_url = extract_operation_url(args.output_dir)
+    if op_url:
+        op_url_msg = "For more info see operation: [[imp]]{}[[rst]]\n".format(op_url)
+    else:
+        op_url_msg = ""
     if os.path.exists(result_path):
+        # Job either failed or succeeded
         with open(result_path, 'r') as res_file:
             yt_res = json.load(res_file)
             yt_metrics.update({"ytexec_" + k: float(v) / 1000**3 for k, v in yt_res['statistics'].items()})
@@ -654,43 +677,76 @@ def process_test_results(args, ytexec_config, exit_code, start_time):
             exit_code = yt_res["exit_code"]
             run_test.dump_meta(args, exit_code, start_time, time.time())
             if exit_code:
-                op_url = extract_operation_url(args.output_dir)
                 if yt_res["is_oom"]:
                     # In case of OOM there is no metadata
                     parts = ["YT operation has reported out-of-memory error"]
                     status = const.Status.CRASHED
-                elif yt_res["exit_signal"]:
-                    parts = ["Run_test node was killed by signal {}".format(yt_res["exit_signal"])]
-                    status = const.Status.TIMEOUT
                 else:
                     parts = ["Unknown yt error"]
                     status = const.Status.FAIL
-                if op_url:
-                    parts.append("For more info see operation: [[imp]]{}[[rst]]".format(op_url))
+                if op_url_msg:
+                    parts.append(op_url_msg)
                 suite = dump_test_info(args, yt_metrics, ". ".join(parts), status)
             else:
                 suite = dump_test_info(args, yt_metrics)
     else:
+        # Operation timed out or artifacts upload took too long and operation
+        # wasn't created at all
         run_test.dump_meta(args, exit_code, start_time, time.time())
-        msg = "ytexec was killed by timeout.\n"
-        if exit_code == const.TestRunExitCode.TimeOut:
-            operation_creation_time = get_operation_creation_time(args.output_dir)
-            if operation_creation_time:
-                start_time_obj = datetime.datetime.fromtimestamp(start_time)
-                creation_time_obj = date_parser.parse(operation_creation_time).replace(tzinfo=None)
-                timediff = creation_time_obj - start_time_obj
-                timediff = timediff.seconds
-                yt_metrics["ytexec_operation_creation_delay_s"] = timediff
-            else:
-                msg += "operation was not created\n"
-            yt_metrics["ytexec_upload_size_mb"] = get_upload_size(ytexec_config) / 2**20
-            msg += "test metrics:\n{}".format(yt_metrics)
-            suite = dump_test_info(args, metrics=yt_metrics, error=msg, status=const.Status.TIMEOUT)
+        operation_creation_time = get_operation_creation_time(args.output_dir)
+        if operation_creation_time:
+            start_time_obj = datetime.datetime.fromtimestamp(start_time)
+            creation_time_obj = date_parser.parse(operation_creation_time).replace(tzinfo=None)
+            timediff = creation_time_obj - start_time_obj
+            timediff = timediff.seconds
+            yt_metrics["ytexec_operation_creation_delay_s"] = timediff
+            op_creation_delay_msg = (
+                "ytexec_operation_creation_delay_s includes artifacts upload and tables preparation by ytexec\n"
+            )
         else:
-            msg = "ytexec result file is not found."
+            op_creation_delay_msg = ""
+
+        if exit_code == const.TestRunExitCode.TimeOut:
+            # TODO: Revisit messages when YT-26757 is complete. As of now operation
+            # can transition to `failed` on timeout only when it gets to `running` stage.
+            msg = "ytexec was killed by timeout.\n"
+            long_prep_msg = (
+                "It may be due to long artifacts upload and tables preparation by ytexec and/or by a job. "
+                "Check out the metrics and the job timeline.\n"
+            )
+            if not operation_creation_time:
+                msg += "Operation was not created. " + long_prep_msg
+            else:
+                msg += (
+                    "Operation was created but we could not wait for it any longer and haulted ytexec. " + long_prep_msg
+                )
+            status = const.Status.TIMEOUT
+        else:
+            msg = "ytexec result file is not found.\n"
             if os.path.exists(stderr_path):
                 msg += "\nytexec error:\n{}".format(shared.read_tail(stderr_path, 5000))
-            suite = dump_test_info(args, metrics=yt_metrics, error=msg, status=const.Status.FAIL)
+            if operation_creation_time:
+                # Operation timed out and failed explicitly causing ytexec to
+                # exit with non-0 exit code.
+                # There may be some internal errors unrelated to timeout that
+                # cause ytexec to fail after spinning up the operation
+                # but it's not as likely as a timeout.
+                # Long artifacts preparation by the job may result in a timeout too.
+                msg += (
+                    "Operation likely timed out. It may be due to long artifacts preparation by a job. "
+                    "Check out the job timeline in your operation.\n"
+                )
+                status = const.Status.TIMEOUT
+            else:
+                # Probably an internal ytexec error
+                msg += "ytexec failed unexpectedly.\n"
+                status = const.Status.FAIL
+        msg += "test metrics:\n{}\n".format(yt_metrics)
+        msg += op_creation_delay_msg
+        msg += f"Operation timeout: {int(ytexec_config.operation_fields.timeout / 1000**3)}s\n"
+        msg += f"ytexec timeout: {yt_exec_timeout or 'No timeout'}\n"
+        msg += op_url_msg
+        suite = dump_test_info(args, metrics=yt_metrics, error=msg, status=status)
 
     run_test.restore_chunk_identity(suite, args)
     run_test.finalize_node(suite)
@@ -714,12 +770,17 @@ def main():
     ytexec_path = args.ytexec_tool
     logger.debug("ytexec path: %s", ytexec_path)
     exit_code = 0
+    ytexec_timeout = None
     try:
         with open(os.path.join(args.output_dir, "stderr"), 'w') as errfile:
             if args.ytexec_node_timeout:
                 ytexec_timeout = int(args.ytexec_node_timeout)
-            else:
-                ytexec_timeout = args.node_timeout - 20 if args.node_timeout else None
+            elif args.node_timeout:
+                # 5s in `max` doesn't carry any meaning, it's there to prevent
+                # negative timeout which normally should not occur
+                ytexec_timeout = max(
+                    args.node_timeout - run_test.get_time_from_node_startup() - RESULTS_PROCESSING_OVERHEAD, 5
+                )
             process.execute([ytexec_path, '--config-yson', conf_path], stderr=errfile, timeout=ytexec_timeout)
     except process.ExecutionTimeoutError:
         exit_code = const.TestRunExitCode.TimeOut
@@ -727,7 +788,7 @@ def main():
         logger.exception("unexpected error")
         exit_code = const.TestRunExitCode.Failed
 
-    process_test_results(args, ytexec_config, exit_code, start_time)
+    process_test_results(args, ytexec_config, exit_code, start_time, ytexec_timeout)
     exts.archive.create_tar(args.output_dir, args.output_tar)
 
 

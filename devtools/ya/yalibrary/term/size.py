@@ -9,6 +9,8 @@ def termsize(stream=sys.stdout):
     rows, cols, _, _ = struct.unpack(
         'HHHH', fcntl.ioctl(stream.fileno(), termios.TIOCGWINSZ, struct.pack('HHHH', 0, 0, 0, 0))
     )
+    if rows == 0 or cols == 0:
+        raise ValueError("Couldn't determine terminal size")
     return rows, cols
 
 

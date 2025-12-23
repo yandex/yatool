@@ -1,4 +1,5 @@
 import collections
+import concurrent.futures
 import copy
 import itertools
 import logging
@@ -15,6 +16,7 @@ import app_config
 import devtools.ya.build.build_opts
 import devtools.ya.build.targets_deref
 import devtools.ya.build.ya_make
+import devtools.ya.build.genconf as bg
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
 import devtools.ya.core.error
@@ -23,9 +25,7 @@ import devtools.ya.core.stage_tracer as stage_tracer
 import devtools.ya.core.yarg
 import devtools.ya.handlers.package.opts as package_opts
 import devtools.ya.test.opts as test_opts
-import exts.archive
 import exts.fs
-import exts.func
 import exts.hashing
 import exts.os2
 import exts.path2
@@ -42,6 +42,7 @@ import package.postprocessor
 import package.process
 import package.rpm
 import package.source
+import package.squashfs
 import package.tarball
 import package.vcs
 import package.wheel
@@ -49,12 +50,12 @@ from package.package_tree import load_package, get_tree_info
 from devtools.ya.package import const
 from yalibrary import find_root
 from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
-from package.utils import timeit
+from package.utils import list_files_from, timeit
 
-if app_config.in_house or app_config.have_sandbox_fetcher:
+if app_config.in_house:
     import package.sandbox_source
     import package.sandbox_postprocessor
-if app_config.in_house:
+
     from yalibrary.upload import uploader, mds_uploader
     from devtools.ya.yalibrary.yandex.sandbox.misc.fix_logging import fix_logging
 
@@ -83,7 +84,7 @@ REQUIRED_META_FIELDS = [
     "version",
 ]
 
-if app_config.in_house or app_config.have_sandbox_fetcher:
+if app_config.in_house:
     SOURCE_ELEMENTS['SANDBOX_RESOURCE'] = package.sandbox_source.SandboxSource
     POSTPROCESS_ELEMENTS['SANDBOX_RESOURCE'] = package.sandbox_postprocessor.SandboxPostprocessor
 
@@ -150,6 +151,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     merged_opts.add_host_result = params.add_host_result
     merged_opts.replace_result = params.replace_result
     merged_opts.all_outputs_to_result = params.all_outputs_to_result
+    merged_opts.add_binaries_to_results = params.add_binaries_to_results
 
     merged_opts.add_modules_to_results = params.add_modules_to_results
     merged_opts.gen_renamed_results = params.gen_renamed_results
@@ -174,6 +176,13 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     build_options.pgo_user_path = build_info.get("pgo_use", params.pgo_user_path)
 
+    # Build graph cache options
+    build_options.debug_options = params.debug_options
+    build_options.build_graph_cache_dir = params.build_graph_cache_dir
+    build_options.build_graph_cache_archive = params.build_graph_cache_archive
+    build_options.build_graph_cache_cl = params.build_graph_cache_cl
+    build_options.build_graph_cache_trust_cl = params.build_graph_cache_trust_cl
+
     build_options.build_threads = params.build_threads
     build_options.output_root = build_info["output_root"]
     build_options.create_symlinks = False
@@ -193,6 +202,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         # no distbuild no cry for opensource
         build_options.use_distbuild = False
 
+    build_options.stat_only_report_file = params.stat_only_report_file
     build_options.ymake_bin = params.ymake_bin
     build_options.prefetch = params.prefetch
 
@@ -235,6 +245,14 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.build_report_type = params.build_report_type
     build_options.build_results_resource_id = params.build_results_resource_id
     build_options.build_results_report_tests_only = params.build_results_report_tests_only
+    if params.json_line_report_file:
+        base, ext = os.path.splitext(params.json_line_report_file)
+        build_options.json_line_report_file = '{base}_{name}{hash}{ext}'.format(
+            base=base,
+            name=parsed_package["meta"]["name"],
+            hash=f'_{exts.hashing.md5_value(build_key)}' if build_key else '',
+            ext=ext,
+        )
     build_options.report_skipped_suites = params.report_skipped_suites
     build_options.report_skipped_suites_only = params.report_skipped_suites_only
     build_options.use_links_in_report = params.use_links_in_report
@@ -247,6 +265,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     if params.run_tests:
         build_options.print_test_console_report = True
         if params.junit_path:
+            # FIXME: The file is overwritten by subsequent builds
+            # if there are more than one build or package
             build_options.junit_path = params.junit_path
         else:
             filename = 'junit_{}'.format(parsed_package["meta"]["name"])
@@ -319,13 +339,15 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_token = params.yt_token
     build_options.yt_readonly = params.yt_readonly
     build_options.yt_max_cache_size = params.yt_max_cache_size
-    build_options.yt_cache_filter = params.yt_cache_filter
     build_options.yt_store_ttl = params.yt_store_ttl
     build_options.yt_store_codec = params.yt_store_codec
     build_options.yt_store_threads = params.yt_store_threads
     build_options.yt_store_refresh_on_read = params.yt_store_refresh_on_read
     build_options.yt_create_tables = params.yt_create_tables
     build_options.yt_store_retry_time_limit = params.yt_store_retry_time_limit
+    build_options.yt_store_init_timeout = params.yt_store_init_timeout
+    build_options.yt_store_prepare_timeout = params.yt_store_prepare_timeout
+    build_options.yt_store_crit = params.yt_store_crit
     # heater options
     build_options.yt_store_wt = params.yt_store_wt
     build_options.eager_execution = params.eager_execution
@@ -507,22 +529,41 @@ def get_tool_path(name, tool_platform=None):
     return tool_path
 
 
-def strip_binary(executable_name, debug_file_name=None, tool_platform=None, full_strip=False):
-    # Separate debug symbols
-    if debug_file_name:
-        args = ['--only-keep-debug', executable_name, debug_file_name]
+def strip_binary(target_path, debug_file_path=None, tool_platform=None, full_strip=False):
+    objcopy_tool = get_tool_path('objcopy', tool_platform)
+    strip_tool = get_tool_path('strip', tool_platform)
 
-    package.process.run_process(get_tool_path('objcopy', tool_platform), args)
+    # Detach debug symbols from file
+    if debug_file_path is not None:
+        package.process.run_process(
+            objcopy_tool,
+            [
+                '--only-keep-debug',
+                os.path.basename(target_path),
+                debug_file_path,
+            ],
+            cwd=os.path.dirname(target_path),
+        )
 
-    # Strip the executable
-    strip_args = [executable_name] if full_strip else ['-g', executable_name]
-    package.process.run_process(get_tool_path('strip', tool_platform), strip_args)
+    # Do strip binary
+    if full_strip:
+        strip_args = [target_path]
+    else:
+        strip_args = ['--strip-debug', target_path]
+    package.process.run_process(strip_tool, strip_args)
 
-    # Add link to the debug symbols
-    if debug_file_name:
-        args = ['--remove-section=.gnu_debuglink', '--add-gnu-debuglink', debug_file_name, executable_name]
-
-        package.process.run_process(get_tool_path('objcopy', tool_platform), args)
+    # Attach debug file info to stripped binary
+    if debug_file_path is not None:
+        package.process.run_process(
+            objcopy_tool,
+            [
+                '--remove-section=.gnu_debuglink',
+                '--add-gnu-debuglink',
+                debug_file_path,
+                os.path.basename(target_path),
+            ],
+            cwd=os.path.dirname(target_path),
+        )
 
 
 def get_platform_from_build_info(tool_platform):
@@ -550,7 +591,15 @@ def guess_tool_platform(filename, tool_platforms):
 
 
 @timeit
-def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False):
+def strip_binaries(
+    result_dir,
+    debug_dir,
+    source_elements,
+    full_strip=False,
+    create_dbg=False,
+    strip_threads=1,
+):
+    strip_tasks = []
     for element in source_elements:
         if element.data['source']['type'] != 'BUILD_OUTPUT':
             logger.debug('Strip binaries only from BUILD_OUTPUT section. Skip %s', element.data)
@@ -566,38 +615,60 @@ def strip_binaries(result_dir, debug_dir, source_elements, full_strip=False):
             'Strip binaries from paths [%s] with toolchains %s', ', '.join(element.destination_paths), tool_platforms
         )
         tool_platform = guess_tool_platform(element.data['source']['path'], tool_platforms)
-        for destination_path in element.destination_paths:
-            if os.path.isdir(destination_path):
-                for root, _, files in os.walk(destination_path):
-                    for f in files:
-                        try_strip_file(
-                            result_dir,
-                            debug_dir,
-                            os.path.join(root, f),
-                            tool_platform=tool_platform,
-                            full_strip=full_strip,
-                        )
-            else:
-                try_strip_file(
-                    result_dir, debug_dir, destination_path, tool_platform=tool_platform, full_strip=full_strip
-                )
+        for target_path in list_files_from(element.destination_paths):
+            strip_tasks.append(
+                {
+                    'result_dir': result_dir,
+                    'debug_dir': debug_dir,
+                    'target_path': target_path,
+                    'tool_platform': tool_platform,
+                    'full_strip': full_strip,
+                    'create_dbg': create_dbg,
+                }
+            )
+
+    logger.debug('Executing strip within %d threads', strip_threads)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=strip_threads) as executor:
+        futures = [executor.submit(try_strip_file, **kwargs) for kwargs in strip_tasks]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
 
 
-def try_strip_file(result_dir, debug_dir, destination_path, tool_platform=None, full_strip=False):
-    if os.path.isfile(destination_path) and os.access(destination_path, os.X_OK) and is_application(destination_path):
-        executable_name = os.path.basename(destination_path)
-        executable_relative_dir = os.path.dirname(os.path.relpath(destination_path, result_dir))
+def is_file_strippable(destination_path):
+    return (
+        os.path.isfile(destination_path) and os.access(destination_path, os.X_OK) and is_application(destination_path)
+    )
 
-        with exts.os2.change_dir(os.path.dirname(destination_path)):
-            debug_file_name = os.path.join(debug_dir, executable_relative_dir, executable_name + ".debug")
 
-            exts.fs.create_dirs(os.path.dirname(debug_file_name))
-            try:
-                strip_binary(
-                    executable_name, debug_file_name=debug_file_name, tool_platform=tool_platform, full_strip=full_strip
-                )
-            except package.packager.YaPackageException as e:
-                package.display.emit_message('[[bad]]Strip failed: {}[[rst]]'.format(e))
+def try_strip_file(
+    result_dir,
+    debug_dir,
+    target_path,
+    tool_platform=None,
+    full_strip=False,
+    create_dbg=False,
+):
+    if not is_file_strippable(target_path):
+        return
+    target_path = os.path.abspath(target_path)
+
+    if create_dbg:
+        target_name = os.path.basename(target_path)
+        executable_relative_dir = os.path.dirname(os.path.relpath(target_path, result_dir))
+        debug_file_path = os.path.join(debug_dir, executable_relative_dir, target_name + '.debug')
+        exts.fs.create_dirs(os.path.dirname(debug_file_path))
+    else:
+        debug_file_path = None
+
+    try:
+        strip_binary(
+            target_path,
+            debug_file_path=debug_file_path,
+            tool_platform=tool_platform,
+            full_strip=full_strip,
+        )
+    except package.packager.YaPackageException as e:
+        package.display.emit_message('[[bad]]Strip failed: {}[[rst]]'.format(e))
 
 
 def is_old_format(package_data):
@@ -699,7 +770,14 @@ def create_package(package_context, output_root, builds):
 
             if params.strip or params.full_strip:
                 debug_dir = exts.fs.create_dirs(os.path.join(temp_work_dir, '.debug'))
-                strip_binaries(temp_work_dir, debug_dir, source_elements, full_strip=params.full_strip)
+                strip_binaries(
+                    temp_work_dir,
+                    debug_dir,
+                    source_elements,
+                    full_strip=params.full_strip,
+                    create_dbg=params.create_dbg,
+                    strip_threads=params.strip_threads,
+                )
                 if params.create_dbg:
                     debug_dir = os.path.join(debug_dir, '.content')
                     create_dbg = os.path.exists(debug_dir)
@@ -745,6 +823,7 @@ def create_package(package_context, output_root, builds):
                         threads=params.build_threads,
                         compression_filter=params.compression_filter,
                         compression_level=params.compression_level,
+                        stable_archive=params.stable_archive,
                     )
                     stage_finished("create_tarball_package")
 
@@ -763,6 +842,7 @@ def create_package(package_context, output_root, builds):
                         threads=params.build_threads,
                         compression_filter=params.compression_filter,
                         compression_level=params.compression_level,
+                        stable_archive=params.stable_archive,
                     )
                     stage_finished("create_tarball_package-dbg")
 
@@ -773,6 +853,13 @@ def create_package(package_context, output_root, builds):
                     package_context,
                     compress=params.compress_archive,
                     publish_to_list=params.publish_to,
+                )
+            elif package_format == const.PackageFormat.SQUASHFS:
+                package_path = package.squashfs.create_squashfs_package(
+                    result_dir,
+                    content_dir,
+                    package_context,
+                    compression_filter=params.squashfs_compression_filter,
                 )
             elif package_format == const.PackageFormat.DEBIAN:
                 if params.build_debian_scripts:
@@ -842,6 +929,7 @@ def create_package(package_context, output_root, builds):
                         debug_install_file.write('.debug/.content/* /\n')
 
                 package_path = package.debian.create_debian_package(
+                    result_dir,
                     temp_work_dir,
                     package_context,
                     params.arch_all,
@@ -934,11 +1022,15 @@ def create_package(package_context, output_root, builds):
                     params.docker_no_cache,
                     params.docker_use_remote_cache,
                     params.docker_remote_image_version,
+                    params.docker_export_cache_to_registry,
+                    params.docker_dest_remote_image_version,
                     params.docker_platform,
                     params.docker_add_host,
                     params.docker_target,
                     params.docker_secrets,
-                    package_context.context,
+                    params.docker_use_buildx,
+                    params.docker_pull,
+                    params.docker_labels,
                 )
                 package_context.set_context("docker_image", info.image_tag)
                 if info.digest:
@@ -1314,6 +1406,9 @@ def do_package(params):
             json.dump(targets, f)
         return
 
+    if params.stat_only_report_file:
+        params.build_only = True
+
     if params.dump_inputs:
         do_dump_input(params, arcadia_root, params.dump_inputs)
         return
@@ -1560,9 +1655,15 @@ def do_dump_input(params, arcadia_root, output):
         Fields not presented in formatter dict will be skipped.
         """
         for key, val in formatter.items():
-            key = "{%s}" % key
-            if key in string:
-                string = string.replace(key, str(val))
+            if isinstance(val, dict):
+                for subkey, subval in val.items():
+                    pattern = f"{{{key}[{subkey}]}}"
+                    if pattern in string:
+                        string = string.replace(pattern, str(subval))
+            else:
+                key = "{%s}" % key
+                if key in string:
+                    string = string.replace(key, str(val))
         return string
 
     result = {}
@@ -1583,12 +1684,12 @@ def do_dump_input(params, arcadia_root, output):
 
         package_build = package_context.parsed_package.get("build", {})
         if "targets" in package_build:
-            for build_info in _do_dump_input_build(package_build):
+            for build_info in _do_dump_input_build(package_build, params):
                 build_section[safe_format(build_info[0], formatters)].add(safe_format(build_info[1], formatters))
         else:
             for build_key in package_build:
                 if "targets" in package_build[build_key]:
-                    for build_info in _do_dump_input_build(package_build[build_key]):
+                    for build_info in _do_dump_input_build(package_build[build_key], params):
                         build_section[safe_format(build_info[0], formatters)].add(
                             safe_format(build_info[1], formatters)
                         )
@@ -1629,13 +1730,15 @@ def do_dump_input(params, arcadia_root, output):
         out.write(json.dumps(result, sort_keys=True, indent=2))
 
 
-def _do_dump_input_build(build_info):
+def _do_dump_input_build(build_info, params):
     targets = build_info.get("targets")
     if not targets:
         return
+    build_type = build_info.get("build_type", params.build_type)
     flags = {item["name"]: item.get("value") for item in build_info.get("flags", [])}
     for platform in build_info.get("target-platforms", []) or ["DEFAULT-LINUX-X86_64"]:
-        platform_key = json.dumps({platform: flags}, sort_keys=True)
+        canonized_platform = bg.mine_platform_name(platform)
+        platform_key = json.dumps({f"{canonized_platform},{build_type}": flags}, sort_keys=True)
         for t in targets:
             yield platform_key, t
 

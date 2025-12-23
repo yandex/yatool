@@ -3,58 +3,77 @@ import os
 import sys
 import typing as tp
 
-from collections.abc import Generator, Callable
+from collections.abc import Generator, Callable, Iterable
 from pathlib import Path, PurePath
 
-from . import state_helper
-from . import styler
+import devtools.ya.handlers.style.state_helper as state_helper
+import devtools.ya.handlers.style.styler as stlr
 
 
 STDIN_FILENAME = 'source.cpp'
-STDIN_FILENAME_STAMP = 'STDIN_FILENAME_STAMP'
 
 logger = logging.getLogger(__name__)
-
-type Target = tuple[Path | PurePath, Callable[..., str]]
 
 
 class MineOptions(tp.NamedTuple):
     targets: tuple[Path, ...]
-    file_types: tuple[styler.StylerKind, ...] = ()
+    file_types: tuple[stlr.StylerKind, ...] = ()
     stdin_filename: str = STDIN_FILENAME
     tty: bool = os.isatty(sys.stdin.fileno())
+    enable_implicit_taxi_formatters: bool = False
+    paths_with_integrations: tuple[str, ...] = ()
+
+
+class Target(tp.NamedTuple):
+    path: Path | PurePath
+    reader: Callable[..., str]
+    stdin: bool = False
+    passed_directly: bool = False
+
+
+def _mine_filepath_targets(paths: Iterable[Path]) -> Generator[Target]:
+    for path in paths:
+        if path.is_symlink():
+            continue
+        if path.is_file():
+            yield Target(path.resolve(), path.read_text, passed_directly=True)
+        elif path.is_dir():
+            path = path.resolve()
+            for dirpath, _, filenames in path.walk():
+                if dirpath.is_symlink():
+                    continue
+
+                for filename in filenames:
+                    filepath = dirpath / filename
+                    if filepath.is_symlink():
+                        continue
+                    yield Target(filepath, filepath.read_text)
+        else:
+            logger.warning('skip %s (no such file or directory)', path)
 
 
 def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
     # read stdin if not tty
     if not mine_opts.tty:
-        yield PurePath(STDIN_FILENAME_STAMP + mine_opts.stdin_filename), sys.stdin.read
+        yield Target(PurePath(mine_opts.stdin_filename), sys.stdin.read, stdin=True)
 
     # read cwd if target is not specified
     if not mine_opts.targets and mine_opts.tty:
-        targets = (Path.cwd(),)
+        paths = (Path.cwd(),)
     else:
-        targets = mine_opts.targets
+        paths = mine_opts.targets
 
-    for target in targets:
-        if target.is_symlink():
-            continue
-        if target.is_file():
-            yield target.absolute(), target.read_text
-        elif target.is_dir():
-            for dirpath, _, filenames in target.walk():
-                for filename in filenames:
-                    file = dirpath / filename
-                    if file.is_symlink():
-                        continue
-                    yield file.absolute(), file.read_text
-        else:
-            logger.warning('skip %s (no such file or directory)', target)
+    yield from _mine_filepath_targets(paths)
 
 
-def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, set[type[styler.Styler]]]]:
+def discover_style_targets(mine_opts: MineOptions) -> Generator[tuple[Target, set[type[stlr.Styler]]]]:
     for target in _mine_targets(mine_opts):
         state_helper.check_cancel_state()
 
-        if styler_classes := styler.select_suitable_stylers(target=target[0], file_types=mine_opts.file_types):
+        if styler_classes := stlr.select_suitable_stylers(
+            target=target,
+            file_types=mine_opts.file_types,
+            enable_implicit_taxi_formatters=mine_opts.enable_implicit_taxi_formatters,
+            paths_with_integrations=mine_opts.paths_with_integrations,
+        ):
             yield target, styler_classes

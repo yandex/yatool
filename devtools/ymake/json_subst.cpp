@@ -173,7 +173,7 @@ void TJsonCmdAcceptor::WriteEnv(TStringBuf env) {
     // originally `BreakQuotedExec(nextsubst.Name, quoteDelim, false)`;
     // `TCommandInfo::SubstData` does this to env data before adding it to `EnvSetDefs`,
     // which causes backslashes in, e.g., `TOOLCHAIN_ENV`, to be doubled;
-    // later in `TSubst2Json::CmdFinished` those are kicked out via `SubstGlobal(valRepl, "\\\\:", ":")`;
+    // later in `TSubst2Json::OnCmdFinished` those are kicked out via `SubstGlobal(valRepl, "\\\\:", ":")`;
     // TODO: what are these backslashes doing there to begin with?
     BreakQuotedExec(envStr, "\", \"", false);
 
@@ -233,43 +233,51 @@ inline void TJsonCmdAcceptor::FinishToken(TString& res, const char* at, bool nex
     InToken = nextIsMacro || TopQuote;
 }
 
-TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeNode* makeNode)
+TSubst2Json::TSubst2Json(const TJSONVisitor& vis, TDumpInfoUID& dumpInfo, TMakeNode* makeNode, bool fillModule2Nodes, const TModule* module)
     : DumpInfo(dumpInfo)
     , JSONVisitor(vis)
     , MakeNode(makeNode)
-{
-}
+    , FillModule2Nodes(fillModule2Nodes)
+    , Module_(module)
+{}
 
 void TSubst2Json::GenerateJsonTargetProperties(const TConstDepNodeRef& node, const TModule* mod, bool isGlobalNode) {
-    const auto nodeType = node->NodeType;
+    auto to_lower_string = [](const TStringBuf& tag) {
+        TString s(tag);
+        s.to_lower();
+        return s;
+    };
+    auto isModule = IsModuleType(node->NodeType);
+    auto isFill = FillModule2Nodes && mod;
+    Y_ASSERT(mod != nullptr);
 
-    if (IsModuleType(nodeType) || isGlobalNode) {
-        Y_ASSERT(mod != nullptr);
-        TStringBuf lang = mod->GetLang();
-        if (!lang.empty()) {
-            TargetProperties["module_lang"] = to_lower(TString{lang});
-        }
-
-        TargetProperties["module_dir"] = TString(mod->GetDir().CutType());
+    if (!isModule && !isGlobalNode && !isFill) {
+        return;
     }
 
-    if (IsModuleType(nodeType)) {
-        Y_ASSERT(mod != nullptr);
-        auto renderModuleType = static_cast<ERenderModuleType>(mod->GetAttrs().RenderModuleType);
-        TargetProperties["module_type"] = ToString(renderModuleType);
+    if (isModule || isGlobalNode) {
+        const TStringBuf lang = mod->GetLang();
+        if (!lang.empty()) {
+            TargetProperties["module_lang"] = to_lower_string(lang);
+        }
+    }
 
-        TStringBuf tag = mod->GetTag();
-        if (mod->IsFromMultimodule() && !tag.empty()) {
-            TargetProperties["module_tag"] = to_lower(TString{tag});
-        }
-    } else if (isGlobalNode) {
-        Y_ASSERT(mod != nullptr);
+    TargetProperties["module_dir"] = TString(mod->GetDir().CutType());
+    const TStringBuf tag = mod->GetTag();
+    if (isGlobalNode && !isModule) {
         TargetProperties["module_type"] = ToString(ERenderModuleType::Library);
-        if (mod->IsFromMultimodule() && !mod->GetTag().empty()) {
-            TargetProperties["module_tag"] = to_lower(TString{mod->GetTag()}) + "_global";
-        }
-        else {
+        if (mod->IsFromMultimodule() && !tag.empty()) {
+            TargetProperties["module_tag"] = to_lower_string(tag) + "_global";
+        } else {
             TargetProperties["module_tag"] = "global";
+        }
+    } else { // isModule || isFill
+        if (isModule) {
+            const auto renderModuleType = static_cast<ERenderModuleType>(mod->GetAttrs().RenderModuleType);
+            TargetProperties["module_type"] = ToString(renderModuleType);
+        }
+        if (mod->IsFromMultimodule() && !tag.empty()) {
+            TargetProperties["module_tag"] = to_lower_string(tag);
         }
     }
 }
@@ -281,7 +289,7 @@ void TSubst2Json::UpdateInputs() {
     DumpInfo.MoveInputsTo(makeNode.Inputs);
 }
 
-void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
+void TSubst2Json::OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
     TMakeNode& makeNode = *MakeNode;
 
     makeNode.Uid = DumpInfo.UID;
@@ -311,6 +319,7 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
     if (cmdInfo.KV) {
         makeNode.KV.swap(*cmdInfo.KV);
     }
+
     makeNode.Requirements = cmdInfo.TakeRequirements();
     makeNode.LateOuts = std::move(DumpInfo.LateOuts);
     TYVar lateOutsVars;
@@ -382,15 +391,9 @@ void TSubst2Json::CmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo&
 
     makeNode.ResourceUris.swap(resources);
     makeNode.TaredOuts.swap(taredOuts);
-}
 
-void TSubst2Json::OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo, const TVars& vars) {
-    CmdFinished(commands, cmdInfo, vars);
-}
-
-void TSubst2Json::FakeFinish(TCommandInfo& cmdInfo) {
-    TVars vars;
-    IsFake = true;
-    TString emptyString;
-    GetAcceptor()->Finish(emptyString, cmdInfo, vars);
+    if (!makeNode.KV || !makeNode.KV.contains("p")) {
+        THolder<TScopedContext> context = Module_ ? MakeHolder<TScopedContext>(Module_->GetName()) : nullptr;
+        YConfErr(Misconfiguration) << "No kv->p in command with output: " << makeNode.Outputs.substr(2 /* [" */, makeNode.Outputs.find('"', 2) - 2) << Endl;
+    }
 }

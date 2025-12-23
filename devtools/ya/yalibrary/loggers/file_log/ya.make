@@ -6,7 +6,9 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/psutil
     devtools/ya/core/sec
+    devtools/ya/exts
 )
 
 END()

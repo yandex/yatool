@@ -86,9 +86,14 @@ DCH_COMMAND = "dch"
 # NOTE: hook must be a single line & must not include '='
 DEBSIGS_HOOK_FMT = "debsigs -v --sign origin {key} ../*.deb"
 
+# https://github.com/rgeissert/devscripts/blob/master/scripts/debchange.pl#L754C27-L754C36
+# https://www.debian.org/doc/debian-policy/ch-controlfields.html#source
+VALID_PACKAGE_NAME_PATTERN = r"^[a-z0-9][a-z0-9+\-\.]+$"
+
 
 def create_debian_package(
     result_dir,
+    prepared_data,
     package_context,
     arch_all,
     sign,
@@ -119,8 +124,8 @@ def create_debian_package(
     with exts.tmp.temp_dir() as temp_dir:
         new_result_dir = os.path.join(temp_dir, 'result_dir')
 
-        # Temporally move result_dir inside temp_dir
-        shutil.move(result_dir, new_result_dir)
+        # Temporally move prepared_data inside temp_dir
+        shutil.move(prepared_data, new_result_dir)
 
         if debian_upload_token and os.path.exists(debian_upload_token):
             with open(debian_upload_token) as f:
@@ -202,12 +207,11 @@ def create_debian_package(
                         upload_dist_opts.publish_to_list = publish_to_list
                         uploader.uploader_dist2.upload_package(temp_dir, full_package_name, upload_dist_opts)
         finally:
-            # Move result_dir back
-            shutil.move(new_result_dir, result_dir)
+            # Move prepared_data back
+            shutil.move(new_result_dir, prepared_data)
 
         if store_debian:
             tar_gz_file = package_context.resolve_filename(extra={"package_ext": "tar.gz"})
-
             with package.fs_util.AtomicPath(tar_gz_file) as temp_file:
                 exts.archive.create_tar(
                     temp_dir,
@@ -215,8 +219,10 @@ def create_debian_package(
                     exts.archive.GZIP,
                     exts.archive.Compression.Fast if sloppy_deb else exts.archive.Compression.Default,
                 )
+            result_package = os.path.join(result_dir, tar_gz_file)
+            shutil.move(tar_gz_file, result_package)
 
-            return tar_gz_file
+            return result_package
 
 
 def prepare_debian_folder(result_dir, debian_dir):
@@ -369,6 +375,11 @@ def create_changelog_file(
     changelog_message,
     force_bad_version=False,
 ):
+    # In case of illegal package name dch prints a warning message and opens an editor to allow
+    # the user to correct the package name and waits indefinitely. We want to fail fast here.
+    if not re.fullmatch(VALID_PACKAGE_NAME_PATTERN, package_name):
+        raise ValueError(f"Illegal package name used with --package: {package_name}")
+
     changelog_file_path = os.path.join(debian_dir, 'changelog')
 
     if not os.path.exists(changelog_file_path):

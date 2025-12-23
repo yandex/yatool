@@ -250,8 +250,6 @@ bool TModuleConf::IsProperty(const TStringBuf name) {
         NProperties::ALIASES,
         NProperties::ALLOWED,
         NProperties::CMD,
-        NProperties::STRUCT_CMD,
-        NProperties::STRUCT_SEM,
         NProperties::DEFAULT_NAME_GENERATOR,
         NProperties::ARGS_PARSER,
         NProperties::GLOBAL,
@@ -314,10 +312,6 @@ void TModuleConf::Inherit(const TModuleConf& parent, bool renderSemantics) {
         if (noSem) {
             return;
         }
-    }
-
-    if (!StructCmdSet) {
-        StructCmd = parent.StructCmd;
     }
 
     if (!NodeType && parent.NodeType) {
@@ -542,16 +536,6 @@ bool TModuleConf::SetProperty(TStringBuf key, TStringBuf name, TStringBuf value,
         }
     } else if (name == NProperties::USE_PEERS_LATE_OUTS) {
         ApplyBoolProperty(UsePeersLateOuts, key, name, value);
-    } else if (name == NProperties::STRUCT_CMD) {
-        if (!renderSemantics) {
-            ApplyBoolProperty(StructCmd, key, name, value);
-            StructCmdSet = true;
-        }
-    } else if (name == NProperties::STRUCT_SEM) {
-        if (renderSemantics) {
-            ApplyBoolProperty(StructCmd, key, name, value);
-            StructCmdSet = true;
-        }
     } else if (name == NProperties::INCLUDE_TAG) {
         ApplyBoolProperty(IncludeTag, key, name, value);
     } else if (name == NProperties::FINAL_TARGET) {
@@ -602,8 +586,6 @@ void TModuleConf::Load(IInputStream* input) {
     ::Load(input, PeerdirType);
     ::Load(input, HasSemantics);
     ::Load(input, HasSemanticsForGlobals);
-    ::Load(input, StructCmd);
-    ::Load(input, StructCmdSet);
     ::Load(input, Transition);
 
     ::Load(input, Restricted);
@@ -654,8 +636,6 @@ void TModuleConf::Save(IOutputStream* output) const {
     ::Save(output, PeerdirType);
     ::Save(output, HasSemantics);
     ::Save(output, HasSemanticsForGlobals);
-    ::Save(output, StructCmd);
-    ::Save(output, StructCmdSet);
     ::Save(output, Transition);
 
     ::Save(output, Restricted);

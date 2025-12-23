@@ -11,6 +11,7 @@
 #include <devtools/ymake/macro_string.h>
 #include <devtools/ymake/plugins/cpp_plugins.h>
 #include <devtools/ymake/lang/plugin_facade.h>
+#include <devtools/ymake/python_runtime.h>
 #include <devtools/ymake/vardefs.h>
 #include <devtools/ymake/yndex/builtin.h>
 #include <devtools/ymake/diag/diag.h>
@@ -90,6 +91,21 @@ namespace {
             }
         }
     }
+
+    void ReadModulesWithExtendedGlobs(TBuildConfiguration& conf) {
+        TVector<TStringBuf> extends;
+        Split(conf.CommandConf.EvalValue(NVariableDefs::VAR_MODULES_WITH_EXTENDED_GLOB_RESTRICTIONS), " ", extends);
+        for (const auto& extend: extends) {
+            if (extend.empty()) {
+                continue;
+            }
+            conf.GlobRestrictionExtends.insert(extend);
+        }
+    }
+
+    void ReadFeatureFlags(TBuildConfiguration& conf) {
+        conf.FillModule2Nodes = NYMake::IsTrue(conf.CommandConf.EvalValue("FILL_MODULE2NODES"));
+    }
 }
 
 TBuildConfiguration::TBuildConfiguration() {
@@ -105,7 +121,6 @@ void TBuildConfiguration::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("foreign-on-nosem", "on NoSem error make foreign request instead configure error").SetFlag(&ForeignOnNoSem).NoArgument();
     opts.AddLongOption('w', "warn-level", "level of human-readable messages to be shown (0 or more: none, error, warning, info, debug)").StoreResult(&WarnLevel);
     opts.AddLongOption('W', "warn", "warnings & messages to display").AppendTo(&WarnFlags);
-    opts.AddLongOption('E', "events", "enable/set trace events").StoreResult(&Events);
     opts.AddLongOption('y', "plugins-root", "set plugins root").SplitHandler(&PluginsRoots, ',');
     opts.AddLongOption('Q', "dump-custom-data", "<type0>:<output file0>;<type1>:<output file1>...<typen>:<output filen> - generate custom data").StoreResult(&CustomData);
 }
@@ -259,19 +274,28 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     CompileAndRecalcAllConditions();
     FoldGlobalCommands(*this);
     FillModuleScopeOnlyFlag(*this);
+    ReadModulesWithExtendedGlobs(*this);
+    ReadFeatureFlags(*this);
 
     NYndex::AddBuiltinDefinitions(CommandDefinitions);
+
+    FillMiscValues();
 
     // this code hangs on win while trying to lock locked non-recursive mutex
     // (after an error that file is not found)
     if (!DontUsePlugins) {
         if (!PluginsRoots.empty()) {
-            TTraceStage stage("Load plugins");
-            LoadPlugins(PluginsRoots, this);
-            for (const auto& it : Plugins) {
+            TTraceStage stage("Discover plugins");
+            auto [allFiles, pluginFiles] = DiscoverPlugins(PluginsRoots);
+            for (const auto& it : allFiles) {
                 TBlob pluginContent = TBlob::FromFile(it);
                 confData.Update((const char*)pluginContent.Data(), pluginContent.Size());
             }
+            Plugins = std::move(pluginFiles);
+        }
+        if (!ShouldLoadPLuginsLazily()) {
+            LoadPlugins();
+            PluginsInitilized = true;
         }
 
         // All cpp plugins should be registered in RegisterCppPlugins()
@@ -304,7 +328,6 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     extraData.Update(rules.RawData);
     confData.Update(rules.RawData);
 
-    FillMiscValues();
     InitExcludedPeerdirs();
 
     confData.Final(YmakeConfMD5.RawData);
@@ -422,6 +445,12 @@ void TBuildConfiguration::FillMiscValues() {
     UseGraphChangesPredictor = NYMake::IsTrue(CommandConf.EvalValue("USE_GRAPH_CHANGES_PREDICTOR"));
     UseGrandBypass = !TDebugOptions::DisableGrandBypass && NYMake::IsTrue(CommandConf.EvalValue("USE_GRAND_BYPASS"));
     YmakeSaveAllCachesWhenBadLoops_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_SAVE_ALL_CACHES_WHEN_BAD_LOOPS"));
+    LoadDartCaches_ = !IsFalse(CommandConf.EvalValue("YMAKE_LOAD_DART_CACHES"));
+    SaveDartCaches_ = !IsFalse(CommandConf.EvalValue("YMAKE_SAVE_DART_CACHES"));
+    LoadJsonCacheEarly_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_JSON_CACHE_EARLY"));
+    LoadUidsCacheEarly_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_UIDS_CACHE_EARLY"));
+    ParallelRendering = ParallelRendering && !IsFalse(CommandConf.EvalValue("YMAKE_PARALLEL_RENDERING"));
+    LoadPLuginsLazily_ = NYMake::IsTrue(CommandConf.EvalValue("YMAKE_LOAD_PLUGINS_LAZILY"));
 
     auto updateFlag = [&](bool& flag, const char* variableName, bool log = false) {
         TStringBuf value = CommandConf.EvalValue(variableName);
@@ -468,6 +497,8 @@ void TBuildConfiguration::FillMiscValues() {
         if (!_dbg_expr_diag.empty())
             ExpressionErrorDetails = ParseShowExpressionErrors(_dbg_expr_diag);
     }
+    ValidateCmdNodes = NYMake::IsTrue(CommandConf.EvalValue("_DBG_VALIDATE_CMD_NODES"));
+    DeprecateNonStructCmdNodes = NYMake::IsTrue(CommandConf.EvalValue("_DBG_DEPRECATE_NON_STRUCT_CMD_NODES"));
 }
 
 void TBuildConfiguration::InitExcludedPeerdirs() {
@@ -483,4 +514,23 @@ bool TBuildConfiguration::IsIncludeOnly(const TStringBuf& name) const {
 
 bool TBuildConfiguration::IsRequiredBuildAndSrcRoots(const TStringBuf& lang) const {
     return Find(LangsRequireBuildAndSrcRoots, lang) != LangsRequireBuildAndSrcRoots.end();
+}
+
+void TBuildConfiguration::LoadPlugins() {
+    if (!SubState && SubinterpreterStateGetter) {
+        SubState = SubinterpreterStateGetter();
+        if (NYMake::CurrentThreadStateScope) {
+            NYMake::CurrentThreadStateScope->Set(SubState);
+        }
+    }
+    ::LoadPlugins(PluginsRoots, Plugins, WriteConfCache ? BuildRoot : TFsPath{}, this);
+}
+
+void TBuildConfiguration::ClearPlugins() {
+    if (!PluginsInitilized) {
+        return;
+    }
+    NYMake::TPythonThreadStateScope finiState{SubState};
+    ParserPlugins.clear();
+    MacroFacade.Clear();
 }

@@ -15,7 +15,6 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/yalibrary/runner
     devtools/ya/yalibrary/store
-    devtools/ya/yalibrary/store/yt_store
     devtools/ya/yalibrary/toolscache
     library/python/fs
     library/python/windows

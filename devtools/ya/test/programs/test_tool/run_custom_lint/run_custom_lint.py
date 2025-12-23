@@ -30,7 +30,7 @@ def parse_args():
     parser.add_argument("--out-path", help="Path to the output test_cases")
     parser.add_argument("--tests-filters", required=False, action="append")
     parser.add_argument("--lint-name", help="Lint name")
-    parser.add_argument("--linter", required=True, help="Path to linter binary (optional")
+    parser.add_argument("--wrapper-script", required=True, help="Path to a wrapper script")
     parser.add_argument("--depends", required=False, action="append", help="Depends. The option can be repeated")
     parser.add_argument(
         "--global-resource",
@@ -80,7 +80,6 @@ def main():
         test_cases.append((file_name, test_name))
 
     if test_cases:
-        linter_path = os.path.join(args.build_root, args.linter)
         linter_params_file = os.path.join(output_path, "linter_params.json")
         linter_report_file = os.path.join(output_path, "linter_report.json")
         global_resources = _parse_kv_arg(args.global_resources, "::")
@@ -101,7 +100,14 @@ def main():
         with open(linter_params_file, "w") as f:
             json.dump(linter_params, f)
 
-        res = process.execute([linter_path, "--params", linter_params_file], check_exit_code=False)
+        test_tool = sys.executable
+        wrapper_script = os.path.join(args.source_root, args.wrapper_script)
+        env = os.environ.copy()
+        env['Y_PYTHON_ENTRY_POINT'] = ':main'
+        res = process.execute(
+            [test_tool, wrapper_script, "--params", linter_params_file], check_exit_code=False, env=env
+        )
+
         if res.exit_code:
             logger.error("Linter return exit code={}".format(res.exit_code))
             return 1
@@ -114,6 +120,7 @@ def main():
             if report is None:
                 raise Exception("Wrong lint report: 'report' key doesn't exist")
 
+            rel_project_path = os.path.relpath(args.project_path, args.source_root)
             for file_name, test_name in test_cases:
                 file_report = report.get(file_name, {})
                 status = file_report.get("status", "GOOD")
@@ -124,13 +131,14 @@ def main():
                     raise ValueError(
                         "Unknown status: '{}'. Expected one of: {}".format(status, ",".join(STATUSES.keys()))
                     )
+
                 suite.chunk.tests.append(
                     facility.TestCase(
                         test_name,
                         test_status,
                         message,
                         logs={"logsdir": output_path},
-                        path=os.path.relpath(file_name, args.source_root),
+                        path=rel_project_path,
                         elapsed=elapsed,
                     )
                 )

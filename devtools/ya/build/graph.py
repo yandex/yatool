@@ -13,6 +13,7 @@ import sys
 import tempfile
 import devtools.ya.test.const as test_consts
 import traceback
+import functools
 
 import typing as tp  # noqa
 from itertools import chain
@@ -57,6 +58,8 @@ from devtools.ya.build.ymake2.consts import YmakeEvents
 import devtools.ya.build.genconf as bg
 from devtools.ya.build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
+from devtools.ya.test.test_types.common import SemanticLinterSuite
+from devtools.ya.test.common import set_python_pattern
 
 if tp.TYPE_CHECKING:
     from devtools.ya.test.test_types.common import AbstractTestSuite
@@ -102,7 +105,7 @@ ALLOWED_EXTRA_RESOURCES = {
 }
 
 GRAPH_STAT_VERSION = 1
-EVENTS_WITH_PROGRESS = YmakeEvents.DEFAULT.value + YmakeEvents.PROGRESS.value
+EVENTS_WITH_PROGRESS = YmakeEvents.DEFAULT.value + YmakeEvents.PROGRESS.value + YmakeEvents.TOOLS.value
 
 
 logger = logging.getLogger(__name__)
@@ -160,9 +163,10 @@ class _OptimizableGraph(dict):
 
 
 class _NodeGen:
-    def __init__(self):
+    def __init__(self, python3_pattern: str):
         self.extra_nodes: list[graph_descr.GraphNode] = []
         self._md5_cache = {}
+        self._python3_pattern = python3_pattern
 
     def resolve_file_md5(self, path):
         if path not in self._md5_cache:
@@ -188,7 +192,10 @@ class _NodeGen:
             'broadcast': False,
             'cmds': [
                 {
-                    'cmd_args': ["$(PYTHON)/python", '$(SOURCE_ROOT)/build/scripts/move.py']
+                    'cmd_args': [
+                        "$({})/bin/python3".format(self._python3_pattern),
+                        '$(SOURCE_ROOT)/build/scripts/move.py',
+                    ]
                     + cmdline.wrap_with_cmd_file_markers(cmd_args)
                 }
             ],
@@ -343,8 +350,8 @@ def _add_json_prefix(graph, tests, prefix):
     _substitute_uids(graph, tests, old_to_new_uids)
 
 
-def _gen_rename_nodes(graph: graph_descr.DictGraph, uid_map, src_dir):
-    node_gen = _NodeGen()
+def _gen_rename_nodes(graph: graph_descr.DictGraph, host_tool_resolver: "_HostToolResolver", uid_map, src_dir):
+    node_gen = _NodeGen(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern'])
     by_output = collections.defaultdict(list)
 
     for uid in graph['result']:
@@ -825,7 +832,7 @@ def _add_pgo_profile_resource(graph, pgo_path):
     return hashing.fast_filehash(os.path.abspath(pgo_path))
 
 
-def _gen_filter_node(node: graph_descr.GraphNode, flt) -> graph_descr.GraphNode:
+def _gen_filter_node(node: graph_descr.GraphNode, flt, python_binary_path: str) -> graph_descr.GraphNode:
     mapping = _get_node_out_names_map(node)
 
     inputs = []
@@ -839,7 +846,7 @@ def _gen_filter_node(node: graph_descr.GraphNode, flt) -> graph_descr.GraphNode:
         if renamed:
             cmd = {
                 'cmd_args': [
-                    "$(PYTHON)/python",
+                    python_binary_path,
                     '$(SOURCE_ROOT)/build/scripts/fs_tools.py',
                     'link_or_copy',
                     inp,
@@ -866,11 +873,49 @@ def _gen_filter_node(node: graph_descr.GraphNode, flt) -> graph_descr.GraphNode:
     }
 
 
+def _mining_python3_from_graph_and_options(graph: graph_descr.DictGraph, opts):
+    # Try extract grom graph
+    try:
+        pattern = next(
+            r['pattern']
+            for r in graph.get('conf', {}).get('resources', {})
+            if r.get('pattern', '').startswith('YMAKE_PYTHON3-')
+        )
+        return "$({})/bin/python3".format(pattern), False
+    except StopIteration:
+        # This may occur when the graph is not present or the Python3 resource is not available.
+        # In this case, python3 will be added using HostToolResolver. See the code below.
+        pass
+
+    # Then try extract from host resolver
+    try:
+        host = getattr(opts, 'host_platform', None)
+        if host:
+            host = bg.mine_platform_name(host)
+        if not host:
+            host = bg.host_platform_name()
+        res_dir = devtools.ya.core.config.tool_root(toolscache_version(opts))
+        parsed_host_p = pm.parse_platform(host)
+        host_tool_resolver = _HostToolResolver(parsed_host_p, res_dir)
+        return host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'), True
+    except Exception as err:
+        msg = 'We cannot find a Python 3 resource for the host platform. '
+        msg += 'Use the system Python 3 binary as fallback. '
+        msg += 'Original exception error: ' + str(err)
+        logger.warn(msg, exc_info=True)
+
+    # Well, use system
+    return "python3", False
+
+
 def finalize_graph(graph: graph_descr.DictGraph, opts):
-    if opts.add_result or opts.add_host_result:
+    if opts.add_result or opts.add_host_result or opts.add_binaries_to_results:
         assert 'result' in graph
 
+        python_binary_path = None
+
         def iter_filter_nodes(filters, host=False):
+            nonlocal python_binary_path
             for flt in filters:
                 for node, full_match in filter_nodes_by_output(
                     graph, flt, warn=False, host=host, any_match=opts.all_outputs_to_result
@@ -880,10 +925,26 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
                     if full_match:
                         yield node, False
                     else:
-                        yield _gen_filter_node(node, flt), True
+                        if python_binary_path is None:
+                            resolved_py3, should_add_resource = _mining_python3_from_graph_and_options(graph, opts)
+                            if should_add_resource:
+                                graph['conf']['resources'].append(resolved_py3)
+                                python_binary_path = "$({})/bin/python3".format(resolved_py3['pattern'])
+                            else:
+                                python_binary_path = resolved_py3
+                        yield _gen_filter_node(node, flt, python_binary_path), True
 
         if opts.replace_result:
             graph['result'] = []
+
+        # Add binary targets (bin/so) to results
+        if opts.add_binaries_to_results:
+            results = set(graph['result'])
+            for node in graph['graph']:
+                target_props = node.get('target_properties', {})
+                if target_props.get('module_type') in ('bin', 'so'):
+                    results.add(node['uid'])
+            graph['result'] = list(results)
 
         for node, need_to_add in chain(
             list(iter_filter_nodes(opts.add_result, host=False)),
@@ -896,7 +957,7 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
         if opts.replace_result:
             graph = strip_graph(graph)
 
-    if opts.download_artifacts and 'result' in graph:
+    if opts.upload_to_remote_store and opts.download_artifacts and 'result' in graph:
         graph_result = set(graph['result'])  # TODO YA-316
         for node in graph['graph']:
             if node.get('uid') in graph_result:
@@ -1146,12 +1207,19 @@ class _ToolEventsQueueServerMode(_ToolTargetsQueue):
         return res
 
 
+def should_use_internal_servermode(opts):
+    return opts.ymake_internal_servermode
+
+
 def should_use_servermode_for_tools(opts):
     return opts.ymake_tool_servermode
 
 
 def create_tool_event_queue(opts):
-    if should_use_servermode_for_tools(opts):
+    if should_use_internal_servermode(opts):
+        # it's enough for disabling external queues and listeners
+        return None
+    elif should_use_servermode_for_tools(opts):
         return _ToolEventsQueueServerMode()
     else:
         return _ToolTargetsQueue()
@@ -1272,16 +1340,16 @@ def build_graph_and_tests(opts, check, event_queue=None, display=None):
             raise GraphBuildError("{} from {} exception".format(ex_val, ex_type)).with_traceback(ex_bt)
 
 
-def _clang_tidy_strip_deps(plan, suites):
+def _static_analysis_strip_deps(plan, suites):
     def get_diff(lhs, rhs):
         return list(sorted(set(lhs) - set(rhs)))
 
     seen_uids = {}
-    for suite in suites:
-        if type(suite).__name__ != "ClangTidySuite":
-            continue
 
-        for out in suite.clang_tidy_inputs:
+    for suite in suites:
+        if not isinstance(suite, SemanticLinterSuite):
+            continue
+        for out in suite.semantic_linter_inputs:
             uid = plan.get_uids_by_outputs(out)
             if not uid:
                 continue
@@ -1351,9 +1419,13 @@ class _GraphMaker:
         cl_generator,
     ):
         self._opts = opts
-        self._platform_threadpool = ThreadPoolExecutor(
-            max_workers=getattr(opts, 'ya_threads')
-        )  # must be unbound when ymake is multithreaded
+        # In multiconfig mode, each task simply adds its options to a common list
+        # and then waits for one multiconfig ymake to process all configurations at once.
+        # For the large ymake to run at all, we first need to collect options from all configurations,
+        # so we should not limit threads here.
+        # We're safe to set high limit since threads are spawned lazily and reused if able.
+        max_workers = 1000 if opts.ymake_multiconfig else getattr(opts, 'ya_threads')
+        self._platform_threadpool = ThreadPoolExecutor(max_workers=max_workers)
         self._ymake_bin = ymake_bin
         self._real_ymake_bin = real_ymake_bin
         self._src_dir = src_dir
@@ -1368,6 +1440,7 @@ class _GraphMaker:
         self._allow_changelist = True
         self._cl_generator = cl_generator
         self.ymakes_scheduled = 0
+        self.has_cmdline_generation_error = False
 
     def disable_changelist(self):
         self._allow_changelist = False
@@ -1426,6 +1499,7 @@ class _GraphMaker:
 
         assert to_build_pic or to_build_no_pic
 
+        platform_id = self._make_debug_id(debug_id, None)
         pic = None
         no_pic = None
         pic_queue = None
@@ -1440,41 +1514,50 @@ class _GraphMaker:
                 no_pic_func, no_pic_tool_queue_putter = tool_targets_queue.add_source(
                     no_pic_func, self._make_debug_id(debug_id, 'nopic')
                 )
-            ymake_opts_nopic = ymake_opts
-            if to_build_pic and should_use_servermode_for_pic(self._opts):
+
+            ymake_opts_nopic = dict(
+                ymake_opts or {},
+                order=self.ymakes_scheduled,
+            )
+            self.ymakes_scheduled += 1
+
+            nopic_servermode_opts = dict(
+                transition_source='nopic',
+                report_pic_nopic=to_build_pic,
+            )
+            if should_use_internal_servermode(self._opts):
+                # tool options are different and set in _get_tools()
+                if graph_kind == _GraphKind.TARGET:
+                    ymake_opts_nopic.update(platform_id=platform_id, **nopic_servermode_opts)
+            elif to_build_pic and should_use_servermode_for_pic(self._opts):
                 pic_queue = _ToolEventsQueueServerMode()
                 no_pic_func, no_pic_queue_putter = pic_queue.add_source(
                     no_pic_func, self._make_debug_id(debug_id, 'nopic')
                 )
 
-                ymake_opts_nopic = dict(
-                    ymake_opts or {},
-                    transition_source='nopic',
-                    report_pic_nopic=True,
-                )
-
-            ymake_opts_nopic = dict(
-                ymake_opts_nopic or {},
-                order=self.ymakes_scheduled,
-            )
-            self.ymakes_scheduled += 1
+                ymake_opts_nopic.update(**nopic_servermode_opts)
 
             def gen_no_pic():
-                return no_pic_func(
-                    flags,
-                    target_tc,
-                    abs_targets,
-                    debug_id=debug_id,
-                    enabled_events=enabled_events,
-                    extra_conf=extra_conf,
-                    cache_dir=cache_dir,
-                    change_list=self._opts.build_graph_cache_cl,
-                    no_caches_on_retry=self._opts.no_caches_on_retry,
-                    no_ymake_retry=self._opts.no_ymake_retry,
-                    tool_targets_queue_putter=no_pic_tool_queue_putter,
-                    pic_queue_putter=no_pic_queue_putter,
-                    ymake_opts=ymake_opts_nopic,
-                )
+                try:
+                    return no_pic_func(
+                        flags,
+                        target_tc,
+                        abs_targets,
+                        debug_id=debug_id,
+                        enabled_events=enabled_events,
+                        extra_conf=extra_conf,
+                        cache_dir=cache_dir,
+                        change_list=self._opts.build_graph_cache_cl,
+                        no_caches_on_retry=self._opts.no_caches_on_retry,
+                        no_ymake_retry=self._opts.no_ymake_retry,
+                        tool_targets_queue_putter=no_pic_tool_queue_putter,
+                        pic_queue_putter=no_pic_queue_putter,
+                        ymake_opts=ymake_opts_nopic,
+                    )
+                except Exception:
+                    # this is merely a workaround to stop multiconfig if there is an error in ymake command generation
+                    self.has_cmdline_generation_error = True
+                    raise
 
             no_pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_no_pic).result))
 
@@ -1489,9 +1572,29 @@ class _GraphMaker:
                     pic_func, self._make_debug_id(debug_id, 'pic')
                 )
 
-            ymake_opts_pic = ymake_opts
+            ymake_opts_pic = dict(
+                ymake_opts or {},
+                order=self.ymakes_scheduled,
+            )
+            self.ymakes_scheduled += 1
+
+            pic_servermode_opts = dict(
+                targets_from_evlog=True,
+                source_root=self._opts.arc_root,
+                transition_source='pic',
+                dont_check_transitive_requirements=True,  # FIXME YMAKE-1612: fix transitive checks in servermode and remove this flag
+            )
+
             abs_targets_pic = abs_targets
-            if pic_queue is not None:
+            if should_use_internal_servermode(self._opts):
+                ymake_opts_pic['platform_id'] = platform_id
+                # tool options are different and set in _get_tools()
+                if graph_kind == _GraphKind.TARGET:
+                    ymake_opts_pic['transition_source'] = 'pic'
+                    if to_build_no_pic:
+                        ymake_opts_pic.update(**pic_servermode_opts)
+                        abs_targets_pic = []
+            elif pic_queue is not None:
 
                 def stdin_line_provider():
                     # This is a workaround. TShellCommand pulls stdin anytime the child process tries to write to any of std{out,err}.
@@ -1502,37 +1605,29 @@ class _GraphMaker:
                         return ''
                     return json.dumps(pic_queue.get()) + '\n'
 
-                ymake_opts_pic = dict(
-                    ymake_opts or {},
-                    targets_from_evlog=True,
-                    source_root=self._opts.arc_root,
-                    stdin_line_provider=stdin_line_provider,
-                    transition_source='pic',
-                    dont_check_transitive_requirements=True,  # FIXME YMAKE-1612: fix transitive checks in servermode and remove this flag
-                )
+                ymake_opts_pic.update(stdin_line_provider=stdin_line_provider, **pic_servermode_opts)
                 abs_targets_pic = []
 
-            ymake_opts_pic = dict(
-                ymake_opts_pic or {},
-                order=self.ymakes_scheduled,
-            )
-            self.ymakes_scheduled += 1
-
             def gen_pic():
-                return pic_func(
-                    flags,
-                    target_tc,
-                    abs_targets_pic,
-                    debug_id=debug_id,
-                    enabled_events=enabled_events,
-                    extra_conf=extra_conf,
-                    cache_dir=cache_dir,
-                    change_list=self._opts.build_graph_cache_cl,
-                    no_caches_on_retry=self._opts.no_caches_on_retry,
-                    no_ymake_retry=self._opts.no_ymake_retry,
-                    tool_targets_queue_putter=pic_queue_putter,
-                    ymake_opts=ymake_opts_pic,
-                )
+                try:
+                    return pic_func(
+                        flags,
+                        target_tc,
+                        abs_targets_pic,
+                        debug_id=debug_id,
+                        enabled_events=enabled_events,
+                        extra_conf=extra_conf,
+                        cache_dir=cache_dir,
+                        change_list=self._opts.build_graph_cache_cl,
+                        no_caches_on_retry=self._opts.no_caches_on_retry,
+                        no_ymake_retry=self._opts.no_ymake_retry,
+                        tool_targets_queue_putter=pic_queue_putter,
+                        ymake_opts=ymake_opts_pic,
+                    )
+                except Exception:
+                    # this is merely a workaround to stop multiconfig if there is an error in ymake command generation
+                    self.has_cmdline_generation_error = True
+                    raise
 
             pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_pic).result))
 
@@ -1907,8 +2002,10 @@ class _GraphMaker:
             ev_listener=self._get_event_listener_debug_id_wrapper(ev_listener, debug_id, tc),
             enabled_events=enabled_events,
             no_caches_on_retry=no_caches_on_retry,
-            no_ymake_retry=no_ymake_retry,
+            no_ymake_retry=no_ymake_retry or self._opts.ymake_multiconfig,
             disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
+            parallel_rendering=self._opts.ymake_parallel_rendering,
+            use_subinterpreters=self._opts.ymake_use_subinterpreters,
         )
 
         if test_dart:
@@ -1946,9 +2043,6 @@ class _GraphMaker:
         if self._opts.compress_ymake_output:
             assert self._opts.compress_ymake_output_codec, "Compress codec must be defined"
             o['compress_ymake_output_codec'] = self._opts.compress_ymake_output_codec
-
-        if self._opts.ymake_multiconfig:
-            o['multiconfig'] = self._opts.ymake_multiconfig
 
         return o
 
@@ -2242,10 +2336,12 @@ def _build_graph_and_tests(
     )
 
     host_tool_resolver = _HostToolResolver(parsed_host_p, res_dir)
+    set_python_pattern(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern'])
 
     graph_handles: list[_TargetGraphsResult] = []
     tool_targets_queue = create_tool_event_queue(opts)
     enabled_events = EVENTS_WITH_PROGRESS + YmakeEvents.PREFETCH.value if opts.prefetch else EVENTS_WITH_PROGRESS
+    ymake_opts = {'multiconfig': opts.ymake_multiconfig}
     for i, tc in enumerate(target_tcs, start=1):
         targets = []
         for target in tc.get('targets', []):
@@ -2261,11 +2357,19 @@ def _build_graph_and_tests(
             extra_conf=opts.extra_conf,
             enabled_events=enabled_events,
             tool_targets_queue=tool_targets_queue,
+            ymake_opts=ymake_opts,
         )
         graph_handles.append(target_graph)
 
     with stager.scope("get-tools"):
-        graph_tools = _get_tools(tool_targets_queue, graph_maker, opts.arc_root, host_tc, opts)
+        graph_tools = _get_tools(
+            tool_targets_queue,
+            graph_maker,
+            opts.arc_root,
+            host_tc,
+            opts,
+            ymake_opts,
+        )
 
     graph_maker.disable_changelist()
 
@@ -2328,12 +2432,13 @@ def _build_graph_and_tests(
     if opts.gen_renamed_results:
         # TODO: this works incorrectly with tests outputs
         by_uid = {n['uid']: n for n in graph['graph']}
-        graph = _gen_rename_nodes(graph, by_uid, src_dir)
+        graph = _gen_rename_nodes(graph, host_tool_resolver, by_uid, src_dir)
         timer.show_step('gen rename nodes')
 
     graph['result'] = list(sorted(set(graph['result'])))
 
     graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
+    graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
 
     if not opts.ymake_bin:
         graph['conf']['resources'].append(host_tool_resolver.resolve('ymake', 'YMAKE'))
@@ -2365,6 +2470,7 @@ def _build_graph_and_tests(
             opts.arc_root,
             opts.rel_targets,
             opts.version,
+            host_tool_resolver,
         )
 
     if opts.add_modules_to_results:
@@ -2400,7 +2506,7 @@ def _build_graph_and_tests(
     bg_cache.archive_cache_dir(opts)
 
     with stager.scope('inject_stats_and_static_uids'):
-        gen_plan.inject_stats_and_static_uids(graph)
+        gen_plan.inject_stats_and_static_uids(graph, opts.schedule_strategy is not None)
 
     with stager.scope("strip-tags"):
         graph['graph'] = _strip_tags(graph['graph'])
@@ -2418,6 +2524,24 @@ def _build_graph_and_tests(
 
     graph = _OptimizableGraph(graph)
     graph.optimize_resources()
+    # Temporary experimental option. TODO: remove when DISTBUILD-4438 is done.
+    if getattr(opts, "force_build_root_cwd", None):
+        logger.debug("Change cwd to $(BUILD_ROOT)")
+        uid_map = {}
+        for node in graph["graph"]:
+            changed = False
+            for cmd in node.get("cmds", ()):
+                if "cwd" not in cmd:
+                    changed = True
+                    cmd["cwd"] = "$(BUILD_ROOT)"
+            if changed:
+                new_uid = node["uid"] + "-FBR"
+                uid_map[node["uid"]] = new_uid
+                node["uid"] = new_uid
+        if uid_map:
+            for node in graph["graph"]:
+                node["deps"] = [uid_map.get(d, d) for d in node["deps"]]
+            graph["result"] = [uid_map.get(r, r) for r in graph["result"]]
 
     with stager.scope('clean-intern-string-storage'):
         # After this point all ccgraphs become useless (all python graphs remain good).
@@ -2539,13 +2663,14 @@ def _get_target_platform_descriptor(target_tc, opts):
     return "-".join(tags) if tags else platform
 
 
-def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver):
+def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver, host_tool_resolver: "_HostToolResolver"):
     modules = [
         n['target_properties']['module_dir'] for n in graph['graph'] if n.get('kv', {}).get('mvn_export', 'no') == 'yes'
     ]
     if len(modules) == 0:
         return graph
 
+    python3_pattern = host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
     inputs = [
         "build/scripts/fs_tools.py",
         "build/scripts/mkdir.py",
@@ -2554,7 +2679,7 @@ def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver):
     ]
     cmds = [
         [
-            "$(PYTHON)/python",
+            '$({})/bin/python3'.format(python3_pattern),
             '$(SOURCE_ROOT)/build/scripts/writer.py',
             '--file',
             '$(BUILD_ROOT)/modules_list.txt',
@@ -2564,7 +2689,7 @@ def _add_global_pom(graph: graph_descr.DictGraph, arc_root, start_paths, ver):
         + [d for d in modules]
         + ['--ya-end-command-file'],
         [
-            '$(PYTHON)/python',
+            '$({})/bin/python3'.format(python3_pattern),
             '$(SOURCE_ROOT)/build/scripts/generate_pom.py',
             '--target',
             'ru.yandex:root-for-{}:{}'.format(
@@ -2603,10 +2728,14 @@ def _clean_maven_deploy_from_run_java_program(graph):
 
     reachable_exported = set()
     queue = collections.deque(res for res in graph['result'] if res in all_exported)
+    reachable_exported.update(queue)
     while queue:
         uid = queue.popleft()
-        queue.extend(dep for dep in all_exported[uid].get('deps', []) if dep in all_exported)
-        reachable_exported.add(uid)
+        deps = [
+            dep for dep in all_exported[uid].get('deps', []) if dep in all_exported and dep not in reachable_exported
+        ]
+        reachable_exported.update(deps)
+        queue.extend(deps)
 
     for uid, node in all_exported.items():
         if uid in reachable_exported:
@@ -2627,11 +2756,12 @@ def _make_yndexing_graph(graph: graph_descr.DictGraph, opts, ymake_bin, host_too
 
     graph['conf']['resources'].append(host_tool_resolver.resolve('ytyndexer', 'YTYNDEXER'))
     graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
+    graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
 
     if opts.flags.get('YMAKE_YNDEXING', 'no') == 'yes':
         _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver)
     if py_yndexing:
-        _gen_pyndex_nodes(graph)  # TODO: Remove?
+        _gen_pyndex_nodes(graph, host_tool_resolver)  # TODO: Remove?
     if py3_yndexing:
         _gen_py3_yndexer_nodes(graph)
 
@@ -2737,10 +2867,11 @@ def _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver: "_HostTool
         graph['conf']['resources'].append(resource_json)
         ymakeyndexer_cmd = '$({})/ymakeyndexer'.format(resource_json['pattern'])
 
+    python3_pattern = host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
     cmds = [
         {
             'cmd_args': [
-                "$(PYTHON)/python",
+                "$({})/bin/python3".format(python3_pattern),
                 '$(SOURCE_ROOT)/build/ymake_conf.py',
                 '$(SOURCE_ROOT)',
                 'nobuild',
@@ -2794,7 +2925,8 @@ def _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver: "_HostTool
     graph['graph'].extend([yndexing_node])
 
 
-def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
+def _gen_pyndex_nodes(graph: graph_descr.DictGraph, host_tool_resolver: "_HostToolResolver", num_partitions: int = 10):
+    python3_pattern = host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern']
     yndexer_script = '$(SOURCE_ROOT)/build/scripts/python_yndexer.py'
     pyxref = next(
         os.path.join('$(' + r['pattern'] + ')', 'pyxref')
@@ -2810,7 +2942,7 @@ def _gen_pyndex_nodes(graph: graph_descr.DictGraph, num_partitions: int = 10):
         for part_id in range(num_partitions):
             ydx_output = "{}.{}.ydx.pb2".format(target, part_id)
             cmd = [
-                "$(PYTHON)/python",
+                "$({})/bin/python3".format(python3_pattern),
                 yndexer_script,
                 pyxref,
                 '1500',
@@ -2899,8 +3031,17 @@ def _gen_merge_nodes(nodes):
     return merging_nodes, alone_nodes
 
 
-def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, opts):
-    if should_use_servermode_for_tools(opts):
+def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, opts, ymake_opts):
+    if should_use_internal_servermode(opts):
+        kwargs = {
+            'abs_targets': [],
+            'ymake_opts': {
+                'targets_from_evlog': True,
+                'source_root': arc_root,
+                **ymake_opts,
+            },
+        }
+    elif should_use_servermode_for_tools(opts):
 
         def stdin_line_provider():
             # This is a workaround. TShellCommand pulls stdin anytime the child process tries to write to any of std{out,err}.
@@ -2917,6 +3058,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
                 'targets_from_evlog': True,
                 'source_root': arc_root,
                 'stdin_line_provider': stdin_line_provider,
+                **ymake_opts,
             },
         }
     else:
@@ -2930,6 +3072,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
 
         kwargs = {
             'abs_targets': abs_targets,
+            'ymake_opts': ymake_opts,
         }
 
     with stager.scope('build-tool-graphs'):
@@ -2942,7 +3085,9 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
             **kwargs,
         )
         if opts.ymake_multiconfig:
-            ymake2.run_ymake_scheduled(graph_maker.ymakes_scheduled)
+            ymake2.run_ymake_scheduled(
+                graph_maker.ymakes_scheduled, opts.ya_threads, lambda: graph_maker.has_cmdline_generation_error
+            )
         graph_tools = tg.pic().graph
 
     graph_tools.add_host_mark(strtobool(host_tc['flags'].get('SANDBOXING', "no")))
@@ -2962,6 +3107,7 @@ class _HostToolResolver:
         host_tool['toolchain'] = 'default'
         return pm.stringize_platform(host_tool)
 
+    @functools.cache
     def resolve(self, name: str, pattern: str) -> graph_descr.GraphConfResourceInfo:
         tc = tools.resolve_tool(name, self._host_tool, self._host_tool)
         tc['params'] = {'match_root': pattern}
@@ -3016,7 +3162,6 @@ def _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debu
         graph_kind=_GraphKind.GLOBAL_TOOLS,
         debug_id=debug_id,
         enabled_events='PSLGE',
-        ymake_opts={'multiconfig': False},
     )
     no_pic = tg.no_pic
     graph = no_pic().graph
@@ -3108,7 +3253,7 @@ def _get_tools_from_suites(suites, ytexec_required):
 
 
 def _build_merged_graph(
-    host_tool_resolver: _HostToolResolver,
+    host_tool_resolver: "_HostToolResolver",
     conf_error_reporter: _ConfErrorReporter,
     opts,
     print_status,
@@ -3142,8 +3287,16 @@ def _build_merged_graph(
             tpc_test_opts = _get_tpc_test_opts(test_opts, tpc)
 
             with stager.scope('insert-tests-{}'.format(target_graph_num)):
-                requested, stripped = _inject_tests(
-                    opts, print_status, src_dir, conf_error_reporter, graph, tests, tpc, tpc_test_opts
+                requested, stripped = _inject_tests(  # need pass host_tools_resolver nechda
+                    opts,
+                    print_status,
+                    src_dir,
+                    conf_error_reporter,
+                    graph,
+                    tests,
+                    tpc,
+                    tpc_test_opts,
+                    host_tool_resolver,
                 )
                 injected_tests += requested
                 stripped_tests += stripped
@@ -3167,6 +3320,7 @@ def _build_merged_graph(
         merged_graph['conf']['resources'].extend(resources)
 
         merged_graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
+        merged_graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
         try:
             merged_graph['conf']['resources'].append(host_tool_resolver.resolve('gdb', 'GDB'))
         except Exception as e:
@@ -3198,7 +3352,17 @@ def _build_merged_graph(
     return merged_graph, list(injected_tests), list(stripped_tests), united_make_files
 
 
-def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests, tpc, test_opts):
+def _inject_tests(
+    opts,
+    print_status,
+    src_dir,
+    conf_error_reporter,
+    graph,
+    tests,
+    tpc,
+    test_opts,
+    host_tool_resolver: "_HostToolResolver",
+):
     assert test_opts is not None
     import devtools.ya.test.filter as test_filter
     import devtools.ya.test.test_node
@@ -3218,14 +3382,14 @@ def _inject_tests(opts, print_status, src_dir, conf_error_reporter, graph, tests
     test_framer = devtools.ya.test.test_node.TestFramer(src_dir, plan, tpc, conf_error_reporter, test_opts)
     tests = test_framer.prepare_suites(tests)
 
-    logger.debug("Stripping clang-tidy irrelevant deps")
-    _clang_tidy_strip_deps(plan, tests)
+    logger.debug("Stripping static analysis irrelevant deps")
+    _static_analysis_strip_deps(plan, tests)
 
     # split after filtering
     requested, stripped = _split_stripped_tests(tests, test_opts)
     # Some tests may have unmet dependencies, so they won't be injected into the graph.
     # Thus the returned set can be lesser than input one. (See DEVTOOLS-6384 for additional details).
-    requested = devtools.ya.test.test_node.inject_tests(src_dir, plan, requested, test_opts, tpc)
+    requested = devtools.ya.test.test_node.inject_tests(src_dir, plan, requested, test_opts, tpc, host_tool_resolver)
     timer.show_step('inject tests for {}'.format(_get_target_platform_descriptor(tpc, opts)))
     logger.debug('injected %s tests for %s', len(requested), _get_target_platform_descriptor(tpc, opts))
 

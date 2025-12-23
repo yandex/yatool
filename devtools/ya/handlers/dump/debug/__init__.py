@@ -155,19 +155,20 @@ def do_dump_debug(params):
     # Store all tools_cache logs
 
     tools_cache_root = item.debug_bundle_data.get('tools_cache_root', None)
-    if tools_cache_root:
+    if tools_cache_root and os.path.exists(tools_cache_root):
         additional_paths.extend(_discovery_folder(tools_cache_root, "fallback.log", "tools_cache_log"))
 
     # Store all build_cache logs
 
     build_cache_root = item.debug_bundle_data.get('build_cache_root', None)
-    if build_cache_root:
+    if build_cache_root and os.path.exists(build_cache_root):
         additional_paths.extend(_discovery_folder(build_cache_root, "fallback.log", "build_cache_log"))
         additional_paths.extend(_discovery_folder(build_cache_root, "blobs.log", "build_cache_blobs_log"))
 
-    changelist_store = item.debug_bundle_data.get('changelist_store', None)
-    if changelist_store:
-        additional_paths.append(("changelist_store", Path(changelist_store)))
+    for additional_item in ["changelist_store", "coding_agent_misc_dir", "coding_agent_log_file"]:
+        additional_path = item.debug_bundle_data.get(additional_item, None)
+        if additional_path and Path(additional_path).exists():
+            additional_paths.append((additional_item, Path(additional_path)))
 
     try:
         repro_manager = reproducer.Reproducer(item)
@@ -238,7 +239,7 @@ def _discovery_folder(tools_cache_root, base_name, item_key):
 
 
 debug_handler = OptsHandler(
-    action=devtools.ya.app.execute(action=do_dump_debug),
+    action=devtools.ya.app.execute(action=do_dump_debug, respawn=devtools.ya.app.RespawnType.OPTIONAL),
     description="Utils for work with debug information stored by last ya runs",
     opts=[
         DumpDebugCommonOptions(),

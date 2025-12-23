@@ -1,30 +1,18 @@
-# coding: utf-8
-
-import sys
 import os
+import uuid
 
-import devtools.ya.core.config
 import exts.yjson as json
 import exts.fs
 import shutil
-import socket
 import logging
 import tempfile
 
-if sys.version[0] == "3":
-    from xmlrpc.client import ProtocolError
-else:
-    from xmlrpclib import ProtocolError
 
-
-import exts.archive
 import app_config
 
-from exts import filelock
-from exts import retry
-from exts import fs
-from exts import func
-from exts import hashing
+import exts.archive
+
+from exts import filelock, fs, func, hashing, asyncthread
 
 
 RESOURCE_INFO_JSON = "resource_info.json"
@@ -56,7 +44,6 @@ class SandboxStorage(object):
         self,
         storage_root,
         use_cached_only=False,
-        download_methods=None,
         custom_fetcher=None,
         update_last_usage=True,
         fetcher_params=None,
@@ -78,13 +65,12 @@ class SandboxStorage(object):
         :param resource_id: resource id
         :param resource_file: downloaded resource file RESOURCE_CONTENT_FILE_NAME with accompanying RESOURCE_INFO_JSON in the same directory
         """
-        if not self._sandbox_client and app_config.have_sandbox_fetcher:
+        if not self._sandbox_client and app_config.in_house:
             import devtools.ya.yalibrary.yandex.sandbox as sandbox
 
             logger.debug("Initializing sandbox client")
             self._sandbox_client = sandbox.SandboxClient(
                 token=self._oauth_token,
-                api_url=devtools.ya.core.config.custom_sandbox_api_url(),  # can be removed after code sync with Nebius ends (NDT-277)
             )
         logger.debug("Getting sandbox resource id %s from storage %s", resource_id, self._storage_root)
         with filelock.FileLock(os.path.join(self._storage_root, str(resource_id) + ".lock")):
@@ -146,10 +132,6 @@ class SandboxStorage(object):
 
     def is_dir_outputs_file_mode(self, resource_info):
         return resource_info.get("dir_outputs_mode", "") == FILE_MODE
-
-    @staticmethod
-    def progress_callback(_, __):
-        logger.debug("Downloading")
 
     def is_resource_prepared_for_dir_outputs(self, resource_id):
         return os.path.exists(self.get_dir_outputs_resource_tar_path(resource_id))
@@ -251,44 +233,50 @@ class SandboxStorage(object):
         :param resource_file: downloaded resource file RESOURCE_CONTENT_FILE_NAME with accompanying RESOURCE_INFO_JSON in the same directory
         """
         resource_info = self._get_resource_info_from_file(resource_file)
-        external_file = resource_info is not None
-        if not external_file:
-            resource_info = self._sandbox_client.get_resource(resource_id)
 
-        downloaded_file_path = os.path.join(download_resource_path, resource_info["file_name"])
+        if resource_info is not None:
+            fname = resource_info["file_name"]
+            dst_filepath = os.path.join(download_resource_path, fname)
 
-        if external_file:
-            logger.debug("Found resource %s at %s, moving to %s", resource_id, resource_file, downloaded_file_path)
-            target_dir = os.path.dirname(downloaded_file_path)
+            logger.debug("found sbr=%s, at=%s, mv_to=%s", resource_id, resource_file, dst_filepath)
+            target_dir = os.path.dirname(dst_filepath)
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
-            exts.fs.copy_tree(resource_file, downloaded_file_path, copy_function=exts.fs.hardlink_or_copy)
+            exts.fs.copy_tree(resource_file, dst_filepath, copy_function=exts.fs.hardlink_or_copy)
         else:
+            tmp_filepath = os.path.join(download_resource_path, str(uuid.uuid4()))
+
             if self._use_cached_only:
                 raise NoResourceInCacheException(
                     "Resource {} was not found in local storages and won't be downloaded".format(resource_id)
                 )
 
-            from devtools.ya.yalibrary.yandex.sandbox import fetcher
+            import yalibrary.fetcher.ufetcher as ufetcher
 
-            logger.debug("Will download resource %s to %s", resource_id, downloaded_file_path)
-            fetcher.download_resource(
-                resource_id,
-                downloaded_file_path,
-                custom_fetcher=self._custom_fetcher,
-                progress_callback=self.progress_callback,
-                sandbox_token=self._oauth_token,
-                fetcher_params=self._fetcher_params,
+            downloader = ufetcher.UFetcherDownloader(
+                ufetcher=ufetcher.get_ufetcher(should_tar_output=False),
+                parsed_uri=f"sbr:{resource_id}",
+                progress_callback=None,
+                keep_directory_packed=False,
+                resource_info=None,
+                resource_type='sbr',
             )
 
-        return resource_info, downloaded_file_path, external_file
+            # XXX: it's vital to have it in a separate thread in order to have a correct signal handler (otherwise ctrl+C won't work)
+            future = asyncthread.future(lambda: downloader(tmp_filepath))
+            result = future()
 
-    # ~315 sec within 35 retries
-    @retry.retrying(
-        max_times=35,
-        ignore_exception=lambda e: isinstance(e, (DownloadException, ProtocolError, socket.error)),
-        retry_sleep=lambda i, t: i / 2.0,
-    )
+            resource_info = result["last_attempt"]["result"]["resource_info"]["attrs"]["raw_meta"]
+            fname = resource_info["file_name"]
+
+            dst_filepath = os.path.join(download_resource_path, fname)
+            logger.debug("mv sbr=%s, src=%s, dst=%s", resource_id, tmp_filepath, dst_filepath)
+
+            exts.fs.ensure_dir(os.path.dirname(dst_filepath))
+            shutil.move(tmp_filepath, dst_filepath)
+
+        return resource_info, dst_filepath
+
     def _download_resource(self, resource_id, decompress_if_archive, rename_to, resource_file):
         """
         :param resource_file: downloaded resource file RESOURCE_CONTENT_FILE_NAME with accompanying RESOURCE_INFO_JSON in the same directory
@@ -300,12 +288,12 @@ class SandboxStorage(object):
         download_resource_path = tempfile.mkdtemp(prefix="download.", dir=resource_path)
         resource_temp_content_path = tempfile.mkdtemp(prefix="content.", dir=resource_path)
 
-        resource_info, downloaded_file_path, external_file = self._get_raw_resource_data(
+        resource_info, downloaded_file_path = self._get_raw_resource_data(
             resource_id, download_resource_path, resource_file
         )
 
         if downloaded_file_path.endswith(".tar.gz") or downloaded_file_path.endswith(".tar"):
-            logger.debug("%s is an archive - will unpack it", downloaded_file_path)
+            logger.debug("%s is an archive - unpack=%s", downloaded_file_path, decompress_if_archive)
             if decompress_if_archive:
                 self._extract_from_tar(downloaded_file_path, resource_temp_content_path)
                 exts.fs.remove_tree(download_resource_path)
@@ -328,23 +316,13 @@ class SandboxStorage(object):
 
         resource_info["path"] = resource_path
         if rename_to:
-            rename_to_path = self._get_resource_path(resource_id, rename_to)
-            rename_from_path = os.path.join(resource_info["path"], resource_info["file_name"])
-            if resource_info.get("multifile") and os.path.isdir(rename_from_path):
-                exts.archive.create_tar([(rename_from_path, os.path.basename(rename_from_path))], rename_to_path)
-                exts.fs.remove_tree(rename_from_path)
+            dst = self._get_resource_path(resource_id, rename_to)
+            src = os.path.join(resource_info["path"], resource_info["file_name"])
+            if resource_info.get("multifile") and os.path.isdir(src):
+                exts.archive.create_tar([(src, os.path.basename(src))], dst)
+                exts.fs.remove_tree(src)
             else:
-                if not external_file:
-                    if "md5" in resource_info:
-                        downloaded_md5 = hashing.md5_path(rename_from_path)
-                        assert (
-                            downloaded_md5 == resource_info["md5"]
-                        ), "Downloaded resource md5 mismatch (expected {}, got {})".format(
-                            resource_info["md5"], downloaded_md5
-                        )
-                    else:
-                        logger.warning("Skipped resource verification - no checksum was provied: %s", resource_info)
-                fs.replace(rename_from_path, rename_to_path)
+                fs.replace(src, dst)
             resource_info["rename_to"] = rename_to
 
         with open(self._get_resource_info_path(resource_id), "w") as info_file:

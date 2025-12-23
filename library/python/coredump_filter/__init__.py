@@ -38,12 +38,9 @@ ARCADIA_ROOT_DIRS = [
     "/kernel/",
     "/build/",
     "/search/",
-
     # "/gcc-4.8.2/",
-
     # system paths
     # "/lib/x86_64-linux-gnu/",
-
     # all other stuff
     "/aapi/",
     "/addappter/",
@@ -319,7 +316,7 @@ class SourceRoot(object):
                 min_pos = pos
 
         if min_pos < len(source):
-            self.root = source[:min_pos + 1]
+            self.root = source[: min_pos + 1]
 
     def crop(self, source):
         if not source:
@@ -337,8 +334,7 @@ class SourceRoot(object):
 
 def highlight_func(s):
     return (
-        s
-        .replace("=", '<span class="symbol">=</span>')
+        s.replace("=", '<span class="symbol">=</span>')
         .replace("(", '<span class="symbol">(</span>')
         .replace(")", '<span class="symbol">)</span>')
     )
@@ -360,6 +356,7 @@ class FrameBase(object):
         self.source = source
         self.source_no = source_no
         self.func_name = func_name
+        self.commit_hash = None  # type: str | None
 
     def __str__(self):
         return "{}\t{}\t{}".format(
@@ -403,6 +400,20 @@ class FrameBase(object):
                 source_fmt=source_fmt,
             )
         )
+
+    def build_arcadia_link(self, source):
+        if not source:
+            return ""
+
+        link = os.path.join(ARCADIA_ROOT_LINK, source)
+
+        if self.commit_hash:
+            link = link + "?rev={rev}".format(rev=self.commit_hash)
+
+        if self.source_no:
+            link = link + "#L{line_no}".format(line_no=self.source_no)
+
+        return link
 
 
 class LLDBFrame(FrameBase):
@@ -459,7 +470,7 @@ class GDBFrame(FrameBase):
     # #7  0x00007f105f3a221d in NAppHost::NTransport::TCoroutineExecutor::Poll (this=0x7f08416a5d00,
     #     tasks=empty TVector (capacity=32)) at /-S/apphost/lib/executors/executors.cpp:373
     # We match with non-greedy regex a function name that cannot contain equal sign
-    FUNC_RE = re.compile(r"(.*?) \(([a-zA-Z0-9_]+=.*|)\)$")   # function with kwarg-params or zero params
+    FUNC_RE = re.compile(r"(.*?) \(([a-zA-Z0-9_]+=.*|)\)$")  # function with kwarg-params or zero params
 
     def __init__(
         self,
@@ -500,13 +511,12 @@ class GDBFrame(FrameBase):
         if len(dirs) > 1 and "/{dir}/".format(dir=dirs[1]) in ARCADIA_ROOT_DIRS:
             if dirs[0] in KNOWN_ARCADIA_ROOT_SIGNS:
                 source = os.path.join(*dirs[1:])
-                link = os.path.join(ARCADIA_ROOT_LINK, source)
+                link = self.build_arcadia_link(source)
         else:
             source = self.source
+
         if self.source_no:
             source_fmt = ' +<span class="source-no">{}</span>'.format(self.source_no)
-            if link:
-                link += "?#L{line}".format(line=self.source_no)
 
         if link:
             source = '<a href="{link}">{source_path}</a>'.format(
@@ -531,7 +541,6 @@ class PythonFrame(FrameBase):
         error_line_no=0,  # type: int
         error_column_selector="",  # type: str
     ):
-
         self._error_line = error_line.strip()
         offset = len(error_line) - len(self._error_line)
         if "^" in error_column_selector:
@@ -557,10 +566,7 @@ class PythonFrame(FrameBase):
     def source_link(self):  # type: () -> str
         if self.source.startswith("<"):
             return ""
-        link = os.path.join(ARCADIA_ROOT_LINK, self.source)
-        if self.source_no:
-            link = link + "#L{}".format(self.source_no)
-        return link
+        return self.build_arcadia_link(self.source)
 
     @property
     def error_line(self):
@@ -568,18 +574,22 @@ class PythonFrame(FrameBase):
 
     @property
     def error_line_html(self):
-        return '{prefix}<span class="python-error-area">{error}</span>{suffix}'.format(
-            prefix=self._error_line[:self._error_col_start],
-            error=self._error_line[self._error_col_start:self._error_col_end],
-            suffix=self._error_line[self._error_col_end:]
-        ).replace("\t", "&nbsp;"*4).replace("\n", "<br/>")
+        return (
+            '{prefix}<span class="python-error-area">{error}</span>{suffix}'.format(
+                prefix=self._error_line[: self._error_col_start],
+                error=self._error_line[self._error_col_start : self._error_col_end],
+                suffix=self._error_line[self._error_col_end :],
+            )
+            .replace("\t", "&nbsp;" * 4)
+            .replace("\n", "<br/>")
+        )
 
     def raw(self):
         error_line = self._error_line
         if not self._in_function_name:
             file_line = ""
         else:
-            error_line = '  {}'.format(self._error_line)
+            error_line = "  {}".format(self._error_line)
             file_line = 'File "{source}", line {line}, in {func}'.format(
                 source=self._module_path,
                 line=self._error_line_no,
@@ -590,15 +600,19 @@ class PythonFrame(FrameBase):
     def html(self):
         if not self._in_function_name:
             file_line = ""
-            error_line = '<span class="python-error-message">{}</span>'.format(
-                self._error_line,
-            ).replace("\t", "&nbsp;"*4).replace("\n", "<br/>")
+            error_line = (
+                '<span class="python-error-message">{}</span>'.format(
+                    self._error_line,
+                )
+                .replace("\t", "&nbsp;" * 4)
+                .replace("\n", "<br/>")
+            )
         else:
             file_line = (
-                '<p>'
+                "<p>"
                 'File <a target="_blank" href="{source_link}">"{source}", line {line}</a>, '
-                'in <strong>{func}</strong>'
-                '</p>'
+                "in <strong>{func}</strong>"
+                "</p>"
             ).format(
                 source_link=self.source_link,
                 source=html_escape(self._module_path),
@@ -614,7 +628,6 @@ class PythonFrame(FrameBase):
 
 
 class SDCAssertFrame(LLDBFrame):
-
     def __init__(
         self,
         frame_no=None,
@@ -718,6 +731,7 @@ class Stack(object):
         stream=None,
         mode=None,  # type: CoredumpMode
         ignore_bad_frames=True,
+        commit_hash=None,  # type: str | None
     ):
         self.lines = lines
         self.source_root = source_root
@@ -736,6 +750,7 @@ class Stack(object):
         self.stack_fp = stack_fp
         self.stream = stream
         self.ignore_bad_frames = ignore_bad_frames
+        self.commit_hash = commit_hash
 
     def to_json(self):
         """Should be symmetric with `from_json`."""
@@ -797,10 +812,12 @@ class Stack(object):
                 self.important = self.LOW_IMPORTANT
 
     def push_frame(self, frame):
+        # type: (FrameBase) -> None
         self.check_importance(frame)
         # ignore duplicated frames
         if len(self.frames) and self.frames[-1].frame_no == frame.frame_no:
             return
+        frame.commit_hash = self.commit_hash
         self.frames.append(frame)
 
     def parse(self):
@@ -831,10 +848,12 @@ class Stack(object):
             logger.warning("Bad frame: %s", line)
             return
 
-        raise Exception("Bad frame: `{}`, frame `{}`".format(
-            line,
-            self.debug(return_result=True),
-        ))
+        raise Exception(
+            "Bad frame: `{}`, frame `{}`".format(
+                line,
+                self.debug(return_result=True),
+            )
+        )
 
     def debug(self, return_result=False):
         if self.low_important():
@@ -862,7 +881,8 @@ class Stack(object):
 
         if same_count >= 0:
             ans += '<span class="hash"><a href="#stack{0}">#{0}</a>, {1} stack(s) with same hash</span>\n'.format(
-                self.hash(), same_count,
+                self.hash(),
+                same_count,
             )
 
         for f in self.frames:
@@ -929,57 +949,34 @@ class Stack(object):
 
 
 class GDBStack(Stack):
-
     mode = CoredumpMode.GDB
 
     REGEXPS = [
         # #6  0x0000000001d9203e in NAsio::TIOService::TImpl::Run (this=0x137b1ec00) at /place/
         # sandbox-data/srcdir/arcadia_cache/library/neh/asio/io_service_impl.cpp:77
-
-        re.compile(
-            r"#(?P<frame_no>\d+)[ \t]+(?P<addr>0x[0-9a-f]+) in (?P<func>.*) at (?P<source>.*)"
-        ),
-
+        re.compile(r"#(?P<frame_no>\d+)[ \t]+(?P<addr>0x[0-9a-f]+) in (?P<func>.*) at (?P<source>.*)"),
         # #5 TCondVar::WaitD (this=this@entry=0x10196b2b8, mutex=..., deadLine=..., deadLine@entry=...)
         # at /place/sandbox-data/srcdir/arcadia_cache/util/system/condvar.cpp:150
-        re.compile(
-            r"#(?P<frame_no>\d+)[ \t]+(?P<func>.*) at (?P<source>/.*)"
-        ),
-
+        re.compile(r"#(?P<frame_no>\d+)[ \t]+(?P<func>.*) at (?P<source>/.*)"),
         # #0  0x00007faf8eb31d84 in pthread_cond_wait@@GLIBC_2.3.2 ()
         # from /lib/x86_64-linux-gnu/libpthread.so.0
-        re.compile(
-            r"#(?P<frame_no>\d+)[ \t]+(?P<addr>0x[0-9a-f]+) in (?P<func>.*) from (?P<source>.*)"
-        ),
-
+        re.compile(r"#(?P<frame_no>\d+)[ \t]+(?P<addr>0x[0-9a-f]+) in (?P<func>.*) from (?P<source>.*)"),
         # #0  pthread_cond_wait@@GLIBC_2.3.2 () at ../sysdeps/unix/sysv/linux/x86_64/pthread_cond_wait.S:185
-        re.compile(
-            r"#(?P<frame_no>\d+)[ \t]+ (?P<func>.*) at (?P<source>.*)"
-        ),
-
+        re.compile(r"#(?P<frame_no>\d+)[ \t]+ (?P<func>.*) at (?P<source>.*)"),
         # #10 0x0000000000000000 in ?? ()
-        re.compile(
-            r"#(?P<frame_no>\d+)[ \t]+(?P<addr>0x[0-9a-f]+) in (?P<func>.*)"
-        ),
+        re.compile(r"#(?P<frame_no>\d+)[ \t]+(?P<addr>0x[0-9a-f]+) in (?P<func>.*)"),
     ]
 
 
 class LLDBStack(Stack):
-
     mode = CoredumpMode.LLDB
 
     REGEXPS = [
         # 0x00007fd7b300a886 libthird_Uparty_Sros_Sros_Ucomm_Sclients_Sroscpp_Sliblibroscpp.so`
         # std::thread::_State_impl<std::thread::_Invoker<std::tuple<ros::PollManager::PollManager()::$_1> > >::_M_run()
         # [inlined] ros::PollManager::threadFunc(this=0x00007fd7b30dab20) at poll_manager.cpp:75:16  # noqa
-        re.compile(
-            r"[ *]*frame #(?P<frame_no>\d+): (?P<addr>0x[0-9a-f]+).+inlined]\s(?P<func>.+)\sat\s(?P<source>.+)"
-        ),
-
-        re.compile(
-            r"[ *]*frame #(?P<frame_no>\d+): (?P<addr>0x[0-9a-f]+).+?`(?P<func>.+)\sat\s(?P<source>.+)"
-        ),
-
+        re.compile(r"[ *]*frame #(?P<frame_no>\d+): (?P<addr>0x[0-9a-f]+).+inlined]\s(?P<func>.+)\sat\s(?P<source>.+)"),
+        re.compile(r"[ *]*frame #(?P<frame_no>\d+): (?P<addr>0x[0-9a-f]+).+?`(?P<func>.+)\sat\s(?P<source>.+)"),
         # * frame #0: 0x00007fd7aee51f47 libc.so.6`gsignal + 199
         re.compile(
             r"[ *]*frame #(?P<frame_no>\d+): (?P<addr>0x[0-9a-f]+)\s(?P<source>.+)`(?P<func>.+)\s\+\s(?P<source_no>\d+)"
@@ -1025,42 +1022,34 @@ class LLDBStack(Stack):
 
 
 class PythonStack(Stack):
-
     REGEXPS = [
-        re.compile(
-            r'File "(?P<source>.*)", line (?P<source_no>\d+), in (?P<func_name>.*)'
-        ),
+        re.compile(r'File "(?P<source>.*)", line (?P<source_no>\d+), in (?P<func_name>.*)'),
     ]
 
 
 class SDCAssertStack(LLDBStack):
-
     mode = CoredumpMode.SDC_ASSERT
 
     REGEXPS = [
         # 0: ./modules/_shared/libcore_Stools_Slibassert.so(yandex::sdc::assert_details_::PanicV(char const*,
         # long, char const*, char const*, bool, char const*, __va_list_tag*)
         # +0x2aa)[0x7fb83268feaa]
-        re.compile(
-            r"(?P<frame_no>\d+):\s(?P<source>.+.so)\((?P<func>.+)\+(?P<source_no>.+).+\[(?P<addr>0x[0-9a-f]+)"
-        ),
-
-        re.compile(
-            r"(?P<frame_no>\d+):\s(?P<source>\w+)\((?P<func>.+)\+(?P<source_no>.+).+\[(?P<addr>0x[0-9a-f]+)"
-        )
+        re.compile(r"(?P<frame_no>\d+):\s(?P<source>.+.so)\((?P<func>.+)\+(?P<source_no>.+).+\[(?P<addr>0x[0-9a-f]+)"),
+        re.compile(r"(?P<frame_no>\d+):\s(?P<source>\w+)\((?P<func>.+)\+(?P<source_no>.+).+\[(?P<addr>0x[0-9a-f]+)"),
     ]
 
 
 def parse_python_traceback(
     trace,  # type: str
+    commit_hash=None,
 ):  # type: (...) -> tuple[list[list[Stack]], list[list[str]], int]
     trace = trace.replace("/home/zomb-sandbox/client/", "/")
     trace = trace.replace("/home/zomb-sandbox/tasks/", "/sandbox/")
     trace = trace.split("\n")
     exception = trace[-1]  # noqa: F841
-    trace = trace[1: -1]
+    trace = trace[1:-1]
     pairs = zip(trace[::2], trace[1::2])
-    stack = Stack(lines=[])
+    stack = Stack(lines=[], commit_hash=commit_hash)
     for frame_no, (path, row) in enumerate(pairs):
         # FIXME: wrap into generic tracer
         m = PythonStack.REGEXPS[0].match(path.strip())
@@ -1076,6 +1065,7 @@ def parse_python_traceback(
 
 def parse_python_traceback_2(
     trace,  # type: str
+    commit_hash=None,
 ):  # type: (...) -> tuple[list[list[Stack]], list[list[str]], int]
     """
     This is a replacement for an older parse_python_traceback (find above).
@@ -1088,7 +1078,7 @@ def parse_python_traceback_2(
 
     frame_no = 0
     line_index = 1
-    stack = Stack(lines=[])
+    stack = Stack(lines=[], commit_hash=commit_hash)
     stack_list = []
 
     while line_index < len(trace):
@@ -1100,7 +1090,7 @@ def parse_python_traceback_2(
 
         if line.strip().startswith("Traceback"):
             stack_list.append(stack)
-            stack = Stack(lines=[])
+            stack = Stack(lines=[], commit_hash=commit_hash)
             line_index += 1
             frame_no = 0
             continue
@@ -1110,17 +1100,19 @@ def parse_python_traceback_2(
         m = PythonFrame.SOURCE_RE.match(line.strip())
 
         if not m:
-            stack.push_frame(PythonFrame(
-                frame_no=frame_no,
-                error_line=line,
-            ))
+            stack.push_frame(
+                PythonFrame(
+                    frame_no=frame_no,
+                    error_line=line,
+                )
+            )
             line_index += 1
             continue
 
         module_path = m.group("module_path")
         for prefix in PythonFrame.SOURCE_REPLACEMENTS:
             if module_path.startswith(prefix):
-                module_path = os.path.join(PythonFrame.SOURCE_REPLACEMENTS[prefix], module_path[len(prefix):])
+                module_path = os.path.join(PythonFrame.SOURCE_REPLACEMENTS[prefix], module_path[len(prefix) :])
                 break
 
         in_function_name = m.group("func_name")
@@ -1136,14 +1128,16 @@ def parse_python_traceback_2(
             error_line = ""
             next_index = line_index + 1
 
-        stack.push_frame(PythonFrame(
-            frame_no=frame_no,
-            module_path=module_path,
-            in_function_name=in_function_name,
-            error_line_no=error_line_no,
-            error_line=error_line,
-            error_column_selector=error_column_selector,
-        ))
+        stack.push_frame(
+            PythonFrame(
+                frame_no=frame_no,
+                module_path=module_path,
+                in_function_name=in_function_name,
+                error_line_no=error_line_no,
+                error_line=error_line,
+                error_column_selector=error_column_selector,
+            )
+        )
         line_index = next_index
 
     if stack and len(stack.frames):
@@ -1190,12 +1184,14 @@ def _file_contents(file_name):
 def html_prolog(stream, timestamp):
     prolog = _file_contents("prolog.html")
     assert isinstance(prolog, six.string_types)
-    stream.write(prolog.format(
-        style=_file_contents("styles.css"),
-        coredump_js=_file_contents("core_proc.js"),
-        version=CORE_PROC_VERSION,
-        timestamp=timestamp,
-    ))
+    stream.write(
+        prolog.format(
+            style=_file_contents("styles.css"),
+            coredump_js=_file_contents("core_proc.js"),
+            version=CORE_PROC_VERSION,
+            timestamp=timestamp,
+        )
+    )
 
 
 def html_epilog(stream):
@@ -1223,6 +1219,7 @@ def filter_stack_dump(
     output_stream=None,
     timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     ignore_bad_frames=True,
+    commit_hash=None,
 ):
     """New interface for stacktrace filtering. Preferred to use."""
     if not core_text and not stack_file_name:
@@ -1247,11 +1244,11 @@ def filter_stack_dump(
         timestamp=timestamp,
         use_fingerprint=use_fingerprint,
         use_stream=output_stream is not None,
+        commit_hash=commit_hash,
     )
 
 
 class StackDumperBase(object):
-
     SANDBOX_TASK_RE = re.compile(r".*/[0-9a-f]/[0-9a-f]/([0-9]+)/.*")
     MAX_SAME_STACKS = 30
 
@@ -1266,6 +1263,7 @@ class StackDumperBase(object):
         mode,
         file_name=None,
         ignore_bad_frames=True,
+        commit_hash=None,
     ):
         self.source_root = SourceRoot()
         self.use_fingerprint = use_fingerprint
@@ -1278,6 +1276,7 @@ class StackDumperBase(object):
         self.timestamp = timestamp
         self.ignore_bad_frames = ignore_bad_frames
         self.stack_class = self.get_stack_class(mode)
+        self.commit_hash = commit_hash
 
         self.signal = SIGNAL_NOT_FOUND
         self.stacks = []
@@ -1320,6 +1319,7 @@ class StackDumperBase(object):
             thread_id=thread_id,
             stream=self.stream,
             ignore_bad_frames=self.ignore_bad_frames,
+            commit_hash=self.commit_hash,
         )
         self.stacks.append(stack)
 
@@ -1346,16 +1346,14 @@ class StackDumperBase(object):
                 if self.sandbox_task_id is not None:
                     self.stream.write(
                         '<div style="padding-top: 6px; font-size: 18px; font-weight: bold;">'
-                        'Coredumped binary build task: '
-                        '<a href="https://sandbox.yandex-team.ru/task/{0}">{0}</a></div>\n'.format(
-                            self.sandbox_task_id
-                        )
+                        "Coredumped binary build task: "
+                        '<a href="https://sandbox.yandex-team.ru/task/{0}">{0}</a></div>\n'.format(self.sandbox_task_id)
                     )
 
                 if self.sandbox_failed_task_id is not None:
                     self.stream.write(
                         '<div style="padding-top: 6px; font-size: 18px; font-weight: bold;">'
-                        'Sandbox failed task: '
+                        "Sandbox failed task: "
                         '<a href="https://sandbox.yandex-team.ru/task/{0}">{0}</a></div>\n'.format(
                             self.sandbox_failed_task_id
                         )
@@ -1387,7 +1385,9 @@ class StackDumperBase(object):
                 all_hash_stacks.append(cur_hash_stacks)
 
             prev_hash = stack.hash()
-            cur_hash_stacks = [stack, ]
+            cur_hash_stacks = [
+                stack,
+            ]
 
         # push last
         if cur_hash_stacks:
@@ -1402,10 +1402,7 @@ class StackDumperBase(object):
 
             html_epilog(self.stream)
         else:
-            raw_hash_stacks = [
-                [stack.raw() for stack in common_hash_stacks]
-                for common_hash_stacks in all_hash_stacks
-            ]  # type: list[list[str]]
+            raw_hash_stacks = [[stack.raw() for stack in common_hash_stacks] for common_hash_stacks in all_hash_stacks]  # type: list[list[str]]
             return all_hash_stacks, raw_hash_stacks, self.signal
 
     def _collect_stacks(self):
@@ -1453,7 +1450,6 @@ class StackDumperBase(object):
 
 
 class StackDumperGDB(StackDumperBase):
-
     SIGNAL_FLAG = "Program terminated with signal"
     THREAD_RE = re.compile(r".*[Tt]hread (\d+) .*")
     LINE_IN = re.compile(r"\d+\tin ")
@@ -1491,11 +1487,10 @@ class StackDumperGDB(StackDumperBase):
 
     def check_signal(self, line):
         if self.SIGNAL_FLAG in line:
-            self.signal = line[line.find(self.SIGNAL_FLAG) + len(self.SIGNAL_FLAG):].split(",")[0]
+            self.signal = line[line.find(self.SIGNAL_FLAG) + len(self.SIGNAL_FLAG) :].split(",")[0]
 
 
 class StackDumperLLDB(StackDumperBase):
-
     SIGNAL_FLAG = "stop reason = signal"
 
     THREAD_RE = re.compile(r".*thread #(\d+), .*")
@@ -1505,12 +1500,10 @@ class StackDumperLLDB(StackDumperBase):
         "(lldb) script import sys",
         "(lldb) target create",
         "Core file",
-
         # Drop signal interceptor call
         # * frame #0: 0x00007efd49042fb7 libc.so.6`__GI___libc_sigaction at sigaction.c:54
         # TODO(epsilond1): Set MAX_IMPORTANT for some thread
         "__GI___libc_sigaction",
-
         # Drop unnamed symbols at lines like
         # frame #4: 0x00007fd8054156df libstdc++.so.6`___lldb_unnamed_symbol440$$libstdc++.so.6 + 15
         "$$",
@@ -1532,10 +1525,7 @@ class StackDumperLLDB(StackDumperBase):
 
 
 class StackDumperSDCAssert(StackDumperBase):
-
-    THREAD_RE = re.compile(
-        r"(\d+)(:\s)"
-    )
+    THREAD_RE = re.compile(r"(\d+)(:\s)")
 
     def is_ignored_line(self, line):
         if not line:
@@ -1571,6 +1561,7 @@ def filter_stackdump(
     timestamp=None,
     ignore_bad_frames=True,
     mode=None,
+    commit_hash=None,
 ):
     if mode is None and file_name is not None:
         mode = detect_coredump_mode(_read_file(file_name))
@@ -1593,6 +1584,7 @@ def filter_stackdump(
         timestamp=timestamp,
         ignore_bad_frames=ignore_bad_frames,
         mode=mode,
+        commit_hash=commit_hash,
     )
 
     return dumper.dump()
@@ -1679,8 +1671,5 @@ def deserialize_stacks(stack_groups_str):
     """
     stack_groups_json = json.loads(stack_groups_str)
     # please do not use `map` hell here, it's impossible to debug
-    all_stacks = [
-        [stack_factory(stack) for stack in stacks]
-        for stacks in stack_groups_json
-    ]
+    all_stacks = [[stack_factory(stack) for stack in stacks] for stacks in stack_groups_json]
     return all_stacks

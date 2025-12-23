@@ -831,7 +831,7 @@ namespace {
             }
 
             // TODO(svidyuk): Ugly hack: TEST_CLASSPATH_DEPS in test DART must support ${ext:so:MANAGED_PEERS_CLOSURE} expansion instead of hardcode here
-            if (parent.Get("MODULE_TYPE") == "JTEST" || parent.Get("MODULE_TYPE") == "JTEST_FOR" || parent.Get("MODULE_TYPE") == "JUNIT5") {
+            if (parent.Get("MODULE_TYPE") == "JTEST" || parent.Get("MODULE_TYPE") == "JTEST_FOR" || parent.Get("MODULE_TYPE") == "JUNIT5"  || parent.Get("MODULE_TYPE") == "JUNIT6") {
                 // Used by tests. Tests require all JNI deps in order to work properly
                 TString var;
                 for (TNodeId item : unmanageablePeersClosure.Data()) {
@@ -1534,7 +1534,7 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
     IterateAll(Graph, StartTargets, collectorState, collectorVisitor, [](const TTarget& t) -> bool { return t.IsModuleTarget; });
     FORCE_TRACE(U, NEvent::TStageFinished("Apply Dependency Management"));
 
-    ComputeDependsToModulesClosure();
+    GetDependsToModulesClosure();
 
     SaveDependencyManagementCache(Conf.YmakeDMCache, &DMCacheTempFile);
 

@@ -5,6 +5,7 @@
 #include <library/cpp/getopt/small/last_getopt.h>
 
 #include <util/folder/path.h>
+#include <util/system/tls.h>
 
 class TFileConf;
 
@@ -30,16 +31,17 @@ struct TRootsOptions {
             return TString();
         }
 
-        if (targetId >= PathsCache.size()) {
-            PathsCache.resize(targetId + 1);
+        auto& cache = PathsCache.Get();
+        if (targetId >= cache.size()) {
+            cache.resize(targetId + 1);
         }
 
-        if (Y_UNLIKELY(PathsCache[targetId].empty())) {
+        if (Y_UNLIKELY(cache[targetId].empty())) {
             TString res = RealPathByStr(view.GetTargetStr());
-            PathsCache[targetId] = res;
+            cache[targetId] = res;
             return res;
         }
-        return PathsCache[targetId];
+        return cache[targetId];
     }
 
     template<typename TView>
@@ -81,6 +83,6 @@ private:
     bool IsRealPathCacheEnabled() const { return RefNames != nullptr; }
     TString RealPathByStr(TStringBuf p) const;
 
-    mutable TVector<TString> PathsCache;
+    mutable Y_THREAD(TVector<TString>) PathsCache;
     const TFileConf* RefNames = nullptr;
 };

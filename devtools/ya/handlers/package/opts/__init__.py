@@ -1,5 +1,6 @@
 import collections
 import logging
+import os
 
 import devtools.ya.build.build_opts
 import devtools.ya.core.yarg
@@ -17,6 +18,7 @@ AAR_SUBGROUP = devtools.ya.core.yarg.Group('Aar', 5)
 RPM_SUBGROUP = devtools.ya.core.yarg.Group('Rpm', 6)
 NPM_SUBGROUP = devtools.ya.core.yarg.Group('Npm', 7)
 PYTHON_WHEEL_SUBGROUP = devtools.ya.core.yarg.Group('Python wheel', 8)
+SQUASHFS_SUBGROUP = devtools.ya.core.yarg.Group('Squashfs', 9)
 
 
 class PackageOperationalOptions(devtools.ya.core.yarg.Options):
@@ -32,9 +34,13 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.debian_upload_token = None  # please, do not remove, we really need it in opensource nebius ya
         self.debian_force_bad_version = False
         self.docker_no_cache = False
+        self.docker_pull = False
         self.docker_push_image = False
         self.docker_remote_image_version = None
         self.docker_use_remote_cache = False
+        self.docker_dest_remote_image_version = None
+        self.docker_export_cache_to_registry = False
+        self.docker_use_buildx = False
         self.dump_build_targets = None
         self.dump_inputs = None
         self.ignore_fail_tests = False
@@ -254,6 +260,14 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ConfigConsumer("docker_no_cache"),
             devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-pull'],
+                help='Always attempt to pull all referenced Docker images',
+                hook=devtools.ya.core.yarg.SetConstValueHook('docker_pull', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer("docker_pull"),
+            devtools.ya.core.yarg.ArgConsumer(
                 names=['--dump-build-targets'],
                 hook=devtools.ya.core.yarg.SetValueHook('dump_build_targets'),
                 visible=False,
@@ -274,6 +288,28 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DOCKER_SUBGROUP,
             ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-export-cache-to-registry'],
+                help='Export build cache to registry (type=inline if --docker-dest-remote-image-version is not provided, otherwise type=registry, requires buildx)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('docker_export_cache_to_registry', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-dest-remote-image-version'],
+                help='Specify image version to be used as cache destination (requires buildx)',
+                hook=devtools.ya.core.yarg.SetValueHook('docker_dest_remote_image_version'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-use-buildx'],
+                help='Use buildx to build docker image',
+                hook=devtools.ya.core.yarg.SetConstValueHook('docker_use_buildx', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer("docker_use_buildx"),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--nanny-release'],
                 help='Notify nanny about new release',
@@ -359,6 +395,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.compress_archive = True
         self.compression_filter = None
         self.compression_level = None
+        self.stable_archive = False
         self.create_dbg = False
         self.custom_version = None
         self.debian_arch = None
@@ -371,6 +408,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.docker_add_host = []
         self.docker_build_arg = {}
         self.docker_build_network = None
+        self.docker_labels = []
         self.docker_platform = None
         self.docker_registry = "registry.yandex.net"
         self.docker_repository = ""
@@ -384,7 +422,9 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.force_dupload = False
         self.format = None
         self.full_strip = False
+        self.include_traversal_variant = None
         self.overwrite_read_only_files = False
+        self.package_filename = None
         self.raw_package = False
         self.resource_attrs = {}
         self.resource_type = "YA_PACKAGE"
@@ -393,12 +433,12 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.sloppy_deb = False
         self.store_debian = True
         self.strip = False
+        self.strip_threads = 1
+        self.squashfs_compression_filter = None
         self.hardlink_package_outputs = False
         self.wheel_platform = ""
         self.wheel_limited_api = ""
         self.wheel_python3 = False
-        self.package_filename = None
-        self.include_traversal_variant = None
 
     @staticmethod
     def consumer():
@@ -414,6 +454,16 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 names=['--full-strip'],
                 help='Strip binaries',
                 hook=devtools.ya.core.yarg.SetConstValueHook('full_strip', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--strip-threads'],
+                help='Number of strip threads',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'strip_threads',
+                    transform=lambda v: max(1, os.cpu_count() if v == 'auto' else int(v)),
+                ),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
             ),
@@ -469,6 +519,20 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 subgroup=TAR_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
+                names=['--stable-archive'],
+                help='Make a stable archive (fix mtime, perform sorting)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('stable_archive', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=TAR_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--squashfs-compression-filter"],
+                help="Specifies compression filter for SquashFS (gzip/zstd/xz/lzo/lz4/lzma)",
+                hook=devtools.ya.core.yarg.SetValueHook('squashfs_compression_filter'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=SQUASHFS_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
                 ["--compression-level"],
                 help="Specifies compression level (0-9 for gzip [6 is default], 0-22 for zstd [3 is default])",
                 hook=devtools.ya.core.yarg.SetValueHook('compression_level', transform=lambda s: int(s)),
@@ -502,6 +566,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook('format', const.PackageFormat.NPM),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=NPM_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--squashfs'],
+                help='Build squashfs package',
+                hook=devtools.ya.core.yarg.SetConstValueHook('format', const.PackageFormat.SQUASHFS),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=SQUASHFS_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--wheel'],
@@ -570,6 +641,13 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 names=['--docker-network'],
                 help='--network parameter for `docker build` command',
                 hook=devtools.ya.core.yarg.SetValueHook('docker_build_network'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-label'],
+                help='Same as Docker --label. You can pass multiple labels',
+                hook=devtools.ya.core.yarg.SetAppendHook('docker_labels'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=DOCKER_SUBGROUP,
             ),
@@ -793,6 +871,10 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         if self.compression_filter not in (None, 'gzip', 'zstd'):
             raise devtools.ya.core.yarg.ArgsValidatingException(
                 "Using unsupported compression filter: {}".format(self.compression_filter)
+            )
+        if self.squashfs_compression_filter not in (None, 'gzip', 'xz', 'zstd', 'lzo', 'lz4', 'lzma'):
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                "Using unsupported squashfs compression filter: {}".format(self.compression_filter)
             )
         if self.include_traversal_variant not in (None, 'postorder', 'preorder'):
             raise devtools.ya.core.yarg.ArgsValidatingException(

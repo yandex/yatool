@@ -3,6 +3,7 @@ package ru.yandex.devtools.test;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -116,8 +117,10 @@ public class Runner extends AbstractRunner {
         TestPlan plan = launcher.discover(request);
 
         YaTestName testName = new YaTestName(baseName, plan);
+
+        String outputRoot = params.testOutputsRoot != null ? params.testOutputsRoot : "";
         YaToolTraceListener listener = new YaToolTraceListener(task.getWriter(), testName, task.getLoggingContext(),
-                Junit5TemplateTestLookup.lazyLookup(testName, request));
+                Junit5TemplateTestLookupFactory.lazyLookup(testName, request, Path.of(outputRoot)));
 
         TraceListener<String, TestIdentifier> traceListener = listener.getListener();
 

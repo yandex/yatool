@@ -2,8 +2,6 @@
 
 #include "module_state.h"
 
-#include "macro_processor.h"
-#include "general_parser.h" // EMakeNodeType
 #include "vars.h"
 #include "conf.h"
 
@@ -21,8 +19,8 @@ class TYMake;
 class TModules;
 
 struct TModuleGlobInfo {
-    ui32 GlobId;
-    ui32 GlobHash;
+    ui32 GlobPatternId;
+    ui32 GlobPatternHash;
     TVector<ui32> WatchedDirs;
     TVector<ui32> MatchedFiles;
     TVector<ui32> Excludes;
@@ -138,7 +136,12 @@ private:
             return;
         }
 
-        for (const auto& call: *macroCalls) {
+        ProcessBodyMacroCalls(name, *macroCalls, localVars, std::forward<TMacroHandler>(handler), callStack);
+    }
+
+    template <typename TMacroHandler>
+    void ProcessBodyMacroCalls(TStringBuf name, const TMacroCalls& macroCalls, TVars localVars, TMacroHandler&& handler, TVector<TStringBuf>& callStack) {
+        for (const auto& call: macroCalls) {
             TSplitString callArgs;
             TStringBuf macroName = PrepareMacroCall(call, localVars, callArgs, name);
             if (!ProcessBaseMacro(macroName, static_cast<const TVector<TStringBuf>&>(callArgs), name)) {
@@ -181,7 +184,29 @@ public:
         ProcessConfigMacroCalls(name, args, [this](const TStringBuf& name, TArrayRef<const TStringBuf> args){this->AddStatement(name, args);}, lintersMake);
     }
 
+    void ProcessModuleCall(const TStringBuf& name, TArrayRef<const TStringBuf> args) {
+        ModuleConf.ParseModuleArgs(&Module, args);
+        ModuleConf.SetModuleBasename(&Module);
+
+        auto pi = Conf.BlockData.find(name);
+        if (!pi || !pi->second.CmdProps || !pi->second.CmdProps->HasMacroCalls()) {
+            return;
+        }
+
+        TVars localVars(&Vars);
+        localVars.Id = Vars.Id;
+        TVector<TStringBuf> callStack;
+        ProcessBodyMacroCalls(
+            name,
+            pi->second.CmdProps->GetMacroCalls(),
+            localVars,
+            [this](const TStringBuf& name, TArrayRef<const TStringBuf> args){this->AddStatement(name, args);},
+            callStack
+        );
+    }
+
     bool ProcessGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args, TVars& vars, TOriginalVars& orig, std::pair<size_t, size_t> location = {0, 0});
+    bool IsExtendGlobRestriction() const;
 
     TFileView GetName() const {
         return Module.GetName();
@@ -219,7 +244,7 @@ public:
         return Vars;
     }
 
-    TVector<TModuleGlobInfo>& GetModuleGlobs();
+    const TVector<TModuleGlobInfo>& GetModuleGlobs() const;
 
     void PrintMakeFileMap() const {
         MakeFileMap.Print();
@@ -234,4 +259,8 @@ public:
     }
 
     TDepsCacheId Commit();
+
+    TModuleGlobsData& GetModuleGlobsData() {
+        return Module.ModuleGlobsData;
+    }
 };

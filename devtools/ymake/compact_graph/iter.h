@@ -2,6 +2,7 @@
 
 #include "dep_graph.h"
 #include "dep_types.h"
+#include "query.h"
 
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/dbg.h>
@@ -491,9 +492,10 @@ public:
     /// we allow edge if it points to never seen node or seen node which is
     /// not currently in stack. This allows processing repeating nodes outside loops
     bool AcceptDep(TState& state) {
-        const auto& to = state.NextDep().To();
+        const auto& dep = state.NextDep();
+        const auto& to = dep.To();
         typename TNodes::iterator i = Nodes.find(to.Id());
-        return i == Nodes.end() || !i->second.InStack;
+        return (i == Nodes.end() || !i->second.InStack);
     }
 
 protected:
@@ -509,14 +511,10 @@ protected:
 struct TEntryStatsData {
     union {
         ui8 AllFlags;
-        struct {  // 4 bits used
+        struct {  // 3 bits used
             bool HasBuildFrom : 1;
             bool HasBuildCmd : 1;
             bool IsFile : 1;
-
-            // a (temporary) means of supporting different graph representations
-            // of variable context for old and new command styles
-            bool StructCmdDetected : 1;
         };
     };
     explicit TEntryStatsData(bool isFile = false)

@@ -6,6 +6,7 @@ import re
 import six
 import sys
 import time
+import typing  # noqa: F401
 
 import app_config
 import devtools.ya.core.error as core_error
@@ -19,6 +20,7 @@ import devtools.ya.core.monitoring as monitoring
 import devtools.ya.core.sec as sec
 import devtools.ya.core.user as user
 import devtools.ya.core.yarg
+import exts.asyncthread
 import exts.os2
 import exts.strings
 import exts.windows
@@ -27,6 +29,7 @@ import yalibrary.find_root
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
+from yalibrary.vcs import vcsversion
 
 from .modules import evlog
 from .modules import params
@@ -99,7 +102,6 @@ def execute_early(action):
                 ('handler_info', configure_handler_info()),
             ]
         )
-
         if not is_sensitive(args):
             modules.extend(
                 [
@@ -163,12 +165,16 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('profile', configure_profiler_support(ctx)),
             ('mlockall', configure_mlock_info()),
             ('event_queue', configure_event_queue()),
-            ('changelist_store', configure_changelist_store(ctx)),
         ]
+
+        if getattr(parameters, 'require_changelist_store', True):
+            modules.append(('changelist_store', configure_changelist_store(ctx)))
+
         if not getattr(parameters, 'no_evlogs', None) and not strtobool(os.environ.get('YA_NO_EVLOGS', '0')):
             modules.append(('evlog', evlog.configure(ctx)))
 
         modules.append(('dump_debug', configure_debug(ctx)))
+        modules.append(('fast_vcs_info_json_callback', configure_fast_vcs_info_json(ctx)))
 
         with ctx.configure(modules, modules_stager):
             el = getattr(ctx, "evlog", None)
@@ -619,17 +625,53 @@ def configure_active_state(app_ctx):
 
 
 def configure_vcs_info():
-    import logging
-
     revision = None
+
     try:
         from library.python import svn_version
 
         revision = svn_version.svn_revision()
-        logging.debug('Release revision: %s', revision)
+        logger.debug('Release revision: %s', revision)
+        if revision == -1:
+            logger.debug("Release branch: %s", svn_version.svn_branch())
+            logger.debug("Release hash: %s", svn_version.hash())
+            logger.debug("Release commit_id: %s", svn_version.commit_id())
+            logger.debug("Release timestamp: %s", svn_version.svn_timestamp())
+
     except ImportError:
         pass
+
     yield revision
+
+
+def _empty_vcs_info():
+    # type: () -> dict
+    return {}
+
+
+def configure_fast_vcs_info_json(ctx):
+    # type: (devtools.ya.yalibrary.app_ctx.AppCtx) -> typing.Generator[typing.Callable[[], dict], None, None]
+    arc_root = getattr(ctx.params, 'arc_root', None)
+    if getattr(ctx.params, 'report', None) is False:
+        logger.debug('Report disabled. Snowden vcs info log skipped')
+        result = _empty_vcs_info
+    elif not arc_root:
+        logger.debug('Unable to get vcs root for %s. Snowden vcs info log skipped', os.getcwd())
+        result = _empty_vcs_info
+    else:
+        result = exts.asyncthread.future(lambda: _load_fast_vcs_info(arc_root))
+
+    yield result
+
+
+def _load_fast_vcs_info(arc_root):
+    # type: (str) -> dict
+    from devtools.ya.core.report import telemetry, ReportTypes
+
+    result = vcsversion.get_fast_version_info(arc_root, timeout=5)
+    telemetry.report(ReportTypes.FAST_VCS_INFO_JSON, result)
+
+    return result
 
 
 def configure_vcs_type(ctx=None):
@@ -713,10 +755,11 @@ def configure_report_interceptor(ctx, report_events):
     from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args, parse_events_filter
 
     params_dict = ctx.params.__dict__ if hasattr(ctx, "params") else None
+    parsed_report_events = parse_events_filter.parse_events_filter(report_events)
 
     telemetry.init_reporter(
         suppressions=sec.mine_suppression_filter(params_dict),
-        report_events=parse_events_filter.parse_events_filter(report_events),
+        report_events=parsed_report_events,
     )
 
     telemetry.report(
@@ -745,7 +788,7 @@ def configure_report_interceptor(ctx, report_events):
     exception_name = ""
     exception_muted = False
     try:
-        yield
+        yield ReportTypes.ALL in parsed_report_events if parsed_report_events else False
     except BaseException as e:
         if isinstance(e, KeyboardInterrupt):
             exit_code = -1
@@ -804,6 +847,18 @@ def configure_report_interceptor(ctx, report_events):
                 version=ctx.revision,
                 total_walltimes=aggregate_stages(),
                 **additional_fields,
+            ),
+        )
+
+        telemetry.report(
+            ReportTypes.FINISH,
+            telemetry.compose(
+                ReportTypes.TIMEIT,
+                ReportTypes.BUILD_ERRORS,
+                ReportTypes.BUILD_ERRORS_COUNT,
+                ReportTypes.PROFILE_BY_TYPE,
+                ReportTypes.VCS_INFO,
+                ReportTypes.FAST_VCS_INFO_JSON,
             ),
         )
 
@@ -923,7 +978,7 @@ def configure_exit_interceptor(error_file):
                 "* remove some `~/.ya/` subdirectories\n"
             )
             if app_config.in_house:
-                sys.stderr.write("* ask  for help: {}\n".format(app_config.support_url))
+                sys.stderr.write("* ask for help: {}\n".format(app_config.support_url))
 
         if error_file:
             if not no_space_left:

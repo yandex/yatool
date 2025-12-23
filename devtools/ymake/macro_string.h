@@ -37,6 +37,7 @@ inline void ParseCommandLikeVariable(const TStringBuf& source, ui64& id, TString
 
 // name=value
 TString FormatProperty(const TStringBuf& name, const TStringBuf& value);
+TString FormatProperty(ui64 id, const TStringBuf& propName, const TStringBuf& value);
 TStringBuf GetPropertyName(const TStringBuf& cmd);
 TStringBuf GetPropertyValue(const TStringBuf& prop);
 

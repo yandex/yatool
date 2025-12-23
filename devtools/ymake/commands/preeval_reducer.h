@@ -30,7 +30,7 @@ namespace NCommands {
         void ReduceIf(TSyntax& ast) {
             for (auto& cmd : ast.Script)
                 ReduceCmd(cmd);
-            Sink.Expression = Compile(Mods, ast);
+            Sink.Expression = Compile(Mods, ast, Values);
         }
 
     private:
@@ -59,7 +59,7 @@ namespace NCommands {
                     }
         }
 
-        NPolexpr::TConstId EvalCmd(const TSyntax::TCommand& cmd) {
+        TMacroValues::TValue EvalCmd(const TSyntax::TCommand& cmd) {
             if (cmd.size() == 1 && cmd.front().size() == 1) {
                 // `input` modifier shenanigans:
                 // * do not add `Args(Terms(...))` wrappers when dealing with `${VAR}`
@@ -74,59 +74,59 @@ namespace NCommands {
                 if (std::holds_alternative<NPolexpr::EVarId>(cmd.front().front()))
                     return EvalTerm(cmd.front().front());
             }
-            TVector<NPolexpr::TConstId> args;
+            TVector<TMacroValues::TValue> args;
             args.reserve(cmd.size());
             for (auto& arg : cmd) {
-                TVector<NPolexpr::TConstId> terms;
+                TVector<TMacroValues::TValue> terms;
                 terms.reserve(arg.size());
                 for (auto& term : arg)
                     terms.push_back(EvalTerm(term));
-                args.push_back(Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Terms), std::span(terms))));
+                args.push_back(Evaluate(Mods.Func2Id(EMacroFunction::Terms), std::span(terms)));
             }
-            return Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Args), std::span(args)));
+            return Evaluate(Mods.Func2Id(EMacroFunction::Args), std::span(args));
         }
 
-        NPolexpr::TConstId EvalTerm(const TSyntax::TTerm& term) {
+        TMacroValues::TValue EvalTerm(const TSyntax::TTerm& term) {
             return std::visit(TOverloaded{
-                [&](NPolexpr::TConstId id) {
-                    return id;
+                [&](TMacroValues::TValue val) {
+                    return val;
                 },
                 [&](NPolexpr::EVarId id) {
-                    return Wrap(Evaluate(id));
+                    return Evaluate(id);
                 },
-                [&](const TSyntax::TTransformation& xfm) -> NPolexpr::TConstId {
+                [&](const TSyntax::TTransformation& xfm) -> TMacroValues::TValue {
                     auto val = EvalCmd(xfm.Body);
                     for (auto& mod : std::ranges::reverse_view(xfm.Mods))
                         val = ApplyMod(mod, val);
                     return val;
                 },
-                [&](const TSyntax::TCall&) -> NPolexpr::TConstId {
+                [&](const TSyntax::TCall&) -> TMacroValues::TValue {
                     Y_ABORT();
                 },
-                [&](const TSyntax::TBuiltinIf&) -> NPolexpr::TConstId {
+                [&](const TSyntax::TBuiltinIf&) -> TMacroValues::TValue {
                     Y_ABORT();
                 },
-                [&](const TSyntax::TIdOrString&) -> NPolexpr::TConstId {
+                [&](const TSyntax::TIdOrString&) -> TMacroValues::TValue {
                     Y_ABORT();
                 },
-                [&](const TSyntax::TUnexpanded&) -> NPolexpr::TConstId {
+                [&](const TSyntax::TUnexpanded&) -> TMacroValues::TValue {
                     Y_ABORT();
                 }
             }, term);
         }
 
-        NPolexpr::TConstId ApplyMod(const TSyntax::TTransformation::TModifier& mod, NPolexpr::TConstId val) {
-            TVector<NPolexpr::TConstId> args;
+        TMacroValues::TValue ApplyMod(const TSyntax::TTransformation::TModifier& mod, TMacroValues::TValue val) {
+            TVector<TMacroValues::TValue> args;
             args.reserve(mod.Arguments.size() + 1);
             for (auto& modArg : mod.Arguments) {
-                TVector<NPolexpr::TConstId> catArgs;
+                TVector<TMacroValues::TValue> catArgs;
                 catArgs.reserve(modArg.size());
                 for (auto& modTerm : modArg)
                     catArgs.push_back(EvalTerm(modTerm));
-                args.push_back(Wrap(Evaluate(Mods.Func2Id(EMacroFunction::Cat), std::span(catArgs))));
+                args.push_back(Evaluate(Mods.Func2Id(EMacroFunction::Cat), std::span(catArgs)));
             }
             args.push_back(val);
-            return Wrap(Evaluate(Mods.Func2Id(mod.Function), std::span(args)));
+            return Evaluate(Mods.Func2Id(mod.Function), std::span(args));
         }
 
     private:
@@ -140,9 +140,9 @@ namespace NCommands {
             return false;
         };
 
-        TStringBuf Evaluate(const TVarStr& val) {
+        std::string Evaluate(const TVarStr& val) {
             if (val.HasPrefix)
-                return GetCmdValue(val.Name);
+                return std::string(GetCmdValue(val.Name));
             else
                 return val.Name;
         }
@@ -154,47 +154,37 @@ namespace NCommands {
                 // this is a special case for when we get a macro argument like IN = "$L/TEXT/$U/__init__.py":
                 // the "$L" etc. are not variables, but root markers (see `NPath::ERoot` & Co.), we should keep them;
                 // TODO: _ackshually_, we should mark/type the whole thing as a file path and never parse it to begin with
-                auto result = TString(fmt::format("${}", name));
-                return Values.GetValue(Values.InsertStr(result));
+                return TMacroValues::TXString{fmt::format("${}", name)};
             }
             if (var->DontExpand /* see InitModuleVars() */) {
                 // this is a Very Special Case that is supposed to handle things like `${input:FOOBAR}` / `FOOBAR=$ARCADIA_ROOT/foobar`;
                 // note that the extra braces in the result are significant:
                 // the pattern should match whatever `TPathResolver::ResolveAsKnown` may expect to see
-                auto result = TString(fmt::format("${{{}}}", name));
-                return Values.GetValue(Values.InsertStr(result));
+                return TMacroValues::TXString{fmt::format("${{{}}}", name)};
             }
-            // TODO? support for TVarStr with .StructCmd
+            // TODO? support for TVarStr with .StructCmdForVars
             if (var->size() == 1) {
                 auto& val = var->front();
-                return Evaluate(val);
+                return TMacroValues::TXString{Evaluate(val)};
             } else {
-                std::vector<std::string_view> result;
-                result.reserve(var->size());
+                TMacroValues::TXStrings result;
+                result.Data.reserve(var->size());
                 for (const auto &val : *var)
-                    result.push_back(Evaluate(val));
+                    result.Data.push_back(Evaluate(val));
                 return result;
             }
         }
 
-        TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<NPolexpr::TConstId> args) {
+        TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<TMacroValues::TValue> args) {
             auto fnIdx = static_cast<EMacroFunction>(id.GetIdx());
             auto mod = Mods.At(fnIdx);
             if (Y_LIKELY(mod && mod->CanPreevaluate)) {
-                TVector<TMacroValues::TValue> unwrappedArgs;
-                unwrappedArgs.reserve(args.size());
-                for(auto&& arg : args)
-                    unwrappedArgs.push_back(Values.GetValue(arg));
-                return mod->Preevaluate({Values, Sink}, unwrappedArgs);
+                return mod->Preevaluate({Values, Sink}, args);
             }
             Y_DEBUG_ABORT_UNLESS(mod);
             throw TConfigurationError()
                 << "Cannot process modifier [[bad]]" << ToString(fnIdx) << "[[rst]]"
                 << " while preevaluating [[bad]]" << ToString(RootFnIdx) << "[[rst]]";
-        }
-
-        NPolexpr::TConstId Wrap(TMacroValues::TValue value) {
-            return Values.InsertValue(std::move(value));
         }
 
     private:

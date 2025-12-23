@@ -19,21 +19,16 @@ logger = logging.getLogger(__name__)
 
 def home_dir():
     # When executed in yp pods, $HOME will point to the current snapshot work dir.
-    # Temporarily delete os.environ["HOME"] to force reading current home directory from /etc/passwd
-    casa_antica = os.environ.pop("HOME", None)
+    # force reading current home directory from /etc/passwd
     try:
-        casa_moderna = os.path.expanduser("~")
-        if os.path.isabs(casa_moderna):
-            # This home dir is valid, prefer it over $HOME
-            return casa_moderna
-        else:
-            # When ya-bin is built with musl, only users from /etc/passwd will be properly resolved,
-            # as musl does not have nss module for LDAP integration.
-            return casa_antica
+        import pwd
 
-    finally:
-        if casa_antica is not None:
-            os.environ["HOME"] = casa_antica
+        pw_dir = pwd.getpwuid(os.getuid()).pw_dir
+        if os.path.isabs(pw_dir):
+            return pw_dir
+    except (ImportError, KeyError):
+        pass
+    return os.environ.get("HOME", None) or os.path.expanduser("~")  # after or for windows
 
 
 # no caching to make testing possible
@@ -272,16 +267,6 @@ def has_mapping():
         return app_config.has_mapping
     except ImportError:
         return False
-
-
-@func.lazy
-def custom_sandbox_api_url():  # can be removed after code sync with Nebius ends (NDT-277)
-    try:
-        import app_config
-
-        return os.getenv('YA_SANDBOX_API_URL') or app_config.custom_sandbox_api_url
-    except (ImportError, AttributeError):
-        return os.getenv('YA_SANDBOX_API_URL')
 
 
 @func.lazy

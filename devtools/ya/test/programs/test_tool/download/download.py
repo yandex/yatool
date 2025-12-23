@@ -83,7 +83,7 @@ def main():
             custom_fetcher=options.custom_fetcher,
             oauth_token=token,
             update_last_usage=update_last_usage,
-            use_cached_only=not app_config.have_sandbox_fetcher,
+            use_cached_only=not app_config.in_house,
         )
         logger.debug("Getting resource %s", resource_id)
         resource = storage.get(

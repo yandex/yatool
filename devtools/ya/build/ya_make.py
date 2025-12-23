@@ -24,6 +24,7 @@ import devtools.ya.build.reports.results_listener as pr
 import devtools.ya.build.stat.graph_metrics as st
 import devtools.ya.build.stat.statistics as bs
 import devtools.ya.core.config as core_config
+import devtools.ya.core.gsid
 import devtools.ya.core.error
 import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.profiler as cp
@@ -409,27 +410,28 @@ class CacheFactory:
         from yalibrary.store.yt_store import yt_store
 
         token = self._get_yt_token()
-        yt_store_class = yt_store.YndexerYtStore if self._opts.yt_replace_result_yt_upload_only else yt_store.YtStore
+        if self._opts.yt_replace_result_yt_upload_only:
+            yt_store_class = yt_store.YndexerYtStore
+        else:
+            yt_store_class = yt_store.YtStore
 
         return yt_store_class(
             self._opts.yt_proxy,
             self._opts.yt_dir,
-            self._opts.yt_cache_filter,
             token=token,
+            proxy_role=self._opts.yt_proxy_role,
             readonly=self._opts.yt_readonly,
-            create_tables=self._opts.yt_create_tables,
-            max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
+            check_size=not self._opts.yt_readonly and bool(self._opts.yt_max_cache_size),
             max_cache_size=self._opts.yt_max_cache_size,
-            ttl=self._opts.yt_store_ttl,
-            heater_mode=not self._opts.yt_store_wt,
-            stager=stager,
-            with_self_uid=self._opts.yt_self_uid,
-            new_client=self._opts.yt_store_cpp_client,
+            max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
             probe_before_put=self._opts.yt_store_probe_before_put,
             probe_before_put_min_size=self._opts.yt_store_probe_before_put_min_size,
-            cpp_prepare_data=self._opts.yt_store_cpp_prepare_data,
-            yt_store_exclusive=self._opts.yt_store_exclusive,
             retry_time_limit=self._opts.yt_store_retry_time_limit,
+            init_timeout=self._opts.yt_store_init_timeout,
+            prepare_timeout=self._opts.yt_store_prepare_timeout,
+            crit_level=self._opts.yt_store_crit,
+            gsid=devtools.ya.core.gsid.flat_session_id(),
+            stager=stager,
         )
 
     def _can_use_bazel_remote_cache(self):
@@ -444,7 +446,9 @@ class CacheFactory:
     def _can_use_yt_dist_cache(self):
         return all(
             (
-                getattr(self._opts, 'build_threads') > 0 or getattr(self._opts, 'yt_replace_result'),
+                getattr(self._opts, 'build_threads') > 0
+                or getattr(self._opts, 'yt_replace_result')
+                or getattr(self._opts, 'yt_store_refresh_on_read'),
                 getattr(self._opts, 'yt_store', False),
                 not (getattr(self._opts, 'use_distbuild', False) and getattr(self._opts, 'yt_readonly', False)),
             )
@@ -483,7 +487,10 @@ class CacheFactory:
         return fits_filter
 
     def _get_connection_pool_size(self):
-        return getattr(self._opts, 'dist_store_threads', 24) + getattr(self._opts, 'build_threads', 0)
+        # NOTE: pool size must be equal to a number of runner's worker threads
+        # to avoid "Connection pool is full" message
+        # devtools/ya/yalibrary/runner/runner3.py
+        return getattr(self._opts, 'dist_store_threads', 24) + getattr(self._opts, 'build_threads', 0) + 1
 
 
 def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
@@ -497,18 +504,12 @@ def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
     cache = dist_cache_future()
     if cache:
         logger.debug("Loading meta from dist cache")
-
-        # could raise error here if not async
-        _async = not (opts.yt_store_exclusive or heater_mode)
-
         cache.prepare(
             self_uids,
             uids,
             refresh_on_read=opts.yt_store_refresh_on_read,
             content_uids=opts.force_content_uids,
-            _async=_async,
         )
-
     logger.debug("Dist cache prepared")
     return cache
 
@@ -545,16 +546,19 @@ def configure_build_graph_cache_dir(app_ctx, opts):
     if opts.build_graph_cache_heater:
         return
 
-    if build_graph_cache:
-        build_graph_cache_resource_dir = build_graph_cache.BuildGraphCacheResourceDir(app_ctx, opts)
+    if not build_graph_cache:
+        logger.debug('Build graph cache is not available in opensource')
+        return
+
+    _, _, sandbox_token = app_ctx.fetcher_params
+    build_graph_cache_resource_dir = build_graph_cache.BuildGraphCacheResourceDir(
+        opts, app_ctx.legacy_sandbox_fetcher, sandbox_token
+    )
 
     try:
         logger.debug("Build graph cache processing started")
-        if not build_graph_cache or not build_graph_cache_resource_dir.enabled():
+        if not build_graph_cache_resource_dir.enabled():
             logger.debug("Build graph cache processing disabled")
-            if not build_graph_cache:
-                logger.debug('Build graph cache is not available in opensource')
-                return
 
             if build_graph_cache.is_cache_provided(opts) and not opts.build_graph_cache_cl and not opts.distbuild_patch:
                 logger.warning(
@@ -727,6 +731,89 @@ def is_dist_cache_suitable(node, result, opts):
     return True
 
 
+# Configure-time cache statistics without running the build
+def compute_predictive_build_statistics(graph, dist_cache, opts, local_cache=None):
+    """
+    Compute configure-time executed/cached/avoided counts via BFS without running the build.
+
+    Algorithm:
+      - Start BFS from graph['result'] and traverse dependencies upward (deps).
+      - If a node is suitable for remote cache (fits + is_dist_cache_suitable) and
+        the artifact exists in remote cache (dist_cache.has(uid)), stop expanding
+        at this node and count it as 'cached' frontier.
+      - Otherwise count it as 'executed' and continue traversal to its dependencies.
+      - Nodes never visited by BFS are 'avoided'.
+
+    Definitions:
+      - executed: nodes that would be built (not available in remote cache or not suitable for remote cache).
+      - cached: nodes at the BFS frontier where traversal stops because remote cache has the artifact and it is suitable to use.
+      - avoided: remaining nodes in the graph that are not needed to build requested results.
+
+    Notes and limitations:
+      - Remote (YT/Bazel) and local caches are considered for the frontier; dynamic (runtime) cache is ignored.
+      - Suitability check applies to remote cache via is_dist_cache_suitable to reflect execution behavior;
+        local cache check is direct (has(uid)).
+      - The result is a plan-time estimate over graph nodes; it is conceptually aligned with print_cache_statistics().
+    """
+    nodes = graph.get('graph', []) or []
+    if not nodes:
+        return {
+            'executed_tasks': 0,
+            'cached_tasks': 0,
+            'avoided_tasks': 0,
+        }
+
+    uid_to_node = {n.get('uid'): n for n in nodes if n.get('uid')}
+    orig_results = set(graph.get('result', []) or [])
+    queue = collections.deque(u for u in orig_results if u in uid_to_node)
+    visited = set()
+    executed = set()
+    frontier_cached = set()
+
+    def is_node_cached(node_uid, node):
+        # Local cache: check presence directly
+        if local_cache and local_cache.has(node_uid):
+            return True
+
+        # Remote cache: require suitability and presence
+        if not dist_cache:
+            return False
+        if not dist_cache.fits(node):
+            return False
+        if not is_dist_cache_suitable(node, orig_results, opts):
+            return False
+        return bool(dist_cache.has(node_uid))
+
+    while queue:
+        uid = queue.popleft()
+        if uid in visited:
+            continue
+        node = uid_to_node.get(uid)
+        if not node:
+            continue
+
+        visited.add(uid)
+
+        if is_node_cached(uid, node):
+            frontier_cached.add(uid)
+            # Do not traverse into dependencies past a cached frontier node
+            continue
+
+        executed.add(uid)
+        for dep in node.get('deps', []) or []:
+            if dep in uid_to_node and dep not in visited:
+                queue.append(dep)
+
+    total_nodes = len(uid_to_node)
+    avoided_count = total_nodes - len(visited)
+
+    return {
+        'executed_tasks': len(executed),
+        'cached_tasks': len(frontier_cached),
+        'avoided_tasks': avoided_count,
+    }
+
+
 # XXX see YA-1354
 def replace_yt_results(graph, opts, dist_cache):
     assert 'result' in graph
@@ -737,54 +824,48 @@ def replace_yt_results(graph, opts, dist_cache):
     new_results = []
     cached_results = []
 
-    if not opts.yt_cache_filter:
-        original_results = set(graph.get('result', []))
-        network_limited_nodes = set()
+    original_results = set(graph.get('result', []))
+    network_limited_nodes = set()
 
-        def network_limited(node):
-            return node.get("requirements", {}).get("network") == "full"
+    def network_limited(node):
+        return node.get("requirements", {}).get("network") == "full"
 
-        def suitable(node):
-            if opts.yt_replace_result_yt_upload_only:
-                return any(out.endswith('.ydx.pb2.yt') for out in node.get('outputs', []))
-            if opts.yt_replace_result_add_objects and any(
-                out.endswith('.o') or out.endswith('.obj') for out in node.get('outputs', [])
-            ):
-                return True
+    def suitable(node):
+        if opts.yt_replace_result_yt_upload_only:
+            return any(out.endswith('.ydx.pb2.yt') for out in node.get('outputs', []))
+        if opts.yt_replace_result_add_objects and any(
+            out.endswith('.o') or out.endswith('.obj') for out in node.get('outputs', [])
+        ):
+            return True
 
-            return is_dist_cache_suitable(node, original_results, opts)
+        return is_dist_cache_suitable(node, original_results, opts)
 
-        first_pass = []
-        for node in graph['graph']:
-            uid = node.get('uid')
+    first_pass = []
+    for node in graph['graph']:
+        uid = node.get('uid')
 
-            if network_limited(node):
-                network_limited_nodes.add(uid)
+        if network_limited(node):
+            network_limited_nodes.add(uid)
 
-            if dist_cache.fits(node) and suitable(node):
-                # (node, new_result)
-                first_pass.append((node, not dist_cache.has(node.get('uid'))))
+        if dist_cache.fits(node) and suitable(node):
+            # (node, new_result)
+            first_pass.append((node, not dist_cache.has(node.get('uid'))))
 
-        # Another pass to filter out network intensive nodes.
-        for node, new_result in first_pass:
-            uid = node.get('uid')
-            if not opts.yt_replace_result_yt_upload_only:
-                if uid in network_limited_nodes:
-                    continue
-                deps = node.get('deps', [])
-                # It is dependence on single fetch_from-like node.
-                if len(deps) == 1 and deps[0] in network_limited_nodes:
-                    continue
+    # Another pass to filter out network intensive nodes.
+    for node, new_result in first_pass:
+        uid = node.get('uid')
+        if not opts.yt_replace_result_yt_upload_only:
+            if uid in network_limited_nodes:
+                continue
+            deps = node.get('deps', [])
+            # It is dependence on single fetch_from-like node.
+            if len(deps) == 1 and deps[0] in network_limited_nodes:
+                continue
 
-            if new_result:
-                new_results.append(uid)
-            else:
-                cached_results.append(uid)
-    else:
-        for node in graph.get('graph'):
-            uid = node.get('uid')
-            if dist_cache.fits(node) and not dist_cache.has(uid):
-                new_results.append(uid)
+        if new_result:
+            new_results.append(uid)
+        else:
+            cached_results.append(uid)
 
     return new_results, cached_results
 
@@ -860,7 +941,11 @@ class Context:
 
         self.ymake_stats = YmakeTimeStatistic()
         self.configure_errors = {}
-        if graph is not None and tests is not None:
+        if (graph is not None or opts.custom_json) and tests is not None:
+            if graph is None and opts.custom_json:
+                with udopen(opts.custom_json, "rb") as custom_json_file:
+                    graph = sjson.load(custom_json_file, intern_keys=True, intern_vals=True)
+                    lg.finalize_graph(graph, opts)
             self.graph = graph
             self.tests = tests
             self.stripped_tests = []
@@ -903,6 +988,9 @@ class Context:
 
         sandbox_run_test_uids = set(self.get_context().get('sandbox_run_test_result_uids', []))
         logger.debug("sandbox_run_test_uids: %s", sandbox_run_test_uids)
+
+        # Save graph size before any strip operations for statistics
+        self.total_nodes_before_strip = len(self.graph.get('graph', []))
 
         # XXX see YA-1354
         if opts.bazel_remote_store and (not opts.bazel_remote_readonly or opts.dist_cache_evict_cached):
@@ -1016,12 +1104,18 @@ class Context:
                 node.clear()
                 node.update(new_node)
 
+            # Update graph size for statistics after adding nodes
+            self.total_nodes_before_strip = len(self.graph.get('graph', []))
+
             # Strip dangling test nodes (such can be appeared if FORK_*TEST or --tests-retries were specified)
             self.graph = lg.strip_graph(self.graph)
 
             timer.show_step("sandbox_run_test_processing finished")
 
         # We assume that graph won't be modified after this point. Lite graph should be same as full one -- but lite!
+
+        if self.opts.stat_only_report_file:
+            self._dump_predictive_build_statistics()
 
         if self.opts.use_distbuild:
             self._full_graph = self.graph
@@ -1184,10 +1278,6 @@ class Context:
                 graph_conf['pool'] = self.opts.distbuild_pool
             if self.opts.dist_priority:
                 graph_conf['priority'] = self.opts.dist_priority
-            if self.opts.distbuild_cluster:
-                graph_conf['cluster'] = self.opts.distbuild_cluster
-            if self.opts.distbuild_cluster:
-                graph_conf['cluster'] = self.opts.distbuild_cluster
             elif self.opts.coordinators_filter:
                 graph_conf['coordinator'] = self.opts.coordinators_filter
             if self.opts.cache_namespace:
@@ -1230,6 +1320,32 @@ class Context:
             stdout.flush()
 
         self._timer.show_step("dump_graph finished")
+
+    def _dump_predictive_build_statistics(self):
+        logger.warning(
+            "--stat-only is an experimental configure-time statistics mode. Results are predictive; "
+            "dynamic uid-based cache is not considered; local+remote caches are. Use at your own risk."
+        )
+
+        # Compute configure-time executed/cached/avoided via remote cache frontier
+        plan_stats = compute_predictive_build_statistics(self.graph, self.dist_cache, self.opts, local_cache=self.cache)
+
+        stat_record = {
+            'targets': getattr(self.opts, 'rel_targets', None) or getattr(self.opts, 'abs_targets', None) or [],
+            'all_run_tasks': self.total_nodes_before_strip,
+            'executed_tasks': plan_stats.get('executed_tasks', 0),
+            'cached_tasks': plan_stats.get('cached_tasks', 0),
+            'avoided_tasks': plan_stats.get('avoided_tasks', 0),
+        }
+
+        stat_file_path = os.path.abspath(self.opts.stat_only_report_file)
+        with open(stat_file_path, 'a') as f:
+            f.write(json.dumps(stat_record, sort_keys=True) + '\n')
+
+        logger.info("Build plan statistics written to: {}".format(stat_file_path))
+
+        self.threads = 0
+        self._timer.show_step("dump_predictive_build_statistics finished")
 
 
 def extension(f):
@@ -1658,7 +1774,8 @@ class YaMake:
                         node_status_map,
                         exit_code_map,
                         result_analyzer,
-                    ) = ({}, {}, {}, {}, 0, {}, {}, None)
+                        execution_log,
+                    ) = ({}, {}, {}, {}, 0, {}, {}, None, {})
                 else:
                     (
                         res,
@@ -1669,6 +1786,7 @@ class YaMake:
                         node_status_map,
                         exit_code_map,
                         result_analyzer,
+                        execution_log,
                     ) = self._dispatch_build(self._build_results_listener)
                 (
                     errors,
@@ -1677,7 +1795,7 @@ class YaMake:
                     node_build_errors,
                     node_build_errors_links,
                 ) = br.make_build_errors_by_project(self.ctx.graph['graph'], err, err_links or {})
-                build_metrics = st.make_targets_metrics(self.ctx.graph['graph'], tasks_metrics)
+                build_metrics = st.make_targets_metrics(self.ctx.graph['graph'], tasks_metrics, execution_log)
                 self.build_result = br.BuildResult(
                     errors,
                     failed_deps,
@@ -1951,6 +2069,7 @@ class YaMake:
             status_map,
             exit_code_map,
             result_analyzer,
+            local_execution_log,
         )
 
     def _build_local(self, callback):
@@ -1985,7 +2104,7 @@ class YaMake:
             if not os.path.exists(latest_path):
                 exts.fs.symlink(self.opts.bld_root, latest_path)
 
-        return res, errors, None, extract_tasks_metrics(), exit_code, {}, exit_code_map, result_analyzer
+        return res, errors, None, extract_tasks_metrics(), exit_code, {}, exit_code_map, result_analyzer, execution_log
 
     @property
     def targets(self):

@@ -26,10 +26,7 @@ from yalibrary.display import strip_markup
 from yatest_lib import external
 from devtools.ya.test import const
 
-try:
-    from yalibrary.vcs import detect
-except ImportError:
-    from standalone import detect
+from yalibrary.vcs import detect
 
 import app_config
 
@@ -814,7 +811,7 @@ class CanonicalData(object):
         diff_tool_timeout=None,
     ):
         exts.fs.ensure_dir(canonical_dir)
-        checksum = exts.hashing.md5_path(saving_path)
+        checksum = exts.hashing.md5_path(saving_path, include_dir_layout=True)
 
         # check if the current result is the same - no need to reupload it
         if current_result:

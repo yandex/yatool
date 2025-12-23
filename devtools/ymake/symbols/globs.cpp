@@ -62,7 +62,47 @@ namespace {
     }
 }
 
-TGlob::TGlob(TFileConf& fileConf, TStringBuf glob, TFileView rootDir)
+bool TGlobRestrictions::Check(const TStringBuf& name, const TStringBuf& pattern, const TGlobStat& globStat) const {
+    size_t tooManyMatches = 0;
+    if (globStat.MatchedFilesCount >= MaxMatches) {
+        tooManyMatches = globStat.MatchedFilesCount;
+    }
+    auto watchedFilesCount = globStat.MatchedFilesCount + globStat.SkippedFilesCount;
+    size_t tooManySkipped = 0;
+    ui8 globSkippedPercent = watchedFilesCount ? (globStat.SkippedFilesCount * 100 + watchedFilesCount/2)/watchedFilesCount : 0;
+    if (watchedFilesCount >= SkippedMinMatches && SkippedErrorPercent && globSkippedPercent >= SkippedErrorPercent) {
+        tooManySkipped = globStat.SkippedFilesCount;
+    }
+    size_t tooManyWatchDirs = 0;
+    if (globStat.WatchedDirsCount >= MaxWatchDirs) {
+        tooManyWatchDirs = globStat.WatchedDirsCount;
+    }
+    if (!tooManyMatches && !tooManySkipped && !tooManyWatchDirs) {
+        return true;
+    }
+    TStringBuilder s;
+    s << "Glob restrictions violated in [[alt1]]" << name << "[[rst]] (" << pattern << "): ";
+    if (tooManyMatches) {
+        s << "too many matched files - " << ToString(tooManyMatches);
+        if (tooManySkipped || tooManyWatchDirs) {
+            s << ", ";
+        }
+    }
+    if (tooManySkipped) {
+        s << "too many skipped files - " << ToString(tooManySkipped) << " of " << ToString(watchedFilesCount) << " ( " << (globSkippedPercent > 99 ? ">99" : ToString(globSkippedPercent)) << "% )";
+        if (tooManyWatchDirs) {
+            s << ", ";
+        }
+    }
+    if (tooManyWatchDirs) {
+        s << "too many watched dirs - " << ToString(tooManyWatchDirs);
+    }
+    s << Endl;
+    YConfErr(Misconfiguration) << s;
+    return false;
+}
+
+TGlobPattern::TGlobPattern(TFileConf& fileConf, TStringBuf glob, TFileView rootDir)
     : FileConf(fileConf)
     , RootDir(rootDir)
 {
@@ -82,14 +122,14 @@ TGlob::TGlob(TFileConf& fileConf, TStringBuf glob, TFileView rootDir)
     ParseGlobPattern();
 }
 
-TGlob::TGlob(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<ui32>&& oldWatchDirs)
-    : TGlob(fileConf, pattern, rootDir)
+TGlobPattern::TGlobPattern(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<ui32>&& oldWatchDirs)
+    : TGlobPattern(fileConf, pattern, rootDir)
 {
     WatchDirs = std::move(oldWatchDirs);
     MatchesHash = TString{hash};
 }
 
-void TGlob::ParseGlobPattern() {
+void TGlobPattern::ParseGlobPattern() {
     TVector<TStringBuf> parts;
     parts = StringSplitter(Pattern).Split(NPath::PATH_SEP).SkipEmpty();
     if (parts.empty()) {
@@ -134,26 +174,27 @@ void TGlob::ParseGlobPattern() {
     finishFixedPart(fixedPartBegin, parts.end());
 }
 
-bool TGlob::WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watchDirs) {
+bool TGlobPattern::WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watchDirs) {
     return AnyOf(watchDirs, [&](ui32 dirId) {
         return fileConf.GetFileById(dirId)->CheckForChanges(ECheckForChangesMethod::RELAXED);
     });
 }
 
-bool TGlob::NeedUpdate(const TExcludeMatcher& excludeMatcher) {
+bool TGlobPattern::NeedUpdate(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat) {
     TUniqVector<ui32> oldWatchDirs = std::move(WatchDirs);
     TString oldMatchesHash = std::move(MatchesHash);
-    Apply(excludeMatcher);
+    Apply(excludeMatcher, globStat);
     bool equal = (oldMatchesHash == MatchesHash) && (oldWatchDirs == WatchDirs);
     return !equal;
 }
 
-TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
+TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat) {
     using namespace NPath;
     WatchDirs.clear();
     TVector<TFileView> matches;
     TVector<TFileView> dirs;
     dirs.emplace_back(RootDir);
+    size_t skippedFilesCount = 0;
 
     for (auto it = Parts.begin(); it != Parts.end(); it++) {
         const auto& part = *it;
@@ -180,7 +221,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
                         path = Reconstruct(path);
                     }
                     auto id = FileConf.Add(path);
-                    bool found = ApplyFixedPart(newDirs, matches, id, isLastPart, excludeMatcher);
+                    bool found = ApplyFixedPart(newDirs, matches, id, isLastPart, excludeMatcher, skippedFilesCount);
                     if (isLastPart || !found) {
                         WatchDirs.Push(FileConf.Add(NPath::Parent(path)));
                     }
@@ -189,7 +230,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
                 case TGlobPart::EGlobType::Pattern:
                 case TGlobPart::EGlobType::Anything: {
                     WatchDirs.Push(dir.GetElemId());
-                    ApplyPatternPart(newDirs, matches, match, dir.GetElemId(), isLastPart, excludeMatcher);
+                    ApplyPatternPart(newDirs, matches, match, dir.GetElemId(), isLastPart, excludeMatcher, skippedFilesCount);
                     if (!isLastPart) {
                         for (const auto& newDir : newDirs) {
                             WatchDirs.Push(newDir.GetElemId());
@@ -198,7 +239,7 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
                     break;
                 }
                 case TGlobPart::EGlobType::Recursive: {
-                    ApplyRecursivePart(newDirs, dir.GetElemId());
+                    ApplyRecursivePart(newDirs, dir.GetElemId(), excludeMatcher);
                     newDirs.push_back(dir);
                     for (const auto& newDir : newDirs) {
                         WatchDirs.Push(newDir.GetElemId());
@@ -224,10 +265,16 @@ TVector<TFileView> TGlob::Apply(const TExcludeMatcher& excludeMatcher) {
     md5.Final(sign.RawData);
     MatchesHash = Md5SignatureAsBase64(sign);
 
+    if (globStat) {
+        globStat->MatchedFilesCount = matches.size();
+        globStat->SkippedFilesCount = skippedFilesCount;
+        globStat->WatchedDirsCount = WatchDirs.size();
+    }
+
     return matches;
 }
 
-void TGlob::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher) const {
+void TGlobPattern::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
     FileConf.ListDir(dirId, true);
     const auto& children = FileConf.GetCachedDirContent(dirId);
     for (const auto& childId : children) {
@@ -239,6 +286,7 @@ void TGlob::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& ma
 
         TFileView nameView = file->GetName();
         if (!matcher(nameView.Basename())) {
+            if (!data.IsDir) ++skippedFilesCount;
             continue;
         }
 
@@ -246,11 +294,13 @@ void TGlob::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& ma
             newDirs.push_back(nameView);
         } else if (!excludeMatcher.IsExcluded(nameView)) {
             matches.push_back(nameView);
+        } else {
+            ++skippedFilesCount;
         }
     }
 }
 
-bool TGlob::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher) const {
+bool TGlobPattern::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
     auto file = FileConf.GetFileById(id);
     const auto& fileData = file->GetFileData();
     if (fileData.NotFound) {
@@ -263,11 +313,13 @@ bool TGlob::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matc
         newDirs.push_back(storedName);
     } else if (isLastPart && !excludeMatcher.IsExcluded(storedName)) {
         matches.push_back(storedName);
+    } else {
+        ++skippedFilesCount;
     }
     return true;
 }
 
-void TGlob::ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 startDirId) const {
+void TGlobPattern::ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 startDirId, const TExcludeMatcher& excludeMatcher) const {
     for  (TQueue<ui32> queue({startDirId}); !queue.empty(); queue.pop()) {
         auto dirId = queue.front();
         FileConf.ListDir(dirId, true);
@@ -276,9 +328,11 @@ void TGlob::ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 startDirId) con
             auto file = FileConf.GetFileById(childId);
             const auto& data = file->GetFileData();
             if (!data.NotFound && data.IsDir) {
-                TFileView name = file->GetName();
-                newDirs.push_back(name);
-                queue.push(childId);
+                TFileView dirName = file->GetName();
+                if (!excludeMatcher.IsExcluded(dirName, true)) {
+                    newDirs.push_back(dirName);
+                    queue.push(childId);
+                }
             }
         }
     }
@@ -303,8 +357,14 @@ TString PatternToRegexp(TStringBuf pattern) {
     return res;
 }
 
-bool MatchPath(const TRegExMatch& globPattern, TFileView graphPath) {
-    return globPattern.Match(TString{graphPath.CutAllTypes()}.c_str()); // TODO(svidyuk) search for regex lib which can work on TStringBuf in arcadia
+bool MatchPath(const TRegExMatch& globPattern, TFileView graphPath, bool isDir) {
+    TString path{graphPath.CutAllTypes()};
+    auto r = globPattern.Match(path.c_str()); // TODO(svidyuk) search for regex lib which can work on TStringBuf in arcadia
+    if (!r && isDir) {
+        return globPattern.Match((path + "/").c_str());
+    } else {
+        return r;
+    }
 }
 
 void TExcludeMatcher::AddExcludePattern(TFileView moddir, TStringBuf pattern) {
@@ -319,6 +379,6 @@ void TExcludeMatcher::AddExcludePattern(TFileView moddir, TStringBuf pattern) {
     Matchers.push_back(PatternToRegexp(NPath::CutAllTypes(path)));
 }
 
-bool TExcludeMatcher::IsExcluded(TFileView path) const {
-    return AnyOf(Matchers, [&](const TRegExMatch& pattern) {return MatchPath(pattern, path);});
+bool TExcludeMatcher::IsExcluded(TFileView path, bool isDir) const {
+    return AnyOf(Matchers, [&](const TRegExMatch& pattern) {return MatchPath(pattern, path, isDir);});
 }

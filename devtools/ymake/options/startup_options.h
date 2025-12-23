@@ -4,6 +4,7 @@
 
 #include <devtools/ymake/config/transition.h>
 
+#include <devtools/ymake/foreign_platforms/io.h>
 #include <library/cpp/getopt/small/last_getopt.h>
 
 #include <util/folder/path.h>
@@ -18,15 +19,18 @@ struct TStartUpOptions: public TRootsOptions {
     TFsPath YmakeUidsCache;
     TFsPath YmakeJsonCache;
     TFsPath ConfDir;
+    TFsPath YmakeDartsCacheDir;
 
     TVector<TFsPath> StartDirs;
     TVector<TFsPath> Targets;
 
     bool ReadStartTargetsFromEvlog = false;
     ETransition TransitionSource = ETransition::None;
+    TString TargetPlatformId;
     bool DescendIntoForeignPlatform = true;
     bool ReportPicNoPic = false;
     bool CheckTransitiveRequirements = true;
+    bool ParallelRendering = false;
 
     PIPEHANDLE InputPipeFd = -1;
     PIPEHANDLE OutputPipeFd = -1;
@@ -34,6 +38,9 @@ struct TStartUpOptions: public TRootsOptions {
     TAtomicSharedPtr<IInputStream> InputStream;
     TAtomicSharedPtr<IOutputStream> OutputStream;
     TAtomicSharedPtr<IOutputStream> ErrorStream;
+
+    THolder<NForeignTargetPipeline::TLineReader> ForeignTargetReader;
+    THolder<NForeignTargetPipeline::TLineWriter> ForeignTargetWriter;
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import functools
-import json
 import logging
 import os
 import tempfile
 import typing as tp
-from collections.abc import Generator
 from pathlib import PurePath, Path
 
 import marisa_trie
@@ -14,10 +12,6 @@ import marisa_trie
 import devtools.ya.core.config
 import devtools.ya.core.resource
 import devtools.ya.test.const as const
-import devtools.ya.handlers.style.config_validator as cfgval
-
-if tp.TYPE_CHECKING:
-    from . import styler as stlr
 
 
 logger = logging.getLogger(__name__)
@@ -29,61 +23,14 @@ type MaybeConfig = Config | None
 class Config(tp.NamedTuple):
     path: ConfigPath
     pretty: str
-    user_defined: bool
 
 
 @functools.cache
-def _find_root() -> str:
+def find_root() -> str:
     return devtools.ya.core.config.find_root(fail_on_error=False)
 
 
-@functools.cache
-def _read_file(path: Path) -> str:
-    return path.read_text()
-
-
-@functools.cache
-def _read_validation_configs(paths: tuple[str, ...]) -> dict[str, str]:
-    joined: dict[str, str] = {}
-    root = Path(_find_root())
-    for path in paths:
-        with (root / path).open() as afile:
-            joined.update(json.load(afile))
-    return joined
-
-
-def validate(
-    user_config: ConfigPath,
-    stylers: set[stlr.ConfigurableStyler],
-    *,
-    validation_configs: tuple[str, ...] = tuple(const.LinterConfigsValidationRules.enumerate()),
-) -> Generator[tuple[stlr.ConfigurableStyler, Path, list[str]]]:
-    raw_user = cfgval.RawConfig(user_config.read_text(), user_config.name)
-    rules_config_map = _read_validation_configs(validation_configs)
-
-    for styler in stylers:
-        if styler.name not in rules_config_map:
-            continue
-
-        rules_config = Path(_find_root()) / rules_config_map[styler.name]
-        raw_rules = cfgval.RawConfig(_read_file(rules_config), rules_config.name)
-
-        base_config = styler.lookup_default_config()
-        raw_base = cfgval.RawConfig(_read_file(base_config.path), base_config.path.name) if base_config else None
-
-        errors = cfgval.validate(raw_rules, raw_user, raw_base)
-        if errors:
-            yield styler, rules_config, errors
-
-
-@tp.runtime_checkable
-class SupportsConfigLookup(tp.Protocol):
-    def lookup_config(self, path: PurePath) -> Config: ...
-
-    def lookup_default_config(self) -> MaybeConfig: ...
-
-
-class ConfigMixin:
+class ConfigFinder:
     def __init__(self, config_loaders: tuple[ConfigLoader, ...]):
         self._config_loaders = config_loaders
 
@@ -111,9 +58,9 @@ class DefaultConfig:
         assert defaults_file or resource_name, "At least one of 'defaults_file' or 'resource_name' must be provided"
 
         if config := self._from_file(linter_name, defaults_file):
-            self._default_config = Config(config, str(config.relative_to(_find_root())), user_defined=False)
+            self._default_config = Config(config, str(config.relative_to(find_root())))
         elif config := self._from_resource(resource_name):
-            self._default_config = Config(config, f'{resource_name} (from resource)', user_defined=False)
+            self._default_config = Config(config, f'{resource_name} (from resource)')
         else:
             self._default_config = None
 
@@ -124,7 +71,7 @@ class DefaultConfig:
             except Exception as e:
                 logger.warning("Couldn't obtain config from fs, config file %s, error %s", defaults_file, repr(e))
             else:
-                return Path(os.path.join(_find_root(), config_map[linter_name]))
+                return Path(os.path.join(find_root(), config_map[linter_name]))
 
     def _from_resource(self, resource_name: str) -> Path | None:
         if resource_name:
@@ -147,7 +94,7 @@ class AutoincludeConfig:
         self._linter_name = linter_name
         self._autoinclude_files = autoinclude_files
 
-        self._root = _find_root()
+        self._root = find_root()
         self._trie = self._load_trie()
         # for a given autoinclude path we can provide the same config for the same linter
         self._autoinc_to_conf = self._build_autoinc_to_conf()
@@ -187,7 +134,7 @@ class AutoincludeConfig:
                 config: Path = Path(path) / config_name
 
                 if config.exists():
-                    map_[path] = Config(config, str(config.relative_to(self._root)), user_defined=True)
+                    map_[path] = Config(config, str(config.relative_to(self._root)))
         return map_
 
     def lookup(self, path: PurePath) -> MaybeConfig:

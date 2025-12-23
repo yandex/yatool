@@ -18,6 +18,7 @@ IF (ARCH_X86_64)
     PEERDIR(
         contrib/libs/asmlib
         contrib/libs/asmglibc
+        contrib/libs/linux-headers
     )
 ENDIF()
 

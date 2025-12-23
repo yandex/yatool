@@ -6,9 +6,10 @@ import os
 import re
 import six
 import sys
+import copy
 import json
 import time
-import copy
+import uuid
 import errno
 import signal
 import logging
@@ -17,6 +18,7 @@ import traceback
 import threading
 import subprocess
 import collections
+import concurrent.futures as futures
 
 from six import string_types
 
@@ -29,7 +31,7 @@ import exts.tmp
 from devtools.ya.test.util import tools, shared
 from devtools.ya.test.common import get_test_log_file_path
 from devtools.ya.test import facility
-from devtools.ya.test.const import Status, TEST_BT_COLORS
+from devtools.ya.test.const import Status, TEST_BT_COLORS, TRACE_FILE_NAME
 from devtools.ya.test.filter import make_testname_filter
 from devtools.ya.test.test_types.common import PerformedTestSuite
 from yalibrary import display
@@ -43,6 +45,7 @@ VALGRIND_ERROR_RC = 101
 START_MARKER = "###subtest-started:"
 FINISH_MARKER = "###subtest-finished:"
 SHUTDOWN_REQUESTED = False
+LOCK = threading.Lock()
 
 Result = collections.namedtuple(
     'Result', ['rc', 'pid', 'logs', 'last_test_name', 'first_test_started', 'end_time', 'stderr_file', 'stdout_file']
@@ -104,6 +107,14 @@ def parse_args():
         "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
     )
 
+    parser.add_argument(
+        "--parallel-tests-within-node-workers",
+        type=int,
+        default=None,
+        help="Amount of workers to run tests in parallel",
+    )
+    parser.add_argument('--temp-tracefile-dir', help="Directory to place temporary trace-files", default=None)
+
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
     if not os.path.exists(args.binary):
@@ -116,6 +127,8 @@ def parse_args():
             parser.error("Failed to determine project path")
         args.project_path = path.rsplit("arcadia")[1]
     args.project_path.strip("/")
+
+    # Don't collect core dump files if truncation is required
     if args.truncate_logs:
         args.collect_cores = False
     return args
@@ -513,7 +526,7 @@ def shorten_wine_paths(wine_path, cmd):
 
         stdin = open(bat_script_file.path)
         cmd = [wine_path, "cmd"]
-        cwd = "/"
+        cwd = wineprefix
 
     else:
         cwd = None
@@ -752,8 +765,11 @@ def update_trace_file(tracefile, suite, performed_suite):
     diff_suite.chunk.logs = performed_suite.chunk.logs
     diff_suite.chunk.metrics = performed_suite.chunk.metrics
 
-    shared.dump_trace_file(diff_suite, tracefile)
-    merge_results(suite, diff_suite)
+    # This lock prevents multiple threads from writing to the same common tracefile with status updates simultaneously
+    # Otherwise it will lead to races and non-determined test statuses.
+    with LOCK:
+        shared.dump_trace_file(diff_suite, tracefile)
+        merge_results(suite, diff_suite)
 
 
 def launch_tests(
@@ -772,10 +788,21 @@ def launch_tests(
     wine_path,
     stop_signal,
     test_binary_args,
+    is_parallel,
+    temp_tracefile_dir,
 ):
+
     logger.debug("Single launch for %d tests", len(test_names))
-    # Don't collect core dump files if truncation is required
-    cmd = [binary, "--trace-path-append", tracefile]
+    if is_parallel:
+        temp_tracefile = os.path.join(temp_tracefile_dir, uuid.uuid4().hex) + "." + TRACE_FILE_NAME
+
+    cmd = [binary]
+
+    if is_parallel:
+        cmd += ["--trace-path-append", temp_tracefile]
+    else:
+        cmd += ["--trace-path-append", tracefile]
+
     for param in test_params:
         cmd += ["--test-param", param]
     cmd += ["+%s" % x for x in test_names]
@@ -784,8 +811,34 @@ def launch_tests(
     res = execute_ut(cmd, logsdir, truncate, gdb_path, gdb_debug, valgrind_path, test_mode, wine_path, stop_signal)
 
     performed_suite = gen_suite(suite.project_path)
-    performed_suite.load_run_results(tracefile)
+
+    current_tracefile = temp_tracefile if is_parallel else tracefile
+
+    performed_suite.load_run_results(current_tracefile)
+
     shared.adjust_test_status(performed_suite, res.rc, res.end_time, add_error_func=suite.add_chunk_error)
+
+    # We need to add subtest-started event to common tracefile from temporary one
+    # to correctly display test status in case of timeout.
+    # subtest-finished is added further, in update_trace_file.
+    if is_parallel:
+        start_events = []
+        with open(current_tracefile, 'r') as trace:
+            for line in trace:
+                try:
+                    json_line = json.loads(line)
+                except json.decoder.JSONDecodeError:
+                    continue
+
+                if json_line.get("name") == "subtest-started":
+                    start_events.append(line + '\n')
+
+        if start_events:
+            with LOCK:
+                with open(tracefile, 'a') as tr_out:
+                    tr_out.write('\n')
+                    tr_out.writelines(start_events)
+
     # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
     update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
 
@@ -832,6 +885,8 @@ def launch_tests(
 
         if is_darwin():
             logger.debug("Skip symbolizer processing - it does not work properly on mac")
+        elif wine_path:
+            logger.debug("Skip symbolizer processing - wine dumps backtrace on its own")
         else:
             run_symbolizer(performed_suite, binary)
     if res.rc == VALGRIND_ERROR_RC:
@@ -1042,13 +1097,14 @@ def main():
     suite.chunk.logs = {"logsdir": logsdir}
     shared.dump_trace_file(suite, args.trace_path)
 
-    def launch(tests):
-        return launch_tests(
+    def launch(tests, logs_directory=logsdir, is_parallel=False, temp_tracefile_dir=None):
+        logger.debug("Launching tests %s in logsdir %s", tests, logs_directory)
+        res = launch_tests(
             suite,
             args.binary,
             tests,
             args.trace_path,
-            logsdir,
+            logs_directory,
             args.truncate_logs,
             args.collect_cores,
             args.gdb_path,
@@ -1059,7 +1115,11 @@ def main():
             wine_path,
             args.stop_signal,
             args.test_binary_args,
+            is_parallel,
+            temp_tracefile_dir,
         )
+        logger.debug("Finished executing tests: %s", tests)
+        return res
 
     try:
         global SHUTDOWN_REQUESTED
@@ -1070,9 +1130,31 @@ def main():
                     break
         else:
             while test_names:
-                rc = launch(test_names)
-                if SHUTDOWN_REQUESTED or rc in [0, TIMEOUT_RC]:
-                    break
+                if not args.parallel_tests_within_node_workers:
+                    rc = launch(test_names)
+                    if SHUTDOWN_REQUESTED or rc in [0, TIMEOUT_RC]:
+                        break
+                else:
+                    workers_count = args.parallel_tests_within_node_workers
+                    logger.debug("Launching %d tests in parallel with %d workers", len(test_names), workers_count)
+                    executor = futures.ThreadPoolExecutor(max_workers=workers_count)
+                    runs = []
+
+                    tests_subchunks = [[test_name] for test_name in test_names]
+
+                    if args.temp_tracefile_dir:
+                        os.makedirs(args.temp_tracefile_dir, exist_ok=True)
+
+                    for index, subchunk in enumerate(tests_subchunks):
+                        logs_directory = os.path.join(logsdir, str(index))
+                        os.makedirs(logs_directory, exist_ok=True)
+
+                        runs.append(executor.submit(launch, subchunk, logs_directory, True, args.temp_tracefile_dir))
+
+                    futures.wait(runs, return_when=futures.ALL_COMPLETED)
+                    if SHUTDOWN_REQUESTED or all(r.result() in [0, TIMEOUT_RC] for r in runs):
+                        break
+
                 # if case of crash there may be missing tests (which were not launched)
                 missing = get_missing_tests(suite, test_names)
                 logger.debug("Missing tests: %s", missing)

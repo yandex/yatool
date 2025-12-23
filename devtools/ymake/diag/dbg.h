@@ -65,37 +65,6 @@ struct TEatStream {
 #define IF_BINARY_LOG(var) if (Y_UNLIKELY(Diag()->BinaryLog && Diag()->var))
 #endif
 
-#if !defined(YMAKE_DEBUG)
-struct TDbgPadHelper {
-    TDbgPadHelper(ui8&, TStringBuf&) {
-    }
-    TStringBuf MsgPad() const {
-        return TStringBuf();
-    }
-};
-#else
-struct TDbgPadHelper {
-    ui8& Pad;
-    TStringBuf& GlobalStr;
-    TDbgPadHelper(ui8& padVar, TStringBuf& globalStr)
-        : Pad(padVar)
-        , GlobalStr(globalStr)
-    {
-        Y_ASSERT(Pad < Max<ui8>());
-        Pad++;
-        GlobalStr = MsgPad();
-    }
-    ~TDbgPadHelper() {
-        Y_ASSERT(Pad > 0);
-        Pad--;
-        GlobalStr = MsgPad();
-    }
-    TStringBuf MsgPad() const {
-        return TStringBuf("                    ", Min<size_t>(20, Pad));
-    }
-};
-#endif
-
 class TNonDebugEmpty {};
 
 #if !defined(YMAKE_DEBUG)

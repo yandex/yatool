@@ -36,25 +36,7 @@
                     "black"
                 ]
             },
-            "formula": {
-                "by_platform": {
-                    "darwin-arm64": {
-                        "uri": "sbr:8110637457"
-                    },
-                    "darwin-x86_64": {
-                        "uri": "sbr:8110637758"
-                    },
-                    "linux-aarch64": {
-                        "uri": "sbr:8110637017"
-                    },
-                    "linux-x86_64": {
-                        "uri": "sbr:8110638456"
-                    },
-                    "win32-x86_64": {
-                        "uri": "sbr:8110638108"
-                    }
-                }
-            }
+            "formula": "build/external_resources/black/resources.json"
         },
         "bloat": {
             "executable": {
@@ -101,55 +83,6 @@
                 ]
             },
             "formula": "build/platform/clang/clang-format/clang-format18.json"
-        },
-        "clang16": {
-            "executable": {
-                "c++": [
-                    "bin",
-                    "clang++"
-                ],
-                "c++filt": [
-                    "bin",
-                    "llvm-cxxfilt"
-                ],
-                "cc": [
-                    "bin",
-                    "clang"
-                ],
-                "clang-rename": [
-                    "bin",
-                    "clang-rename"
-                ],
-                "llvm-cov": [
-                    "bin",
-                    "llvm-cov"
-                ],
-                "llvm-gcov": [
-                    "bin",
-                    "llvm-gcov"
-                ],
-                "llvm-nm": [
-                    "bin",
-                    "llvm-nm"
-                ],
-                "llvm-objcopy": [
-                    "bin",
-                    "llvm-objcopy"
-                ],
-                "llvm-profdata": [
-                    "bin",
-                    "llvm-profdata"
-                ],
-                "llvm-strip": [
-                    "bin",
-                    "llvm-strip"
-                ],
-                "llvm-symbolizer": [
-                    "bin",
-                    "llvm-symbolizer"
-                ]
-            },
-            "formula": "build/platform/clang/clang16.json"
         },
         "clang18": {
             "executable": {
@@ -200,7 +133,56 @@
             },
             "formula": "build/platform/clang/clang18.json"
         },
-        "clangd": {
+        "clang20": {
+            "executable": {
+                "c++": [
+                    "bin",
+                    "clang++"
+                ],
+                "c++filt": [
+                    "bin",
+                    "llvm-cxxfilt"
+                ],
+                "cc": [
+                    "bin",
+                    "clang"
+                ],
+                "clang-rename": [
+                    "bin",
+                    "clang-rename"
+                ],
+                "llvm-cov": [
+                    "bin",
+                    "llvm-cov"
+                ],
+                "llvm-gcov": [
+                    "bin",
+                    "llvm-gcov"
+                ],
+                "llvm-nm": [
+                    "bin",
+                    "llvm-nm"
+                ],
+                "llvm-objcopy": [
+                    "bin",
+                    "llvm-objcopy"
+                ],
+                "llvm-profdata": [
+                    "bin",
+                    "llvm-profdata"
+                ],
+                "llvm-strip": [
+                    "bin",
+                    "llvm-strip"
+                ],
+                "llvm-symbolizer": [
+                    "bin",
+                    "llvm-symbolizer"
+                ]
+            },
+            "formula": "build/platform/clang/clang20.json"
+        },
+        "clangd-18": {
             "executable": {
                 "clangd": [
                     "bin",
@@ -208,6 +190,23 @@
                 ]
             },
             "formula": "build/platform/clang/clangd/clangd18.json"
+        },
+        "clangd-20": {
+            "executable": {
+                "clangd": [
+                    "bin",
+                    "clangd"
+                ]
+            },
+            "formula": "build/platform/clang/clangd/clangd20.json"
+        },
+        "contexts_difference": {
+            "executable": {
+                "contexts_difference": [
+                    "contexts_difference"
+                ]
+            },
+            "formula": "build/yandex_specific/autocheck/contexts_difference/resources.json"
         },
         "gdb": {
             "executable": {
@@ -260,7 +259,7 @@
                     "gofmt"
                 ]
             },
-            "formula": "build/external_resources/go_tools/go1.23.json"
+            "formula": "build/external_resources/go_tools/go1.25.json"
         },
         "jdk17": {
             "executable": {
@@ -312,6 +311,15 @@
             },
             "formula": "build/platform/python/ymake_python3/resources.json"
         },
+        "ruff": {
+            "executable": {
+                "ruff": [
+                    "bin",
+                    "ruff"
+                ]
+            },
+            "formula": "build/external_resources/ruff/resources.json"
+        },
         "ya-tc": {
             "executable": {
                 "ya-tc": [
@@ -327,6 +335,14 @@
                 ]
             },
             "formula": "build/external_resources/yexport/public.resources.json"
+        },
+        "ygdiff": {
+            "executable": {
+                "ygdiff": [
+                    "ygdiff"
+                ]
+            },
+            "formula": "build/yandex_specific/autocheck/ygdiff/resources.json"
         },
         "ymake": {
             "executable": {
@@ -595,7 +611,7 @@
                 }
             }
         },
-        "clang16": {
+        "clang18": {
             "env": {
                 "CPATH": [
                     ""
@@ -619,9 +635,19 @@
                 "strip": "$(CLANG)/bin/llvm-strip",
                 "type": "clang",
                 "use_bundle": true,
-                "version": "16"
+                "version": "18"
             },
             "platforms": [
+                {
+                    "default": false,
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "arch": "x86_64",
+                        "os": "FREEBSD"
+                    }
+                },
                 {
                     "default": false,
                     "host": {
@@ -1000,6 +1026,16 @@
                         "os": "LINUX"
                     },
                     "target": {
+                        "arch": "armv6hf",
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": false,
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
                         "arch": "armv7a",
                         "os": "LINUX"
                     }
@@ -1109,7 +1145,49 @@
                 {
                     "default": false,
                     "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "arch": "wasm32",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": false,
+                    "host": {
+                        "arch": "arm64",
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "arch": "wasm32",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": false,
+                    "host": {
                         "os": "LINUX"
+                    },
+                    "target": {
+                        "arch": "wasm64",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": false,
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "arch": "wasm64",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": false,
+                    "host": {
+                        "arch": "arm64",
+                        "os": "DARWIN"
                     },
                     "target": {
                         "arch": "wasm64",
@@ -1130,53 +1208,53 @@
             ],
             "tools": {
                 "c++": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "c++"
                 },
                 "c++filt": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "c++filt"
                 },
                 "cc": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "cc"
                 },
                 "clang-rename": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "clang-rename"
                 },
                 "gcov": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-gcov"
                 },
                 "llvm-cov": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-cov"
                 },
                 "llvm-profdata": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-profdata"
                 },
                 "llvm-symbolizer": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-symbolizer"
                 },
                 "nm": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-nm"
                 },
                 "objcopy": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-objcopy"
                 },
                 "strip": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-strip"
                 }
             }
         },
-        "clang16-windows": {
-            "name": "clang16",
+        "clang18-windows": {
+            "name": "clang18",
             "params": {
                 "c_compiler": "$(CLANG)/bin/clang-cl",
                 "cxx_compiler": "$(CLANG)/bin/clang-cl",
@@ -1186,7 +1264,7 @@
                 "type": "msvc",
                 "use_bundle": true,
                 "use_clang": true,
-                "version": "16"
+                "version": "18"
             },
             "platforms": [
                 {
@@ -1232,48 +1310,48 @@
             ],
             "tools": {
                 "c++": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "c++"
                 },
                 "c++filt": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "c++filt"
                 },
                 "cc": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "cc"
                 },
                 "gcov": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-gcov"
                 },
                 "llvm-cov": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-cov"
                 },
                 "llvm-profdata": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-profdata"
                 },
                 "llvm-symbolizer": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-symbolizer"
                 },
                 "nm": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-nm"
                 },
                 "objcopy": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-objcopy"
                 },
                 "strip": {
-                    "bottle": "clang16",
+                    "bottle": "clang18",
                     "executable": "llvm-strip"
                 }
             }
         },
-        "clang18": {
+        "clang20": {
             "env": {
                 "CPATH": [
                     ""
@@ -1297,9 +1375,19 @@
                 "strip": "$(CLANG)/bin/llvm-strip",
                 "type": "clang",
                 "use_bundle": true,
-                "version": "18"
+                "version": "20"
             },
             "platforms": [
+                {
+                    "default": true,
+                    "host": {
+                        "os": "LINUX"
+                    },
+                    "target": {
+                        "arch": "x86_64",
+                        "os": "FREEBSD"
+                    }
+                },
                 {
                     "default": true,
                     "host": {
@@ -1797,7 +1885,49 @@
                 {
                     "default": true,
                     "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "arch": "wasm32",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "arm64",
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "arch": "wasm32",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
                         "os": "LINUX"
+                    },
+                    "target": {
+                        "arch": "wasm64",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "DARWIN"
+                    },
+                    "target": {
+                        "arch": "wasm64",
+                        "os": "EMSCRIPTEN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "arm64",
+                        "os": "DARWIN"
                     },
                     "target": {
                         "arch": "wasm64",
@@ -1818,53 +1948,53 @@
             ],
             "tools": {
                 "c++": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "c++"
                 },
                 "c++filt": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "c++filt"
                 },
                 "cc": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "cc"
                 },
                 "clang-rename": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "clang-rename"
                 },
                 "gcov": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-gcov"
                 },
                 "llvm-cov": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-cov"
                 },
                 "llvm-profdata": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-profdata"
                 },
                 "llvm-symbolizer": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-symbolizer"
                 },
                 "nm": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-nm"
                 },
                 "objcopy": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-objcopy"
                 },
                 "strip": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-strip"
                 }
             }
         },
-        "clang18-windows": {
-            "name": "clang18",
+        "clang20-windows": {
+            "name": "clang20",
             "params": {
                 "c_compiler": "$(CLANG)/bin/clang-cl",
                 "cxx_compiler": "$(CLANG)/bin/clang-cl",
@@ -1874,7 +2004,7 @@
                 "type": "msvc",
                 "use_bundle": true,
                 "use_clang": true,
-                "version": "18"
+                "version": "20"
             },
             "platforms": [
                 {
@@ -1920,43 +2050,43 @@
             ],
             "tools": {
                 "c++": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "c++"
                 },
                 "c++filt": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "c++filt"
                 },
                 "cc": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "cc"
                 },
                 "gcov": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-gcov"
                 },
                 "llvm-cov": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-cov"
                 },
                 "llvm-profdata": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-profdata"
                 },
                 "llvm-symbolizer": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-symbolizer"
                 },
                 "nm": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-nm"
                 },
                 "objcopy": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-objcopy"
                 },
                 "strip": {
-                    "bottle": "clang18",
+                    "bottle": "clang20",
                     "executable": "llvm-strip"
                 }
             }
@@ -1999,8 +2129,122 @@
             ],
             "tools": {
                 "clangd": {
-                    "bottle": "clangd",
+                    "bottle": "clangd-20",
                     "executable": "clangd"
+                }
+            }
+        },
+        "clangd-18": {
+            "platforms": [
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "x86_64",
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "aarch64",
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "WIN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "DARWIN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "arm64",
+                        "os": "DARWIN"
+                    }
+                }
+            ],
+            "tools": {
+                "clangd-18": {
+                    "bottle": "clangd-18",
+                    "executable": "clangd"
+                }
+            }
+        },
+        "clangd-20": {
+            "platforms": [
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "x86_64",
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "aarch64",
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "WIN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "DARWIN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "arm64",
+                        "os": "DARWIN"
+                    }
+                }
+            ],
+            "tools": {
+                "clangd-20": {
+                    "bottle": "clangd-20",
+                    "executable": "clangd"
+                }
+            }
+        },
+        "contexts_difference": {
+            "platforms": [
+                {
+                    "default": true,
+                    "host": {
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "DARWIN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "WIN"
+                    }
+                }
+            ],
+            "tools": {
+                "contexts_difference": {
+                    "bottle": "contexts_difference",
+                    "executable": "contexts_difference"
                 }
             }
         },
@@ -2095,7 +2339,7 @@
         "golang": {
             "params": {
                 "type": "golang",
-                "version": "1.23.8"
+                "version": "1.25.0"
             },
             "platforms": [
                 {
@@ -2325,6 +2569,35 @@
                 }
             }
         },
+        "ruff": {
+            "platforms": [
+                {
+                    "default": true,
+                    "host": {
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "arch": "arm64",
+                        "os": "DARWIN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "DARWIN"
+                    }
+                }
+            ],
+            "tools": {
+                "ruff": {
+                    "bottle": "ruff",
+                    "executable": "ruff"
+                }
+            }
+        },
         "ya-tc": {
             "platforms": [
                 {
@@ -2360,6 +2633,34 @@
                 "yexport": {
                     "bottle": "yexport",
                     "executable": "yexport"
+                }
+            }
+        },
+        "ygdiff": {
+            "platforms": [
+                {
+                    "default": true,
+                    "host": {
+                        "os": "LINUX"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "DARWIN"
+                    }
+                },
+                {
+                    "default": true,
+                    "host": {
+                        "os": "WIN"
+                    }
+                }
+            ],
+            "tools": {
+                "ygdiff": {
+                    "bottle": "ygdiff",
+                    "executable": "ygdiff"
                 }
             }
         },
@@ -2446,8 +2747,7 @@
             "description": "Python styler, Python 3 only"
         },
         "bloat": {
-            "description": "Run bloat tool",
-            "visible": false
+            "description": "Run bloat tool"
         },
         "buf": {
             "description": "Protobuf lint and breaking change detector"
@@ -2475,6 +2775,16 @@
         },
         "clangd": {
             "description": "Run clangd language server"
+        },
+        "clangd-18": {
+            "description": "Run clangd language server (18 version)"
+        },
+        "clangd-20": {
+            "description": "Run clangd language server (20 version)"
+        },
+        "contexts_difference": {
+            "description": "Run contexts_difference tool",
+            "visible": false
         },
         "gcov": {
             "description": "Run gcov"
@@ -2538,6 +2848,9 @@
             "description": "Run Python 3",
             "visible": false
         },
+        "ruff": {
+            "description": "An extremely fast Python linter, written in Rust."
+        },
         "strip": {
             "description": "Run strip utility"
         },
@@ -2547,6 +2860,10 @@
         },
         "yexport": {
             "description": "Run yexport",
+            "visible": false
+        },
+        "ygdiff": {
+            "description": "Run ygdiff tool",
             "visible": false
         },
         "ymake": {

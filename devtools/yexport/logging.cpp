@@ -11,6 +11,7 @@
 #include <util/system/file.h>
 #include <util/system/mutex.h>
 
+#include <spdlog/spdlog.h>
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/stdout_sinks.h>
 

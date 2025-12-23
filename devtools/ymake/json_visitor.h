@@ -45,7 +45,11 @@ protected:
 public:
     using TBaseVisitor::Nodes;
 
-    TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget>& startDirs);
+    TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget> startDirs);
+    TUidsData(const TUidsData&) = delete;
+    TUidsData& operator=(const TUidsData&) = delete;
+    TUidsData(TUidsData&&) noexcept = default;
+    TUidsData& operator=(TUidsData&&) noexcept = default;
     virtual ~TUidsData() = default;
 
     virtual void SaveCache(IOutputStream* output, const TDepGraph& graph) override;
@@ -70,6 +74,7 @@ private:
 
     ui64 NumModuleNodesForRendering = 0;
     TVector<TNodeId> SortedNodesForRendering;
+    TMap<size_t, TVector<TNodeId>> TopoGenerations;
 
     TVector<TLoopCnt> LoopsHash;
 
@@ -94,6 +99,7 @@ private:
 
 public:
     TJSONVisitor(const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
+    TJSONVisitor(TUidsData&& uidsData, const TRestoreContext& restoreContext, TCommands& commands, const TCmdConf& cmdConf, const TVector<TTarget>& startDirs);
 
     using TBaseVisitor::Nodes;
 
@@ -110,6 +116,15 @@ public:
     const THashMap<TString, TString>& GetResources() const;
     TNodeId GetModuleByNode(TNodeId nodeId);
     const TVector<TNodeId>& GetOrderedNodes() const { return SortedNodesForRendering; }
+    const TMap<size_t, TVector<TNodeId>>& GetTopoGenerations() const {
+        TStringStream ss;
+        ss << "GetTopoGenerations: ";
+        for (const auto& [_, nodes] : TopoGenerations) {
+            ss << "  " << nodes.size();
+        }
+        YDebug() << ss.Str() << Endl;
+        return TopoGenerations;
+    }
     ui64 GetModuleNodesNum() const { return NumModuleNodesForRendering; }
 
     void ReportCacheStats();

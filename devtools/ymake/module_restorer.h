@@ -61,7 +61,6 @@ public:
 
     const TModule* GetModule() const;
 
-private:
     void MineModuleDirs();
 
     /// This mines:
@@ -78,6 +77,7 @@ private:
     /// as well as MineIncludesRecursive
     void MineGlobalVars();
 
+private:
     TVarStr& AddPath(TYVar& var, const TStringBuf& what);
 
     bool IsFakeModule(ui32 elemId) const;

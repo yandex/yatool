@@ -8,9 +8,6 @@
 #include <util/generic/string.h>
 #include <util/ysaveload.h>
 
-struct TVars;
-struct TDiagCtrl;
-
 class TYmakeConfigConditionCalc: public TFieldCalculatorBase {
 public:
     bool item_by_name(dump_item& it, const char* name) const override {

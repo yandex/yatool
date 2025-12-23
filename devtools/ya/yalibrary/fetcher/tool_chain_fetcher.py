@@ -157,13 +157,14 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
     def _fetch(self):
         resource = self._get_matched_resource()
-        return self._download_fn(
+        res = self._download_fn(
             None,
             self._root,
             self._get_resource_uri(resource),
             force_refetch=self._force_refetch,
             **self._binname_kwargs
         )
+        return res.where
 
     def _details(self):
         raise NotImplementedError()
@@ -219,7 +220,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
         strip_prefix = resource_desc.get('strip_prefix')
         parsed_uri = parse_resource_uri(self._get_resource_uri(resource_desc))
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, parsed_uri.resource_type)
-        where = self._download_fn(
+        res = self._download_fn(
             fetcher,
             self._root,
             self._get_resource_uri(resource_desc),
@@ -228,7 +229,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
             strip_prefix=strip_prefix,
             **self._binname_kwargs
         )
-        return where
+        return res.where
 
 
 class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
@@ -470,18 +471,22 @@ def _get_fetcher(name, resource_type):
         import app_ctx
 
         if getattr(app_ctx, 'state') and getattr(app_ctx, 'display'):
-
             progress_info = progress_info_lib.ProgressInfo()
 
+            use_universal_fetcher_everywhere = (
+                hasattr(app_ctx, 'use_universal_fetcher_everywhere') and app_ctx.use_universal_fetcher_everywhere
+            )
+
             def display_progress(downloaded, total):
-                if app_ctx.state.check_cancel_state():
+                if not use_universal_fetcher_everywhere:
+                    app_ctx.state.check_cancel_state()
 
-                    progress_info.set_total(total)
-                    progress_info.update_downloaded(downloaded)
+                progress_info.set_total(total)
+                progress_info.update_downloaded(downloaded)
 
-                    app_ctx.display.emit_status(
-                        'Downloading [[imp]]{}[[rst]] - [[imp]]{}[[rst]]'.format(name, progress_info.pretty_progress)
-                    )
+                app_ctx.display.emit_status(
+                    'Downloading [[imp]]{}[[rst]] - [[imp]]{}[[rst]]'.format(name, progress_info.pretty_progress)
+                )
 
             def display_finish():
                 app_ctx.display.emit_status('')
@@ -498,9 +503,13 @@ def _get_fetcher(name, resource_type):
         progress_printer = ProgressPrinter(
             progress_callback=default_progress_callback, finish_callback=default_finish_callback
         )
+
+    try:
         from devtools.ya.yalibrary.yandex.sandbox import fetcher
 
         return fetcher.SandboxFetcher(), progress_printer
+    except ImportError:
+        return None, progress_printer
 
 
 def _list_all_resources(**kwargs):

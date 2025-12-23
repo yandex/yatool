@@ -1,0 +1,21 @@
+#pragma once
+
+#include <library/cpp/yt/misc/enum.h>
+
+namespace NYT::NCodegen {
+
+////////////////////////////////////////////////////////////////////////////////
+
+DEFINE_ENUM(EExecutionBackend,
+    (Native)
+    (WebAssembly)
+);
+
+DEFINE_ENUM(EOptimizationLevel,
+    (None)
+    (Default)
+);
+
+////////////////////////////////////////////////////////////////////////////////
+
+} // namespace NYT::NCodegen

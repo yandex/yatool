@@ -24,8 +24,7 @@ constinit const auto Logger = HttpLogger;
 
 namespace {
 
-using TFilteredHeaderMap = THashSet<std::string, TCaseInsensitiveStringHasher, TCaseInsensitiveStringEqualityComparer>;
-YT_DEFINE_GLOBAL(const TFilteredHeaderMap, FilteredHeaders, {
+YT_DEFINE_GLOBAL(const THeaders::THeaderNames, FilteredHeaders, {
     "transfer-encoding",
     "content-length",
     "connection",
@@ -60,7 +59,8 @@ http_parser_settings THttpParser::GetParserSettings()
 const http_parser_settings ParserSettings = THttpParser::GetParserSettings();
 
 THttpParser::THttpParser(http_parser_type parserType)
-    : Headers_(New<THeaders>())
+    : ParserType_(parserType)
+    , Headers_(New<THeaders>())
 {
     http_parser_init(&Parser_, parserType);
     Parser_.data = reinterpret_cast<void*>(this);
@@ -87,6 +87,8 @@ void THttpParser::Reset()
     YT_VERIFY(FirstLine_.GetLength() == 0);
     YT_VERIFY(NextField_.GetLength() == 0);
     YT_VERIFY(NextValue_.GetLength() == 0);
+
+    http_parser_init(&Parser_, ParserType_);
 }
 
 TSharedRef THttpParser::Feed(const TSharedRef& input)
@@ -869,7 +871,7 @@ void THttpOutput::OnWriteFinish()
     auto now = TInstant::Now();
     auto stats = Connection_->GetWriteStatistics();
     if (LastProgressLogTime_ + Config_->WriteIdleTimeout < now) {
-        YT_LOG_DEBUG("Writing HTTP message (Requestid: %v, BytesOut: %v, IdleDuration: %v, BusyDuration: %v)",
+        YT_LOG_DEBUG("Writing HTTP message (RequestId: %v, BytesOut: %v, IdleDuration: %v, BusyDuration: %v)",
             RequestId_,
             GetWriteByteCount(),
             stats.IdleDuration - StartStatistics_.IdleDuration,

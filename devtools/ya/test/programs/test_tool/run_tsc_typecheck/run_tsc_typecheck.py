@@ -3,25 +3,39 @@ import logging
 import os
 
 import build.plugins.lib.nots.package_manager.base.constants as pm_const
+import build.plugins.lib.nots.package_manager.base.utils as pm_utils
 import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
-import build.plugins.lib.nots.test_utils.ts_utils as nots_ts_utils
-import build.plugins.lib.nots.typescript as nots_typescript
-
-import devtools.ya.test
-import devtools.ya.test.const
-import devtools.ya.test.system.process
-import devtools.ya.test.test_types.common
-import devtools.ya.test.util
-
+import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
+from devtools.ya.test.const import Status
+from devtools.ya.test.facility import TestCase
+from devtools.ya.test.system.process import execute
+from devtools.ya.test.test_types.common import PerformedTestSuite
+from devtools.ya.test.util.shared import setup_logging
 from .parse_output import parse_output
+
 
 logger = logging.getLogger(__name__)
 
 
 def main():
     args = parse_args()
-    devtools.ya.test.util.shared.setup_logging(args.log_level, args.log_path)
+    setup_logging(args.log_level, args.log_path)
     return run(args)
+
+
+def get_env(args):
+    build_dir = os.path.join(args.build_root, args.source_folder_path)
+    bindir_node_modules_path = os.path.join(build_dir, pm_const.NODE_MODULES_DIRNAME)
+    node_path = [
+        bindir_node_modules_path,
+        os.path.join(
+            pm_utils.build_vs_store_path(args.build_root, args.source_folder_path), pm_const.NODE_MODULES_DIRNAME
+        ),
+        # TODO: remove - no longer needed
+        os.path.join(bindir_node_modules_path, pnpm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+    ]
+
+    return {"NODE_PATH": os.pathsep.join(node_path)}
 
 
 def run(args):
@@ -33,11 +47,11 @@ def run(args):
     build_dir = os.path.join(args.build_root, args.source_folder_path)
     cwd = build_dir
 
-    suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
+    suite = PerformedTestSuite(None, None, None)
     suite.set_work_dir(cwd)
     suite.register_chunk()
 
-    devtools.ya.test.util.tools.copy_dir_contents(
+    ts_utils.copy_dir_contents(
         src_dir,
         build_dir,
         ignore_list=[
@@ -47,20 +61,21 @@ def run(args):
             pm_const.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             pm_const.PACKAGE_JSON_FILENAME,
             pnpm_const.PNPM_LOCKFILE_FILENAME,
-            nots_typescript.DEFAULT_TS_CONFIG_FILE,
+            args.ts_config_path,
         ],
     )
 
-    nots_ts_utils.create_bin_tsconfig(
+    ts_utils.create_bin_tsconfig(
         module_arc_path=args.source_folder_path,
         source_root=args.source_root,
         bin_root=args.build_root,
+        ts_config_path=args.ts_config_path,
     )
 
     cmd = get_cmd(args)
 
     # Apparently suite.set_work_dir is not enough to make this work in the cwd, passing directly
-    res = devtools.ya.test.system.process.execute(cmd, cwd=cwd, check_exit_code=False)
+    res = execute(cmd, cwd=cwd, env=get_env(args), check_exit_code=False)
 
     if res.exit_code != 0 and len(res.stdout or '') == 0 and len(res.stderr or '') != 0:
         return 1
@@ -96,7 +111,8 @@ def fill_tests(src_dir: str, output: str, files: list[str], suite):
     src_dir += "/"
     result = {}
     for file_name in files:
-        result[file_name[len(src_dir) :]] = {
+        finally_file_name = file_name.replace(src_dir, "")
+        result[finally_file_name] = {
             'has_errors': False,
             'details': [],
         }
@@ -110,9 +126,9 @@ def fill_tests(src_dir: str, output: str, files: list[str], suite):
         }
 
     for file_name, entry in result.items():
-        test_case = devtools.ya.test.facility.TestCase(
+        test_case = TestCase(
             "{}::typecheck".format(file_name),
-            devtools.ya.test.const.Status.FAIL if entry['has_errors'] else devtools.ya.test.const.Status.GOOD,
+            Status.FAIL if entry['has_errors'] else Status.GOOD,
             "\n".join(entry['details']),
         )
         suite.chunk.tests.append(test_case)

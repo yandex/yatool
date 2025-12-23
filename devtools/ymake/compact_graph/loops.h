@@ -34,7 +34,7 @@ public:
     void RemoveBadLoops(TDepGraph& graph, TVector<TTarget>& startTargets) const;
     const TNodeId* FindLoopForNode(TNodeId node) const {return Node2Loop.FindPtr(node);}
 
-    static TGraphLoops Find(const TDepGraph& graph, const TVector<TTarget>& startTargets, bool outTogetherIsLoop);
+    static TGraphLoops Find(const TDepGraph& graph, const TVector<TTarget> startTargets, bool outTogetherIsLoop);
 
     void DumpAllLoops(const TDepGraph& graph, IOutputStream& out) const;
     void DumpBuildLoops(const TDepGraph& graph, IOutputStream& out) const;

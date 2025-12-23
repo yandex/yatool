@@ -37,7 +37,6 @@ ATTRS_TO_STATE_HASH = [
     'global_resources',
     'recipes',
     'requirements',
-    'timeout',
     'test_size',
     'name',
 ]
@@ -65,11 +64,11 @@ class AbstractTestSuite(facility.Suite):
         """
         raise NotImplementedError()
 
-    def _get_meta_info_parser(self):
+    def _get_meta_constructor(self):
         """
-        Return parser for meta information from which test suites are generated
+        Return constructor for meta information from which test suites are generated
         """
-        return facility.DartInfo
+        return facility.make_meta_from_dart
 
     @property
     def class_type(self):
@@ -96,7 +95,7 @@ class AbstractTestSuite(facility.Suite):
 
     def __init__(
         self,
-        meta_dict,
+        raw_meta,
         modulo=1,
         modulo_index=0,
         target_platform_descriptor=None,
@@ -107,7 +106,7 @@ class AbstractTestSuite(facility.Suite):
         :param meta: meta info like parsed `test.dart` file
         """
         super(AbstractTestSuite, self).__init__()
-        self.meta = self._get_meta_info_parser()(meta_dict)
+        self.meta = self._get_meta_constructor()(raw_meta)
         self._result_uids = []
         self._output_uids = []
         self.dep_uids = []
@@ -165,7 +164,7 @@ class AbstractTestSuite(facility.Suite):
     def save(self):
         #  needed for ya dump
         return {
-            'dart_info': self.meta.meta_dict,
+            'dart_info': self.meta.meta_raw,
             'tests': self.tests,
             'result_uids': self._result_uids,
             'output_uids': self._output_uids,
@@ -482,10 +481,13 @@ class AbstractTestSuite(facility.Suite):
         """
         This is used to pinpoint exactly the same tests between different runs
         """
-        res = ''
+        res = []  # for better debugging
+        # TODO: We calculate here timeout, which will be changed in preparing test nodes
         for attr in ATTRS_TO_STATE_HASH:
-            res += str(getattr(self, attr, ''))
-        return hashing.md5_value(res)
+            res.append(attr)
+            res.append(str(getattr(self, attr, '')))
+
+        return hashing.md5_value(' '.join(res))
 
     def stdout_path(self):
         return os.path.join(self.output_dir(), "run.stdout")
@@ -519,7 +521,11 @@ class AbstractTestSuite(facility.Suite):
         raise NotImplementedError()
 
     def __str__(self):
-        return "Test [project=%s, name=%s]" % (self.project_path, self.name)
+        return "Test [type={}, project={}, name={}]".format(
+            self.get_type(),
+            self.project_path,
+            self.name,
+        )
 
     def __repr__(self):
         return str(self)
@@ -801,6 +807,13 @@ class AbstractTestSuite(facility.Suite):
     def get_split_params(self):
         return self._modulo, self._modulo_index, self._split_file_name
 
+    @exts.func.memoize()
+    def get_parallel_tests_within_node_workers(self):
+        if self.meta.parallel_tests_within_node_workers == "auto":
+            return self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 1)
+        else:
+            return int(self.meta.parallel_tests_within_node_workers or 0)
+
     def get_fork_mode(self):
         return self.meta.fork_mode
 
@@ -1024,6 +1037,20 @@ class PythonTestSuite(AbstractTestSuite):
         return True
 
 
+class SemanticLinterSuite(AbstractTestSuite):
+    """
+    Base class for static analysis test suites (clang-tidy, iwyu, etc.)
+    """
+
+    @property
+    def semantic_linter_inputs(self):
+        """
+        Property that returns tuple/list of semantic linter input files.
+        Should be implemented by concrete static analyzer suites.
+        """
+        raise NotImplementedError("Subclasses must implement semantic_linter_inputs property")
+
+
 class StyleTestSuite(PythonTestSuite):
     def get_test_related_paths(self, arc_root, opts):
         return []
@@ -1237,3 +1264,9 @@ class SkippedTestSuite(object):
     def requirements(self):
         # distbuild fails if finds some requirements, e.g. ram_disk:8, even for skipped tests, TODO: DEVTOOLS-5005 - stop sending skipped tests to distbs
         return {}
+
+    def __str__(self):
+        return "SkippedTestSuite[of {}]".format(object.__getattribute__(self, "_original_suite"))
+
+    def __repr__(self):
+        return str(self)

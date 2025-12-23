@@ -8,11 +8,10 @@ import six
 
 from devtools.ya.test import const
 from devtools.ya.test.system import process
-from devtools.ya.test.util import shared, tools
+from devtools.ya.test.util import shared
 from devtools.ya.test.test_types.common import PerformedTestSuite
 from devtools.ya.test import facility
 from build.plugins.lib.nots.test_utils import ts_utils
-from build.plugins.lib.nots.typescript import DEFAULT_TS_CONFIG_FILE
 from build.plugins.lib.nots.package_manager.base.constants import (
     BUILD_DIRNAME,
     BUNDLE_DIRNAME,
@@ -20,7 +19,10 @@ from build.plugins.lib.nots.package_manager.base.constants import (
     NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
     PACKAGE_JSON_FILENAME,
 )
-from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME
+from build.plugins.lib.nots.package_manager.base.utils import (
+    build_vs_store_path,
+)
+from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME, VIRTUAL_STORE_DIRNAME
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,7 @@ def parse_args():
     parser.add_argument("--config", help="Relative path to jest config, from testing module root")
     parser.add_argument("--timeout", default=0, type=int)
     parser.add_argument("--nodejs")
+    parser.add_argument("--ts-config-path", dest="ts_config_path", help="tsconfig.json path", required=True)
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--ts-coverage-path", default="")
 
@@ -62,12 +65,13 @@ def parse_args():
 
 
 def run_tests(opts):
-    cmd = get_test_cmd(opts)
-
-    logger.debug("cmd: %s", json.dumps(cmd, indent=4))
-
     jest_stdout = os.path.join(opts.output_dir, "jest.out")
     jest_stderr = os.path.join(opts.output_dir, "jest.err")
+    jest_results_file = os.path.join(opts.output_dir, "jest_results.json")
+
+    cmd = get_test_cmd(opts, jest_results_file)
+
+    logger.debug("cmd: %s", json.dumps(cmd, indent=4))
 
     def shutdown(proc):
         if hasattr(signal, "SIGQUIT"):
@@ -89,7 +93,7 @@ def run_tests(opts):
     src_path = os.path.join(opts.source_root, test_for_project_path)
     dst_path = opts.test_for_path
 
-    tools.copy_dir_contents(
+    ts_utils.copy_dir_contents(
         src_path,
         dst_path,
         ignore_list=[
@@ -99,7 +103,7 @@ def run_tests(opts):
             NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             PACKAGE_JSON_FILENAME,
             PNPM_LOCKFILE_FILENAME,
-            DEFAULT_TS_CONFIG_FILE,
+            opts.ts_config_path,
         ],
     )
 
@@ -107,6 +111,16 @@ def run_tests(opts):
         module_arc_path=test_for_project_path,
         source_root=opts.source_root,
         bin_root=opts.build_root,
+        ts_config_path=opts.ts_config_path,
+    )
+
+    bindir_node_modules_path = os.path.join(opts.build_root, test_for_project_path, NODE_MODULES_DIRNAME)
+    os.environ["NODE_PATH"] = os.pathsep.join(
+        [
+            os.path.join(build_vs_store_path(opts.build_root, test_for_project_path), NODE_MODULES_DIRNAME),
+            os.path.join(bindir_node_modules_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
+            bindir_node_modules_path,
+        ]
     )
 
     try:
@@ -115,15 +129,14 @@ def run_tests(opts):
     except process.SignalInterruptionError:
         exit_code = const.TestRunExitCode.TimeOut
 
-    stdout = open(jest_stdout, "r")
-    suite = parse_jest_stdout(opts, stdout)
-
-    shared.dump_trace_file(suite, opts.tracefile)
+    with open(jest_results_file, "r") as results_stream:
+        suite = parse_jest_stdout(opts, results_stream)
+        shared.dump_trace_file(suite, opts.tracefile)
 
     return exit_code
 
 
-def get_test_cmd(opts):
+def get_test_cmd(opts, jest_results_file):
     cmd = [
         os.path.join(opts.nodejs, "node"),
         os.path.join(opts.node_path, "jest", "bin", "jest"),
@@ -131,6 +144,8 @@ def get_test_cmd(opts):
         os.path.join(opts.test_for_path, opts.config),
         "--reporters=default",
         "--json",
+        "--outputFile",
+        jest_results_file,
         "--ci",
         "--color",
     ]
@@ -149,14 +164,14 @@ def get_test_cmd(opts):
     return cmd
 
 
-def parse_jest_stdout(opts, stdout):
-    results = json.load(stdout)
+def parse_jest_stdout(opts, results_stream):
+    results = json.load(results_stream)
     suite = PerformedTestSuite(None, opts.project_path)
     suite.set_work_dir(opts.test_work_dir)
     suite.register_chunk()
 
     for suite_result in results.get("testResults", []):
-        rel_test_path = os.path.relpath(suite_result["name"], opts.build_root)
+        rel_test_path = os.path.relpath(suite_result["name"], opts.test_for_path)
         for test_result in suite_result["assertionResults"]:
             full_test_name = six.ensure_str(
                 "{}: {}::{}".format(

@@ -12,6 +12,8 @@ using namespace NYTree;
 
 ////////////////////////////////////////////////////////////////////////////////
 
+namespace {
+
 class TRoamingRequestControl
     : public TClientRequestControlThunk
 {
@@ -29,7 +31,7 @@ public:
     {
         if (Options_.Timeout) {
             asyncChannel = asyncChannel.WithTimeout(*Options_.Timeout, TFutureTimeoutOptions{
-                .Error = TError("Error getting channel"),
+                .Error = TError(NYT::EErrorCode::Timeout, "Error getting channel"),
             });
         }
 
@@ -194,6 +196,8 @@ private:
     const IRoamingChannelProviderPtr Provider_;
     const IMemoryUsageTrackerPtr MemoryUsageTracker_ = GetNullMemoryUsageTracker();
 };
+
+} // namespace
 
 IChannelPtr CreateRoamingChannel(IRoamingChannelProviderPtr provider)
 {

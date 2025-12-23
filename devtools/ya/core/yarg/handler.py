@@ -426,7 +426,7 @@ class OptsHandler(BaseHandler):
             if self._extra_help:
                 usage += self._extra_help + '\n\n'
             usage += format_examples(self.opts_recursive(tuple(prefix)))
-            usage += '\n' + self.format_help(exc.help_level)
+            usage += '\n' + self.format_help(exc.help_level, exc.help_search)
             if (
                 self._stderr_help
                 and exc.help_level is HelpLevel.BASIC
@@ -449,8 +449,8 @@ class OptsHandler(BaseHandler):
     def dump(self):
         return '{name}({args})'.format(name=self._action.__name__, args=self._opt)
 
-    def format_help(self, help_level=HelpLevel.BASIC):
-        return format_help(self._opt, help_level)
+    def format_help(self, help_level=HelpLevel.BASIC, search_query=None):
+        return format_help(self._opt, help_level, search_query=search_query)
 
     def format_usage(self):
         return format_usage(self._opt)

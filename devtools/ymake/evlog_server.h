@@ -1,5 +1,6 @@
 #pragma once
 
+#include <devtools/ymake/foreign_platforms/io.h>
 #include <devtools/ymake/ymake.h>
 #include <library/cpp/protobuf/json/json2proto.h>
 #include <util/stream/input.h>
@@ -41,7 +42,7 @@ namespace NEvlogServer {
                 ReachableTargets_.insert({dir, "", true});
             }
         }
-        asio::awaitable<void> ProcessStreamBlocking(IInputStream& input);
+        asio::awaitable<void> ProcessStreamBlocking(NForeignTargetPipeline::TLineReader& reader);
 
     private:
         asio::awaitable<void> ForeignPlatformTargetEventHandler(const TString& line);

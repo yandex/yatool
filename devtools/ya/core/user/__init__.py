@@ -37,6 +37,8 @@ def classify_user(username: str) -> UserClass:
         return UserClass.ROBOT
     if username.startswith('teamcity'):
         return UserClass.ROBOT
+    if username == 'loadbase':
+        return UserClass.ROBOT
     if username.startswith('robot-'):
         return UserClass.ROBOT
     if username in ('sandbox', 'isandbox'):

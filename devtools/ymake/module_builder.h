@@ -60,6 +60,7 @@ public:
 
     // Implementation of TPluginUnit
     void CallMacro(TStringBuf name, const TVector<TStringBuf>& args) override;
+    void CallMacro(TStringBuf name, const TVector<TStringBuf>& args, TVars extraVars) override;
 
     void SetProperty(TStringBuf propName, TStringBuf value) override;
 
@@ -147,7 +148,7 @@ private:
     enum class EModuleCmdKind {
         // change this enum with caution
         Default = 0,
-        Fail,
+        Fail, // TODO? drop it
         Global
     };
 
@@ -167,12 +168,11 @@ private:
     // These return true
     bool AddByExt(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args);
     bool AddSource(const TStringBuf& sname, TVarStrEx& src, const TVector<TStringBuf>* args);
-    void AddPluginCustomCmd(TMacroCmd& macroCmd);
 
     void ApplyVarAsMacro(const TStringBuf& name, bool force = false);
     void AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind = EModuleCmdKind::Default);
-    void AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node, bool structCmd);
-    void AddGlobalVarDeps(TAddDepAdaptor& node, bool structCmd);
+    void AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node);
+    void AddGlobalVarDeps(TAddDepAdaptor& node);
     void AddGlobalDep();
     void AddFileGroupVars();
     void AddDartsVars();

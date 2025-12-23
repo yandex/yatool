@@ -79,24 +79,35 @@ def _add_metric(
     metrics[n['uid']].update({name: value})
 
 
-def make_targets_metrics(graph: typing.List[GraphNode], tasks_metrics: typing.Dict) -> typing.DefaultDict:
+def make_targets_metrics(
+    graph: typing.List[GraphNode], tasks_metrics: typing.Dict[str, dict], execution_log: dict[str, dict]
+) -> typing.DefaultDict:
     metrics = defaultdict(dict)
     deps = _make_dependencies_lists(graph)
 
     for node in graph:
-        if is_module(node):
-            uid = node['uid']
-            task_metrics = tasks_metrics.get(uid, {})
-            if 'size' in task_metrics:
-                _add_metric(node, 'artifacts-size', task_metrics['size'], metrics)
+        if not is_module(node):
+            continue
 
-            if uid in deps:
-                module_count, not_modules = deps[uid]
-                if is_binary(node):
-                    _add_metric(node, 'dependencies-count', module_count, metrics)
+        uid = node['uid']
+        task_metrics = tasks_metrics.get(uid, {})
+        if 'size' in task_metrics:
+            size = task_metrics['size']
+        else:
+            # Constructing a key that matches string representation of a dist download task: devtools/ya/yalibrary/runner/tasks/distbuild/__init__.py
+            key = f'DistDownload({uid})'
+            size = execution_log[key]['size'] if key in execution_log else -1
 
-                elapsed = _calculate_elapsed_time_by_deps(list(not_modules) + [uid], tasks_metrics)
-                if elapsed is not None:
-                    _add_metric(node, 'build-time', elapsed, metrics)
+        if size != -1:
+            _add_metric(node, 'artifacts-size', size, metrics)
+
+        if uid in deps:
+            module_count, not_modules = deps[uid]
+            if is_binary(node):
+                _add_metric(node, 'dependencies-count', module_count, metrics)
+
+            elapsed = _calculate_elapsed_time_by_deps(list(not_modules) + [uid], tasks_metrics)
+            if elapsed is not None:
+                _add_metric(node, 'build-time', elapsed, metrics)
 
     return metrics

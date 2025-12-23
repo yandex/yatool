@@ -251,16 +251,16 @@ namespace {
                     if (!arg.InitFalse.empty()) {
                         kwMissing = arg.InitFalse;
                     }
-                    keywords.AddKeyword(arg.Name, 0, 0, TString(), kwPresent, kwMissing);
+                    keywords.AddFlagKeyword(arg.Name, kwPresent, kwMissing);
                     break;
                 case EArgType::NamedScalar:
                     if (!arg.InitFalse.empty()) {
                         kwMissing = arg.InitFalse;
                     }
-                    keywords.AddKeyword(arg.Name, 1, 1, arg.DeepReplace, kwPresent, kwMissing);
+                    keywords.AddScalarKeyword(arg.Name, kwMissing, arg.DeepReplace);
                     break;
                 case EArgType::NamedArray:
-                    keywords.AddKeyword(arg.Name, 0, ::Max<ssize_t>(), arg.DeepReplace);
+                    keywords.AddArrayKeyword(arg.Name, arg.DeepReplace);
                     break;
                 default:
                     break;
@@ -330,7 +330,7 @@ namespace {
                 } else if (auto defaultInit = arg->defaultInit()) {
                     argDesc.Type = EArgType::NamedScalar;
                     argDesc.InitFalse = TString(defaultInit->string()->stringContent()->getText());
-                } else if (auto specArg = arg->specArg()) {
+                } else if (/* auto specArg = */ arg->specArg()) {
                     ReportConfigError(fmt::format(
                         "Specialization parameter [{}] must precede all positional and named arguments in the definition of macro [{}]", arg->getText(), MacroName_
                     ), FileName_);
@@ -1003,28 +1003,6 @@ namespace {
             } else if (name == NProperties::PROXY) {
                 SetProxyProp();
                 return;
-            } else if (name == NProperties::STRUCT_CMD) {
-                if (Conf.RenderSemantics)
-                    return;
-                if (value == "yes") {
-                    BlockStack.back().BlockData().StructCmd = true;
-                } else if (value == "no") {
-                    BlockStack.back().BlockData().StructCmd = false;
-                } else {
-                    ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
-                }
-                return;
-            } else if (name == NProperties::STRUCT_SEM) {
-                if (!Conf.RenderSemantics)
-                    return;
-                if (value == "yes") {
-                    BlockStack.back().BlockData().StructCmd = true;
-                } else if (value == "no") {
-                    BlockStack.back().BlockData().StructCmd = false;
-                } else {
-                    ReportError(TString::Join("Unexpected value [", value, "] for macro property [", block.Name(), ".", name, "]"));
-                }
-                return;
             } else if (name == NProperties::FILE_GROUP) {
                 if (value == "yes") {
                     BlockStack.back().BlockData().IsFileGroupMacro = true;
@@ -1088,8 +1066,6 @@ namespace {
                        name == NProperties::INCLUDE_TAG ||
                        name == NProperties::PROXY ||
                        name == NProperties::VERSION_PROXY ||
-                       name == NProperties::STRUCT_CMD ||
-                       name == NProperties::STRUCT_SEM ||
                        name == NProperties::USE_PEERS_LATE_OUTS)
             {
                 if (value == "yes") {
@@ -1224,7 +1200,6 @@ namespace {
             auto& blockData = (name == block.Name()) ? block.BlockData() : Conf.BlockData[name];
             const TString& fullCommand = MakeFullCommand(args, command);
             SetCommandInternal(blockData, name, fullCommand, isUserMacro);
-            Commands[name] = std::make_pair(fullCommand, args);
         }
 
         void PostprocessForeachStatements() {
@@ -1275,7 +1250,6 @@ namespace {
         TConditionStack ConditionStack;
         TVector<TVector<TString>> ConditionVarsStack;
         bool AllowConditionVars;
-        THashMap<TString, std::pair<TString, TString>> Commands;
         THashMap<TString, TArgs> Macros;
         TSet<TString> Generics;
         TVector<TSelectAlts> SelectStack;

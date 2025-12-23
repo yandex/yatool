@@ -175,6 +175,8 @@ private:
 
     ETransition Transition;
 
+    TModuleGlobsData ModuleGlobsData;
+
 public:
     TModuleSavedState(const TModule& mod);
 
@@ -202,8 +204,9 @@ public:
         SelfPeers,
         ExtraOuts,
         PeersRules,
-        Transition
-        );
+        Transition,
+        ModuleGlobsData
+    );
 };
 
 /// @brief class representing module state including vars, dirs and vital properties
@@ -224,6 +227,7 @@ public:
     TVector<ui32> SelfPeers;
     TVector<ui32> ExtraOuts;
     ETransition Transition;
+    TModuleGlobsData ModuleGlobsData;
 
     explicit TModule() = delete; // Must initialize IncDirs.
 
@@ -521,6 +525,8 @@ private:
     mutable THolder<TOwnEntries> OwnEntries;
     THolder<TOwnEntries>& SharedEntries;
 
+    TVector<ui32> ConfigVars;
+
     TModule(TFileView dir, TStringBuf makefile, TStringBuf tag, TModulesSharedContext& context);
     TModule(TModuleSavedState&& saved, TModulesSharedContext& context);
 
@@ -532,6 +538,7 @@ private:
 
     void TrimVars();
     void OnBuildCompleted();
+    void ComputeConfigVars();
 
     bool IsStaticLib() const {
         return GetNodeType() == EMNT_Library && !IsCompleteTarget();

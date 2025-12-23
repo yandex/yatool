@@ -26,6 +26,12 @@ enum EDepType {
     EDT_Last = EDT_Group,
 };
 
+enum ELogicalDepType {
+    ELDT_FromDepType = 1 /* "FromDepType" */,
+    ELDT_Depend = 2 /* "Depend" */, // direct depend edge from module to direct depend
+    ELDT_Last = ELDT_Depend,
+};
+
 enum EMakeNodeType : ui8 {
     EMNT_Deleted = 0 /* "Deleted" */,
     EMNT_File = 1 /* "File" */,

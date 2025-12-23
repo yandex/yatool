@@ -335,6 +335,95 @@ void TSpecBasedGenerator::SetupHandmadeFunctions(TJinjaEnvPtr& JinjaEnv) {
         }
     });
 
+    auto dirname = [](const jinja2::Value& value, const std::string& error_message) {
+        std::string_view path;
+        if (value.isString()) {
+            path = value.asString();
+        } else if (std::holds_alternative<std::string_view>(value.data())) {
+            path = value.get<std::string_view>();
+        } else if (value.isEmpty()) { // ignore empty value - return empty
+            return jinja2::Value{};
+        } else { // unknown type
+            throw std::runtime_error(error_message + " " + NYexport::Dump(value));
+        }
+        const auto dirname = fs::path{path}.parent_path();
+        const auto sdirname = dirname.string();
+        if (sdirname.empty() || sdirname == "/") {
+            return jinja2::Value{};
+        } else {
+            return jinja2::Value{sdirname};
+        }
+    };
+
+    // Handmade dirname of path or paths
+    static const std::string DIRNAME = "dirname";
+    static const std::string PATHS = "paths";
+    static const std::string RECURSIVE = "recursive";
+    JinjaEnv->AddGlobal(DIRNAME, jinja2::UserCallable{
+        /*fptr=*/[&](const jinja2::UserCallableParams& params) -> jinja2::Value {
+            try {
+                auto pathsParam = params[PATHS];
+                const auto recursiveParam = params[RECURSIVE];
+                bool recursive = false;
+                if (std::holds_alternative<bool>(recursiveParam.data())) {
+                    recursive = recursiveParam.get<bool>();
+                }
+                if (recursive && !pathsParam.isList()) { // recursive always return list
+                    pathsParam = jinja2::ValuesList{1, pathsParam};
+                }
+                if (pathsParam.isList()) { // input is list, and result list too
+                    jinja2::ValuesList dirnames;
+                    jinja2::ValuesList stepDirnames;
+                    const std::string error_message = "Some item of " + std::string{PATHS} + " is not string";
+                    auto onPath = [&dirnames, &stepDirnames, &error_message, &dirname](const jinja2::Value& path) {
+                        const auto jdirname = dirname(path, error_message);
+                        if (!jdirname.isEmpty()
+                            && std::find(stepDirnames.begin(), stepDirnames.end(), jdirname) == stepDirnames.end()
+                            && std::find(dirnames.begin(), dirnames.end(), jdirname) == dirnames.end()
+                        ) {
+                            stepDirnames.push_back(jdirname);
+                        }
+                    };
+
+                    jinja2::Value pathsList = pathsParam;
+                    for (auto i = 0; i < 16; ++i) {
+                        stepDirnames.clear();
+                        const auto* pathsGenList = pathsList.getPtr<jinja2::GenericList>();
+                        if (pathsGenList) {
+                            for (const auto& path: *pathsGenList) {
+                                onPath(path);
+                            }
+                        } else {
+                            for (const auto& path: pathsList.asList()) {
+                                onPath(path);
+                            }
+                        }
+                        for (auto& d: stepDirnames) {
+                            dirnames.push_back(d);
+                        }
+                        if (!recursive || stepDirnames.empty()) {
+                            break;
+                        }
+                        pathsList = std::move(stepDirnames);
+                    }
+                    std::sort(dirnames.begin(), dirnames.end(), [](const jinja2::Value& a, const jinja2::Value& b) {
+                        return a.asString() < b.asString();
+                    });
+                    return dirnames;
+                } else { // else wait string input only
+                    return dirname(pathsParam, std::string{PATHS} + " is not list and not string");
+                }
+            } catch (const std::exception& e) {
+                onHandmadeException(DIRNAME, params.args, e);
+                return jinja2::Value{};
+            }
+        },
+        /*argsInfos=*/ {
+            jinja2::ArgInfo{PATHS},
+            jinja2::ArgInfo{RECURSIVE, false, false}
+        }
+    });
+
     // Handmade dump any variable function for debug jinja2 code
     static const std::string DUMP = "dump";
     static const std::string VAR = "var";
@@ -355,7 +444,6 @@ void TSpecBasedGenerator::SetCurrentDirectory(const fs::path& dir) const {
     YEXPORT_VERIFY(JinjaEnv, "Cannot set current directory to " << dir << " before setting up jinja environment");
     SourceTemplateFs->SetRootFolder(dir.c_str());
 }
-
 
 const TNodeSemantics& TSpecBasedGenerator::ApplyReplacement(TPathView path, const TNodeSemantics& inputSem) const {
     return TargetReplacements_.ApplyReplacement(path, inputSem);

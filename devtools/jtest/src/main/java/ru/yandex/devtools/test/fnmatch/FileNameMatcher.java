@@ -178,7 +178,7 @@ public class FileNameMatcher {
     private static int findGroupEnd(final int indexOfStartBracket,
             final String pattern) {
         int firstValidCharClassIndex = indexOfStartBracket + 1;
-        int firstValidEndBracketIndex = indexOfStartBracket + 2;
+        int firstValidEndBracketIndex = indexOfStartBracket + 1;
 
         if (indexOfStartBracket + 1 >= pattern.length())
             throw new NoClosingBracketException(indexOfStartBracket, "[", "]", //$NON-NLS-1$ //$NON-NLS-2$
@@ -186,6 +186,12 @@ public class FileNameMatcher {
 
         if (pattern.charAt(firstValidCharClassIndex) == '!') {
             firstValidCharClassIndex++;
+            firstValidEndBracketIndex++;
+        } else if (pattern.charAt(firstValidCharClassIndex) == ']') {
+            // Allow empty groups like []
+            return firstValidCharClassIndex;
+        } else {
+            // Normal case: skip at least one character before looking for ]
             firstValidEndBracketIndex++;
         }
 

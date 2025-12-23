@@ -1,9 +1,11 @@
 import humanfriendly
 
 
-def parse_yt_max_cache_size(raw_size: str | None) -> str | int | None:
+def parse_yt_max_cache_size(raw_size: int | str | None) -> str | int | None:
     if not raw_size:
         return None
+    if isinstance(raw_size, int):
+        return raw_size
     raw_size = raw_size.strip()
     if raw_size.endswith("%"):
         v = float(raw_size[:-1])

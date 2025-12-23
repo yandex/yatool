@@ -17,6 +17,7 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
        - Multimodule [JTEST](#multimodule_JTEST)
        - Multimodule [JTEST_FOR](#multimodule_JTEST_FOR)
        - Multimodule [JUNIT5](#multimodule_JUNIT5)
+       - Multimodule [JUNIT6](#multimodule_JUNIT6)
        - Multimodule [PACKAGE](#multimodule_PACKAGE)
        - Multimodule [PROTO_LIBRARY](#multimodule_PROTO_LIBRARY)
        - Multimodule [PROTO_SCHEMA](#multimodule_PROTO_SCHEMA)
@@ -27,6 +28,7 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
        - Multimodule [PY3_PROGRAM](#multimodule_PY3_PROGRAM)
        - Multimodule [TS_NEXT](#multimodule_TS_NEXT)
        - Multimodule [TS_PACKAGE](#multimodule_TS_PACKAGE)
+       - Multimodule [TS_RSPACK](#multimodule_TS_RSPACK)
        - Multimodule [TS_TSC](#multimodule_TS_TSC)
        - Multimodule [TS_VITE](#multimodule_TS_VITE)
        - Multimodule [TS_WEBPACK](#multimodule_TS_WEBPACK)
@@ -41,6 +43,7 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
        - Module [DEFAULT_IOS_INTERFACE](#module_DEFAULT_IOS_INTERFACE)
        - Module [DLL](#module_DLL)
        - Module [DLL_TOOL](#module_DLL_TOOL)
+       - Module [DOCS_HTML](#module_DOCS_HTML)
        - Module [DOCS_LIBRARY](#module_DOCS_LIBRARY)
        - Module [EXECTEST](#module_EXECTEST)
        - Module [FAT_OBJECT](#module_FAT_OBJECT)
@@ -79,6 +82,7 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
        - Module [TS_TEST_JEST_FOR](#module_TS_TEST_JEST_FOR)
        - Module [TS_TEST_PLAYWRIGHT_FOR](#module_TS_TEST_PLAYWRIGHT_FOR)
        - Module [TS_TEST_PLAYWRIGHT_LARGE_FOR](#module_TS_TEST_PLAYWRIGHT_LARGE_FOR)
+       - Module [TS_TEST_VITEST_FOR](#module_TS_TEST_VITEST_FOR)
        - Module [UNION](#module_UNION)
        - Module [UNITTEST](#module_UNITTEST)
        - Module [UNITTEST_FOR](#module_UNITTEST_FOR)
@@ -95,58 +99,61 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
        - Module [YT_UNITTEST](#module_YT_UNITTEST)
        - Module [Y_BENCHMARK](#module_Y_BENCHMARK)
    * [Macros](#macros)
-       - Macros [ACCELEO](#macro_ACCELEO) .. [ADD_PYTEST_BIN](#macro_ADD_PYTEST_BIN)
-       - Macros [ADD_YTEST](#macro_ADD_YTEST) .. [ALL_RESOURCE_FILES_FROM_DIRS](#macro_ALL_RESOURCE_FILES_FROM_DIRS)
-       - Macros [ALL_SRCS](#macro_ALL_SRCS) .. [BENCHMARK_OPTS](#macro_BENCHMARK_OPTS)
-       - Macros [BISON_FLAGS](#macro_BISON_FLAGS) .. [BUILDWITH_RAGEL6](#macro_BUILDWITH_RAGEL6)
-       - Macros [BUILD_CATBOOST](#macro_BUILD_CATBOOST) .. [CHECK_CONTRIB_CREDITS](#macro_CHECK_CONTRIB_CREDITS)
-       - Macros [CHECK_DEPENDENT_DIRS](#macro_CHECK_DEPENDENT_DIRS) .. [COLLECT_YAML_CONFIG_FILES](#macro_COLLECT_YAML_CONFIG_FILES)
-       - Macros [COMPILE_C_AS_CXX](#macro_COMPILE_C_AS_CXX) .. [COPY_FILE_WITH_CONTEXT](#macro_COPY_FILE_WITH_CONTEXT)
-       - Macros [CPP_ADDINCL](#macro_CPP_ADDINCL) .. [CTEMPLATE_VARNAMES](#macro_CTEMPLATE_VARNAMES)
-       - Macros [CUDA_NVCC_FLAGS](#macro_CUDA_NVCC_FLAGS) .. [DECIMAL_MD5_LOWER_32_BITS](#macro_DECIMAL_MD5_LOWER_32_BITS)
-       - Macros [DECLARE_EXTERNAL_HOST_RESOURCES_BUNDLE](#macro_DECLARE_EXTERNAL_HOST_RESOURCES_BUNDLE) .. [DEFAULT_JUNIT_JAVA_SRCS_LAYOUT](#macro_DEFAULT_JUNIT_JAVA_SRCS_LAYOUT)
-       - Macros [DEPENDENCY_MANAGEMENT](#macro_DEPENDENCY_MANAGEMENT) .. [DOCS_DIR](#macro_DOCS_DIR)
-       - Macros [DOCS_INCLUDE_SOURCES](#macro_DOCS_INCLUDE_SOURCES) .. [ENDIF](#macro_ENDIF)
-       - Macros [ENV](#macro_ENV) .. [EXTERNAL_RESOURCE](#macro_EXTERNAL_RESOURCE)
-       - Macros [EXTRADIR](#macro_EXTRADIR) .. [FLEX_GEN_C](#macro_FLEX_GEN_C)
-       - Macros [FLEX_GEN_CPP](#macro_FLEX_GEN_CPP) .. [FUZZ_OPTS](#macro_FUZZ_OPTS)
-       - Macros [GENERATE_ENUM_SERIALIZATION](#macro_GENERATE_ENUM_SERIALIZATION) .. [GOLANG_VERSION](#macro_GOLANG_VERSION)
-       - Macros [GO_ASM_FLAGS](#macro_GO_ASM_FLAGS) .. [GO_EMBED_XTEST_DIR](#macro_GO_EMBED_XTEST_DIR)
-       - Macros [GO_FAKE_OUTPUT](#macro_GO_FAKE_OUTPUT) .. [GO_MOCKGEN_MOCKS](#macro_GO_MOCKGEN_MOCKS)
-       - Macros [GO_MOCKGEN_PACKAGE](#macro_GO_MOCKGEN_PACKAGE) .. [GO_PROTO_USE_V2](#macro_GO_PROTO_USE_V2)
-       - Macros [GO_SKIP_TESTS](#macro_GO_SKIP_TESTS) .. [GRPC_WITH_GMOCK](#macro_GRPC_WITH_GMOCK)
-       - Macros [HEADERS](#macro_HEADERS) .. [IOS_APP_ASSETS_FLAGS](#macro_IOS_APP_ASSETS_FLAGS)
-       - Macros [IOS_APP_COMMON_FLAGS](#macro_IOS_APP_COMMON_FLAGS) .. [JAVA_EXTERNAL_DEPENDENCIES](#macro_JAVA_EXTERNAL_DEPENDENCIES)
-       - Macros [JAVA_IGNORE_CLASSPATH_CLASH_FOR](#macro_JAVA_IGNORE_CLASSPATH_CLASH_FOR) .. [JNI_EXPORTS](#macro_JNI_EXPORTS)
-       - Macros [JOIN_SRCS](#macro_JOIN_SRCS) .. [LARGE_FILES](#macro_LARGE_FILES)
-       - Macros [LDFLAGS](#macro_LDFLAGS) .. [LIST_PROTO](#macro_LIST_PROTO)
-       - Macros [LJ_21_ARCHIVE](#macro_LJ_21_ARCHIVE) .. [LOCAL_JAR](#macro_LOCAL_JAR)
-       - Macros [LOCAL_SOURCES_JAR](#macro_LOCAL_SOURCES_JAR) .. [NGINX_MODULES](#macro_NGINX_MODULES)
-       - Macros [NO_BUILD_IF](#macro_NO_BUILD_IF) .. [NO_EXPORT_DYNAMIC_SYMBOLS](#macro_NO_EXPORT_DYNAMIC_SYMBOLS)
-       - Macros [NO_EXTENDED_SOURCE_SEARCH](#macro_NO_EXTENDED_SOURCE_SEARCH) .. [NO_OPTIMIZE_PY_PROTOS](#macro_NO_OPTIMIZE_PY_PROTOS)
+       - Macros [ACCELEO](#macro_ACCELEO) .. [ADD_IWYU](#macro_ADD_IWYU)
+       - Macros [ADD_PYTEST_BIN](#macro_ADD_PYTEST_BIN) .. [ALL_RESOURCE_FILES](#macro_ALL_RESOURCE_FILES)
+       - Macros [ALL_RESOURCE_FILES_FROM_DIRS](#macro_ALL_RESOURCE_FILES_FROM_DIRS) .. [AUTO_SERVICE](#macro_AUTO_SERVICE)
+       - Macros [BENCHMARK_OPTS](#macro_BENCHMARK_OPTS) .. [BUILDWITH_CYTHON_CPP](#macro_BUILDWITH_CYTHON_CPP)
+       - Macros [BUILDWITH_RAGEL6](#macro_BUILDWITH_RAGEL6) .. [CGO_SRCS](#macro_CGO_SRCS)
+       - Macros [CHECK_ALLOWED_PATH](#macro_CHECK_ALLOWED_PATH) .. [COLLECT_GO_SWAGGER_FILES](#macro_COLLECT_GO_SWAGGER_FILES)
+       - Macros [COLLECT_JINJA_TEMPLATES](#macro_COLLECT_JINJA_TEMPLATES) .. [COPY](#macro_COPY)
+       - Macros [COPY_FILE](#macro_COPY_FILE) .. [CPP_PROTO_PLUGIN2](#macro_CPP_PROTO_PLUGIN2)
+       - Macros [CREATE_BUILDINFO_FOR](#macro_CREATE_BUILDINFO_FOR) .. [DARWIN_STRINGS_RESOURCE](#macro_DARWIN_STRINGS_RESOURCE)
+       - Macros [DATA](#macro_DATA) .. [DECLARE_IN_DIRS](#macro_DECLARE_IN_DIRS)
+       - Macros [DEFAULT](#macro_DEFAULT) .. [DLL_FOR](#macro_DLL_FOR)
+       - Macros [DOCKER_IMAGE](#macro_DOCKER_IMAGE) .. [ELSEIF](#macro_ELSEIF)
+       - Macros [EMBED_JAVA_VCS_INFO](#macro_EMBED_JAVA_VCS_INFO) .. [EXPERIMENTAL_FORK](#macro_EXPERIMENTAL_FORK)
+       - Macros [EXPLICIT_DATA](#macro_EXPLICIT_DATA) .. [FBS_TO_PY2SRC](#macro_FBS_TO_PY2SRC)
+       - Macros [FILES](#macro_FILES) .. [FROM_ARCHIVE](#macro_FROM_ARCHIVE)
+       - Macros [FROM_SANDBOX](#macro_FROM_SANDBOX) .. [GENERATE_SCRIPT](#macro_GENERATE_SCRIPT)
+       - Macros [GENERATE_YT_RECORD](#macro_GENERATE_YT_RECORD) .. [GO_COMPILE_FLAGS](#macro_GO_COMPILE_FLAGS)
+       - Macros [GO_EMBED_BINDIR](#macro_GO_EMBED_BINDIR) .. [GO_LDFLAGS](#macro_GO_LDFLAGS)
+       - Macros [GO_LINK_FLAGS](#macro_GO_LINK_FLAGS) .. [GO_OAPI_CODEGEN_TAXI](#macro_GO_OAPI_CODEGEN_TAXI)
+       - Macros [GO_OAPI_CODEGEN_TAXI_1134](#macro_GO_OAPI_CODEGEN_TAXI_1134) .. [GO_TEST_SRCS](#macro_GO_TEST_SRCS)
+       - Macros [GO_XTEST_EMBED_BINDIR](#macro_GO_XTEST_EMBED_BINDIR) .. [IF](#macro_IF)
+       - Macros [INCLUDE](#macro_INCLUDE) .. [JAR_ANNOTATION_PROCESSOR](#macro_JAR_ANNOTATION_PROCESSOR)
+       - Macros [JAR_EXCLUDE](#macro_JAR_EXCLUDE) .. [JAVA_RESOURCE](#macro_JAVA_RESOURCE)
+       - Macros [JAVA_RESOURCE_TAR](#macro_JAVA_RESOURCE_TAR) .. [JVM_ARGS](#macro_JVM_ARGS)
+       - Macros [KAPT_ANNOTATION_PROCESSOR](#macro_KAPT_ANNOTATION_PROCESSOR) .. [LD_PLUGIN](#macro_LD_PLUGIN)
+       - Macros [LICENSE](#macro_LICENSE) .. [LJ_ARCHIVE](#macro_LJ_ARCHIVE)
+       - Macros [LLVM_BC](#macro_LLVM_BC) .. [MACROS_WITH_ERROR](#macro_MACROS_WITH_ERROR)
+       - Macros [MANUAL_GENERATION](#macro_MANUAL_GENERATION) .. [NO_CHECK_IMPORTS](#macro_NO_CHECK_IMPORTS)
+       - Macros [NO_CLANG_COVERAGE](#macro_NO_CLANG_COVERAGE) .. [NO_EXTENDED_SOURCE_SEARCH](#macro_NO_EXTENDED_SOURCE_SEARCH)
+       - Macros [NO_IMPORT_TRACING](#macro_NO_IMPORT_TRACING) .. [NO_OPTIMIZE_PY_PROTOS](#macro_NO_OPTIMIZE_PY_PROTOS)
        - Macros [NO_PLATFORM](#macro_NO_PLATFORM) .. [NO_UTIL](#macro_NO_UTIL)
-       - Macros [NO_WSHADOW](#macro_NO_WSHADOW) .. [PARTITIONED_RECURSE_FOR_TESTS](#macro_PARTITIONED_RECURSE_FOR_TESTS)
-       - Macros [PARTITIONED_RECURSE_ROOT_RELATIVE](#macro_PARTITIONED_RECURSE_ROOT_RELATIVE) .. [PROCESS_MKDOCS](#macro_PROCESS_MKDOCS)
-       - Macros [PROTO2FBS](#macro_PROTO2FBS) .. [PYTHON3_ADDINCL](#macro_PYTHON3_ADDINCL)
-       - Macros [PYTHON3_MODULE](#macro_PYTHON3_MODULE) .. [PY_PROTOS_FOR](#macro_PY_PROTOS_FOR)
-       - Macros [PY_PROTO_PLUGIN](#macro_PY_PROTO_PLUGIN) .. [REQUIREMENTS](#macro_REQUIREMENTS)
-       - Macros [REQUIRES](#macro_REQUIRES) .. [RUN_ANTLR4_CPP](#macro_RUN_ANTLR4_CPP)
-       - Macros [RUN_ANTLR4_CPP_SPLIT](#macro_RUN_ANTLR4_CPP_SPLIT) .. [RUN_PYTHON3](#macro_RUN_PYTHON3)
-       - Macros [SDBUS_CPP_ADAPTOR](#macro_SDBUS_CPP_ADAPTOR) .. [SET_APPEND](#macro_SET_APPEND)
-       - Macros [SET_APPEND_WITH_GLOBAL](#macro_SET_APPEND_WITH_GLOBAL) .. [SPLIT_DWARF](#macro_SPLIT_DWARF)
-       - Macros [SPLIT_FACTOR](#macro_SPLIT_FACTOR) .. [SRC_C_PIC](#macro_SRC_C_PIC)
-       - Macros [SRC_C_SSE2](#macro_SRC_C_SSE2) .. [STYLE_DUMMY](#macro_STYLE_DUMMY)
-       - Macros [STYLE_FLAKE8](#macro_STYLE_FLAKE8) .. [TASKLET](#macro_TASKLET)
-       - Macros [TASKLET_REG](#macro_TASKLET_REG) .. [TOUCH_RANDOM_FILE](#macro_TOUCH_RANDOM_FILE)
-       - Macros [TS_CONFIG](#macro_TS_CONFIG) .. [TS_PROTO_OPT](#macro_TS_PROTO_OPT)
-       - Macros [TS_STYLELINT](#macro_TS_STYLELINT) .. [TS_VITE_OUTPUT](#macro_TS_VITE_OUTPUT)
-       - Macros [TS_WEBPACK_CONFIG](#macro_TS_WEBPACK_CONFIG) .. [UBERJAR_PATH_EXCLUDE_PREFIX](#macro_UBERJAR_PATH_EXCLUDE_PREFIX)
-       - Macros [UBERJAR_SERVICES_RESOURCE_TRANSFORMER](#macro_UBERJAR_SERVICES_RESOURCE_TRANSFORMER) .. [USE_KTLINT_OLD](#macro_USE_KTLINT_OLD)
-       - Macros [USE_LINKER_GOLD](#macro_USE_LINKER_GOLD) .. [USE_PYTHON3](#macro_USE_PYTHON3)
-       - Macros [USE_RECIPE](#macro_USE_RECIPE) .. [VITE_OUTPUT](#macro_VITE_OUTPUT)
-       - Macros [WEBPACK_OUTPUT](#macro_WEBPACK_OUTPUT) .. [WITH_KOTLINC_ALLOPEN](#macro_WITH_KOTLINC_ALLOPEN)
-       - Macros [WITH_KOTLINC_DETEKT](#macro_WITH_KOTLINC_DETEKT) .. [YABS_GENERATE_PHANTOM_CONF_TEST_CHECK](#macro_YABS_GENERATE_PHANTOM_CONF_TEST_CHECK)
-       - Macros [YA_CONF_JSON](#macro_YA_CONF_JSON) .. [YT_SPEC](#macro_YT_SPEC)
+       - Macros [NO_WSHADOW](#macro_NO_WSHADOW) .. [PARTITIONED_RECURSE](#macro_PARTITIONED_RECURSE)
+       - Macros [PARTITIONED_RECURSE_FOR_TESTS](#macro_PARTITIONED_RECURSE_FOR_TESTS) .. [PROCESS_DOCS](#macro_PROCESS_DOCS)
+       - Macros [PROCESS_MKDOCS](#macro_PROCESS_MKDOCS) .. [PYTHON2_MODULE](#macro_PYTHON2_MODULE)
+       - Macros [PYTHON3_ADDINCL](#macro_PYTHON3_ADDINCL) .. [PY_NAMESPACE](#macro_PY_NAMESPACE)
+       - Macros [PY_PROTOS_FOR](#macro_PY_PROTOS_FOR) .. [REGISTER_YQL_PYTHON_UDF](#macro_REGISTER_YQL_PYTHON_UDF)
+       - Macros [REQUIREMENTS](#macro_REQUIREMENTS) .. [RUN](#macro_RUN)
+       - Macros [RUN_ANTLR](#macro_RUN_ANTLR) .. [RUN_JAVA_PROGRAM](#macro_RUN_JAVA_PROGRAM)
+       - Macros [RUN_LUA](#macro_RUN_LUA) .. [SELECT_CLANG_SA_CONFIG](#macro_SELECT_CLANG_SA_CONFIG)
+       - Macros [SELECT_PROTO_LAYOUT](#macro_SELECT_PROTO_LAYOUT) .. [SET_RESOURCE_MAP_FROM_JSON](#macro_SET_RESOURCE_MAP_FROM_JSON)
+       - Macros [SET_RESOURCE_URI_FROM_JSON](#macro_SET_RESOURCE_URI_FROM_JSON) .. [SRCS](#macro_SRCS)
+       - Macros [SRC_C_AMX](#macro_SRC_C_AMX) .. [SRC_C_SSE41](#macro_SRC_C_SSE41)
+       - Macros [SRC_C_SSSE3](#macro_SRC_C_SSSE3) .. [STYLE_PYTHON](#macro_STYLE_PYTHON)
+       - Macros [STYLE_RUFF](#macro_STYLE_RUFF) .. [TASKLET_REG](#macro_TASKLET_REG)
+       - Macros [TASKLET_REG_EXT](#macro_TASKLET_REG_EXT) .. [TS_BUILD_ENV](#macro_TS_BUILD_ENV)
+       - Macros [TS_CONFIG](#macro_TS_CONFIG) .. [TS_NEXT_OUTPUT](#macro_TS_NEXT_OUTPUT)
+       - Macros [TS_PROTO_OPT](#macro_TS_PROTO_OPT) .. [TS_TEST_INCLUDE_NODEJS](#macro_TS_TEST_INCLUDE_NODEJS)
+       - Macros [TS_TEST_SRCS](#macro_TS_TEST_SRCS) .. [UBERJAR_HIDE_INCLUDE_PATTERN](#macro_UBERJAR_HIDE_INCLUDE_PATTERN)
+       - Macros [UBERJAR_HIDING_PREFIX](#macro_UBERJAR_HIDING_PREFIX) .. [USE_CXX](#macro_USE_CXX)
+       - Macros [USE_DYNAMIC_CUDA](#macro_USE_DYNAMIC_CUDA) .. [USE_MODERN_FLEX](#macro_USE_MODERN_FLEX)
+       - Macros [USE_MODERN_FLEX_WITH_HEADER](#macro_USE_MODERN_FLEX_WITH_HEADER) .. [USE_UTIL](#macro_USE_UTIL)
+       - Macros [USRV_GEN_PROTO_STRUCTS](#macro_USRV_GEN_PROTO_STRUCTS) .. [WINDOWS_MANIFEST](#macro_WINDOWS_MANIFEST)
+       - Macros [WITHOUT_LICENSE_TEXTS](#macro_WITHOUT_LICENSE_TEXTS) .. [WITH_KOTLINC_NOARG](#macro_WITH_KOTLINC_NOARG)
+       - Macros [WITH_KOTLINC_SERIALIZATION](#macro_WITH_KOTLINC_SERIALIZATION) .. [YQL_ABI_VERSION](#macro_YQL_ABI_VERSION)
+       - Macros [YQL_LAST_ABI_VERSION](#macro_YQL_LAST_ABI_VERSION) .. [YT_SPEC](#macro_YT_SPEC)
    * [Properties](#properties)
        - Property [ALIASES](#property_ALIASES)
        - Property [ALLOWED](#property_ALLOWED)
@@ -172,8 +179,6 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
        - Property [PROXY](#property_PROXY)
        - Property [RESTRICTED](#property_RESTRICTED)
        - Property [SEM](#property_SEM)
-       - Property [STRUCT_CMD](#property_STRUCT_CMD)
-       - Property [STRUCT_SEM](#property_STRUCT_SEM)
        - Property [SYMLINK_POLICY](#property_SYMLINK_POLICY)
        - Property [TRANSITION](#property_TRANSITION)
        - Property [USE_PEERS_LATE_OUTS](#property_USE_PEERS_LATE_OUTS)
@@ -307,6 +312,9 @@ Not documented yet.
 ###### Multimodule [JUNIT5][] <a name="multimodule_JUNIT5"></a>
 Not documented yet.
 
+###### Multimodule [JUNIT6][] <a name="multimodule_JUNIT6"></a>
+Not documented yet.
+
 ###### Multimodule [PACKAGE][](name) <a name="multimodule_PACKAGE"></a>
 Module collects what is described directly inside it, builds and collects all its transitively available PEERDIRs.
 As a result, build directory of the project gets the structure of the accessible part of Arcadia, where the build result of each PEERDIR is placed to relevant Arcadia subpath.
@@ -339,8 +347,7 @@ See: [GRPC()](#macro\_GRPC), [OPTIMIZE\_PY\_PROTOS()](#macro\_OPTIMIZE\_PY\_PROT
 Build some variant of protocol buffers library or proto descriptions.
 
 When used as a PEERDIR from a language module like GO\_PROGRAM it behaves like PROTO\_LIBRARY.
-When built directly it produces proto descriptions. When required by RECURSE it produces
-both proto descriptions and language libraries.
+When built directly or by RECURSE it produces proto descriptions.
 PROTO\_SCHEMA can depend on PROTO\_LIBRARY, but PROTO\_LIBRARY cannot depend on PROTO\_SCHEMA.
 
 See: [PROTO\_LIBRARY()](#module\_PROTO\_LIBRARY)
@@ -387,8 +394,8 @@ Documentation: https://wiki.yandex-team.ru/devtools/commandsandvars/py\_srcs/
 
 ###### Multimodule [TS\_NEXT][]([name]) <a name="multimodule_TS_NEXT"></a>
 NextJS app, built with `next build`. Requires sources to be under /src folder.
-/pages and /app on the root level ar not supported.
-Build results are <module\_name>.output.tar.
+/pages and /app on the root level are not supported.
+Build results are output.tar.
 
 Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_NEXT
 
@@ -413,6 +420,17 @@ Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_PA
         )
     END()
 
+###### Multimodule [TS\_RSPACK][]([name]) <a name="multimodule_TS_RSPACK"></a>
+The Rspack bundle, bundles JavaScript code.
+Build results are packed as `output.tar`.
+
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_RSPACK
+
+@example
+
+    TS_RSPACK()
+    END()
+
 ###### Multimodule [TS\_TSC][]([name]) <a name="multimodule_TS_TSC"></a>
 The TypeScript/JavaScript library module, compiles TypeScript sources to JavaScript using tsc.
 Build results are JavaScript files, typings and source mappings (depending on local tsconfig.json settings).
@@ -427,7 +445,7 @@ Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_TS
 
 ###### Multimodule [TS\_VITE][]([name]) <a name="multimodule_TS_VITE"></a>
 The Vite bundle, bundles JavaScript code.
-Build results are packed as `<module\_name>.output.tar`.
+Build results are packed as `output.tar`.
 
 Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_VITE
 
@@ -438,7 +456,7 @@ Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_VI
 
 ###### Multimodule [TS\_WEBPACK][]([name]) <a name="multimodule_TS_WEBPACK"></a>
 The Webpack bundle, bundles JavaScript code.
-Build results are packed as `<module\_name>.output.tar`.
+Build results are packed as `output.tar`.
 
 Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_WEBPACK
 
@@ -495,6 +513,14 @@ DLL cannot participate in linking to programs but can be used from Java or as fi
 ###### Module [DLL\_TOOL][] <a name="module_DLL_TOOL"></a>
 DLL\_TOOL is a DLL that can be used as a LD\_PRELOAD tool.
 
+###### Module [DOCS\_HTML][]() <a name="module_DOCS_HTML"></a>
+This module provides the HTML archive output from the DOCS multimodule. You have to call
+DOCS\_HTML\_FROM macro to specify the path to the DOCS module at least once. If there are
+several calls to DOCS\_HTML\_FROM macro the last one wins (that is the last call to
+DOCS\_HTML\_FROM is considered and all others are ignored).
+
+@see: [DOCS\_HTML\_FROM()](#macro\_DOCS\_HTML\_FROM), [DOCS()](#module\_DOCSS).
+
 ###### Module [DOCS\_LIBRARY][]: \_DOCS\_BARE\_UNIT <a name="module_DOCS_LIBRARY"></a>
 Not documented yet.
 
@@ -505,8 +531,6 @@ Use macro RUN to specify binary to run.
 @example:
 
     EXECTEST()
-        OWNER(g:yatool)
-
         RUN(
             cat input.txt
         )
@@ -769,6 +793,18 @@ Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_TE
         TS_TEST_CONFIG(../playwright.config.js)
     END()
 
+###### Module [TS\_TEST\_VITEST\_FOR][](Path) <a name="module_TS_TEST_VITEST_FOR"></a>
+Defines testing module with vitest test runner.
+
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_TEST\_VITEST\_FOR
+
+@example
+
+    TS_TEST_VITEST_FOR(path/to/module)
+        TS_TEST_SRCS(../src)
+        TS_TEST_CONFIG(../vitest.config.ts)
+    END()
+
 ###### Module [UNION][](name) <a name="module_UNION"></a>
 Collection of PEERDIR dependencies, files and artifacts.
 UNION doesn't build its peers, just provides those to modules depending on it.
@@ -891,6 +927,9 @@ This will emit both translit, untranslit and ngrams table codes those will be th
 ###### Macro [ADD\_DLLS\_TO\_JAR][]() <a name="macro_ADD_DLLS_TO_JAR"></a>
 Not documented yet.
 
+###### Macro [ADD\_IWYU][]() <a name="macro_ADD_IWYU"></a>
+Not documented yet.
+
 ###### Macro [ADD\_PYTEST\_BIN][] <a name="macro_ADD_PYTEST_BIN"></a>
 Not documented yet.
 
@@ -908,33 +947,47 @@ Also adds it into resources
 
 Use DONT\_ADD\_TO\_RESOURCE if you dont need it in resources
 
-###### Macro [ALLOCATOR][](Alloc)  _# Default: LF_ <a name="macro_ALLOCATOR"></a>
+###### Macro [ALLOCATOR][](Alloc) <a name="macro_ALLOCATOR"></a>
 Set memory allocator implementation for the PROGRAM()/DLL() module.
 This may only be specified for programs and dlls, use in other modules leads to configuration errors.
 
-Available allocators are: "LF", "LF\_YT", "LF\_DBG", "YT", "J", "B", "BM", "C", "TCMALLOC", "GOOGLE", "LOCKLESS", "SYSTEM", "FAKE", "MIM", "MIM\_SDC", "HU", "PROFILED\_HU", "THREAD\_PROFILED\_HU".
+Different platforms have different default allocators (for example, Linux x86-64 uses TCMALLOC\_TC for builds w/o MUSL, Darwin uses SYSTEM).
+See DEFAULT\_ALLOCATOR variable definition.
+
+Available allocators are:
   - LF - lfalloc (https://github.com/yandex/yatool/tree/main/library/cpp/lfalloc)
-  - LF\_YT -  Allocator selection for YT (https://github.com/yandex/yatool/tree/main/library/cpp/lfalloc/yt/ya.make)
-  - LF\_DBG -  Debug allocator selection (https://github.com/yandex/yatool/tree/main/library/cpp/lfalloc/dbg/ya.make)
+  - LF\_YT - Allocator selection for YT (https://github.com/yandex/yatool/tree/main/library/cpp/lfalloc/yt/ya.make)
+  - LF\_DBG - Debug allocator selection (https://github.com/yandex/yatool/tree/main/library/cpp/lfalloc/dbg/ya.make)
   - YT - The YTAlloc allocator (https://github.com/yandex/yatool/tree/main/library/cpp/ytalloc/impl/ya.make)
   - J - The JEMalloc allocator (https://github.com/yandex/yatool/tree/main/library/malloc/jemalloc)
-  - B - The balloc allocator named Pyotr Popov and Anton Samokhvalov
-      - Discussion: https://ironpeter.at.yandex-team.ru/replies.xml?item\_no=126
+  - B - The balloc allocator by Pyotr Popov and Anton Samokhvalov
+      - Discussion: https://at.yandex-team.ru/users/ironpeter/126
       - Code: https://github.com/yandex/yatool/tree/main/library/cpp/balloc
   - BM - The balloc for market (agri@ commits from july 2018 till November 2018 saved)
   - C - Like B, but can be disabled for each thread to LF or SYSTEM one (B can be disabled only to SYSTEM)
-  - MIM -  Microsoft's mimalloc (actual version) (https://github.com/yandex/yatool/tree/main/library/malloc/mimalloc)
+  - MIM - Microsoft's mimalloc (actual version) (https://github.com/yandex/yatool/tree/main/library/malloc/mimalloc)
   - MIM\_SDC - Microsoft's mimalloc patched by SDC (https://github.com/yandex/yatool/tree/main/library/malloc/mimalloc\_sdc)
-  - TCMALLOC -  Google TCMalloc (actual version) (https://github.com/yandex/yatool/tree/main/library/malloc/tcmalloc)
-  - GOOGLE -  Google TCMalloc (https://github.com/yandex/yatool/tree/main/library/malloc/galloc)
+  - TCMALLOC - Google TCMalloc (actual version) (https://github.com/yandex/yatool/tree/main/library/malloc/tcmalloc)
+  - TCMALLOC\_256K - TCMalloc with 256k pages (usually faster but fragmentation is higher) + huge page awareness (https://github.com/yandex/yatool/tree/main/contrib/libs/tcmalloc/default)
+  - TCMALLOC\_SMALL\_BUT\_SLOW (https://github.com/yandex/yatool/tree/main/contrib/libs/tcmalloc/small\_but\_slow)
+       TCMalloc small-but-slow is a a version of TCMalloc that chooses to minimize
+       fragmentation at a \*severe\* cost to performance.  It should be used by
+       applications that have significant memory constraints, but don't need to
+       frequently allocate/free objects.
+  - TCMALLOC\_NUMA\_256K - TCMalloc with 256k pages (usually faster but fragmentation is higher) + NUMA awareness (https://github.com/yandex/yatool/tree/main/contrib/libs/tcmalloc/numa\_256k)
+  - TCMALLOC\_NUMA\_LARGE\_PAGES - TCMalloc with large pages (usually faster but fragmentation is higher) + NUMA awareness (https://github.com/yandex/yatool/tree/main/contrib/libs/tcmalloc/numa\_large\_pages)
+  - TCMALLOC\_TC - TCMalloc with 256k pages (usually faster but fragmentation is higher) + huge page awareness + Per-thread mode (https://github.com/yandex/yatool/tree/main/contrib/libs/tcmalloc/no\_percpu\_cache)
+  - GOOGLE - Google TCMalloc (old version) (https://github.com/yandex/yatool/tree/main/library/malloc/galloc)
   - LOCKLESS - Allocator based upon lockless queues (https://github.com/yandex/yatool/tree/main/library/malloc/lockless)
+  - HU - Huge page allocator by @gulin.
+      - Discussion: https://at.yandex-team.ru/users/gulin/759
+      - Code: https://a.yandex-team.ru/arcadia/library/cpp/malloc/hu
+  - PROFILED\_HU - patched HU (https://a.yandex-team.ru/arcadia/library/cpp/malloc/profiled\_hu). It is a bit slower but has metrics of memory consumption.
+  - THREAD\_PROFILED\_HU - patched (special for market) HU (https://a.yandex-team.ru/arcadia/library/cpp/malloc/thread\_profiled\_hu). It is a bit slower but has metrics of memory consumption.
   - SYSTEM - Use target system allocator
   - FAKE - Don't link with any allocator
-  - HU - Huge page allocator by @gulin.
-  - PROFILED\_HU - patched HU. It is a bit slower but has metrics of memory consumption.
-  - THREAD\_PROFILED\_HU - patched (special for market) HU. It is a bit slower but has metrics of memory consumption.
 
-More about allocators in Arcadia: https://wiki.yandex-team.ru/arcadia/allocators/
+More about allocators in Arcadia (outdated): https://wiki.yandex-team.ru/arcadia/allocators/
 
 ###### Macro [ALLOCATOR\_IMPL][]() <a name="macro_ALLOCATOR_IMPL"></a>
 Not documented yet.
@@ -973,7 +1026,7 @@ Note: Macro is designed to reject any ya.make files in Dirs except current one
 This macro collects all files with extension `Ext` and
 Passes them to `RESOURCE\_FILES` macro as relative to current directory
 
-`PREFIX` and `STRIP` have the same meaning as in `ROURCES\_FILES`, both are applied over moddir-relative paths
+`PREFIX` and `STRIP` have the same meaning as in `RESOURCE\_FILES`, both are applied over moddir-relative paths
 
 Note: This macro can be used multiple times per ya.make, but only once for each Ext value
 Note: Wildcards are not allowed neither as Ext nor in Dirs
@@ -983,7 +1036,7 @@ This macro collects all files non-recursively from listed Dirs and
 Passes them to `RESOURCE\_FILES` macro as relative to current directory
 The macro is usefull if literally all files are needed because `ALL\_RESOURCE\_FILES` requires extension to be specified
 
-`PREFIX` and `STRIP` have the same meaning as in `ROURCES\_FILES`, both are applied over moddir-relative paths
+`PREFIX` and `STRIP` have the same meaning as in `RESOURCE\_FILES`, both are applied over moddir-relative paths
 
 Note: This macro can be used only once per ya.make
 Note: Wildcards are not allowed neither as Ext nor in Dirs
@@ -1107,6 +1160,11 @@ Optional SUFFIX allows to use secondary module output. The suffix is appended to
 It makes little sense to specify BUNDLE on non-final targets and so this may stop working without prior notice.
 Bundle on multimodule will select final target among multimodule variants and will fail if there are none or more than one.
 
+###### Macro [BUNDLE\_OUTPUT][](Dir OutputName [RENAME <Rename>]) <a name="macro_BUNDLE_OUTPUT"></a>
+`Dir` - Path to module
+`OutputName` - the name of module artefact to be collected
+`Rename` - the output name of collected artefact if needed
+
 ###### Macro [CFLAGS][]([GLOBAL compiler\_flag]\* compiler\_flags) <a name="macro_CFLAGS"></a>
 Add the specified flags to the compilation command of C and C++ files.
 @params: GLOBAL - Propagates these flags to dependent projects
@@ -1220,30 +1278,38 @@ Add the specified flags to the compilation command of .c (but not .cpp) files.
 ###### Macro [COPY][] <a name="macro_COPY"></a>
 Not documented yet.
 
-###### Macro [COPY\_FILE][](File Destination [AUTO] [OUTPUT\_INCLUDES Deps...]) <a name="macro_COPY_FILE"></a>
+###### Macro [COPY\_FILE][](File Destination [AUTO] [OUTPUT\_INCLUDES...] [INDUCED\_DEPS...] [TEXT]) <a name="macro_COPY_FILE"></a>
 Copy file to build root. It is possible to change both location and the name.
 
 Parameters:
 - File - Source file name.
-- Destination - Output file name.
+- Dest - Output file name.
 - AUTO - Consider copied file for further processing automatically.
 - OUTPUT\_INCLUDES output\_includes... - Output file dependencies.
 - INDUCED\_DEPS $VARs... - Dependencies for generated files. Unlike `OUTPUT\_INCLUDES` these may target files further in processing chain.
                           In order to do so VAR should be filled by PREPARE\_INDUCED\_DEPS macro, stating target files (by type)
                           and set of dependencies
+- TEXT - deprecated
 
 The file will be just copied if AUTO boolean parameter is not specified. You should explicitly
 mention it in SRCS under new name (or specify AUTO boolean parameter) for further processing.
 
-###### Macro [COPY\_FILE\_WITH\_CONTEXT][](FILE DEST [AUTO] [OUTPUT\_INCLUDES DEPS...]) <a name="macro_COPY_FILE_WITH_CONTEXT"></a>
+###### Macro [COPY\_FILE\_WITH\_CONTEXT][](File Dest [AUTO] [OUTPUT\_INCLUDES...] [INDUCED\_DEPS...]) <a name="macro_COPY_FILE_WITH_CONTEXT"></a>
 Copy file to build root the same way as it is done for COPY\_FILE, but also
 propagates the context of the source file.
+
+###### Macro [COW][]() <a name="macro_COW"></a>
+Not documented yet.
 
 ###### Macro [CPP\_ADDINCL][](Dirs...) <a name="macro_CPP_ADDINCL"></a>
 Not documented yet.
 
 ###### Macro [CPP\_ENUMS\_SERIALIZATION][] <a name="macro_CPP_ENUMS_SERIALIZATION"></a>
 Not documented yet.
+
+###### Macro [CPP\_EVLOG][]() <a name="macro_CPP_EVLOG"></a>
+Apply event2cpp proto plugin for all .proto files of PROTO\_LIBRARY.
+This macro affects only c++ code generation - CPP\_PROTO submodule.
 
 ###### Macro [CPP\_PROTOLIBS\_DEBUG\_INFO][]() <a name="macro_CPP_PROTOLIBS_DEBUG_INFO"></a>
 Eqvivalent to NO\_DEBUG\_INFO() macro if the flag CPP\_PROTO\_NO\_DBGINFO=yes
@@ -1405,15 +1471,22 @@ Notes:
 Sets varname to value if value is not set yet
 
 ###### Macro [DEFAULT\_JAVA\_SRCS\_LAYOUT][]() <a name="macro_DEFAULT_JAVA_SRCS_LAYOUT"></a>
-DEFAULT\_JAVA\_SRCS\_LAYOUT() declare all source files can be find at maven/gradle standard path src/main/java \*\*/\*.java
-and all resources an be find at maven/gradle standard path src/main/resources \*\*/\*
+Configures standard Maven/Gradle directory layout for main sources:
+  - Java/Kotlin sources: src/main/java/\*\*/\*.java (and Kotlin equivalents)
+  - Resources: src/main/resources/\*\*/\*
 
 ###### Macro [DEFAULT\_JDK\_VERSION][](Version) <a name="macro_DEFAULT_JDK_VERSION"></a>
 Specify JDK version for module, can be overridden by setting the JDK\_VERSION variable
 
 ###### Macro [DEFAULT\_JUNIT\_JAVA\_SRCS\_LAYOUT][]() <a name="macro_DEFAULT_JUNIT_JAVA_SRCS_LAYOUT"></a>
-DEFAULT\_JUNIT\_JAVA\_SRCS\_LAYOUT() declare all test source files can be find at maven/gradle standard path src/test/java \*\*/\*.java
-and all resources can be find at maven/gradle standard path src/test/resources \*\*/\*
+Configures standard Maven/Gradle directory layout for JUnit tests:
+  - Java/Kotlin sources: java/\*\*/\*.java (and Kotlin equivalents)
+  - Test resources: resources/\*\*/\*
+
+Note: This macro assumes it's called from within src/test directory context.
+The actual paths will be:
+  - Sources: src/test/java/\*\*/\*.java
+  - Resources: src/test/resources/\*\*/\*
 
 ###### Macro [DEPENDENCY\_MANAGEMENT][](path/to/lib1 path/to/lib2 ...) <a name="macro_DEPENDENCY_MANAGEMENT"></a>
 Lock version of the library from the contrib/java at some point, so that all unversioned PEERDIRs to this library refer to the specified version.
@@ -1443,7 +1516,7 @@ Add direct PEERDIR's only in java compile classpath
 ###### Macro [DISABLE][](varname)  _#builtin_ <a name="macro_DISABLE"></a>
 Sets varname to 'no'
 
-###### Macro [DISABLE\_DATA\_VALIDATION][]() <a name="macro_DISABLE_DATA_VALIDATION"></a>
+###### Macro [DISABLE\_DATA\_VALIDATION][](Args...) <a name="macro_DISABLE_DATA_VALIDATION"></a>
 Not documented yet.
 
 ###### Macro [DLL\_FOR][](path/to/lib [libname] [major\_ver [minor\_ver]] [EXPORTS symlist\_file])  _#builtin_ <a name="macro_DLL_FOR"></a>
@@ -1468,6 +1541,10 @@ Specify directory with source .md files for DOCS multimodule if it differs from 
 Path must be Arcadia root relative.
 
 @see: [DOCS](#multimodule\_DOCS)
+
+###### Macro [DOCS\_HTML\_FROM][](Dir Name) <a name="macro_DOCS_HTML_FROM"></a>
+`Dir` - the path to DOCS module
+`Name` - the name of html archive for the DOCS module in `Dir`
 
 ###### Macro [DOCS\_INCLUDE\_SOURCES][](path...) <a name="macro_DOCS_INCLUDE_SOURCES"></a>
 Specify a list of paths to source code files which will be used as text includes in a documentation project.
@@ -1674,7 +1751,7 @@ The wrapper loads the real library on the first call to any of its functions
 
 @example:
 
-    PEERDIR(build/platform/cuda)
+    PEERDIR(build/internal/platform/cuda)
 
     GENERATE_IMPLIB(cuda $CUDA_TARGET_ROOT/lib64/stubs/libcuda.so SONAME libcuda.so.1)
 
@@ -1763,9 +1840,6 @@ Define an embed directory DIR for internal go tests.
 ###### Macro [GO\_EMBED\_XTEST\_DIR][](DIR) <a name="macro_GO_EMBED_XTEST_DIR"></a>
 Define an embed directory DIR for external go tests.
 
-###### Macro [GO\_FAKE\_OUTPUT][](go-src-files...) <a name="macro_GO_FAKE_OUTPUT"></a>
-Not documented yet.
-
 ###### Macro [GO\_GRPC\_GATEWAY\_SRCS][]() <a name="macro_GO_GRPC_GATEWAY_SRCS"></a>
 Use of grpc-gateway plugin (Supported for Go only).
 
@@ -1824,6 +1898,18 @@ private, taxi only
 
 ###### Macro [GO\_OAPI\_CODEGEN\_TAXI\_1134][] <a name="macro_GO_OAPI_CODEGEN_TAXI_1134"></a>
 private, taxi only
+
+###### Macro [GO\_OAPI\_CODEGEN\_V2][](GENERATE, PACKAGE, IN, IN\_NOPARSE[], Args...) <a name="macro_GO_OAPI_CODEGEN_V2"></a>
+Go oapi-codegen (v2) module
+Generates GENERATE thing with PACKAGE package from file IN into STDOUT file
+Optional arguments will be passed into generator
+IN\_NOPARSE - input files required for running generation, except IN
+Can be placed multiple times in same ya.make
+
+PEERDIRs to dependencies of the generated code must be added manually.
+All possible dependencies are listed in:
+vendor/github.com/oapi-codegen/oapi-codegen/v2/pkg/codegen/templates/imports.tmpl
+For example, see devtools/dummy\_arcadia/go/oapi-codegen-v2
 
 ###### Macro [GO\_PACKAGE\_NAME][](Name) <a name="macro_GO_PACKAGE_NAME"></a>
 Override name of a Go package.
@@ -1913,6 +1999,9 @@ Not documented yet.
 
 ###### Macro [IOS\_ASSETS][] <a name="macro_IOS_ASSETS"></a>
 Not documented yet.
+
+###### Macro [IWYU\_MAPPING\_FILE][](mapping\_file) <a name="macro_IWYU_MAPPING_FILE"></a>
+Specify a mapping file for IWYU to provide custom mappings for headers.
 
 ###### Macro [JAR\_ANNOTATION\_PROCESSOR][](Classes...) <a name="macro_JAR_ANNOTATION_PROCESSOR"></a>
 Not documented yet.
@@ -2008,7 +2097,7 @@ You should specify file name with the extension as Out. Further processing will 
 
 ###### Macro [JUNIT\_TESTS\_JAR][](path/to/some/peer realname.jar) <a name="macro_JUNIT_TESTS_JAR"></a>
 Specifies jar to search test suites and test cases. By default tests are
-searched in the jar compild by JTEST or JUNIT5 module sources. This macro
+searched in the jar compild by JTEST, JUNIT5 or JUNIT6 module sources. This macro
 allows to specify diferent jar to search tests.
 
 Only one jar file is used to search tests. If this macro invoked multiple
@@ -2031,6 +2120,10 @@ If specified multiple times, only last specification is used.
 Used to specify classpath for annotation processors.
 If specified multiple times, all specifications are used.
 
+###### Macro [KAPT\_ANNOTATION\_PROCESSOR\_OPTIONS][](Opts...) <a name="macro_KAPT_ANNOTATION_PROCESSOR_OPTIONS"></a>
+Used to specify options for KAPT annotation processors.
+If specified multiple times, all specifications are used.
+
 ###### Macro [KAPT\_OPTS][](opts...) <a name="macro_KAPT_OPTS"></a>
 Used to specify annotation processor qualified class names.
 If specified multiple times, only last specification is used.
@@ -2040,6 +2133,9 @@ Set additional Kotlin compilation flags.
 
 ###### Macro [KTLINT\_BASELINE\_FILE][](ktlint-baseline.xml "https://st.yandex-team.ru/REMOVE-BASELINE-1") _# deprecated_ <a name="macro_KTLINT_BASELINE_FILE"></a>
 Path to baseline file for ktlint test and ticket to fix all ktlint warnings in file and then remove it
+
+###### Macro [KTLINT\_RULESET][](path/to/ruleset/module) <a name="macro_KTLINT_RULESET"></a>
+Set path to ktlint ruleset module, used in command as "ktlint -R path/to/ruleset/module/ruletset-module.jar"
 
 ###### Macro [LARGE\_FILES][]([AUTOUPDATED]  Files...) <a name="macro_LARGE_FILES"></a>
 Use large file ether from working copy or from remote storage via placeholder <File>.external
@@ -2182,7 +2278,6 @@ The use of this macro is disabled by default.
 
 ###### Macro [NEED\_REVIEW][]() _# deprecated_ <a name="macro_NEED_REVIEW"></a>
 Mark the project as needing review.
-Reviewers are listed in the macro OWNER. The use of this macro is disabled by default.
 Details can be found here: https://clubs.at.yandex-team.ru/arcadia/6104
 
 ###### Macro [NGINX\_MODULES][](Modules...) <a name="macro_NGINX_MODULES"></a>
@@ -2205,6 +2300,9 @@ Not documented yet.
 
 ###### Macro [NO\_COMPILER\_WARNINGS][]() <a name="macro_NO_COMPILER_WARNINGS"></a>
 Disable all compiler warnings in the module.
+
+###### Macro [NO\_COW][]() <a name="macro_NO_COW"></a>
+Not documented yet.
 
 ###### Macro [NO\_CPU\_CHECK][]() <a name="macro_NO_CPU_CHECK"></a>
 Compile module without startup CPU features check
@@ -2232,6 +2330,9 @@ Also see: https://docs.yandex-team.ru/ya-make/manual/python/vars#y\_python\_exte
 
 ###### Macro [NO\_IMPORT\_TRACING][]() <a name="macro_NO_IMPORT_TRACING"></a>
 Disable python coverage for module
+
+###### Macro [NO\_IWYU][]() <a name="macro_NO_IWYU"></a>
+Disable Include What You Use (IWYU) analysis for the module.
 
 ###### Macro [NO\_JOIN\_SRC][]() _# deprecated, does-nothing_ <a name="macro_NO_JOIN_SRC"></a>
 This macro currently does nothing. This is default behavior which cannot be overridden at module level.
@@ -2277,7 +2378,7 @@ Disable python coverage for module
 
 ###### Macro [NO\_RUNTIME][]() <a name="macro_NO_RUNTIME"></a>
 This macro:
-1. Sets the ENABLE(NOUTIL) + DISABLE(USE\_INTERNAL\_STL);
+1. Calls NO\_UTIL()
 2. If the project that contains the macro NO\_RUNTIME(), peerdir-it project does not contain NO\_RUNTIME() => Warning.
 Note: use this with care. Arcadia STL most likely will be linked into executable anyway, so using STL headers/functions/classes
 may not be detected at build time and may lead to unpredictable behavors at configure time.
@@ -2339,6 +2440,17 @@ When placed inside the PACKAGE module, packs the build results tree to the archi
 Is not allowed other module types than PACKAGE().
 
 @see: [PACKAGE()](#module\_PACKAGE)
+
+###### Macro [PARALLEL\_TESTS\_WITHIN\_NODE][](COUNT) <a name="macro_PARALLEL_TESTS_WITHIN_NODE"></a>
+Execute tests in parallel within one node.
+
+Supported for execution tests on yt/sandbox and local run. Ignored for unsupported test types and environments.
+May cause some tests to break due to races or other circumstances.
+
+Allowed values of COUNT:
+'auto' to run tests in all available CPUs according to requirements, or integer amount of workers used.
+
+EXPERIMENTAL! DO NOT USE IF YOU ARE NOT SURE.
 
 ###### Macro [PARTITIONED\_RECURSE][]([BALANCING\_CONFIG config] dirs...)  _# builtin_ <a name="macro_PARTITIONED_RECURSE"></a>
 Add directories to the build
@@ -2609,6 +2721,11 @@ Specify list of dirs which this module must depend on indirectly.
 This macro can be used if module depends on the directories specified but they can't be listed
 as direct PEERDIR dependencies (due to public include order or link order issues).
 
+###### Macro [REQUIRE\_RESOURCE][](PeerdirPath RESOURCES Resources...) <a name="macro_REQUIRE_RESOURCE"></a>
+Specifies toolchain alike global resources which must be provided to a test.
+
+Used only inside TEST modules.
+
 ###### Macro [RESOLVE\_PROTO][]() <a name="macro_RESOLVE_PROTO"></a>
 Enable include resolving within UNIONs and let system .proto being resolved
 among .proto/.gztproto imports
@@ -2632,8 +2749,6 @@ Use the FORCE\_TEXT parameter to explicitly mark all Src files as text files: th
 @example:
 
     LIBRARY()
-        OWNER(user1)
-
         RESOURCE(
             path/to/file1 /key/in/program/1
             path/to/file2 /key2
@@ -2662,6 +2777,9 @@ RESOURCE\_FILES([DEST {dest}] {path}) expands into RESOURCE({path} resfs/file/{d
 ###### Macro [RESTRICT\_PATH][] <a name="macro_RESTRICT_PATH"></a>
 Not documented yet.
 
+###### Macro [RISK\_GEN\_DATA\_MODEL][] <a name="macro_RISK_GEN_DATA_MODEL"></a>
+Not documented yet.
+
 ###### Macro [ROS\_SRCS][](<[ZERO\_COPY] File>...) <a name="macro_ROS_SRCS"></a>
 A helper macro for ROS .msg/.srv files
 
@@ -2685,13 +2803,21 @@ Macro to invoke ANTLR4 generator for separate lexer and parser grammars (Cpp)
 ###### Macro [RUN\_ANTLR4\_GO][](GRAMMAR, DEPS <extra\_go\_deps>, LISTENER, VISITOR, Args...) <a name="macro_RUN_ANTLR4_GO"></a>
 Macro to invoke ANTLR4 generator (Go)
 
-###### Macro [RUN\_ANTLR4\_PYTHON][](Grammar [LISTENER] [VISITOR] [SUBDIR] [EXTRA\_OUTS Outs...] Args...) <a name="macro_RUN_ANTLR4_PYTHON"></a>
+###### Macro [RUN\_ANTLR4\_PYTHON2][](Grammar [LISTENER] [VISITOR] [SUBDIR] [EXTRA\_OUTS Outs...] Args...) <a name="macro_RUN_ANTLR4_PYTHON2"></a>
 `LISTENER` - emit grammar listener
 `VISITOR` -  emit grammar visitor
 `SUBDIR` - place generated files to specified subdirectory of BINDIR
 `EXTRA\_OUTS` - list extra outputs produced by Antlr (e.g. .interp and .token files) if they are needed. If `SUBDIR` is specied it will affect these as well. Use file names only.
 
-Macro to invoke ANTLR4 generator (Python). The Python3 will be used for PY3\_LIBRARY/PY3\_PROGRAM/PY3TEST, Python2 will be used in all other cases.
+Macro to invoke ANTLR4 (version 4.11.1) generator (Python).
+
+###### Macro [RUN\_ANTLR4\_PYTHON3][](Grammar [LISTENER] [VISITOR] [SUBDIR] [EXTRA\_OUTS Outs...] Args...) <a name="macro_RUN_ANTLR4_PYTHON3"></a>
+`LISTENER` - emit grammar listener
+`VISITOR` -  emit grammar visitor
+`SUBDIR` - place generated files to specified subdirectory of BINDIR
+`EXTRA\_OUTS` - list extra outputs produced by Antlr (e.g. .interp and .token files) if they are needed. If `SUBDIR` is specied it will affect these as well. Use file names only.
+
+Macro to invoke ANTLR4 generator (Python).
 
 ###### Macro [RUN\_JAVASCRIPT][](script\_path [args...] [IN inputs...] [OUTDIR outdir]) <a name="macro_RUN_JAVASCRIPT"></a>
 Run JS script after build of TS\_\* module.
@@ -2795,7 +2921,10 @@ Not documented yet.
 ###### Macro [SDBUS\_CPP\_PROXY][](File) <a name="macro_SDBUS_CPP_PROXY"></a>
 Not documented yet.
 
-###### Macro [SDC\_DIAGS\_SPLIT\_GENERATOR][] <a name="macro_SDC_DIAGS_SPLIT_GENERATOR"></a>
+###### Macro [SDC\_DIAGS\_SPLIT\_GENERATOR\_V3][] <a name="macro_SDC_DIAGS_SPLIT_GENERATOR_V3"></a>
+Not documented yet.
+
+###### Macro [SDC\_DIAGS\_SPLIT\_GENERATOR\_V4][] <a name="macro_SDC_DIAGS_SPLIT_GENERATOR_V4"></a>
 Not documented yet.
 
 ###### Macro [SDC\_INSTALL][]([Kind [Path | TARGET Target | NODE\_LINK NodeName | NODE NodeName Target]...]...) <a name="macro_SDC_INSTALL"></a>
@@ -2830,6 +2959,9 @@ SDC\_USE\_SUPERNODE build flag.
 ###### Macro [SELECT\_CLANG\_SA\_CONFIG][](static\_analyzer.yaml) <a name="macro_SELECT_CLANG_SA_CONFIG"></a>
 Select config file for clang static analyzer.
 The file should be called static\_analyzer.yaml.
+
+###### Macro [SELECT\_PROTO\_LAYOUT][](PROTO\_LAYOUT) <a name="macro_SELECT_PROTO_LAYOUT"></a>
+Select proto layout for generation. Options repeated options from generator.cc (optimize for)
 
 ###### Macro [SET][](varname value)  _#builtin_ <a name="macro_SET"></a>
 Sets varname to value
@@ -2983,6 +3115,9 @@ Not an actual linter, used for dummy linter demonstration
 ###### Macro [STYLE\_FLAKE8][]() <a name="macro_STYLE_FLAKE8"></a>
 Check python3 sources for style issues using flake8.
 
+###### Macro [STYLE\_JSON][]([DIRS dirs] [DIRS\_RECURSE dirs\_recurse]) <a name="macro_STYLE_JSON"></a>
+\_ADD\_PY\_LINTER\_CHECK(NAME name LINTER linter [DEPENDS deps] [DEFAULT\_CONFIGS configs\_file] [FILE\_PROCESSING\_TIME fpt] [EXTRA\_PARAMS params] [CONFIG\_TYPE ct])
+
 ###### Macro [STYLE\_PY2\_FLAKE8][]() <a name="macro_STYLE_PY2_FLAKE8"></a>
 Check python3 sources for style issues using flake8.
 
@@ -2990,7 +3125,15 @@ Check python3 sources for style issues using flake8.
 Check python3 sources for style issues using black.
 
 ###### Macro [STYLE\_RUFF][]([CONFIG\_TYPE config\_type] [CHECK\_FORMAT]) <a name="macro_STYLE_RUFF"></a>
-Check python3 sources for style issues using ruff. `CHECK\_FORMAT` enables `ruff format` check.
+Check python3 sources for style issues using ruff.
+`CHECK\_FORMAT` enables `ruff format` check.
+`RUN\_IN\_SOURCE\_ROOT` is a hacky option allowed for a limited number of projects, do not use it.
+
+###### Macro [STYLE\_YAML][]([DIRS dirs] [DIRS\_RECURSE dirs\_recurse]) <a name="macro_STYLE_YAML"></a>
+Not documented yet.
+
+###### Macro [STYLE\_YQL][]([DIRS dirs] [DIRS\_RECURSE dirs\_recurse]) <a name="macro_STYLE_YQL"></a>
+Not documented yet.
 
 ###### Macro [SUBSCRIBER][](UsersOrGroups) <a name="macro_SUBSCRIBER"></a>
 Add observers of the code.
@@ -3055,8 +3198,17 @@ In PY2TEST, PY3TEST and PY\*\_LIBRARY modules used as PY\_SRCS macro and additio
 
 Documentation: https://wiki.yandex-team.ru/yatool/test/#testynapytest
 
-###### Macro [THINLTO\_CACHE][](file) <a name="macro_THINLTO_CACHE"></a>
-Not documented yet.
+###### Macro [THINLTO\_CACHE][](File) <a name="macro_THINLTO_CACHE"></a>
+Use specified file as cache for ThinLTO link phase either for reading or for writing
+It is assumed that file is generated once in a while and than reused to accelerate ThinLTO builds
+
+Default mode is reading and in this case file is consumed as input of link command in `--thinlto mode`
+The most probable use is with `LARGE\_FILES` or `FROM\_SANDBOX` to bring cache from the storage.
+
+In order to generate file use `-DTHINLTO\_CACHE=gen` option and the file with name `out-<File>`
+will be emitted as additional output of link command in `--thinlto` mode. The file name is mangled with `out-`
+to avoid clashes with existing cache present in the build. Generated file is to be renamed and uploaded to the
+storage, in case of using `FROM\_SANDBOX` the resource ID is to be [auto-]updated upon upload.
 
 ###### Macro [TIMEOUT][](TIMEOUT) <a name="macro_TIMEOUT"></a>
 Sets a timeout on test execution
@@ -3067,8 +3219,21 @@ Documentation about the system test: https://wiki.yandex-team.ru/yatool/test/
 Specify that current module is used as toolchain. Allows to have contrib hooks for toolchain modules
 defined in repo internal python plugins
 
-###### Macro [TOUCH\_RANDOM\_FILE][] <a name="macro_TOUCH_RANDOM_FILE"></a>
-Not documented yet.
+###### Macro [TS\_BIOME][](configFile) <a name="macro_TS_BIOME"></a>
+For JavaScript, TypeScript, JSX, TSX, JSON, CSS and GraphQL. Must be inside of Module (TS\_WEBPACK, TS\_VITE, TS\_NEXT, etc)
+
+   - configFile by default biome.json
+
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/macros#ts-biome
+
+@example:
+
+    TS_VITE()
+        TS_BIOME(biome.json or biome.jsonc)
+    END()
+
+###### Macro [TS\_BUILD\_ENV][](key=value) <a name="macro_TS_BUILD_ENV"></a>
+Sets env variable key to value.
 
 ###### Macro [TS\_CONFIG][](ConfigPath) <a name="macro_TS_CONFIG"></a>
 Macro sets the path for "TypeScript Config".
@@ -3110,6 +3275,13 @@ Then file will be copied to DESTINATION folder preserving file structure.
 Copied file becomes output of TS\_PACKAGE
 Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_PACKAGE#ts-large-files
 
+###### Macro [TS\_NEXT\_BUILD\_OPTIONS][](Options...) <a name="macro_TS_NEXT_BUILD_OPTIONS"></a>
+Macro sets the build options for TS\_NEXT module.
+
+- Options - next build options.
+
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_NEXT#ts-next-build-options
+
 ###### Macro [TS\_NEXT\_CONFIG][](ConfigPath) <a name="macro_TS_NEXT_CONFIG"></a>
 Macro sets the config path for TS\_NEXT module.
 
@@ -3117,8 +3289,11 @@ Macro sets the config path for TS\_NEXT module.
 
 Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_NEXT#ts-next-config
 
-###### Macro [TS\_NEXT\_EXPERIMENTAL\_COMPILE][]() <a name="macro_TS_NEXT_EXPERIMENTAL_COMPILE"></a>
-Not documented yet.
+###### Macro [TS\_NEXT\_EXPERIMENTAL\_BUILD\_MODE][]() <a name="macro_TS_NEXT_EXPERIMENTAL_BUILD_MODE"></a>
+Macro tune the build command to use experimental build feature.
+The method depends on the next.js version.
+
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_NEXT#ts-next-experimental-build-mode
 
 ###### Macro [TS\_NEXT\_OUTPUT][](DirName) <a name="macro_TS_NEXT_OUTPUT"></a>
 Macro sets the output directory name for TS\_NEXT module.
@@ -3131,7 +3306,7 @@ Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_NE
 Overrides default options for `--ts\_proto\_opt`
 ([supported options](https://github.com/stephenh/ts-proto?tab=readme-ov-file#supported-options)).
 
-Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/PROTO\_LIBRARY#ts\_proto\_opt
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_PROTO#ts\_proto\_opt
 
 @example
 
@@ -3140,6 +3315,30 @@ Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/PROTO\
         useJsonName=true
         useJsonWireFormat=true
     )
+
+###### Macro [TS\_PROTO\_PACKAGE\_NAME][](@scope/pkg) <a name="macro_TS_PROTO_PACKAGE_NAME"></a>
+Sets package name for `TS\_PROTO`.
+Use `@scope/\*` to set package scope with autogenerated name.
+
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_PROTO#ts\_proto\_package\_name
+
+@example
+
+    TS_PROTO_PACKAGE_NAME(@yandex-proto/ci-tasklet-sidecar)
+    TS_PROTO_PACKAGE_NAME(@yandex-proto/*)
+
+###### Macro [TS\_RSPACK\_CONFIG][](ConfigPath) <a name="macro_TS_RSPACK_CONFIG"></a>
+Macro sets the config path for TS\_RSPACK module.
+
+- ConfigPath - config path
+
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_RSPACK#ts-rspack-config
+
+###### Macro [TS\_RSPACK\_OUTPUT][](FirstDirName DirNames) <a name="macro_TS_RSPACK_OUTPUT"></a>
+Macro sets the output directory names (one at least) for TS\_RSPACK module.
+
+- DirNames - output directory names (one at least)
+Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/TS\_RSPACK#ts-rspack-output
 
 ###### Macro [TS\_STYLELINT][](configFile) <a name="macro_TS_STYLELINT"></a>
 For check CSS, SASS, LESS for StyleLint. Must be inside of Module (TS\_WEBPACK, TS\_VITE, TS\_NEXT, etc)
@@ -3185,6 +3384,10 @@ Macro adds NodeJS binary to the test module build output.
 
 ###### Macro [TS\_TEST\_SRCS][](DIRS...) <a name="macro_TS_TEST_SRCS"></a>
 Macro to define directories where the test source files should be located.
+It does not define the exact scope to run tests for - it is to define the scope for the
+test module configuration.
+For example, changes to test files in these directories will not cause the test to be re-run,
+and results could be retrieved from the cache.
 
 - DIRS... - directories.
 
@@ -3201,6 +3404,10 @@ Documentation: https://docs.yandex-team.ru/frontend-in-arcadia/references/macros
 
     TS_VITE()
         TS_TYPECHECK()
+    END()
+
+    TS_WEBPACK()
+        TS_TYPECHECK(tsconfig.wp.json)
     END()
 
 ###### Macro [TS\_VITE\_CONFIG][](ConfigPath) <a name="macro_TS_VITE_CONFIG"></a>
@@ -3326,6 +3533,9 @@ Use protobuf-javalite for Java
 ###### Macro [USE\_KTLINT\_OLD][]() <a name="macro_USE_KTLINT_OLD"></a>
 Marks that need use the old version of ktlint
 
+###### Macro [USE\_LEGACY\_PNPM\_VIRTUAL\_STORE][]() <a name="macro_USE_LEGACY_PNPM_VIRTUAL_STORE"></a>
+Not documented yet.
+
 ###### Macro [USE\_LINKER\_GOLD][]() <a name="macro_USE_LINKER_GOLD"></a>
 Use gold linker for a program. This doesn't work in libraries
 
@@ -3333,6 +3543,9 @@ Use gold linker for a program. This doesn't work in libraries
 Not documented yet.
 
 ###### Macro [USE\_LLVM\_BC18][]() <a name="macro_USE_LLVM_BC18"></a>
+Not documented yet.
+
+###### Macro [USE\_LLVM\_BC20][]() <a name="macro_USE_LLVM_BC20"></a>
 Not documented yet.
 
 ###### Macro [USE\_MODERN\_FLEX][]() <a name="macro_USE_MODERN_FLEX"></a>
@@ -3391,6 +3604,9 @@ Use mapreduce/yt/skiff\_proto/plugin for C++
 ###### Macro [USE\_UTIL][]() <a name="macro_USE_UTIL"></a>
 Add dependency on util and C++ runtime
 Note: This macro is intended for use in \_GO\_BASE\_UNIT like module when the module is build without util by default
+
+###### Macro [USRV\_GEN\_PROTO\_STRUCTS][] <a name="macro_USRV_GEN_PROTO_STRUCTS"></a>
+Not documented yet.
 
 ###### Macro [VALIDATE\_DATA\_RESTART][](ext) <a name="macro_VALIDATE_DATA_RESTART"></a>
 Change uid for resource validation tests. May be useful when sandbox resource ttl is changed, but test status is cached in CI.
@@ -3598,12 +3814,6 @@ Not documented yet.
 
 ###### Property [SEM][] <a name="property_SEM"></a>
 Semantics (instead of commands) for export to other build systems in --sem-graph mode
-
-###### Property [STRUCT\_CMD][] <a name="property_STRUCT_CMD"></a>
-Enables or disables new command template interpreter for this macro or module
-
-###### Property [STRUCT\_SEM][] <a name="property_STRUCT_SEM"></a>
-Enables or disables new semantics template interpreter for this macro or module
 
 ###### Property [SYMLINK\_POLICY][] <a name="property_SYMLINK_POLICY"></a>
 Not documented yet.
@@ -3826,704 +4036,733 @@ Not documented yet.
 ###### Variable [YMAKE\_BIN][] <a name="variable_YMAKE_BIN"></a>
 Not documented yet.
 
- [DLL\_JAVA]: https://github.com/yandex/yatool/tree/main/build/conf/swig.conf?rev=16676981#L81
- [DOCS]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L152
- [FBS\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=16676981#L103
- [JAVA\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L106
- [JAVA\_CONTRIB\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L124
- [JAVA\_CONTRIB\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L323
- [JAVA\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L64
- [JTEST]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L222
- [JTEST\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L282
- [JUNIT5]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L160
- [PACKAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2350
- [PROTO\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L872
- [PROTO\_SCHEMA]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L964
- [PY23\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1121
- [PY23\_NATIVE\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1149
- [PY23\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1175
- [PY3TEST]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L434
- [PY3\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L268
- [TS\_NEXT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=16676981#L57
- [TS\_PACKAGE]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_package.conf?rev=16676981#L34
- [TS\_TSC]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_tsc.conf?rev=16676981#L21
- [TS\_VITE]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=16676981#L57
- [TS\_WEBPACK]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=16676981#L55
- [YQL\_UDF]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L155
- [YQL\_UDF\_CONTRIB]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L197
- [YQL\_UDF\_YDB]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L176
- [BOOSTTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1433
- [BOOSTTEST\_WITH\_MAIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1455
- [CI\_GROUP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2378
- [CUDA\_DEVICE\_LINK\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4109
- [DEFAULT\_IOS\_INTERFACE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5645
- [DLL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2140
- [DLL\_TOOL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2157
- [DOCS\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L85
- [EXECTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1675
- [FAT\_OBJECT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1958
- [FUZZ]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1389
- [GEN\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L561
- [GO\_DLL]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L984
- [GO\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L852
- [GO\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L869
- [GO\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1004
- [GTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1365
- [G\_BENCHMARK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1714
- [IOS\_INTERFACE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5633
- [JAVA\_CONTRIB]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L646
- [JAVA\_CONTRIB\_PROXY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L592
- [JAVA\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L19
- [JAVA\_TEST\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L23
- [LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1845
- [PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1216
- [PROTO\_DESCRIPTIONS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L933
- [PROTO\_REGISTRY]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L948
- [PY2MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L522
- [PY2TEST]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L382
- [PY2\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L613
- [PY2\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L236
- [PY3MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L541
- [PY3TEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L405
- [PY3\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L655
- [PY3\_PROGRAM\_BIN]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L828
- [PYTEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L364
- [PY\_ANY\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L464
- [RECURSIVE\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2009
- [RESOURCES\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1917
- [R\_MODULE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2110
- [SO\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2169
- [TS\_TEST\_HERMIONE\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L70
- [TS\_TEST\_JEST\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L35
- [TS\_TEST\_PLAYWRIGHT\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L105
- [TS\_TEST\_PLAYWRIGHT\_LARGE\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L138
- [UNION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2401
- [UNITTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1310
- [UNITTEST\_FOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1758
- [UNITTEST\_WITH\_CUSTOM\_ENTRY\_POINT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1346
- [YQL\_PYTHON3\_UDF]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L294
- [YQL\_PYTHON3\_UDF\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L343
- [YQL\_PYTHON\_UDF]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L241
- [YQL\_PYTHON\_UDF\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L268
- [YQL\_PYTHON\_UDF\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L329
- [YQL\_UDF\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L122
- [YQL\_UDF\_MODULE\_CONTRIB]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L134
- [YQL\_UDF\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L36
- [YQL\_UDF\_YDB\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L128
- [YT\_UNITTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1336
- [Y\_BENCHMARK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1696
- [ACCELEO]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L9
- [ADDINCL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [ADDINCLSELF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2962
- [ADD\_CHECK]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=16676981#L750
- [ADD\_CHECK\_PY\_IMPORTS]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=16676981#L45
- [ADD\_CLANG\_TIDY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1113
- [ADD\_COMPILABLE\_TRANSLATE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2591
- [ADD\_COMPILABLE\_TRANSLIT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2601
- [ADD\_DLLS\_TO\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1937
- [ADD\_PYTEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=16676981#L45
- [ADD\_YTEST]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=16676981#L1455
- [ALICE\_GENERATE\_FUNCTION\_PROTO\_INCLUDES]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/alice.py?rev=16676981#L85
- [ALICE\_GENERATE\_FUNCTION\_SPECS]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/alice.py?rev=16676981#L46
- [ALLOCATOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2489
- [ALLOCATOR\_IMPL]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=16676981#L113
- [ALL\_PYTEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1079
- [ALL\_PY\_EXTRA\_LINT\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1099
- [ALL\_PY\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1061
- [ALL\_RESOURCE\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2681
- [ALL\_RESOURCE\_FILES\_FROM\_DIRS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2696
- [ALL\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2288
- [ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1871
- [ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3944
- [ARCHIVE\_ASM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3922
- [ARCHIVE\_BY\_KEYS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3955
- [AR\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3189
- [ASM\_PREINCLUDE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5002
- [ASSERT]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=16676981#L28
- [AUTO\_SERVICE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L92
- [BENCHMARK\_OPTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1733
- [BISON\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L57
- [BISON\_GEN\_C]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L64
- [BISON\_GEN\_CPP]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L72
- [BISON\_HEADER]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L94
- [BISON\_NO\_HEADER]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L104
- [BPF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4791
- [BPF\_STATIC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4805
- [BUILDWITH\_CYTHON\_C]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3828
- [BUILDWITH\_CYTHON\_CPP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3797
- [BUILDWITH\_RAGEL6]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3866
- [BUILD\_CATBOOST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/other.conf?rev=16676981#L9
- [BUILD\_ONLY\_IF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [BUILD\_YDL\_DESC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3532
- [BUNDLE]: https://github.com/yandex/yatool/tree/main/build/plugins/bundle.py?rev=16676981#L4
- [CFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4062
- [CGO\_CFLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L343
- [CGO\_LDFLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L352
- [CGO\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L326
- [CHECK\_ALLOWED\_PATH]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/container_layers.py?rev=16676981#L4
- [CHECK\_CONTRIB\_CREDITS]: https://github.com/yandex/yatool/tree/main/build/plugins/credits.py?rev=16676981#L9
- [CHECK\_DEPENDENT\_DIRS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L452
- [CHECK\_JAVA\_DEPS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1635
- [CLANG\_EMIT\_AST\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4752
- [CLANG\_EMIT\_AST\_CXX\_RUN\_TOOL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5893
- [CLEAN\_TEXTREL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2028
- [CMAKE\_EXPORTED\_TARGET\_NAME]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=16676981#L108
- [COLLECT\_FRONTEND\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5682
- [COLLECT\_GO\_SWAGGER\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L5
- [COLLECT\_JINJA\_TEMPLATES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5206
- [COLLECT\_YAML\_CONFIG\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5689
- [COMPILE\_C\_AS\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4715
- [COMPILE\_LUA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3456
- [COMPILE\_LUA\_21]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3474
- [COMPILE\_LUA\_OPENRESTY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3492
- [CONFIGURE\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4041
- [CONFTEST\_LOAD\_POLICY\_LOCAL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1595
- [CONLYFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4085
- [COPY]: https://github.com/yandex/yatool/tree/main/build/plugins/cp.py?rev=16676981#L6
- [COPY\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2635
- [COPY\_FILE\_WITH\_CONTEXT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2657
- [CPP\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5065
- [CPP\_ENUMS\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=16676981#L812
- [CPP\_PROTOLIBS\_DEBUG\_INFO]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L73
- [CPP\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L246
- [CPP\_PROTO\_PLUGIN0]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L232
- [CPP\_PROTO\_PLUGIN2]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L257
- [CREATE\_BUILDINFO\_FOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4011
- [CREATE\_INIT\_PY\_STRUCTURE]: https://github.com/yandex/yatool/tree/main/build/plugins/create_init_py.py?rev=16676981#L4
- [CREDITS\_DISCLAIMER]: https://github.com/yandex/yatool/tree/main/build/plugins/credits.py?rev=16676981#L4
- [CTEMPLATE\_VARNAMES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4731
- [CUDA\_NVCC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4099
- [CUSTOM\_LINK\_STEP\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1269
- [CXXFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4092
- [CYTHON\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4128
- [DARWIN\_SIGNED\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5624
- [DARWIN\_STRINGS\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5620
- [DATA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1530
- [DATA\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1546
- [DEB\_VERSION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4337
- [DECIMAL\_MD5\_LOWER\_32\_BITS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4024
- [DECLARE\_EXTERNAL\_HOST\_RESOURCES\_BUNDLE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DECLARE\_EXTERNAL\_HOST\_RESOURCES\_BUNDLE\_BY\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DECLARE\_EXTERNAL\_HOST\_RESOURCES\_PACK]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DECLARE\_EXTERNAL\_RESOURCE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DECLARE\_EXTERNAL\_RESOURCE\_BY\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DECLARE\_IN\_DIRS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4532
- [DEFAULT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DEFAULT\_JAVA\_SRCS\_LAYOUT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L462
- [DEFAULT\_JDK\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2251
- [DEFAULT\_JUNIT\_JAVA\_SRCS\_LAYOUT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L474
- [DEPENDENCY\_MANAGEMENT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1966
- [DEPENDS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DIRECT\_DEPS\_ONLY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2129
- [DISABLE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DISABLE\_DATA\_VALIDATION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1515
- [DLL\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [DOCKER\_IMAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1536
- [DOCS\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L288
- [DOCS\_COPY\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L13
- [DOCS\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L244
- [DOCS\_INCLUDE\_SOURCES]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L312
- [DOCS\_VARS]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L300
- [DYNAMIC\_LIBRARY\_FROM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2127
- [ELSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [ELSEIF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [EMBED\_JAVA\_VCS\_INFO]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L358
- [ENABLE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [ENABLE\_PREVIEW]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1836
- [END]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [ENDIF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [ENV]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1588
- [EVLOG\_CMD]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L1032
- [EXCLUDE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1879
- [EXCLUDE\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [EXPERIMENTAL\_FORK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2791
- [EXPLICIT\_DATA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1556
- [EXPLICIT\_OUTPUTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4913
- [EXPORTS\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1233
- [EXPORT\_ALL\_DYNAMIC\_SYMBOLS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1251
- [EXTERNAL\_RESOURCE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [EXTRADIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [EXTRALIBS\_STATIC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2584
- [FBS\_CMD]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=16676981#L143
- [FBS\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=16676981#L85
- [FBS\_TO\_PY2SRC]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=16676981#L28
- [FILES]: https://github.com/yandex/yatool/tree/main/build/plugins/files.py?rev=16676981#L1
- [FLATC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=16676981#L10
- [FLAT\_JOIN\_SRCS\_GLOBAL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2833
- [FLEX\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L50
- [FLEX\_GEN\_C]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L80
- [FLEX\_GEN\_CPP]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L87
- [FORK\_SUBTESTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2753
- [FORK\_TESTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2739
- [FORK\_TEST\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2779
- [FROM\_ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4700
- [FROM\_SANDBOX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4681
- [FULL\_JAVA\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L451
- [FUNCTION\_ORDERING\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L142
- [FUZZ\_DICTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1467
- [FUZZ\_OPTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1486
- [GENERATE\_ENUM\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4316
- [GENERATE\_ENUM\_SERIALIZATION\_WITH\_HEADER]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4328
- [GENERATE\_IMPLIB]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5948
- [GENERATE\_PY\_PROTOS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L618
- [GENERATE\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/plugins/java.py?rev=16676981#L287
- [GENERATE\_YT\_RECORD]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yt.conf?rev=16676981#L1
- [GEN\_SCHEEME2]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4424
- [GLOBAL\_CFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4070
- [GLOBAL\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2270
- [GOLANG\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L175
- [GO\_ASM\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L137
- [GO\_BENCH\_TIMEOUT]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L993
- [GO\_CGO1\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L145
- [GO\_CGO2\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L153
- [GO\_COMPILE\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L161
- [GO\_EMBED\_BINDIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L458
- [GO\_EMBED\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L425
- [GO\_EMBED\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L389
- [GO\_EMBED\_TEST\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L433
- [GO\_EMBED\_XTEST\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L441
- [GO\_FAKE\_OUTPUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/plugins/plugin_go_fake_output_handler.cpp?rev=16676981#L110
- [GO\_GRPC\_GATEWAY\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L531
- [GO\_GRPC\_GATEWAY\_SWAGGER\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L539
- [GO\_GRPC\_GATEWAY\_V2\_OPENAPI\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L586
- [GO\_GRPC\_GATEWAY\_V2\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L604
- [GO\_LDFLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L335
- [GO\_LINK\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L169
- [GO\_MOCKGEN\_CONTRIB\_FROM]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1062
- [GO\_MOCKGEN\_FROM]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1052
- [GO\_MOCKGEN\_MOCKS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1114
- [GO\_MOCKGEN\_PACKAGE]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1078
- [GO\_MOCKGEN\_REFLECT]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1087
- [GO\_MOCKGEN\_SOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1143
- [GO\_MOCKGEN\_TYPES]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1068
- [GO\_OAPI\_CODEGEN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1159
- [GO\_OAPI\_CODEGEN\_TAXI]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1165
- [GO\_OAPI\_CODEGEN\_TAXI\_1134]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L1171
- [GO\_PACKAGE\_NAME]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L281
- [GO\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L374
- [GO\_PROTO\_USE\_V2]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L595
- [GO\_SKIP\_TESTS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L363
- [GO\_TEST\_EMBED\_BINDIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L466
- [GO\_TEST\_EMBED\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L397
- [GO\_TEST\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [GO\_TEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L300
- [GO\_XTEST\_EMBED\_BINDIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L474
- [GO\_XTEST\_EMBED\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L405
- [GO\_XTEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=16676981#L311
- [GRPC]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L567
- [GRPC\_WITH\_GMOCK]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L588
- [HEADERS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5872
- [IDEA\_EXCLUDE\_DIRS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1794
- [IDEA\_MODULE\_NAME]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1814
- [IDEA\_RESOURCE\_DIRS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1804
- [IF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [INCLUDE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [INCLUDE\_ONCE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [INCLUDE\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [INDUCED\_DEPS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [IOS\_APP\_ASSETS\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5616
- [IOS\_APP\_COMMON\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5610
- [IOS\_APP\_SETTINGS]: https://github.com/yandex/yatool/tree/main/build/plugins/ios_app_settings.py?rev=16676981#L5
- [IOS\_ASSETS]: https://github.com/yandex/yatool/tree/main/build/plugins/ios_assets.py?rev=16676981#L6
- [JAR\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L522
- [JAR\_EXCLUDE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2180
- [JAR\_MAIN\_CLASS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1009
- [JAR\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L617
- [JAVAC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1824
- [JAVA\_DEPENDENCIES\_CONFIGURATION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2169
- [JAVA\_EXTERNAL\_DEPENDENCIES]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2138
- [JAVA\_IGNORE\_CLASSPATH\_CLASH\_FOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5575
- [JAVA\_MODULE]: https://github.com/yandex/yatool/tree/main/build/plugins/java.py?rev=16676981#L40
- [JAVA\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L192
- [JAVA\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L904
- [JAVA\_RESOURCE\_TAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1928
- [JAVA\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1916
- [JAVA\_TEST]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=16676981#L45
- [JAVA\_TEST\_DEPS]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=16676981#L45
- [JDK\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2243
- [JNI\_EXPORTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1237
- [JOIN\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2812
- [JOIN\_SRCS\_GLOBAL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2823
- [JUNIT\_TESTS\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L152
- [JVM\_ARGS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1624
- [KAPT\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L737
- [KAPT\_ANNOTATION\_PROCESSOR\_CLASSPATH]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L745
- [KAPT\_OPTS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L730
- [KOTLINC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2016
- [KTLINT\_BASELINE\_FILE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2278
- [LARGE\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4691
- [LDFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4052
- [LD\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3198
- [LICENSE]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=16676981#L26
- [LICENSE\_RESTRICTION]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=16676981#L43
- [LICENSE\_RESTRICTION\_EXCEPTIONS]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=16676981#L66
- [LICENSE\_TEXTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5815
- [LINKER\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/plugins/linker_script.py?rev=16676981#L1
- [LINK\_EXCLUDE\_LIBRARIES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5932
- [LINT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1645
- [LIST\_PROTO]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L646
- [LJ\_21\_ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/plugins/lj_archive.py?rev=16676981#L25
- [LJ\_ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/plugins/lj_archive.py?rev=16676981#L1
- [LLVM\_BC]: https://github.com/yandex/yatool/tree/main/build/plugins/llvm_bc.py?rev=16676981#L4
- [LLVM\_COMPILE\_C]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4776
- [LLVM\_COMPILE\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4761
- [LLVM\_COMPILE\_LL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4814
- [LLVM\_LINK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4824
- [LLVM\_LLC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4845
- [LLVM\_OPT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4834
- [LOCAL\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L627
- [LOCAL\_SOURCES\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L632
- [MACROS\_WITH\_ERROR]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=16676981#L8
- [MANUAL\_GENERATION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3162
- [MASMFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4077
- [MAVEN\_GROUP\_ID]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1860
- [MESSAGE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [MODULEWISE\_LICENSE\_RESTRICTION]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=16676981#L58
- [NEED\_CHECK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4346
- [NEED\_REVIEW]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4365
- [NGINX\_MODULES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5792
- [NO\_BUILD\_IF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [NO\_CHECK\_IMPORTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4922
- [NO\_CLANG\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4277
- [NO\_CLANG\_TIDY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4289
- [NO\_COMPILER\_WARNINGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4150
- [NO\_CPU\_CHECK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2955
- [NO\_CYTHON\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1004
- [NO\_DEBUG\_INFO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4722
- [NO\_DOCTESTS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L339
- [NO\_EXPORT\_DYNAMIC\_SYMBOLS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1244
- [NO\_EXTENDED\_SOURCE\_SEARCH]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L256
- [NO\_IMPORT\_TRACING]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L995
- [NO\_JOIN\_SRC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4249
- [NO\_LIBC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4203
- [NO\_LINT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1638
- [NO\_LTO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L362
- [NO\_MYPY]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L471
- [NO\_NEED\_CHECK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4355
- [NO\_OPTIMIZE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4141
- [NO\_OPTIMIZE\_PY\_PROTOS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L141
- [NO\_PLATFORM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4214
- [NO\_PROFILE\_RUNTIME]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4285
- [NO\_PYTHON\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L987
- [NO\_RUNTIME]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4192
- [NO\_SANITIZE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4257
- [NO\_SANITIZE\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4269
- [NO\_SPLIT\_DWARF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2569
- [NO\_SSE4]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2947
- [NO\_TS\_TYPECHECK]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L271
- [NO\_UTIL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4181
- [NO\_WSHADOW]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4157
- [NO\_YMAKE\_PYTHON3]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L190
- [NVCC\_DEVICE\_LINK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4120
- [ONLY\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [OPENSOURCE\_EXPORT\_REPLACEMENT]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=16676981#L83
- [OPENSOURCE\_EXPORT\_REPLACEMENT\_BY\_OS]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=16676981#L92
- [ORIGINAL\_SOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5802
- [PACK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2314
- [PARTITIONED\_RECURSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [PARTITIONED\_RECURSE\_FOR\_TESTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [PARTITIONED\_RECURSE\_ROOT\_RELATIVE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [PEERDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [PIRE\_INLINE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3933
- [PIRE\_INLINE\_CMD]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3928
- [POPULATE\_CPP\_COVERAGE\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/coverage_full_instrumentation.conf?rev=16676981#L3
- [POPULATE\_CPP\_YNDEXING]: https://github.com/yandex/yatool/tree/main/build/conf/yndexing/cpp_instrumentation.conf?rev=16676981#L6
- [PREPARE\_INDUCED\_DEPS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4458
- [PROCESSOR\_CLASSES]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L88
- [PROCESS\_DOCS]: https://github.com/yandex/yatool/tree/main/build/plugins/docs.py?rev=16676981#L38
- [PROCESS\_MKDOCS]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/mkdocs.py?rev=16676981#L35
- [PROTO2FBS]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=16676981#L152
- [PROTOC\_FATAL\_WARNINGS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L121
- [PROTO\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L94
- [PROTO\_CMD]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L1037
- [PROTO\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L111
- [PROTO\_TO\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sdc_proto.py?rev=16676981#L11
- [PROVIDES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [PYTHON2\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L857
- [PYTHON2\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L551
- [PYTHON3\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L906
- [PYTHON3\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L563
- [PYTHON\_PATH]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1618
- [PY\_CONSTRUCTOR]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=16676981#L780
- [PY\_DOCTESTS]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=16676981#L694
- [PY\_ENUMS\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=16676981#L795
- [PY\_EXTRALIBS]: https://github.com/yandex/yatool/tree/main/build/plugins/extralibs.py?rev=16676981#L1
- [PY\_EXTRA\_LINT\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1109
- [PY\_MAIN]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=16676981#L758
- [PY\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L599
- [PY\_PROTOS\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [PY\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L164
- [PY\_PROTO\_PLUGIN2]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L176
- [PY\_REGISTER]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=16676981#L712
- [PY\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L1035
- [RECURSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [RECURSE\_FOR\_TESTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [RECURSE\_ROOT\_RELATIVE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [REGISTER\_SANDBOX\_IMPORT]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sandbox_registry.py?rev=16676981#L6
- [REGISTER\_YQL\_PYTHON\_UDF]: https://github.com/yandex/yatool/tree/main/build/plugins/yql_python_udf.py?rev=16676981#L11
- [REQUIREMENTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1579
- [REQUIRES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L430
- [RESOLVE\_PROTO]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L608
- [RESOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L491
- [RESOURCE\_FILES]: https://github.com/yandex/yatool/tree/main/build/plugins/res.py?rev=16676981#L13
- [RESTRICT\_PATH]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=16676981#L13
- [ROS\_SRCS]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/ros.py?rev=16676981#L5
- [RUN]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=16676981#L968
- [RUN\_ANTLR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5009
- [RUN\_ANTLR4]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5016
- [RUN\_ANTLR4\_CPP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5038
- [RUN\_ANTLR4\_CPP\_SPLIT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5030
- [RUN\_ANTLR4\_GO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5046
- [RUN\_ANTLR4\_PYTHON]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5059
- [RUN\_JAVASCRIPT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L249
- [RUN\_JAVASCRIPT\_AFTER\_BUILD]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L234
- [RUN\_JAVA\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L514
- [RUN\_LUA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4589
- [RUN\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4562
- [RUN\_PY3\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4645
- [RUN\_PYTHON3]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4616
- [SDBUS\_CPP\_ADAPTOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5771
- [SDBUS\_CPP\_PROXY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5777
- [SDC\_DIAGS\_SPLIT\_GENERATOR]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sdc_diagnostics.py?rev=16676981#L16
- [SDC\_INSTALL]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sdc.py?rev=16676981#L59
- [SELECT\_CLANG\_SA\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L158
- [SET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [SETUP\_EXECTEST]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=16676981#L45
- [SETUP\_PYTEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=16676981#L961
- [SETUP\_RUN\_PYTHON]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=16676981#L1012
- [SET\_APPEND]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [SET\_APPEND\_WITH\_GLOBAL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [SET\_COMPILE\_OUTPUTS\_MODIFIERS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2975
- [SET\_CPP\_COVERAGE\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/plugins/coverage.py?rev=16676981#L61
- [SET\_RESOURCE\_MAP\_FROM\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [SET\_RESOURCE\_URI\_FROM\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [SIZE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2803
- [SKIP\_TEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1627
- [SOURCE\_GROUP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [SPLIT\_CODEGEN]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/split_codegen.py?rev=16676981#L9
- [SPLIT\_DWARF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2561
- [SPLIT\_FACTOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2767
- [SRC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3558
- [SRCDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3577
- [SRC\_C\_AMX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3714
- [SRC\_C\_AVX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3690
- [SRC\_C\_AVX2]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3698
- [SRC\_C\_AVX512]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3706
- [SRC\_C\_NO\_LTO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3788
- [SRC\_C\_PIC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3780
- [SRC\_C\_SSE2]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3650
- [SRC\_C\_SSE3]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3658
- [SRC\_C\_SSE4]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3674
- [SRC\_C\_SSE41]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3682
- [SRC\_C\_SSSE3]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3666
- [SRC\_C\_XOP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3723
- [SRC\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L622
- [STRIP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4135
- [STYLE\_CPP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5863
- [STYLE\_DUMMY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L297
- [STYLE\_FLAKE8]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L323
- [STYLE\_PY2\_FLAKE8]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L331
- [STYLE\_PYTHON]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L305
- [STYLE\_RUFF]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L314
- [SUBSCRIBER]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4379
- [SUPPRESSIONS]: https://github.com/yandex/yatool/tree/main/build/plugins/suppressions.py?rev=16676981#L1
- [SYMLINK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4430
- [SYSTEM\_PROPERTIES]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1613
- [TAG]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1568
- [TASKLET]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5079
- [TASKLET\_REG]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5096
- [TASKLET\_REG\_EXT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5111
- [TEST\_CWD]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2456
- [TEST\_DATA]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=16676981#L116
- [TEST\_JAVA\_CLASSPATH\_CMD\_TYPE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2152
- [TEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1511
- [THINLTO\_CACHE]: https://github.com/yandex/yatool/tree/main/build/conf/linkers/ld.conf?rev=16676981#L399
- [TIMEOUT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2712
- [TOOLCHAIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5906
- [TOUCH\_RANDOM\_FILE]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/touch_random_file.py?rev=16676981#L16
- [TS\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L30
- [TS\_ESLINT\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L132
- [TS\_EXCLUDE\_FILES\_GLOB]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L90
- [TS\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L201
- [TS\_FILES\_GLOB]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L210
- [TS\_LARGE\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=16676981#L224
- [TS\_NEXT\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=16676981#L11
- [TS\_NEXT\_EXPERIMENTAL\_COMPILE]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=16676981#L29
- [TS\_NEXT\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=16676981#L25
- [TS\_PROTO\_OPT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_proto.conf?rev=16676981#L65
- [TS\_STYLELINT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L311
- [TS\_TEST\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L209
- [TS\_TEST\_DATA]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L246
- [TS\_TEST\_DEPENDS\_ON\_BUILD]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L255
- [TS\_TEST\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=16676981#L16
- [TS\_TEST\_INCLUDE\_NODEJS]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L262
- [TS\_TEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L223
- [TS\_TYPECHECK]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=16676981#L288
- [TS\_VITE\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=16676981#L10
- [TS\_VITE\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=16676981#L24
- [TS\_WEBPACK\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=16676981#L10
- [TS\_WEBPACK\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=16676981#L22
- [UBERJAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1670
- [UBERJAR\_APPENDING\_TRANSFORMER]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1770
- [UBERJAR\_HIDE\_EXCLUDE\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1699
- [UBERJAR\_HIDE\_INCLUDE\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1714
- [UBERJAR\_HIDING\_PREFIX]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1684
- [UBERJAR\_MANIFEST\_TRANSFORMER\_ATTRIBUTE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1754
- [UBERJAR\_MANIFEST\_TRANSFORMER\_MAIN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1741
- [UBERJAR\_PATH\_EXCLUDE\_PREFIX]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1728
- [UBERJAR\_SERVICES\_RESOURCE\_TRANSFORMER]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1783
- [UDF\_NO\_PROBE]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L26
- [UPDATE\_VCS\_JAVA\_INFO\_NODEP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3984
- [USE\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L543
- [USE\_COMMON\_GOOGLE\_APIS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L325
- [USE\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4224
- [USE\_DYNAMIC\_CUDA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1259
- [USE\_ERROR\_PRONE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1644
- [USE\_JAVALITE]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L496
- [USE\_KTLINT\_OLD]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2268
- [USE\_LINKER\_GOLD]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L838
- [USE\_LLVM\_BC16]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4738
- [USE\_LLVM\_BC18]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4743
- [USE\_MODERN\_FLEX]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L112
- [USE\_MODERN\_FLEX\_WITH\_HEADER]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L123
- [USE\_NASM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4241
- [USE\_OLD\_FLEX]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=16676981#L132
- [USE\_PLANTUML]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=16676981#L231
- [USE\_PYTHON2]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L956
- [USE\_PYTHON3]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=16676981#L973
- [USE\_RECIPE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1606
- [USE\_SA\_PLUGINS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L167
- [USE\_SKIFF]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L268
- [USE\_UTIL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4232
- [VALIDATE\_DATA\_RESTART]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L2722
- [VALIDATE\_IN\_DIRS]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=16676981#L35
- [VCS\_INFO\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3998
- [VERSION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L4387
- [VISIBILITY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5749
- [VITE\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=16676981#L30
- [WEBPACK\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=16676981#L28
- [WINDOWS\_LONG\_PATH\_MANIFEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5734
- [WINDOWS\_MANIFEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5729
- [WITHOUT\_LICENSE\_TEXTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5823
- [WITHOUT\_VERSION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5910
- [WITH\_DYNAMIC\_LIBS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1012
- [WITH\_JDK]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1976
- [WITH\_KAPT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2005
- [WITH\_KOTLIN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L1994
- [WITH\_KOTLINC\_ALLOPEN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2034
- [WITH\_KOTLINC\_DETEKT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2080
- [WITH\_KOTLINC\_LOMBOK]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2045
- [WITH\_KOTLINC\_NOARG]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2057
- [WITH\_KOTLINC\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2069
- [WITH\_KOTLIN\_GRPC]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L204
- [WITH\_NODE\_MODULES]: https://github.com/yandex/yatool/tree/main/build/conf/ts/node_modules.conf?rev=16676981#L28
- [WITH\_YA\_1931]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=16676981#L2288
- [YABS\_GENERATE\_CONF]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/yabs_generate_conf.py?rev=16676981#L10
- [YABS\_GENERATE\_PHANTOM\_CONF\_PATCH]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/yabs_generate_conf.py?rev=16676981#L41
- [YABS\_GENERATE\_PHANTOM\_CONF\_TEST\_CHECK]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/yabs_generate_conf.py?rev=16676981#L51
- [YA\_CONF\_JSON]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L5844
- [YDL\_DESC\_USE\_BINARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L3549
- [YQL\_ABI\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L221
- [YQL\_LAST\_ABI\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=16676981#L230
- [YT\_ORM\_PROTO\_YSON]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=16676981#L407
- [YT\_SPEC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=16676981#L1500
- [ALIASES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L27
- [ALLOWED]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L30
- [ALLOWED\_IN\_LINTERS\_MAKE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L31
- [ARGS\_PARSER]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L39
- [CMD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L40
- [DEFAULT\_NAME\_GENERATOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L43
- [EPILOGUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L44
- [EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L45
- [FILE\_GROUP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L67
- [FINAL\_TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L46
- [GEN\_FROM\_FILE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L47
- [GLOBAL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L48
- [GLOBAL\_CMD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L49
- [GLOBAL\_EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L50
- [GLOBAL\_SEM]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L51
- [IGNORED]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L52
- [INCLUDE\_TAG]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L53
- [NODE\_TYPE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L54
- [NO\_EXPAND]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L55
- [PEERDIRSELF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L58
- [PEERDIR\_POLICY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L57
- [PROXY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L59
- [RESTRICTED]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L63
- [SEM]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L64
- [STRUCT\_CMD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L41
- [STRUCT\_SEM]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L42
- [SYMLINK\_POLICY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L65
- [TRANSITION]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L70
- [USE\_PEERS\_LATE\_OUTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L66
- [VERSION\_PROXY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=16676981#L62
- [APPLIED\_EXCLUDES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L23
- [ARCADIA\_BUILD\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L24
- [ARCADIA\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L25
- [AUTO\_INPUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L26
- [BINDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L27
- [CMAKE\_CURRENT\_BINARY\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L29
- [CMAKE\_CURRENT\_SOURCE\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L30
- [CONSUME\_NON\_MANAGEABLE\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L31
- [CURDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L32
- [DART\_CLASSPATH]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L34
- [DART\_CLASSPATH\_DEPS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L33
- [DEFAULT\_MODULE\_LICENSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L35
- [DEPENDENCY\_MANAGEMENT\_VALUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L36
- [DONT\_RESOLVE\_INCLUDES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L37
- [DYNAMIC\_LINK]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L38
- [EV\_HEADER\_EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L39
- [EXCLUDE\_SUBMODULES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L40
- [EXCLUDE\_VALUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L41
- [EXPORTED\_BUILD\_SYSTEM\_BUILD\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L42
- [EXPORTED\_BUILD\_SYSTEM\_SOURCE\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L43
- [GLOBAL\_SUFFIX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L44
- [GLOBAL\_TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L45
- [GO\_TEST\_FOR\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L47
- [HAS\_MANAGEABLE\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L48
- [IGNORE\_JAVA\_DEPENDENCIES\_CONFIGURATION]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L49
- [INPUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L50
- [JAVA\_DEPENDENCIES\_CONFIGURATION\_VALUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L52
- [MANAGED\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L54
- [MANAGED\_PEERS\_CLOSURE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L53
- [MANGLED\_MODULE\_TYPE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L55
- [MODDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L56
- [MODULE\_ARGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L57
- [MODULE\_COMMON\_CONFIGS\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L58
- [MODULE\_KIND]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L59
- [MODULE\_LANG]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L60
- [MODULE\_PREFIX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L61
- [MODULE\_SEM\_IGNORE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L67
- [MODULE\_SUFFIX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L62
- [MODULE\_TYPE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L66
- [NON\_NAMAGEABLE\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L68
- [OUTPUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L69
- [PASS\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L72
- [PEERDIR\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L73
- [PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L75
- [PEERS\_LATE\_OUTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L74
- [PROTO\_HEADER\_EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L76
- [PYTHON\_BIN]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L77
- [REALPRJNAME]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L78
- [SONAME]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L79
- [SRCS\_GLOBAL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L81
- [START\_TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L82
- [TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L83
- [TEST\_CASE\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L84
- [TEST\_OUT\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L85
- [TEST\_SOURCE\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L86
- [TEST\_WORK\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L87
- [TOOLS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L88
- [TS\_CONFIG\_DECLARATION]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L90
- [TS\_CONFIG\_DECLARATION\_MAP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L89
- [TS\_CONFIG\_DEDUCE\_OUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L91
- [TS\_CONFIG\_OUT\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L92
- [TS\_CONFIG\_PRESERVE\_JSX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L93
- [TS\_CONFIG\_ROOT\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L94
- [TS\_CONFIG\_SOURCE\_MAP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L95
- [UNITTEST\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L96
- [UNITTEST\_MOD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L97
- [USE\_ALL\_SRCS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L98
- [USE\_GLOBAL\_CMD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L99
- [YMAKE\_BIN]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=16676981#L100
+ [DLL\_JAVA]: https://github.com/yandex/yatool/tree/main/build/conf/swig.conf?rev=18394309#L90
+ [DOCS]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L155
+ [FBS\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=18394309#L113
+ [JAVA\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L106
+ [JAVA\_CONTRIB\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L124
+ [JAVA\_CONTRIB\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L377
+ [JAVA\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L60
+ [JTEST]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L280
+ [JTEST\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L338
+ [JUNIT5]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L220
+ [JUNIT6]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L160
+ [PACKAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2440
+ [PROTO\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L906
+ [PROTO\_SCHEMA]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L993
+ [PY23\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1152
+ [PY23\_NATIVE\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1178
+ [PY23\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1204
+ [PY3TEST]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L450
+ [PY3\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L282
+ [TS\_NEXT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=18394309#L73
+ [TS\_PACKAGE]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_package.conf?rev=18394309#L34
+ [TS\_RSPACK]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_rspack.conf?rev=18394309#L48
+ [TS\_TSC]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_tsc.conf?rev=18394309#L21
+ [TS\_VITE]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=18394309#L57
+ [TS\_WEBPACK]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=18394309#L55
+ [YQL\_UDF]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L155
+ [YQL\_UDF\_CONTRIB]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L197
+ [YQL\_UDF\_YDB]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L176
+ [BOOSTTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1486
+ [BOOSTTEST\_WITH\_MAIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1508
+ [CI\_GROUP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2469
+ [CUDA\_DEVICE\_LINK\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4242
+ [DEFAULT\_IOS\_INTERFACE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5469
+ [DLL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2231
+ [DLL\_TOOL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2248
+ [DOCS\_HTML]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L236
+ [DOCS\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L88
+ [EXECTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1740
+ [FAT\_OBJECT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2029
+ [FUZZ]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1442
+ [GEN\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L590
+ [GO\_DLL]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L999
+ [GO\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L873
+ [GO\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L890
+ [GO\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1019
+ [GTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1418
+ [G\_BENCHMARK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1778
+ [IOS\_INTERFACE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5458
+ [JAVA\_CONTRIB]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L723
+ [JAVA\_CONTRIB\_PROXY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L667
+ [JAVA\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L15
+ [JAVA\_TEST\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L19
+ [LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1913
+ [PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1269
+ [PROTO\_DESCRIPTIONS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L965
+ [PROTO\_REGISTRY]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L978
+ [PY2MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L537
+ [PY2TEST]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L398
+ [PY2\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L633
+ [PY2\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L250
+ [PY3MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L556
+ [PY3TEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L421
+ [PY3\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L677
+ [PY3\_PROGRAM\_BIN]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L859
+ [PYTEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L380
+ [PY\_ANY\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L479
+ [RECURSIVE\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2088
+ [RESOURCES\_LIBRARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1988
+ [R\_MODULE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2201
+ [SO\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2260
+ [TS\_TEST\_HERMIONE\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L92
+ [TS\_TEST\_JEST\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L29
+ [TS\_TEST\_PLAYWRIGHT\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L125
+ [TS\_TEST\_PLAYWRIGHT\_LARGE\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L155
+ [TS\_TEST\_VITEST\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L61
+ [UNION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2491
+ [UNITTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1363
+ [UNITTEST\_FOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1822
+ [UNITTEST\_WITH\_CUSTOM\_ENTRY\_POINT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1399
+ [YQL\_PYTHON3\_UDF]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L298
+ [YQL\_PYTHON3\_UDF\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L349
+ [YQL\_PYTHON\_UDF]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L241
+ [YQL\_PYTHON\_UDF\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L270
+ [YQL\_PYTHON\_UDF\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L335
+ [YQL\_UDF\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L122
+ [YQL\_UDF\_MODULE\_CONTRIB]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L134
+ [YQL\_UDF\_TEST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L36
+ [YQL\_UDF\_YDB\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L128
+ [YT\_UNITTEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1389
+ [Y\_BENCHMARK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1760
+ [ACCELEO]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L5
+ [ADDINCL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [ADDINCLSELF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3103
+ [ADD\_CHECK]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=18394309#L771
+ [ADD\_CHECK\_PY\_IMPORTS]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=18394309#L62
+ [ADD\_CLANG\_TIDY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1163
+ [ADD\_COMPILABLE\_TRANSLATE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2698
+ [ADD\_COMPILABLE\_TRANSLIT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2708
+ [ADD\_DLLS\_TO\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2064
+ [ADD\_IWYU]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1167
+ [ADD\_PYTEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=18394309#L62
+ [ADD\_YTEST]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=18394309#L1559
+ [ALICE\_GENERATE\_FUNCTION\_PROTO\_INCLUDES]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/alice.py?rev=18394309#L85
+ [ALICE\_GENERATE\_FUNCTION\_SPECS]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/alice.py?rev=18394309#L46
+ [ALLOCATOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2596
+ [ALLOCATOR\_IMPL]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=18394309#L113
+ [ALL\_PYTEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1110
+ [ALL\_PY\_EXTRA\_LINT\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1130
+ [ALL\_PY\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1092
+ [ALL\_RESOURCE\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2787
+ [ALL\_RESOURCE\_FILES\_FROM\_DIRS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2802
+ [ALL\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2378
+ [ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1998
+ [ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4077
+ [ARCHIVE\_ASM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4055
+ [ARCHIVE\_BY\_KEYS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4088
+ [AR\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3319
+ [ASM\_PREINCLUDE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5165
+ [ASSERT]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=18394309#L28
+ [AUTO\_SERVICE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L92
+ [BENCHMARK\_OPTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1797
+ [BISON\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L57
+ [BISON\_GEN\_C]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L64
+ [BISON\_GEN\_CPP]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L72
+ [BISON\_HEADER]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L94
+ [BISON\_NO\_HEADER]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L104
+ [BPF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4937
+ [BPF\_STATIC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4951
+ [BUILDWITH\_CYTHON\_C]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3961
+ [BUILDWITH\_CYTHON\_CPP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3930
+ [BUILDWITH\_RAGEL6]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3999
+ [BUILD\_CATBOOST]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/other.conf?rev=18394309#L9
+ [BUILD\_ONLY\_IF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [BUILD\_YDL\_DESC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3667
+ [BUNDLE]: https://github.com/yandex/yatool/tree/main/build/plugins/bundle.py?rev=18394309#L4
+ [BUNDLE\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2827
+ [CFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4195
+ [CGO\_CFLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L347
+ [CGO\_LDFLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L356
+ [CGO\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L330
+ [CHECK\_ALLOWED\_PATH]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/container_layers.py?rev=18394309#L4
+ [CHECK\_CONTRIB\_CREDITS]: https://github.com/yandex/yatool/tree/main/build/plugins/credits.py?rev=18394309#L9
+ [CHECK\_DEPENDENT\_DIRS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L483
+ [CHECK\_JAVA\_DEPS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1760
+ [CLANG\_EMIT\_AST\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4900
+ [CLANG\_EMIT\_AST\_CXX\_RUN\_TOOL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5714
+ [CLEAN\_TEXTREL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2121
+ [CMAKE\_EXPORTED\_TARGET\_NAME]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=18394309#L108
+ [COLLECT\_FRONTEND\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5506
+ [COLLECT\_GO\_SWAGGER\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L5
+ [COLLECT\_JINJA\_TEMPLATES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5399
+ [COLLECT\_YAML\_CONFIG\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5513
+ [COMPILE\_C\_AS\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4858
+ [COMPILE\_LUA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3590
+ [COMPILE\_LUA\_21]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3609
+ [COMPILE\_LUA\_OPENRESTY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3627
+ [CONFIGURE\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4174
+ [CONFTEST\_LOAD\_POLICY\_LOCAL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1661
+ [CONLYFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4218
+ [COPY]: https://github.com/yandex/yatool/tree/main/build/plugins/cp.py?rev=18394309#L6
+ [COPY\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2743
+ [COPY\_FILE\_WITH\_CONTEXT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2763
+ [COW]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L881
+ [CPP\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5257
+ [CPP\_ENUMS\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=18394309#L816
+ [CPP\_EVLOG]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L595
+ [CPP\_PROTOLIBS\_DEBUG\_INFO]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L74
+ [CPP\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L273
+ [CPP\_PROTO\_PLUGIN0]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L259
+ [CPP\_PROTO\_PLUGIN2]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L284
+ [CREATE\_BUILDINFO\_FOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4144
+ [CREATE\_INIT\_PY\_STRUCTURE]: https://github.com/yandex/yatool/tree/main/build/plugins/create_init_py.py?rev=18394309#L4
+ [CREDITS\_DISCLAIMER]: https://github.com/yandex/yatool/tree/main/build/plugins/credits.py?rev=18394309#L4
+ [CTEMPLATE\_VARNAMES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4874
+ [CUDA\_NVCC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4232
+ [CUSTOM\_LINK\_STEP\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1322
+ [CXXFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4225
+ [CYTHON\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4261
+ [DARWIN\_SIGNED\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5449
+ [DARWIN\_STRINGS\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5445
+ [DATA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1584
+ [DATA\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1610
+ [DEB\_VERSION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4485
+ [DECIMAL\_MD5\_LOWER\_32\_BITS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4157
+ [DECLARE\_EXTERNAL\_HOST\_RESOURCES\_BUNDLE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DECLARE\_EXTERNAL\_HOST\_RESOURCES\_BUNDLE\_BY\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DECLARE\_EXTERNAL\_HOST\_RESOURCES\_PACK]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DECLARE\_EXTERNAL\_RESOURCE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DECLARE\_EXTERNAL\_RESOURCE\_BY\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DECLARE\_IN\_DIRS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4679
+ [DEFAULT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DEFAULT\_JAVA\_SRCS\_LAYOUT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L523
+ [DEFAULT\_JDK\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2384
+ [DEFAULT\_JUNIT\_JAVA\_SRCS\_LAYOUT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L541
+ [DEPENDENCY\_MANAGEMENT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2093
+ [DEPENDS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DIRECT\_DEPS\_ONLY]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2262
+ [DISABLE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DISABLE\_DATA\_VALIDATION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1568
+ [DLL\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [DOCKER\_IMAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1600
+ [DOCS\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L332
+ [DOCS\_COPY\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L13
+ [DOCS\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L288
+ [DOCS\_HTML\_FROM]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L254
+ [DOCS\_INCLUDE\_SOURCES]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L356
+ [DOCS\_VARS]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L344
+ [DYNAMIC\_LIBRARY\_FROM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2218
+ [ELSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [ELSEIF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [EMBED\_JAVA\_VCS\_INFO]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L412
+ [ENABLE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [ENABLE\_PREVIEW]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1962
+ [END]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [ENDIF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [ENV]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1653
+ [EVLOG\_CMD]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L1061
+ [EXCLUDE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2006
+ [EXCLUDE\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [EXPERIMENTAL\_FORK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2932
+ [EXPLICIT\_DATA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1620
+ [EXPLICIT\_OUTPUTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5076
+ [EXPORTS\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1286
+ [EXPORT\_ALL\_DYNAMIC\_SYMBOLS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1304
+ [EXTERNAL\_RESOURCE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [EXTRADIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [EXTRALIBS\_STATIC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2691
+ [FBS\_CMD]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=18394309#L153
+ [FBS\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=18394309#L95
+ [FBS\_TO\_PY2SRC]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=18394309#L28
+ [FILES]: https://github.com/yandex/yatool/tree/main/build/plugins/files.py?rev=18394309#L1
+ [FLATC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=18394309#L10
+ [FLAT\_JOIN\_SRCS\_GLOBAL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2974
+ [FLEX\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L50
+ [FLEX\_GEN\_C]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L80
+ [FLEX\_GEN\_CPP]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L87
+ [FORK\_SUBTESTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2894
+ [FORK\_TESTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2880
+ [FORK\_TEST\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2920
+ [FROM\_ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4843
+ [FROM\_SANDBOX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4823
+ [FULL\_JAVA\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L511
+ [FUNCTION\_ORDERING\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L151
+ [FUZZ\_DICTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1520
+ [FUZZ\_OPTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1539
+ [GENERATE\_ENUM\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4464
+ [GENERATE\_ENUM\_SERIALIZATION\_WITH\_HEADER]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4476
+ [GENERATE\_IMPLIB]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5769
+ [GENERATE\_PY\_PROTOS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L661
+ [GENERATE\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/plugins/java.py?rev=18394309#L289
+ [GENERATE\_YT\_RECORD]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yt.conf?rev=18394309#L1
+ [GEN\_SCHEEME2]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4571
+ [GLOBAL\_CFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4203
+ [GLOBAL\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2360
+ [GOLANG\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L181
+ [GO\_ASM\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L143
+ [GO\_BENCH\_TIMEOUT]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1008
+ [GO\_CGO1\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L151
+ [GO\_CGO2\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L159
+ [GO\_COMPILE\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L167
+ [GO\_EMBED\_BINDIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L462
+ [GO\_EMBED\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L429
+ [GO\_EMBED\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L393
+ [GO\_EMBED\_TEST\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L437
+ [GO\_EMBED\_XTEST\_DIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L445
+ [GO\_GRPC\_GATEWAY\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L538
+ [GO\_GRPC\_GATEWAY\_SWAGGER\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L546
+ [GO\_GRPC\_GATEWAY\_V2\_OPENAPI\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L598
+ [GO\_GRPC\_GATEWAY\_V2\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L616
+ [GO\_LDFLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L339
+ [GO\_LINK\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L175
+ [GO\_MOCKGEN\_CONTRIB\_FROM]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1080
+ [GO\_MOCKGEN\_FROM]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1070
+ [GO\_MOCKGEN\_MOCKS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1131
+ [GO\_MOCKGEN\_PACKAGE]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1096
+ [GO\_MOCKGEN\_REFLECT]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1105
+ [GO\_MOCKGEN\_SOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1160
+ [GO\_MOCKGEN\_TYPES]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1086
+ [GO\_OAPI\_CODEGEN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1176
+ [GO\_OAPI\_CODEGEN\_TAXI]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1199
+ [GO\_OAPI\_CODEGEN\_TAXI\_1134]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1205
+ [GO\_OAPI\_CODEGEN\_V2]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L1193
+ [GO\_PACKAGE\_NAME]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L288
+ [GO\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L402
+ [GO\_PROTO\_USE\_V2]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L638
+ [GO\_SKIP\_TESTS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L367
+ [GO\_TEST\_EMBED\_BINDIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L470
+ [GO\_TEST\_EMBED\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L401
+ [GO\_TEST\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [GO\_TEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L306
+ [GO\_XTEST\_EMBED\_BINDIR]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L478
+ [GO\_XTEST\_EMBED\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L409
+ [GO\_XTEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/go.conf?rev=18394309#L316
+ [GRPC]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L610
+ [GRPC\_WITH\_GMOCK]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L631
+ [HEADERS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5693
+ [IDEA\_EXCLUDE\_DIRS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1919
+ [IDEA\_MODULE\_NAME]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1939
+ [IDEA\_RESOURCE\_DIRS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1929
+ [IF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [INCLUDE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [INCLUDE\_ONCE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [INCLUDE\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [INDUCED\_DEPS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [IOS\_APP\_ASSETS\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5441
+ [IOS\_APP\_COMMON\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5435
+ [IOS\_APP\_SETTINGS]: https://github.com/yandex/yatool/tree/main/build/plugins/ios_app_settings.py?rev=18394309#L5
+ [IOS\_ASSETS]: https://github.com/yandex/yatool/tree/main/build/plugins/ios_assets.py?rev=18394309#L6
+ [IWYU\_MAPPING\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4430
+ [JAR\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L598
+ [JAR\_EXCLUDE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2313
+ [JAR\_MAIN\_CLASS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1101
+ [JAR\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L692
+ [JAVAC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1950
+ [JAVA\_DEPENDENCIES\_CONFIGURATION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2302
+ [JAVA\_EXTERNAL\_DEPENDENCIES]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2271
+ [JAVA\_IGNORE\_CLASSPATH\_CLASH\_FOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L570
+ [JAVA\_MODULE]: https://github.com/yandex/yatool/tree/main/build/plugins/java.py?rev=18394309#L42
+ [JAVA\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L217
+ [JAVA\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L995
+ [JAVA\_RESOURCE\_TAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2055
+ [JAVA\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2043
+ [JAVA\_TEST]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=18394309#L62
+ [JAVA\_TEST\_DEPS]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=18394309#L62
+ [JDK\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2376
+ [JNI\_EXPORTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1290
+ [JOIN\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2953
+ [JOIN\_SRCS\_GLOBAL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2964
+ [JUNIT\_TESTS\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L152
+ [JVM\_ARGS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1749
+ [KAPT\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L818
+ [KAPT\_ANNOTATION\_PROCESSOR\_CLASSPATH]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L826
+ [KAPT\_ANNOTATION\_PROCESSOR\_OPTIONS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L836
+ [KAPT\_OPTS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L810
+ [KOTLINC\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2148
+ [KTLINT\_BASELINE\_FILE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2411
+ [KTLINT\_RULESET]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2419
+ [LARGE\_FILES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4834
+ [LDFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4185
+ [LD\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3328
+ [LICENSE]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=18394309#L26
+ [LICENSE\_RESTRICTION]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=18394309#L43
+ [LICENSE\_RESTRICTION\_EXCEPTIONS]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=18394309#L66
+ [LICENSE\_TEXTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5636
+ [LINKER\_SCRIPT]: https://github.com/yandex/yatool/tree/main/build/plugins/linker_script.py?rev=18394309#L1
+ [LINK\_EXCLUDE\_LIBRARIES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5753
+ [LINT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1712
+ [LIST\_PROTO]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L689
+ [LJ\_21\_ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/plugins/lj_archive.py?rev=18394309#L25
+ [LJ\_ARCHIVE]: https://github.com/yandex/yatool/tree/main/build/plugins/lj_archive.py?rev=18394309#L1
+ [LLVM\_BC]: https://github.com/yandex/yatool/tree/main/build/plugins/llvm_bc.py?rev=18394309#L4
+ [LLVM\_COMPILE\_C]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4923
+ [LLVM\_COMPILE\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4909
+ [LLVM\_COMPILE\_LL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4960
+ [LLVM\_LINK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4970
+ [LLVM\_LLC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4991
+ [LLVM\_OPT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4980
+ [LOCAL\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L702
+ [LOCAL\_SOURCES\_JAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L707
+ [MACROS\_WITH\_ERROR]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=18394309#L8
+ [MANUAL\_GENERATION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3295
+ [MASMFLAGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4210
+ [MAVEN\_GROUP\_ID]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1987
+ [MESSAGE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [MODULEWISE\_LICENSE\_RESTRICTION]: https://github.com/yandex/yatool/tree/main/build/conf/license.conf?rev=18394309#L58
+ [NEED\_CHECK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4494
+ [NEED\_REVIEW]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4512
+ [NGINX\_MODULES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5613
+ [NO\_BUILD\_IF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [NO\_CHECK\_IMPORTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5085
+ [NO\_CLANG\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4410
+ [NO\_CLANG\_TIDY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4422
+ [NO\_COMPILER\_WARNINGS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4283
+ [NO\_COW]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L885
+ [NO\_CPU\_CHECK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3096
+ [NO\_CYTHON\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1035
+ [NO\_DEBUG\_INFO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4865
+ [NO\_DOCTESTS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L355
+ [NO\_EXPORT\_DYNAMIC\_SYMBOLS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1297
+ [NO\_EXTENDED\_SOURCE\_SEARCH]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L270
+ [NO\_IMPORT\_TRACING]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1026
+ [NO\_IWYU]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4437
+ [NO\_JOIN\_SRC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4382
+ [NO\_LIBC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4336
+ [NO\_LINT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1705
+ [NO\_LTO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L398
+ [NO\_MYPY]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L500
+ [NO\_NEED\_CHECK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4503
+ [NO\_OPTIMIZE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4274
+ [NO\_OPTIMIZE\_PY\_PROTOS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L164
+ [NO\_PLATFORM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4347
+ [NO\_PROFILE\_RUNTIME]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4418
+ [NO\_PYTHON\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1018
+ [NO\_RUNTIME]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4325
+ [NO\_SANITIZE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4390
+ [NO\_SANITIZE\_COVERAGE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4402
+ [NO\_SPLIT\_DWARF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2676
+ [NO\_SSE4]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3088
+ [NO\_TS\_TYPECHECK]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L291
+ [NO\_UTIL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4314
+ [NO\_WSHADOW]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4290
+ [NO\_YMAKE\_PYTHON3]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L204
+ [NVCC\_DEVICE\_LINK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4253
+ [ONLY\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [OPENSOURCE\_EXPORT\_REPLACEMENT]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=18394309#L83
+ [OPENSOURCE\_EXPORT\_REPLACEMENT\_BY\_OS]: https://github.com/yandex/yatool/tree/main/build/conf/opensource.conf?rev=18394309#L92
+ [ORIGINAL\_SOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5623
+ [PACK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2404
+ [PARALLEL\_TESTS\_WITHIN\_NODE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2863
+ [PARTITIONED\_RECURSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [PARTITIONED\_RECURSE\_FOR\_TESTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [PARTITIONED\_RECURSE\_ROOT\_RELATIVE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [PEERDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [PIRE\_INLINE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4066
+ [PIRE\_INLINE\_CMD]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4061
+ [POPULATE\_CPP\_COVERAGE\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/conf/coverage_full_instrumentation.conf?rev=18394309#L7
+ [POPULATE\_CPP\_YNDEXING]: https://github.com/yandex/yatool/tree/main/build/conf/yndexing/cpp_instrumentation.conf?rev=18394309#L6
+ [PREPARE\_INDUCED\_DEPS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4605
+ [PROCESSOR\_CLASSES]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L88
+ [PROCESS\_DOCS]: https://github.com/yandex/yatool/tree/main/build/plugins/docs.py?rev=18394309#L39
+ [PROCESS\_MKDOCS]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/mkdocs.py?rev=18394309#L35
+ [PROTO2FBS]: https://github.com/yandex/yatool/tree/main/build/conf/fbs.conf?rev=18394309#L162
+ [PROTOC\_FATAL\_WARNINGS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L144
+ [PROTO\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L117
+ [PROTO\_CMD]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L1066
+ [PROTO\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L134
+ [PROTO\_TO\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sdc_proto.py?rev=18394309#L11
+ [PROVIDES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [PYTHON2\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L888
+ [PYTHON2\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L566
+ [PYTHON3\_ADDINCL]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L937
+ [PYTHON3\_MODULE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L578
+ [PYTHON\_PATH]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1685
+ [PY\_CONSTRUCTOR]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=18394309#L784
+ [PY\_DOCTESTS]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=18394309#L698
+ [PY\_ENUMS\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=18394309#L799
+ [PY\_EXTRALIBS]: https://github.com/yandex/yatool/tree/main/build/plugins/extralibs.py?rev=18394309#L1
+ [PY\_EXTRA\_LINT\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1140
+ [PY\_MAIN]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=18394309#L762
+ [PY\_NAMESPACE]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L619
+ [PY\_PROTOS\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [PY\_PROTO\_PLUGIN]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L189
+ [PY\_PROTO\_PLUGIN2]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L201
+ [PY\_REGISTER]: https://github.com/yandex/yatool/tree/main/build/plugins/pybuild.py?rev=18394309#L716
+ [PY\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1066
+ [RECURSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [RECURSE\_FOR\_TESTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [RECURSE\_ROOT\_RELATIVE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [REGISTER\_SANDBOX\_IMPORT]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sandbox_registry.py?rev=18394309#L6
+ [REGISTER\_YQL\_PYTHON\_UDF]: https://github.com/yandex/yatool/tree/main/build/plugins/yql_python_udf.py?rev=18394309#L11
+ [REQUIREMENTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1643
+ [REQUIRES]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L461
+ [REQUIRE\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1595
+ [RESOLVE\_PROTO]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L651
+ [RESOURCE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L520
+ [RESOURCE\_FILES]: https://github.com/yandex/yatool/tree/main/build/plugins/res.py?rev=18394309#L12
+ [RESTRICT\_PATH]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=18394309#L13
+ [RISK\_GEN\_DATA\_MODEL]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/fintech_risk_model.py?rev=18394309#L276
+ [ROS\_SRCS]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/ros.py?rev=18394309#L5
+ [RUN]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=18394309#L990
+ [RUN\_ANTLR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5172
+ [RUN\_ANTLR4]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5192
+ [RUN\_ANTLR4\_CPP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5216
+ [RUN\_ANTLR4\_CPP\_SPLIT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5206
+ [RUN\_ANTLR4\_GO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5226
+ [RUN\_ANTLR4\_PYTHON2]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5239
+ [RUN\_ANTLR4\_PYTHON3]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5252
+ [RUN\_JAVASCRIPT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L256
+ [RUN\_JAVASCRIPT\_AFTER\_BUILD]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L241
+ [RUN\_JAVA\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L590
+ [RUN\_LUA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4735
+ [RUN\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4709
+ [RUN\_PY3\_PROGRAM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4789
+ [RUN\_PYTHON3]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4761
+ [SDBUS\_CPP\_ADAPTOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5592
+ [SDBUS\_CPP\_PROXY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5598
+ [SDC\_DIAGS\_SPLIT\_GENERATOR\_V3]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sdc_diagnostics.py?rev=18394309#L42
+ [SDC\_DIAGS\_SPLIT\_GENERATOR\_V4]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sdc_diagnostics.py?rev=18394309#L22
+ [SDC\_INSTALL]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/sdc.py?rev=18394309#L59
+ [SELECT\_CLANG\_SA\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L167
+ [SELECT\_PROTO\_LAYOUT]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L82
+ [SET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [SETUP\_EXECTEST]: https://github.com/yandex/yatool/tree/main/build/plugins/_dart_fields.py?rev=18394309#L62
+ [SETUP\_PYTEST\_BIN]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=18394309#L983
+ [SETUP\_RUN\_PYTHON]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=18394309#L1035
+ [SET\_APPEND]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [SET\_APPEND\_WITH\_GLOBAL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [SET\_COMPILE\_OUTPUTS\_MODIFIERS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3116
+ [SET\_CPP\_COVERAGE\_FLAGS]: https://github.com/yandex/yatool/tree/main/build/plugins/coverage.py?rev=18394309#L42
+ [SET\_RESOURCE\_MAP\_FROM\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [SET\_RESOURCE\_URI\_FROM\_JSON]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [SIZE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2944
+ [SKIP\_TEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1694
+ [SOURCE\_GROUP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [SPLIT\_CODEGEN]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/split_codegen.py?rev=18394309#L9
+ [SPLIT\_DWARF]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2668
+ [SPLIT\_FACTOR]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2908
+ [SRC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3693
+ [SRCDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3712
+ [SRC\_C\_AMX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3847
+ [SRC\_C\_AVX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3823
+ [SRC\_C\_AVX2]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3831
+ [SRC\_C\_AVX512]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3839
+ [SRC\_C\_NO\_LTO]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3921
+ [SRC\_C\_PIC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3913
+ [SRC\_C\_SSE2]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3783
+ [SRC\_C\_SSE3]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3791
+ [SRC\_C\_SSE4]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3807
+ [SRC\_C\_SSE41]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3815
+ [SRC\_C\_SSSE3]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3799
+ [SRC\_C\_XOP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3856
+ [SRC\_RESOURCE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L697
+ [STRIP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4268
+ [STYLE\_CPP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5684
+ [STYLE\_DUMMY]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L311
+ [STYLE\_FLAKE8]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L339
+ [STYLE\_JSON]: https://github.com/yandex/yatool/tree/main/build/conf/custom_lint.conf?rev=18394309#L13
+ [STYLE\_PY2\_FLAKE8]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L347
+ [STYLE\_PYTHON]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L319
+ [STYLE\_RUFF]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L330
+ [STYLE\_YAML]: https://github.com/yandex/yatool/tree/main/build/conf/custom_lint.conf?rev=18394309#L23
+ [STYLE\_YQL]: https://github.com/yandex/yatool/tree/main/build/conf/custom_lint.conf?rev=18394309#L33
+ [SUBSCRIBER]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4526
+ [SUPPRESSIONS]: https://github.com/yandex/yatool/tree/main/build/plugins/suppressions.py?rev=18394309#L1
+ [SYMLINK]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4577
+ [SYSTEM\_PROPERTIES]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1737
+ [TAG]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1632
+ [TASKLET]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5271
+ [TASKLET\_REG]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5288
+ [TASKLET\_REG\_EXT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5303
+ [TEST\_CWD]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2548
+ [TEST\_DATA]: https://github.com/yandex/yatool/tree/main/build/plugins/ytest.py?rev=18394309#L118
+ [TEST\_JAVA\_CLASSPATH\_CMD\_TYPE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2285
+ [TEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1564
+ [THINLTO\_CACHE]: https://github.com/yandex/yatool/tree/main/build/conf/linkers/ld.conf?rev=18394309#L434
+ [TIMEOUT]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2836
+ [TOOLCHAIN]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5727
+ [TS\_BIOME]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L361
+ [TS\_BUILD\_ENV]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L265
+ [TS\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L35
+ [TS\_ESLINT\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L135
+ [TS\_EXCLUDE\_FILES\_GLOB]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L93
+ [TS\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L208
+ [TS\_FILES\_GLOB]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L217
+ [TS\_LARGE\_FILES]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts.conf?rev=18394309#L231
+ [TS\_NEXT\_BUILD\_OPTIONS]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=18394309#L22
+ [TS\_NEXT\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=18394309#L11
+ [TS\_NEXT\_EXPERIMENTAL\_BUILD\_MODE]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=18394309#L45
+ [TS\_NEXT\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_next.conf?rev=18394309#L35
+ [TS\_PROTO\_OPT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_proto.conf?rev=18394309#L87
+ [TS\_PROTO\_PACKAGE\_NAME]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_proto.conf?rev=18394309#L102
+ [TS\_RSPACK\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_rspack.conf?rev=18394309#L10
+ [TS\_RSPACK\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_rspack.conf?rev=18394309#L22
+ [TS\_STYLELINT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L335
+ [TS\_TEST\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L225
+ [TS\_TEST\_DATA]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L266
+ [TS\_TEST\_DEPENDS\_ON\_BUILD]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L275
+ [TS\_TEST\_FOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/yndex/builtin.cpp?rev=18394309#L16
+ [TS\_TEST\_INCLUDE\_NODEJS]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L282
+ [TS\_TEST\_SRCS]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L243
+ [TS\_TYPECHECK]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_test.conf?rev=18394309#L312
+ [TS\_VITE\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=18394309#L10
+ [TS\_VITE\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=18394309#L24
+ [TS\_WEBPACK\_CONFIG]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=18394309#L10
+ [TS\_WEBPACK\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=18394309#L22
+ [UBERJAR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1795
+ [UBERJAR\_APPENDING\_TRANSFORMER]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1895
+ [UBERJAR\_HIDE\_EXCLUDE\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1824
+ [UBERJAR\_HIDE\_INCLUDE\_PATTERN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1839
+ [UBERJAR\_HIDING\_PREFIX]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1809
+ [UBERJAR\_MANIFEST\_TRANSFORMER\_ATTRIBUTE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1879
+ [UBERJAR\_MANIFEST\_TRANSFORMER\_MAIN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1866
+ [UBERJAR\_PATH\_EXCLUDE\_PREFIX]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1853
+ [UBERJAR\_SERVICES\_RESOURCE\_TRANSFORMER]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1908
+ [UDF\_NO\_PROBE]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L26
+ [UPDATE\_VCS\_JAVA\_INFO\_NODEP]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4117
+ [USE\_ANNOTATION\_PROCESSOR]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L619
+ [USE\_COMMON\_GOOGLE\_APIS]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L353
+ [USE\_CXX]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4357
+ [USE\_DYNAMIC\_CUDA]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1312
+ [USE\_ERROR\_PRONE]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L1769
+ [USE\_JAVALITE]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L527
+ [USE\_KTLINT\_OLD]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2401
+ [USE\_LEGACY\_PNPM\_VIRTUAL\_STORE]: https://github.com/yandex/yatool/tree/main/build/conf/ts/node_modules.conf?rev=18394309#L81
+ [USE\_LINKER\_GOLD]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L868
+ [USE\_LLVM\_BC16]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4881
+ [USE\_LLVM\_BC18]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4886
+ [USE\_LLVM\_BC20]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4891
+ [USE\_MODERN\_FLEX]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L112
+ [USE\_MODERN\_FLEX\_WITH\_HEADER]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L123
+ [USE\_NASM]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4374
+ [USE\_OLD\_FLEX]: https://github.com/yandex/yatool/tree/main/build/conf/bison_lex.conf?rev=18394309#L132
+ [USE\_PLANTUML]: https://github.com/yandex/yatool/tree/main/build/conf/docs.conf?rev=18394309#L275
+ [USE\_PYTHON2]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L987
+ [USE\_PYTHON3]: https://github.com/yandex/yatool/tree/main/build/conf/python.conf?rev=18394309#L1004
+ [USE\_RECIPE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1673
+ [USE\_SA\_PLUGINS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L176
+ [USE\_SKIFF]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L295
+ [USE\_UTIL]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4365
+ [USRV\_GEN\_PROTO\_STRUCTS]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/userver.py?rev=18394309#L319
+ [VALIDATE\_DATA\_RESTART]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L2846
+ [VALIDATE\_IN\_DIRS]: https://github.com/yandex/yatool/tree/main/build/plugins/macros_with_error.py?rev=18394309#L35
+ [VCS\_INFO\_FILE]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4131
+ [VERSION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L4534
+ [VISIBILITY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5570
+ [VITE\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_vite.conf?rev=18394309#L30
+ [WEBPACK\_OUTPUT]: https://github.com/yandex/yatool/tree/main/build/conf/ts/ts_webpack.conf?rev=18394309#L28
+ [WINDOWS\_LONG\_PATH\_MANIFEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5555
+ [WINDOWS\_MANIFEST]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5550
+ [WITHOUT\_LICENSE\_TEXTS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5644
+ [WITHOUT\_VERSION]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5731
+ [WITH\_DYNAMIC\_LIBS]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1058
+ [WITH\_JDK]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2103
+ [WITH\_KAPT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2134
+ [WITH\_KOTLIN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2122
+ [WITH\_KOTLINC\_ALLOPEN]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2166
+ [WITH\_KOTLINC\_DETEKT]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2212
+ [WITH\_KOTLINC\_LOMBOK]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2177
+ [WITH\_KOTLINC\_NOARG]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2189
+ [WITH\_KOTLINC\_SERIALIZATION]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2201
+ [WITH\_KOTLIN\_GRPC]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L231
+ [WITH\_NODE\_MODULES]: https://github.com/yandex/yatool/tree/main/build/conf/ts/node_modules.conf?rev=18394309#L26
+ [WITH\_YA\_1931]: https://github.com/yandex/yatool/tree/main/build/conf/java.conf?rev=18394309#L2429
+ [YABS\_GENERATE\_CONF]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/yabs_generate_conf.py?rev=18394309#L10
+ [YABS\_GENERATE\_PHANTOM\_CONF\_PATCH]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/yabs_generate_conf.py?rev=18394309#L41
+ [YABS\_GENERATE\_PHANTOM\_CONF\_TEST\_CHECK]: https://github.com/yandex/yatool/tree/main/build/internal/plugins/yabs_generate_conf.py?rev=18394309#L51
+ [YA\_CONF\_JSON]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L5665
+ [YDL\_DESC\_USE\_BINARY]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L3684
+ [YQL\_ABI\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L221
+ [YQL\_LAST\_ABI\_VERSION]: https://github.com/yandex/yatool/tree/main/build/conf/project_specific/yql_udf.conf?rev=18394309#L230
+ [YT\_ORM\_PROTO\_YSON]: https://github.com/yandex/yatool/tree/main/build/conf/proto.conf?rev=18394309#L436
+ [YT\_SPEC]: https://github.com/yandex/yatool/tree/main/build/ymake.core.conf?rev=18394309#L1553
+ [ALIASES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L27
+ [ALLOWED]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L30
+ [ALLOWED\_IN\_LINTERS\_MAKE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L31
+ [ARGS\_PARSER]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L39
+ [CMD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L40
+ [DEFAULT\_NAME\_GENERATOR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L41
+ [EPILOGUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L42
+ [EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L43
+ [FILE\_GROUP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L65
+ [FINAL\_TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L44
+ [GEN\_FROM\_FILE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L45
+ [GLOBAL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L46
+ [GLOBAL\_CMD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L47
+ [GLOBAL\_EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L48
+ [GLOBAL\_SEM]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L49
+ [IGNORED]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L50
+ [INCLUDE\_TAG]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L51
+ [NODE\_TYPE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L52
+ [NO\_EXPAND]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L53
+ [PEERDIRSELF]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L56
+ [PEERDIR\_POLICY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L55
+ [PROXY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L57
+ [RESTRICTED]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L61
+ [SEM]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L62
+ [SYMLINK\_POLICY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L63
+ [TRANSITION]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L68
+ [USE\_PEERS\_LATE\_OUTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L64
+ [VERSION\_PROXY]: https://github.com/yandex/yatool/tree/main/devtools/ymake/lang/properties.h?rev=18394309#L60
+ [APPLIED\_EXCLUDES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L23
+ [ARCADIA\_BUILD\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L24
+ [ARCADIA\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L25
+ [AUTO\_INPUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L26
+ [BINDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L27
+ [CMAKE\_CURRENT\_BINARY\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L29
+ [CMAKE\_CURRENT\_SOURCE\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L30
+ [CONSUME\_NON\_MANAGEABLE\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L31
+ [CURDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L32
+ [DART\_CLASSPATH]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L34
+ [DART\_CLASSPATH\_DEPS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L33
+ [DEFAULT\_MODULE\_LICENSE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L35
+ [DEPENDENCY\_MANAGEMENT\_VALUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L36
+ [DONT\_RESOLVE\_INCLUDES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L37
+ [DYNAMIC\_LINK]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L38
+ [EV\_HEADER\_EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L39
+ [EXCLUDE\_SUBMODULES]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L40
+ [EXCLUDE\_VALUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L41
+ [EXPORTED\_BUILD\_SYSTEM\_BUILD\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L42
+ [EXPORTED\_BUILD\_SYSTEM\_SOURCE\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L43
+ [GLOBAL\_SUFFIX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L45
+ [GLOBAL\_TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L46
+ [GO\_TEST\_FOR\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L48
+ [HAS\_MANAGEABLE\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L49
+ [IGNORE\_JAVA\_DEPENDENCIES\_CONFIGURATION]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L50
+ [INPUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L51
+ [JAVA\_DEPENDENCIES\_CONFIGURATION\_VALUE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L53
+ [MANAGED\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L55
+ [MANAGED\_PEERS\_CLOSURE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L54
+ [MANGLED\_MODULE\_TYPE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L56
+ [MODDIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L57
+ [MODULE\_ARGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L58
+ [MODULE\_COMMON\_CONFIGS\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L59
+ [MODULE\_KIND]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L60
+ [MODULE\_LANG]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L61
+ [MODULE\_PREFIX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L62
+ [MODULE\_SEM\_IGNORE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L68
+ [MODULE\_SUFFIX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L63
+ [MODULE\_TYPE]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L67
+ [NON\_NAMAGEABLE\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L70
+ [OUTPUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L71
+ [PASS\_PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L74
+ [PEERDIR\_TAGS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L75
+ [PEERS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L77
+ [PEERS\_LATE\_OUTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L76
+ [PROTO\_HEADER\_EXTS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L78
+ [PYTHON\_BIN]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L79
+ [REALPRJNAME]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L80
+ [SONAME]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L81
+ [SRCS\_GLOBAL]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L83
+ [START\_TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L84
+ [TARGET]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L85
+ [TEST\_CASE\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L86
+ [TEST\_OUT\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L87
+ [TEST\_SOURCE\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L88
+ [TEST\_WORK\_ROOT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L89
+ [TOOLS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L90
+ [TS\_CONFIG\_DECLARATION]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L92
+ [TS\_CONFIG\_DECLARATION\_MAP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L91
+ [TS\_CONFIG\_DEDUCE\_OUT]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L93
+ [TS\_CONFIG\_OUT\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L94
+ [TS\_CONFIG\_PRESERVE\_JSX]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L95
+ [TS\_CONFIG\_ROOT\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L96
+ [TS\_CONFIG\_SOURCE\_MAP]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L97
+ [UNITTEST\_DIR]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L98
+ [UNITTEST\_MOD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L99
+ [USE\_ALL\_SRCS]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L100
+ [USE\_GLOBAL\_CMD]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L101
+ [YMAKE\_BIN]: https://github.com/yandex/yatool/tree/main/devtools/ymake/vardefs.h?rev=18394309#L102

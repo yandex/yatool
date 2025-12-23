@@ -7,6 +7,7 @@
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/command_store.h>
 
+#include <library/cpp/containers/concurrent_hash/concurrent_hash.h>
 #include <util/generic/hash_set.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -60,8 +61,8 @@ public:
         TUpdIter* updIter = nullptr,
         const TVars* base0 = nullptr);
 
-    void GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFormat, TDumpInfoEx* addinfo = nullptr, bool skipRender = false, bool isGlobalNode = false);
-    void RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorShower);
+    void GetFromGraph(TNodeId nodeId, TNodeId modId, TDumpInfoEx* addinfo = nullptr, bool skipRender = false, bool isGlobalNode = false);
+    void RenderCmdStr(TErrorShowerState* errorShower);
 
     static void ReportStats();
 
@@ -89,13 +90,10 @@ public:
 };
 
 class TMakeModuleStates {
-private:
+protected:
     const TBuildConfiguration& Conf_;
     TDepGraph& Graph_;
     TModules& Modules_;
-
-    TNodeId LastStateId_ = TNodeId::Invalid;
-    TMakeModuleStatePtr LastState_;
 
 public:
     TMakeModuleStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules)
@@ -103,7 +101,39 @@ public:
     {
     }
 
-    TMakeModuleStatePtr GetState(TNodeId moduleId);
+    virtual ~TMakeModuleStates() = default;
+    virtual TMakeModuleStatePtr GetState(TNodeId moduleId) = 0;
+    virtual void ClearState(TNodeId moduleId) = 0;
 
     static inline NStats::TMakeCommandStats& GetStats();
+};
+
+class TMakeModuleSequentialStates : public TMakeModuleStates {
+private:
+    TNodeId LastStateId_ = TNodeId::Invalid;
+    TMakeModuleStatePtr LastState_;
+
+public:
+    TMakeModuleSequentialStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules)
+        : TMakeModuleStates(conf, graph, modules)
+    {
+    }
+
+    TMakeModuleStatePtr GetState(TNodeId moduleId) override;
+    void ClearState(TNodeId moduleId) override;
+};
+
+class TMakeModuleParallelStates : public TMakeModuleStates {
+private:
+    TConcurrentHashMap<TNodeId, TMakeModuleStatePtr> States_;
+    TAdaptiveLock NodeListsLock_;
+
+public:
+    TMakeModuleParallelStates(const TBuildConfiguration& conf, TDepGraph& graph, TModules& modules)
+        : TMakeModuleStates(conf, graph, modules)
+    {
+    }
+
+    TMakeModuleStatePtr GetState(TNodeId moduleId) override;
+    void ClearState(TNodeId moduleId) override;
 };

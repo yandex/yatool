@@ -3,7 +3,7 @@
 .. :Author:    Ken Robbins <ken@kenrobbins.com>
 .. :License:   MIT License
 .. :Copyright: © 2015 Ken Robbins
-.. :Copyright: © 2016, 2017, 2018, 2020, 2022 Lele Gaifax
+.. :Copyright: © 2016, 2017, 2018, 2020, 2022, 2024, 2025 Lele Gaifax
 ..
 
 ==================
@@ -75,6 +75,26 @@ Basic usage looks like this:
     Chunk: b'":"ba'
     Chunk: b'z"}'
 
+Most functionalities are exposed both as *functions* and as *classes*.
+
+The following uses a *relaxed syntax* ``Decoder`` instance, that handles JSONC__ and
+*trailing commas*:
+
+__ https://jsonc.org/
+
+.. code-block:: python
+
+    >>> from rapidjson import Decoder
+    >>> from rapidjson import PM_COMMENTS, PM_TRAILING_COMMAS
+    >>> decoder = Decoder(parse_mode=PM_COMMENTS | PM_TRAILING_COMMAS)
+    >>> decoder('''
+    ... {
+    ...     "bar": /* Block comment */ "baz",
+    ...     "foo":100, // Trailing comma and comment
+    ... }
+    ... ''')
+    {'bar': 'baz', 'foo': 100}
+
 
 Development
 -----------
@@ -108,7 +128,7 @@ Performance
 ``python-rapidjson`` tries to be as performant as possible while staying
 compatible with the ``json`` module.
 
-See the `this section`__ in the documentation for a comparison with other JSON libraries.
+See `this section`__ in the documentation for a comparison with other JSON libraries.
 
 __ https://python-rapidjson.readthedocs.io/en/latest/benchmarks.html
 

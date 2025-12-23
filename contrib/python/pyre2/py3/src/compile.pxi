@@ -14,13 +14,13 @@ def compile(pattern, int flags=0, int max_mem=8388608):
 def _compile(object pattern, int flags=0, int max_mem=8388608):
     """Compile a regular expression pattern, returning a pattern object."""
     def fallback(pattern, flags, error_msg):
-        """Raise error, warn, or simply return fallback from re module."""
+        """Raise error, warn, or simply return fallback from re-compatible module."""
         if current_notification == FALLBACK_EXCEPTION:
             raise RegexError(error_msg)
         elif current_notification == FALLBACK_WARNING:
-            warnings.warn("WARNING: Using re module. Reason: %s" % error_msg)
+            warnings.warn("WARNING: Using %s module. Reason: %s" % (fallback_module.__name__, error_msg))
         try:
-            result = PythonRePattern(pattern, flags)
+            result = FallbackPattern(pattern, flags)
         except re.error as err:
             raise RegexError(*err.args)
         return result
@@ -91,8 +91,8 @@ def _compile(object pattern, int flags=0, int max_mem=8388608):
             # ``re`` module.
             raise RegexError(error_msg)
         elif current_notification == FALLBACK_WARNING:
-            warnings.warn("WARNING: Using re module. Reason: %s" % error_msg)
-        return PythonRePattern(original_pattern, flags)
+            warnings.warn("WARNING: Using %s module. Reason: %s" % (fallback_module.__name__, error_msg))
+        return FallbackPattern(original_pattern, flags)
 
     cdef Pattern pypattern = Pattern()
     cdef map[cpp_string, int] named_groups = re_pattern.NamedCapturingGroups()

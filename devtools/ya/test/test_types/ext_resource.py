@@ -55,6 +55,10 @@ class CheckResourceTestSuite(ExtResourceAbstractSuite):
 
         return ' '.join(cmd)
 
+    def setup_environment(self, env, opts):
+        env.clear()
+        env.clean_mandatory()
+
 
 class CheckDataSbrTestSuite(CheckResourceTestSuite):
     def get_type(self):

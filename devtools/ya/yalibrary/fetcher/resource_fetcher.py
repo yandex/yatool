@@ -2,6 +2,9 @@ import base64
 import logging
 import os
 import sys
+import collections
+
+import six
 
 from exts import uniq_id, http_client
 from exts.hashing import md5_value
@@ -21,6 +24,8 @@ from .cache_helper import install_resource
 class MissingResourceError(Exception):
     mute = True
 
+
+FetchResponse = collections.namedtuple("FetchResponse", ("install_stat", "where"))
 
 CAN_USE_UNIVERSAL_FETCHER = sys.version_info[0] >= 3
 FALLBACK_MSG_LOGGED = False
@@ -104,13 +109,21 @@ def fetch_resource_if_need(
     def do_deploy(download_to, resource_info):
         deploy_tool(download_to, result_dir, post_process, resource_info, resource_uri, binname, strip_prefix)
 
-    return _do_fetch_resource_if_need(
-        result_dir,
-        downloader,
-        do_deploy,
-        target_is_tool_dir,
-        force_refetch,
-    )
+    try:
+        return _do_fetch_resource_if_need(
+            result_dir,
+            downloader,
+            do_deploy,
+            target_is_tool_dir,
+            force_refetch,
+        )
+    except Exception:
+        ei = sys.exc_info()
+        six.reraise(
+            ei[0],
+            ei[0]("{}\n{}".format(ei[1], 'Failed while fetching resource with id: ' + str(parsed_uri.resource_id))),
+            ei[2],
+        )
 
 
 def select_resource(item, platform=None):
@@ -185,13 +198,15 @@ def _do_fetch_resource_if_need(
         download_to = os.path.join(result_dir, filename)
         resource_info = downloader(download_to)
         deployer(download_to, resource_info)
+        return resource_info
 
     if target_is_tool_dir:
-        return install_resource(result_dir, do_install, force_refetch)
+        install_stat, where = install_resource(result_dir, do_install, force_refetch)
+        return FetchResponse(install_stat, where)
     else:
         clean_dir(result_dir)
-        do_install()
-        return result_dir
+        install_stat = do_install()
+        return FetchResponse(install_stat, result_dir)
 
 
 class DownloaderBase(object):

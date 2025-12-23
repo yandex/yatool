@@ -112,8 +112,8 @@ class Topo(object):
 
     def schedule_node(self, node, when_ready=None, inplace_execution=False):
         with self._lock:
-            assert node in self._dsu
-            assert node not in self._scheduled
+            assert node in self._dsu, "Node {} is not in DSU".format(node)
+            assert node not in self._scheduled, "Node {} has been already scheduled".format(node)
 
             if when_ready:
                 self._when_ready[node] = when_ready

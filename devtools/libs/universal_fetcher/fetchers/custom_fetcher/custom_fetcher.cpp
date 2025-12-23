@@ -26,7 +26,11 @@ namespace NUniversalFetcher {
                 auto tmpPath = dst.FilePath() + ".tmp";
                 TVector<TString> args{Params_.PathToFetcher, uri, tmpPath};
 
-                auto res = ProcessRunner_->Run(args, {}, std::move(cancellation));
+                auto res = ProcessRunner_->Run(args, {}, cancellation);
+                if (cancellation.IsCancellationRequested()) {
+                    Log() << TLOG_INFO << "Custom fetch cancelled";
+                    return {EFetchStatus::Cancelled};
+                }
 
                 if (res.ExitStatus == 0) {
                     TFsPath(tmpPath).RenameTo(dst.FilePath());

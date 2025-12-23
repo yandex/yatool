@@ -75,13 +75,8 @@ bool TJinjaProject::TBuilder::ValueInList(const jinja2::ValuesList& list, const 
     if (list.empty()) {
         return false;
     }
-    TStringBuilder valueStr;
-    TStringBuilder listValueStr;
-    Dump(valueStr.Out, value);
-    for (const auto& listValue : list) {
-        listValueStr.clear();
-        Dump(listValueStr.Out, listValue);
-        if (valueStr == listValueStr) {
+    for (const auto& list_value: list) {
+        if (list_value == value) {
             return true;
         }
     }

@@ -23,7 +23,7 @@ namespace NFlatJsonGraph {
         return AddNode(node->NodeType, node->ElemId, TDepGraph::Graph(node).ToTargetStringBuf(node), EIDFormat::Simple);
     }
 
-    TNodeWriter TWriter::AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name, EIDFormat format) {
+    TNodeWriter TWriter::AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name, const EIDFormat format) {
         FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
@@ -46,7 +46,7 @@ namespace NFlatJsonGraph {
         return AddLink(dep.From()->ElemId, dep.From()->NodeType, dep.To()->ElemId, dep.To()->NodeType, dep.Value(), EIDFormat::Simple);
     }
 
-    TNodeWriter TWriter::AddLink(ui32 fromId, EMakeNodeType fromType, ui32 toId, EMakeNodeType toType, EDepType type, EIDFormat format) {
+    TNodeWriter TWriter::AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const EIDFormat format, const ELogicalDepType logicalDepType) {
         FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
@@ -64,8 +64,11 @@ namespace NFlatJsonGraph {
             JsonWriter.WriteInt(toId);
         }
         JsonWriter.WriteKey("DepType");
-        JsonWriter.WriteString(TStringBuilder() << type);
-
+        if (logicalDepType == ELDT_FromDepType) {
+            JsonWriter.WriteString(TStringBuilder() << depType);
+        } else {
+            JsonWriter.WriteString(TStringBuilder() << logicalDepType);
+        }
         return TNodeWriter{JsonWriter};
     }
 

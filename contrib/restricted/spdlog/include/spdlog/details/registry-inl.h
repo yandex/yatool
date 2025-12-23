@@ -54,6 +54,11 @@ SPDLOG_INLINE void registry::register_logger(std::shared_ptr<logger> new_logger)
     register_logger_(std::move(new_logger));
 }
 
+SPDLOG_INLINE void registry::register_or_replace(std::shared_ptr<logger> new_logger) {
+    std::lock_guard<std::mutex> lock(logger_map_mutex_);
+    register_or_replace_(std::move(new_logger));
+}
+
 SPDLOG_INLINE void registry::initialize_logger(std::shared_ptr<logger> new_logger) {
     std::lock_guard<std::mutex> lock(logger_map_mutex_);
     new_logger->set_formatter(formatter_->clone());
@@ -96,7 +101,7 @@ SPDLOG_INLINE std::shared_ptr<logger> registry::default_logger() {
 SPDLOG_INLINE logger *registry::get_default_raw() { return default_logger_.get(); }
 
 // set default logger.
-// default logger is stored in default_logger_ (for faster retrieval) and in the loggers_ map.
+// the default logger is stored in default_logger_ (for faster retrieval) and in the loggers_ map.
 SPDLOG_INLINE void registry::set_default_logger(std::shared_ptr<logger> new_default_logger) {
     std::lock_guard<std::mutex> lock(logger_map_mutex_);
     if (new_default_logger != nullptr) {
@@ -252,9 +257,13 @@ SPDLOG_INLINE void registry::throw_if_exists_(const std::string &logger_name) {
 }
 
 SPDLOG_INLINE void registry::register_logger_(std::shared_ptr<logger> new_logger) {
-    auto logger_name = new_logger->name();
+    auto &logger_name = new_logger->name();
     throw_if_exists_(logger_name);
     loggers_[logger_name] = std::move(new_logger);
+}
+
+SPDLOG_INLINE void registry::register_or_replace_(std::shared_ptr<logger> new_logger) {
+    loggers_[new_logger->name()] = std::move(new_logger);
 }
 
 }  // namespace details

@@ -150,8 +150,8 @@ public:
         TRefCountedTypeCookie cookie)
     {
         if (options.ExtendToUsableSize) {
-            if (auto usableSize = GetUsableSpaceSize(); usableSize != 0) {
-                size = usableSize;
+            if (auto usableSize = GetUsableSpaceSize()) {
+                size = *usableSize;
             }
         }
         Initialize(size, options, cookie);
@@ -167,6 +167,44 @@ public:
     {
         return Size_;
     }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+class TCustomAlignedAllocationHolder
+    : public TAllocationHolderBase<TCustomAlignedAllocationHolder>
+{
+public:
+    TCustomAlignedAllocationHolder(
+        size_t size,
+        size_t alignment,
+        TSharedMutableRefAllocateOptions options,
+        TRefCountedTypeCookie cookie)
+        : Begin_(static_cast<char*>(::aligned_malloc(size, alignment)))
+        , Alignment_(alignment)
+    {
+        Initialize(size, options, cookie);
+    }
+
+    ~TCustomAlignedAllocationHolder()
+    {
+        ::free(Begin_);
+    }
+
+    char* GetBegin()
+    {
+        return Begin_;
+    }
+
+    // TSharedRangeHolder overrides.
+    std::optional<size_t> GetTotalByteSize() const override
+    {
+        return AlignUp(Size_, Alignment_);
+    }
+
+private:
+    char* const Begin_;
+    size_t Alignment_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -278,11 +316,15 @@ std::vector<TSharedRef> TSharedRef::Split(size_t partSize) const
 {
     YT_VERIFY(partSize > 0);
     std::vector<TSharedRef> result;
+    if (partSize >= Size()) {
+        result.push_back(Slice(Begin(), End()));
+        return result;
+    }
     result.reserve(Size() / partSize + 1);
     auto sliceBegin = Begin();
     while (sliceBegin < End()) {
         auto sliceEnd = sliceBegin + partSize;
-        if (sliceEnd < sliceBegin || sliceEnd > End()) {
+        if (sliceEnd > End()) {
             sliceEnd = End();
         }
         result.push_back(Slice(sliceBegin, sliceEnd));
@@ -303,6 +345,13 @@ TSharedMutableRef TSharedMutableRef::Allocate(size_t size, TSharedMutableRefAllo
 TSharedMutableRef TSharedMutableRef::AllocatePageAligned(size_t size, TSharedMutableRefAllocateOptions options, TRefCountedTypeCookie tagCookie)
 {
     auto holder = New<TPageAlignedAllocationHolder>(size, options, tagCookie);
+    auto ref = holder->GetRef();
+    return TSharedMutableRef(ref, std::move(holder));
+}
+
+TSharedMutableRef TSharedMutableRef::AllocateAligned(size_t size, size_t alignment, TSharedMutableRefAllocateOptions options, TRefCountedTypeCookie tagCookie)
+{
+    auto holder = New<TCustomAlignedAllocationHolder>(size, alignment, options, tagCookie);
     auto ref = holder->GetRef();
     return TSharedMutableRef(ref, std::move(holder));
 }
@@ -427,6 +476,21 @@ TSharedRefArray TSharedRefArray::MakeCopy(
         ::memcpy(partCopy.Begin(), part.Begin(), part.Size());
     }
     return builder.Finish();
+}
+
+bool TSharedRefArray::AreBitwiseEqual(
+    const TSharedRefArray& lhs,
+    const TSharedRefArray& rhs)
+{
+    if (lhs.Size() != rhs.Size()) {
+        return false;
+    }
+    for (size_t index = 0; index < lhs.Size(); ++index) {
+        if (!TRef::AreBitwiseEqual(lhs[index], rhs[index])) {
+            return false;
+        }
+    }
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

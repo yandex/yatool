@@ -19,25 +19,32 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
-            auto prefix = std::get<std::string_view>(args[0]);
+            auto prefix = std::move(std::get<TMacroValues::TXString>(args[0]));
             return std::visit(TOverloaded{
-                [&](std::string_view body) -> TMacroValues::TValue {
-                    return ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(prefix, body)));
-                },
-                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
-                    auto result = std::vector<std::string_view>();
-                    result.reserve(bodies.size());
-                    for (auto& body : bodies)
-                        result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(prefix, body)))));
+                [&](TMacroValues::TXString&& body) -> TMacroValues::TValue {
+                    auto result = std::move(prefix);
+                    result.Data += body.Data;
                     return result;
                 },
-                [&](auto& x) -> TMacroValues::TValue {
+                [&](const TMacroValues::TXStrings& bodies) -> TMacroValues::TValue {
+                    auto result = TMacroValues::TXStrings();
+                    result.Data.reserve(bodies.Data.size());
+                    for (auto& body : bodies.Data) {
+                        auto item = std::string();
+                        item.reserve(prefix.Data.size() + body.size());
+                        item = prefix.Data;
+                        item += body;
+                        result.Data.push_back(std::move(item));
+                    }
+                    return result;
+                },
+                [&](const auto& x) -> TMacroValues::TValue {
                     throw TBadArgType(Name, x);
                 }
-            }, args[1]);
+            }, std::move(args[1]));
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -148,22 +155,22 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
-            auto suf = std::get<std::string_view>(args[0]);
+            auto suf = std::get<TMacroValues::TXString>(args[0]);
             return std::visit(TOverloaded{
-                [&](std::string_view body) -> TMacroValues::TValue {
-                    return ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(body, suf)));
+                [&](const TMacroValues::TXString& body) -> TMacroValues::TValue {
+                    return TMacroValues::TXString{TString::Join(body.Data, suf.Data)};
                 },
-                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
-                    auto result = std::vector<std::string_view>();
-                    result.reserve(bodies.size());
-                    for (auto& body : bodies)
-                        result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(TString::Join(body, suf)))));
+                [&](const TMacroValues::TXStrings& bodies) -> TMacroValues::TValue {
+                    auto result = TMacroValues::TXStrings();
+                    result.Data.reserve(bodies.Data.size());
+                    for (auto& body : bodies.Data)
+                        result.Data.push_back(TString::Join(body, suf.Data));
                     return result;
                 },
-                [&](auto& x) -> TMacroValues::TValue {
+                [&](const auto& x) -> TMacroValues::TValue {
                     throw TBadArgType(Name, x);
                 }
             }, args[1]);
@@ -209,23 +216,23 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
-            auto glue = std::get<std::string_view>(args[0]);
+            auto glue = std::get<TMacroValues::TXString>(args[0]);
             return std::visit(TOverloaded{
                 [](std::monostate) -> TMacroValues::TValue {
                     return std::monostate();
                 },
-                [&](const std::string_view& body) -> TMacroValues::TValue {
+                [&](TMacroValues::TXString body) -> TMacroValues::TValue {
                     return body;
                 },
-                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
-                    if (bodies.empty())
+                [&](const TMacroValues::TXStrings& bodies) -> TMacroValues::TValue {
+                    if (bodies.Data.empty())
                         return std::monostate();
-                    return ctx.Values.GetValue(ctx.Values.InsertStr(JoinSeq(glue, bodies)));
+                    return TMacroValues::TXString{JoinSeq(TString(glue.Data), bodies.Data)};
                 },
-                [&](auto& x) -> TMacroValues::TValue {
+                [&](const auto& x) -> TMacroValues::TValue {
                     throw TBadArgType(Name, x);
                 }
             }, args[1]);
@@ -388,20 +395,20 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             return std::visit(TOverloaded{
                 [](std::monostate) -> TMacroValues::TValue {
                     return std::monostate();
                 },
-                [&](std::string_view body) -> TMacroValues::TValue {
-                    return ctx.Values.GetValue(ctx.Values.InsertStr(DoString(body)));
+                [&](const TMacroValues::TXString& body) -> TMacroValues::TValue {
+                    return TMacroValues::TXString{DoString(body.Data)};
                 },
-                [&](const std::vector<std::string_view>& bodies) -> TMacroValues::TValue {
-                    return ctx.Values.GetValue(ctx.Values.InsertStr(DoStrings(bodies)));
+                [&](const TMacroValues::TXStrings& bodies) -> TMacroValues::TValue {
+                    return TMacroValues::TXString{DoStrings(bodies.Data)};
                 },
-                [&](auto& x) -> TMacroValues::TValue {
+                [&](const auto& x) -> TMacroValues::TValue {
                     throw TBadArgType(Name, x);
                 }
             }, args[0]);

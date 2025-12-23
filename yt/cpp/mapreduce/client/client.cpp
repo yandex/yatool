@@ -5,6 +5,7 @@
 #include "client_writer.h"
 #include "file_reader.h"
 #include "file_writer.h"
+#include "file_fragment_writer.h"
 #include "format_hints.h"
 #include "init.h"
 #include "lock.h"
@@ -65,18 +66,13 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-THashMap<TString, TString> ParseProxyUrlAliasingRules(TString envConfig)
+void ApplyProxyUrlAliasingRules(
+    TString& url,
+    const THashMap<TString, TString>& proxyUrlAliasingRules)
 {
-    if (envConfig.empty()) {
-        return {};
-    }
-    return NYTree::ConvertTo<THashMap<TString, TString>>(NYson::TYsonString(envConfig));
-}
-
-void ApplyProxyUrlAliasingRules(TString& url)
-{
-    static auto rules = ParseProxyUrlAliasingRules(GetEnv("YT_PROXY_URL_ALIASING_CONFIG"));
-    if (auto ruleIt = rules.find(url); ruleIt != rules.end()) {
+    if (auto ruleIt = proxyUrlAliasingRules.find(url);
+        ruleIt != proxyUrlAliasingRules.end()
+    ) {
         url = ruleIt->second;
     }
 }
@@ -102,6 +98,30 @@ ITransactionPtr TClientBase::StartTransaction(
     const TStartTransactionOptions& options)
 {
     return MakeIntrusive<TTransaction>(RawClient_, GetParentClientImpl(), Context_, TransactionId_, options);
+}
+
+TDistributedWriteFileSessionWithCookies TClientBase::StartDistributedWriteFileSession(
+    const TRichYPath& richPath,
+    i64 cookieCount,
+    const TStartDistributedWriteFileOptions& options)
+{
+    return RequestWithRetry<TDistributedWriteFileSessionWithCookies>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [this, cookieCount, &richPath, &options] (TMutationId& mutationId) {
+            return RawClient_->StartDistributedWriteFileSession(mutationId, TransactionId_, richPath, cookieCount, options);
+        });
+}
+
+TDistributedWriteTableSessionWithCookies TClientBase::StartDistributedWriteTableSession(
+    const TRichYPath& richPath,
+    i64 cookieCount,
+    const TStartDistributedWriteTableOptions& options)
+{
+    return RequestWithRetry<TDistributedWriteTableSessionWithCookies>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [this, cookieCount, &richPath, &options] (TMutationId& mutationId) {
+            return RawClient_->StartDistributedWriteTableSession(mutationId, TransactionId_, richPath, cookieCount, options);
+        });
 }
 
 TNodeId TClientBase::Create(
@@ -404,6 +424,13 @@ IFileWriterPtr TClientBase::CreateFileWriter(
     }
 
     return new TFileWriter(realPath, RawClient_, ClientRetryPolicy_, GetTransactionPinger(), Context_, TransactionId_, options);
+}
+
+IFileFragmentWriterPtr TClientBase::CreateFileFragmentWriter(
+    const TDistributedWriteFileCookie& cookie,
+    const TFileFragmentWriterOptions& options)
+{
+    return NDetail::CreateFileFragmentWriter(RawClient_, ClientRetryPolicy_->CreatePolicyForGenericRequest(), cookie, options);
 }
 
 TTableWriterPtr<::google::protobuf::Message> TClientBase::CreateTableWriter(
@@ -880,13 +907,15 @@ THolder<TClientWriter> TClientBase::CreateClientWriter(
     const TRichYPath& path,
     const TTableReaderOptions& options,
     const ISkiffRowSkipperPtr& skipper,
-    const NSkiff::TSkiffSchemaPtr& schema)
+    const NSkiff::TSkiffSchemaPtr& requestedSchema,
+    const NSkiff::TSkiffSchemaPtr& parserSchema)
 {
     auto skiffOptions = TCreateSkiffSchemaOptions().HasRangeIndex(true);
-    auto resultSchema = NYT::NDetail::CreateSkiffSchema(TVector{schema}, skiffOptions);
+    auto resultRequestedSchema = NYT::NDetail::CreateSkiffSchema(TVector{requestedSchema}, skiffOptions);
+    auto resultParserSchema = NYT::NDetail::CreateSkiffSchema(TVector{parserSchema}, skiffOptions);
     return new TSkiffRowTableReader(
-        CreateClientReader(path, NYT::NDetail::CreateSkiffFormat(resultSchema), options),
-        resultSchema,
+        CreateClientReader(path, NYT::NDetail::CreateSkiffFormat(resultRequestedSchema), options),
+        resultParserSchema,
         {skipper},
         std::move(skiffOptions));
 }
@@ -919,13 +948,16 @@ THolder<TClientWriter> TClientBase::CreateClientWriter(
     const TString& cookie,
     const TTablePartitionReaderOptions& options,
     const ISkiffRowSkipperPtr& skipper,
-    const NSkiff::TSkiffSchemaPtr& schema)
+    const NSkiff::TSkiffSchemaPtr& requestedSchema,
+    const NSkiff::TSkiffSchemaPtr& parserSchema)
 {
     auto skiffOptions = TCreateSkiffSchemaOptions().HasRangeIndex(true);
-    auto resultSchema = NYT::NDetail::CreateSkiffSchema(TVector{schema}, skiffOptions);
+    auto resultRequestedSchema = NYT::NDetail::CreateSkiffSchema(TVector{requestedSchema}, skiffOptions);
+    auto resultParserSchema = NYT::NDetail::CreateSkiffSchema(TVector{parserSchema}, skiffOptions);
+
     return new TSkiffRowTableReader(
-        CreateRawTablePartitionReader(cookie, NYT::NDetail::CreateSkiffFormat(resultSchema), options),
-        resultSchema,
+        CreateRawTablePartitionReader(cookie, NYT::NDetail::CreateSkiffFormat(resultRequestedSchema), options),
+        resultParserSchema,
         {skipper},
         std::move(skiffOptions));
 }
@@ -976,6 +1008,70 @@ THolder<TClientWriter> TClientBase::CreateClientWriter(
             CreateClientWriter(pathWithSchema, format, options),
             std::move(descriptors));
     }
+}
+
+::TIntrusivePtr<ITableFragmentWriter<TNode>> TClientBase::CreateNodeFragmentWriter(
+    const TDistributedWriteTableCookie& cookie,
+    const TTableFragmentWriterOptions& options)
+{
+    auto format = TFormat::YsonBinary();
+
+    // TODO(achains): Make proper wrapper class with retries and auto ping.
+    auto stream = NDetail::RequestWithRetry<std::unique_ptr<IOutputStreamWithResponse>>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [&] (TMutationId /*mutationId*/) {
+            return RawClient_->WriteTableFragment(cookie, format, options);
+        }
+    );
+
+    return ::MakeIntrusive<TNodeTableFragmentWriter>(std::move(stream));
+}
+
+::TIntrusivePtr<ITableFragmentWriter<TYaMRRow>> TClientBase::CreateYaMRFragmentWriter(
+    const TDistributedWriteTableCookie& cookie,
+    const TTableFragmentWriterOptions& options)
+{
+    auto format = TFormat::YaMRLenval();
+
+    // TODO(achains): Make proper wrapper class with retries and auto ping.
+    auto stream = NDetail::RequestWithRetry<std::unique_ptr<IOutputStreamWithResponse>>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [&] (TMutationId /*mutationId*/) {
+            return RawClient_->WriteTableFragment(cookie, format, options);
+        }
+    );
+
+    return ::MakeIntrusive<TYaMRTableFragmentWriter>(std::move(stream));
+}
+
+::TIntrusivePtr<ITableFragmentWriter<Message>> TClientBase::CreateProtoFragmentWriter(
+    const TDistributedWriteTableCookie& cookie,
+    const TTableFragmentWriterOptions& options,
+    const Message* prototype)
+{
+    TVector<const ::google::protobuf::Descriptor*> descriptors;
+    descriptors.push_back(prototype->GetDescriptor());
+
+    TFormat format;
+    if (Context_.Config->UseClientProtobuf) {
+        format = TFormat::YsonBinary();
+    } else {
+        format = TFormat::Protobuf({prototype->GetDescriptor()}, Context_.Config->ProtobufFormatWithDescriptors);
+    }
+
+    // TODO(achains): Make proper wrapper class with retries and auto ping.
+    auto stream = NDetail::RequestWithRetry<std::unique_ptr<IOutputStreamWithResponse>>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [&] (TMutationId /*mutationId*/) {
+            return RawClient_->WriteTableFragment(cookie, format, options);
+        }
+    );
+
+    if (Context_.Config->UseClientProtobuf) {
+        return ::MakeIntrusive<TProtoTableFragmentWriter>(std::move(stream), std::move(descriptors));
+    }
+
+    return ::MakeIntrusive<TLenvalProtoTableFragmentWriter>(std::move(stream), std::move(descriptors));
 }
 
 TBatchRequestPtr TClientBase::CreateBatchRequest()
@@ -1409,16 +1505,13 @@ IFileReaderPtr TClient::GetJobStderr(
     return RawClient_->GetJobStderr(operationId, jobId, options);
 }
 
-std::vector<TJobTraceEvent> TClient::GetJobTrace(
+IFileReaderPtr TClient::GetJobTrace(
     const TOperationId& operationId,
+    const TJobId& jobId,
     const TGetJobTraceOptions& options)
 {
     CheckShutdown();
-    return RequestWithRetry<std::vector<TJobTraceEvent>>(
-        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
-        [this, &operationId, &options] (TMutationId /*mutationId*/) {
-            return RawClient_->GetJobTrace(operationId, options);
-        });
+    return RawClient_->GetJobTrace(operationId, jobId, options);
 }
 
 TNode::TListType TClient::SkyShareTable(
@@ -1500,6 +1593,56 @@ void TClient::ResumeOperation(
         });
 }
 
+void TClient::PingDistributedWriteTableSession(
+    const TDistributedWriteTableSession& session,
+    const TPingDistributedWriteTableOptions& options)
+{
+    CheckShutdown();
+    RequestWithRetry<void>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [this, &session, &options] (TMutationId& /*mutationId*/) {
+            RawClient_->PingDistributedWriteTableSession(session, options);
+        });
+}
+
+void TClient::FinishDistributedWriteTableSession(
+    const TDistributedWriteTableSession& session,
+    const TVector<TWriteTableFragmentResult>& results,
+    const TFinishDistributedWriteTableOptions& options)
+{
+    CheckShutdown();
+    RequestWithRetry<void>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [this, &session, &results, &options] (TMutationId& mutationId) {
+            RawClient_->FinishDistributedWriteTableSession(mutationId, session, results, options);
+        });
+}
+
+void TClient::PingDistributedWriteFileSession(
+    const TDistributedWriteFileSession& session,
+    const TPingDistributedWriteFileOptions& options)
+{
+    CheckShutdown();
+    RequestWithRetry<void>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [this, &session, &options] (TMutationId& /*mutationId*/) {
+            RawClient_->PingDistributedWriteFileSession(session, options);
+        });
+}
+
+void TClient::FinishDistributedWriteFileSession(
+    const TDistributedWriteFileSession& session,
+    const TVector<TWriteFileFragmentResult>& results,
+    const TFinishDistributedWriteFileOptions& options)
+{
+    CheckShutdown();
+    RequestWithRetry<void>(
+        ClientRetryPolicy_->CreatePolicyForGenericRequest(),
+        [this, &session, &results, &options] (TMutationId& mutationId) {
+            RawClient_->FinishDistributedWriteFileSession(mutationId, session, results, options);
+        });
+}
+
 TYtPoller& TClient::GetYtPoller()
 {
     auto g = Guard(Lock_);
@@ -1560,12 +1703,59 @@ void TClient::CheckShutdown() const
     }
 }
 
+const TNode::TMapType& TClient::GetDynamicConfiguration(const TString& configProfile)
+{
+    auto g = Guard(ClusterConfigLock_);
+
+    if (!ClusterConfig_) {
+        TNode clusterConfigNode;
+
+        TYPath clusterConfigPath = Context_.Config->ConfigRemotePatchPath + "/" + configProfile;
+        YT_LOG_DEBUG(
+            "Fetching cluster config (ConfigPath: %v, ConfigProfile: %v)",
+            Context_.Config->ConfigRemotePatchPath,
+            configProfile);
+
+        try {
+            clusterConfigNode = Get(clusterConfigPath, TGetOptions());
+        } catch (const TErrorResponse& error) {
+            if (!error.IsResolveError()) {
+                throw;
+            }
+
+            ClusterConfig_.emplace();
+            YT_LOG_WARNING(
+                "Could not resolve, saved empty cluster config (ConfigPath: %v, ConfigProfile: %v)",
+                Context_.Config->ConfigRemotePatchPath,
+                configProfile);
+        }
+
+        if (clusterConfigNode.IsMap()) {
+            ClusterConfig_ = clusterConfigNode.UncheckedAsMap();
+            YT_LOG_DEBUG(
+                "Saved cluster config (ConfigPath: %v, ConfigProfile: %v)",
+                Context_.Config->ConfigRemotePatchPath,
+                configProfile);
+        } else if (!ClusterConfig_.has_value()) {
+            ClusterConfig_.emplace();
+            YT_LOG_WARNING(
+                "Config node has incorrect type, saved empty cluster config (NodeType: %v, ConfigPath: %v, ConfigProfile: %v)",
+                clusterConfigNode.GetType(),
+                Context_.Config->ConfigRemotePatchPath,
+                configProfile);
+        }
+    }
+
+    return *ClusterConfig_;
+}
+
 void SetupClusterContext(
     TClientContext& context,
     const TString& serverName)
 {
     context.ServerName = serverName;
-    ApplyProxyUrlAliasingRules(context.ServerName);
+    context.MultiproxyTargetCluster = serverName;
+    ApplyProxyUrlAliasingRules(context.ServerName, context.Config->ProxyUrlAliasingRules);
 
     if (context.ServerName.find('.') == TString::npos &&
         context.ServerName.find(':') == TString::npos &&
@@ -1612,18 +1802,13 @@ TClientContext CreateClientContext(
     context.Config = options.Config_ ? options.Config_ : TConfig::Get();
     context.TvmOnly = options.TvmOnly_;
     context.ProxyAddress = options.ProxyAddress_;
-    context.UseProxyUnixDomainSocket = options.UseProxyUnixDomainSocket_;
-    context.MultiproxyTargetCluster = options.MultiproxyTargetCluster_;
+    context.JobProxySocketPath = options.JobProxySocketPath_;
 
     if (options.UseTLS_) {
         context.UseTLS = *options.UseTLS_;
     }
 
-    if (!options.UseProxyUnixDomainSocket_) {
-        SetupClusterContext(context, serverName);
-    } else {
-        context.ServerName = serverName;
-    }
+    SetupClusterContext(context, serverName);
 
     if (context.Config->HttpProxyRole && context.Config->Hosts == DefaultHosts) {
         context.Config->Hosts = "hosts?role=" + context.Config->HttpProxyRole;

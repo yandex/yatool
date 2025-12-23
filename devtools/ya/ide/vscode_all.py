@@ -105,7 +105,8 @@ class VSCodeProject:
             self.links_dir = os.path.join(self.project_root, ".links")
             if not os.path.exists(self.links_dir):
                 ide_common.emit_message(f"Creating directory: {self.links_dir}")
-                fs.ensure_dir(self.links_dir)
+            fs.remove_tree_safe(self.links_dir)
+            fs.ensure_dir(self.links_dir)
             if self.params.debug_enabled:
                 self.python_wrappers_dir = os.path.join(self.project_root, "python_wrappers")
                 if not os.path.exists(self.python_wrappers_dir):
@@ -123,7 +124,7 @@ class VSCodeProject:
             if self.params.compile_commands_fix:
                 tools_list.extend(["cc", "c++"])
             if self.params.debug_enabled and not pm.my_platform().startswith("darwin"):
-                tools_list.append("gdbnew")
+                tools_list.append("gdb")
             if self.params.clang_format_enabled:
                 tools_list.append("clang-format-18")
             if self.params.use_tool_clangd:
@@ -168,8 +169,7 @@ class VSCodeProject:
                 ("clang", tool_fetcher("cc")["executable"]),
             ]
             for item in compilation_database:
-                if item["command"].startswith("clang"):
-                    item["command"] = item["command"].replace(" -I", " -isystem")
+                item["command"] = item["command"].replace(" -I", " -isystem")
                 item["command"] = vscode.common.replace_prefix(item["command"], tools_replacements)
                 if is_windows:
                     item["command"] = item["command"].replace("\\", "/")
@@ -257,7 +257,7 @@ class VSCodeProject:
                 ("npm.autoDetect", "off"),
                 ("python.analysis.autoSearchPaths", False),
                 ("python.analysis.diagnosticMode", "openFilesOnly"),
-                ("python.analysis.enablePytestSupport", False),
+                ("python.analysis.enablePytestSupport", pm.my_platform().startswith("linux")),
                 ("python.analysis.indexing", False),
                 ("python.languageServer", "None"),
                 ("python.testing.autoTestDiscoverOnSaveEnabled", False),
@@ -345,7 +345,7 @@ class VSCodeProject:
         venv_opts = venv.VenvOptions()
         venv_opts.venv_add_tests = self.params.tests_enabled
         venv_opts.venv_root = os.path.join(self.project_root, 'venv')
-        venv_opts.venv_with_pip = False
+        venv_opts.venv_with_pip = True
         fs.remove_tree_safe(venv_opts.venv_root)
         venv_opts.venv_tmp_project = self.venv_tmp_project()
         venv_params = devtools.ya.core.yarg.merge_params(venv_opts.params(), copy.deepcopy(self.params))
@@ -433,8 +433,12 @@ class VSCodeProject:
         if self.is_py3:
             ide_common.emit_message("Collecting python extra paths")
             python_srcdirs = vscode.dump.get_python_srcdirs(modules)
-            extra_paths = vscode.dump.collect_python_path(self.params.arc_root, self.links_dir, modules, python_srcdirs)
+            extra_paths = vscode.dump.collect_python_path(
+                self.params.arc_root, self.links_dir, modules, python_srcdirs, self.params.python_new_extra_paths
+            )
             python_excludes = vscode.workspace.gen_pyrights_excludes(self.params.arc_root, python_srcdirs)
+            if self.params.ruff_formatter_enabled:
+                workspace["settings"]["ruff.exclude"] = python_excludes
             pyright_config = vscode.workspace.gen_pyrightconfig(
                 self.params, python_srcdirs, extra_paths, python_excludes
             )
@@ -454,6 +458,7 @@ class VSCodeProject:
             venv_args = self.params.ya_make_extra + [
                 '--venv-root=%s' % os.path.join(self.project_root, 'venv'),
                 '--venv-tmp-project=%s' % self.venv_tmp_project(),
+                '--venv-with-pip',
             ]
             if self.params.tests_enabled:
                 venv_args.append('--venv-add-tests')
@@ -562,6 +567,11 @@ class VSCodeProject:
 def gen_vscode_workspace(params):
     # noinspection PyUnresolvedReferences
     import app_ctx  # pyright: ignore[reportMissingImports]
+
+    if '.' in params.rel_targets and 'WHOLE_ARCADIA_BUILD' not in params.flags:
+        raise vscode.YaIDEError(
+            "You have attempted to generate workspace for whole arcadia. Use -DWHOLE_ARCADIA_BUILD if this is your desire."
+        )
 
     project = VSCodeProject(app_ctx, params)
     project.gen_workspace()

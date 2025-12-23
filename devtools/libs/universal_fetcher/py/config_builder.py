@@ -82,7 +82,7 @@ class HttpParams:
     connect_timeout_ms: int = 30_000
     socket_timeout_ms: int = 5_000
     max_redirect_count: int = 5
-    user_agent: str = "HttpUnifetcher/0.1"
+    user_agent: str = "universal_fetcher"
 
     def to_dict(self) -> dict:
         return {
@@ -123,6 +123,7 @@ class SandboxParams:
     api_url: str = "https://sandbox.yandex-team.ru/api/v1.0/resource/"
     oauth_token: str = ""
     allow_no_auth: bool = False
+    should_tar_output: bool = True
     transports_order: collections.abc.Sequence[SandboxTransportType] = (
         SandboxTransportType.EXTERNAL_PROGRAM_FETCHER,
         SandboxTransportType.HTTP,

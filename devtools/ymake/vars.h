@@ -111,7 +111,7 @@ struct TVarStr {
 
             ui16 OutInclsFromInput: 1;
             ui16 OutputInThisModule: 1;  // Dynamic mark for vars created as outputs in current module
-            ui16 StructCmd: 1;
+            ui16 StructCmdForVars: 1;
             ui16 IsGlob: 1;
             ui16 : 0;              // Start next word
             // ^^^^^^^^^^^^^^^^^^^^
@@ -190,6 +190,7 @@ struct TYVar: public TVector<TVarStr> {
             ui32 NoInline : 1;
             ui32 ModuleScopeOnly : 1;
             ui32 FakeDeepReplacement : 1;
+            ui32 DontParse : 1;
         };
     };
     ui32 Id; // tmp hack! only used to return id from Lookup commands
@@ -359,16 +360,15 @@ public:
         (*this)[k].DelFromSingleVal(args);
     }
 
-    value_type& SetValue(const TStringBuf& k, const TStringBuf& args, const TYVar* baseVal = nullptr) {
-        TString key = TString{k};
+    value_type& SetValue(const TStringBuf& key, const TStringBuf& args, const TYVar* baseVal = nullptr) {
         auto [pos, _] = emplace(key, TYVar{});
         pos->second.SetSingleVal(FormatCmd(Id, key, args), true);
-        pos->second.BaseVal = baseVal ? baseVal : Base ? Base->Lookup(k) : nullptr;
+        pos->second.BaseVal = baseVal ? baseVal : Base ? Base->Lookup(key) : nullptr;
         return *pos;
     }
 
     void SetPathResolvedValue(const TStringBuf key, const TStringBuf args) {
-        TYVar& yvar = (*this)[TString{key}];
+        TYVar& yvar = (*this)[key];
         yvar.SetSingleVal(FormatCmd(Id, key, args), true);
         yvar[0].IsPathResolved = true;
     }

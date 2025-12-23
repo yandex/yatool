@@ -20,16 +20,16 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
             if (Y_UNLIKELY(args.size() == 1 && std::holds_alternative<TMacroValues::TLegacyLateGlobPatterns>(args.front()))) {
-                return args.front();
+                return std::move(args.front());
             }
-            std::vector<std::string_view> result;
-            result.reserve(args.size());
+            TMacroValues::TXStrings result;
+            result.Data.reserve(args.size());
             for (auto& arg : args)
-                result.push_back(std::get<std::string_view>(ctx.Values.GetValue(ctx.Values.InsertStr(std::get<std::string_view>(arg)))));
+                result.Data.push_back(std::move(std::get<TMacroValues::TXString>(arg).Data));
             return result;
         }
         TTermValue Evaluate(
@@ -69,20 +69,20 @@ namespace {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] const TVector<TMacroValues::TValue>& args
+            [[maybe_unused]] std::span<TMacroValues::TValue> args
         ) const override {
             CheckArgCount(args);
-            auto result = TString();
             if (Y_UNLIKELY(args.size() == 1 && std::holds_alternative<TMacroValues::TLegacyLateGlobPatterns>(args.front()))) {
-                return args.front();
+                return std::move(args.front());
             }
+            auto result = std::string();
             for (auto& arg : args) {
                 std::visit(TOverloaded{
-                    [&](std::string_view piece) {
-                        result += piece;
+                    [&](const TMacroValues::TXString& piece) {
+                        result += piece.Data;
                     },
-                    [&](const std::vector<std::string_view>& pieces) {
-                        for (auto& piece : pieces)
+                    [&](const TMacroValues::TXStrings& pieces) {
+                        for (auto& piece : pieces.Data)
                             result += piece;
                     },
                     [&](const auto& x) {
@@ -90,7 +90,7 @@ namespace {
                     }
                 }, arg);
             }
-            return ctx.Values.GetValue(ctx.Values.InsertStr(result));
+            return TMacroValues::TXString{result};
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,

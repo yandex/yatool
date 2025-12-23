@@ -9,7 +9,9 @@
 #include "module_restorer.h"  // for TRestoreContext
 #include "module_resolver.h"  // for TModuleResolveContext
 #include "saveload.h"
+#include "json_visitor.h"
 
+#include <devtools/ymake/make_plan_cache.h>
 #include <devtools/ymake/symbols/time_store.h>
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
@@ -25,6 +27,7 @@
 #include <util/stream/format.h>
 
 #include <asio/awaitable.hpp>
+#include <asio/experimental/promise.hpp>
 #include <asio/thread_pool.hpp>
 #include <asio/strand.hpp>
 
@@ -70,11 +73,15 @@ public:
     bool HasNonDirTargets = false;
 
     TDependsToModulesClosure DependsToModulesClosure;
+    bool DependsToModulesClosureCollected{false};
 
     NYndex::TYndex Yndex;
 
     TModules Modules;
     TCommands Commands;
+
+    std::optional<asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)>> JSONCachePreloadingPromise;
+    std::optional<asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)>> UidsCachePreloadingPromise;
 
 private:
     TFsPath DepCacheTempFile;      // Name of temporary file with delayed save data
@@ -116,8 +123,11 @@ public:
     void AddRecursesToStartTargets();
     void AddModulesToStartTargets();
     void ComputeDependsToModulesClosure();
+    void GetDependsToModulesClosure();
     asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) override;
     asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) override;
+    asio::awaitable<THolder<TMakePlanCache>> LoadJsonCacheAsync(asio::any_io_executor exec);
+    asio::awaitable<THolder<TUidsData>> LoadUidsAsync(asio::any_io_executor exec);
     void SortAllEdges();
     void CheckBlacklist();
     void CheckIsolatedProjects();
@@ -184,6 +194,13 @@ public:
         // --xcompletely-trust-fs-cache can't be passed without --patch-path
         return Conf.ShouldUseGrandBypass() && Conf.CompletelyTrustFSCache && !HasGraphStructuralChanges_;
     }
+    // This function should only be used for testing purposes
+    void ForceBypassConfigure() {
+        Conf.EnableGrandBypass();
+        Conf.CompletelyTrustFSCache = true;
+        HasGraphStructuralChanges_ = false;
+        Y_ASSERT(CanBypassConfigure());
+    }
     void UpdateExternalFilesChanges();
     void UpdateUnreachableExternalFileChanges();
 
@@ -191,6 +208,8 @@ public:
     TRestoreContext GetRestoreContext();
     TTraverseStartsContext GetTraverseStartsContext() const noexcept;
     TFileProcessContext GetFileProcessContext(TModule* module, TAddDepAdaptor& node);
+
+    void InitPluginsAndParsers();
 
     const TStringBuf& GetExportLang() {
         if (ExportLang_ == "?") {

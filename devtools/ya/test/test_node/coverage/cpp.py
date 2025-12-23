@@ -235,6 +235,10 @@ def inject_clang_coverage_resolve_node(
         str(timeout),
     ]
 
+    if opts.clang_mcdc_coverage:
+        cmd.append("--mcdc-coverage")
+        cmd.append("--branch-coverage")
+
     if opts.use_distbuild or opts.coverage_verbose_resolve:
         cmd += ["--log-level", "DEBUG"]
 
@@ -297,6 +301,10 @@ def inject_create_clang_coverage_report_node(graph, suites, coverage_tar_name, o
         "--log-path",
         log_path,
     ]
+
+    if opts.clang_mcdc_coverage:
+        cmd.append("--mcdc-coverage")
+        cmd.append("--branch-coverage")
 
     if opts.use_distbuild or opts.coverage_verbose_resolve:
         cmd += ["--log-level", "DEBUG"]

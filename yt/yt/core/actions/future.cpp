@@ -1,6 +1,12 @@
 #include "future.h"
 #include "invoker_util.h"
 
+#ifdef YT_ENRICH_PROMISE_ABANDONED_WITH_BACKTRACE
+#include <yt/yt/core/misc/backtrace.h>
+
+#include <library/cpp/yt/backtrace/backtrace.h>
+#endif
+
 namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,6 +42,15 @@ TFutureCallbackCookie TFutureState<void>::Subscribe(TVoidResultHandler handler)
     }
 }
 
+TFutureCallbackCookie TFutureState<void>::SubscribeUnique(TUniqueVoidResultHandler handler)
+{
+    // TODO(babenko): consider optimizing this (rare) case.
+    return Subscribe(BIND([handler = std::move(handler)] (const TError& error) {
+        auto errorCopy = error;
+        handler(std::move(errorCopy));
+    }));
+}
+
 void TFutureState<void>::Unsubscribe(TFutureCallbackCookie cookie)
 {
     // Fast path.
@@ -63,20 +78,17 @@ bool TFutureState<void>::Cancel(const TError& error) noexcept
     // The reference is acquired above.
     TIntrusivePtr<TFutureState<void>> this_(this, /*addReference*/ false);
 
-    {
-        auto guard = Guard(SpinLock_);
-        if (Set_ || AbandonedUnset_ || Canceled_) {
-            return false;
-        }
-        CancelationError_ = error;
-        Canceled_ = true;
+    auto guard = Guard(SpinLock_);
+    if (Set_ || AbandonedUnset_ || Canceled_) {
+        return false;
     }
+    CancelationError_ = error;
+    Canceled_ = true;
 
     if (CancelHandlers_.empty()) {
-        if (!TrySetError(NDetail::WrapIntoCancelationError(error))) {
-            return false;
-        }
+        SetErrorGuarded(NDetail::WrapIntoCancelationError(error), std::move(guard));
     } else {
+        guard.Release();
         for (const auto& handler : CancelHandlers_) {
             RunNoExcept(handler, error);
         }
@@ -171,6 +183,11 @@ bool TFutureState<void>::TrySetError(const TError& error)
     return TrySet(error);
 }
 
+void TFutureState<void>::SetErrorGuarded(const TError& error, TGuard<NThreading::TSpinLock>&& guard)
+{
+    DoTrySet<true>(error, std::move(guard));
+}
+
 bool TFutureState<void>::DoUnsubscribe(TFutureCallbackCookie cookie, TGuard<NThreading::TSpinLock>* guard)
 {
     YT_ASSERT_SPINLOCK_AFFINITY(SpinLock_);
@@ -189,7 +206,7 @@ void TFutureState<void>::WaitUntilSet() const
         auto guard = Guard(SpinLock_);
         InstallAbandonedError();
         if (Set_) {
-            return ;
+            return;
         }
         if (!ReadyEvent_) {
             ReadyEvent_ = std::make_unique<NThreading::TEvent>();
@@ -251,7 +268,17 @@ void TFutureState<void>::OnLastPromiseRefLost()
     }
 
     // Slow path: notify the subscribers in a dedicated thread.
-    GetFinalizerInvoker()->Invoke(BIND_NO_PROPAGATE([this, error = std::move(cancelationError)] {
+    GetFinalizerInvoker()->Invoke(BIND_NO_PROPAGATE([
+#ifdef YT_ENRICH_PROMISE_ABANDONED_WITH_BACKTRACE
+        backtrace = NYT::CaptureBacktrace(),
+#endif
+        this,
+        error = std::move(cancelationError)
+    ] () mutable {
+#ifdef YT_ENRICH_PROMISE_ABANDONED_WITH_BACKTRACE
+        // NB: Backtrace symbolization can take a quite and thus is being offloaded to Finalizer thread.
+        error <<= TErrorAttribute("backtrace_origin", NBacktrace::SymbolizeBacktrace(backtrace));
+#endif
         // Set the promise if the value is still missing.
         TrySetError(std::move(error));
         // Kill the fake weak reference.
@@ -260,6 +287,20 @@ void TFutureState<void>::OnLastPromiseRefLost()
 }
 
 } // namespace NDetail
+
+////////////////////////////////////////////////////////////////////////////////
+
+std::atomic<bool> ContextSwitchInFutureHandlerForbidden;
+
+void ForbidContextSwitchInFutureHandler()
+{
+    ContextSwitchInFutureHandlerForbidden.store(true, std::memory_order::release);
+}
+
+bool IsContextSwitchInFutureHandlerForbidden()
+{
+    return ContextSwitchInFutureHandlerForbidden.load(std::memory_order::acquire);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 

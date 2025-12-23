@@ -1,8 +1,6 @@
 JAVA_PROGRAM()
 
-IF(JDK_VERSION == "")
-    JDK_VERSION(11)
-ENDIF()
+DEFAULT_JDK_VERSION(11)
 
 PROVIDES(junit-runner)
 
@@ -24,5 +22,6 @@ END()
 
 RECURSE_FOR_TESTS(
     test-pack/test
+    test-example/test
     src/test
 )

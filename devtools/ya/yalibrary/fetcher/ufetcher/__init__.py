@@ -2,11 +2,11 @@ import os
 import stat
 import logging
 import typing as tp
+import functools
 
 
 import devtools.libs.universal_fetcher.py as universal_fetcher
 import devtools.ya.core.report
-import exts.func
 import exts.archive
 import exts.deepget as deepget
 import exts.windows as windows
@@ -57,7 +57,7 @@ def _get_docker_config() -> str:
         return ""
 
 
-@exts.func.memoize(thread_safe=False)
+@functools.cache
 def _get_external_program_fetcher_cmd() -> list[str]:
     try:
         import app_ctx
@@ -101,11 +101,11 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
     return order
 
 
-@exts.func.memoize(thread_safe=False)
-def get_ufetcher() -> universal_fetcher.UniversalFetcher:
+@functools.cache
+def get_ufetcher(should_tar_output: bool = True) -> universal_fetcher.UniversalFetcher:
     # 2.3 + 5 + 12 + 27 + 64 + 148 + 340 + 360
     default_retry_policy = universal_fetcher.RetryPolicy(
-        max_retry_count=8,
+        max_retry_count=9,
         initial_delay_ms=1_000,
         use_fixed_delay=False,
         max_delay_ms=360_000,
@@ -135,7 +135,10 @@ def get_ufetcher() -> universal_fetcher.UniversalFetcher:
     if app_config.in_house:
         transports_order = _get_transports_order()
         sandbox_params = universal_fetcher.SandboxParams(
-            oauth_token=_get_sandbox_token(), transports_order=transports_order, allow_no_auth=True
+            oauth_token=_get_sandbox_token(),
+            transports_order=transports_order,
+            allow_no_auth=True,
+            should_tar_output=should_tar_output,
         )
         kwargs = {
             "sandbox_params": sandbox_params,
@@ -196,7 +199,7 @@ class UFetcherDownloader:
     def __call__(self, download_to: str) -> dict:
         res_info = self._download(download_to)
         self._send_result_to_telemetry_if_needed(res_info)
-        self._handle_error(res_info)
+        self.handle_error(res_info)
         self._post_process(res_info, download_to)
         return res_info
 
@@ -235,10 +238,10 @@ class UFetcherDownloader:
             except Exception as err:
                 logger.debug("Couldn't extract from tar: %s" % err)
 
-        self._update_permissions(download_to, is_executable)
+        self.update_permissions(download_to, is_executable, self._resource_type)
 
     @staticmethod
-    def _handle_error(res_info: dict) -> None:
+    def handle_error(res_info: dict) -> None:
         try:
             status = res_info['last_attempt']['result']['status']
             if status != universal_fetcher.OK:
@@ -249,7 +252,8 @@ class UFetcherDownloader:
         except KeyError as err:
             raise UnableToFetchError(f'No attempt was made: {err}')
 
-    def _update_permissions(self, dst: str, executable: bool) -> None:
+    @classmethod
+    def update_permissions(cls, dst: str, executable: bool, resource_type: str) -> None:
         """
         Update permissions on downloaded result
         - Remove write permissions for files on non-Windows
@@ -257,7 +261,7 @@ class UFetcherDownloader:
         - Set write permissions for directories
         - If resource is executable, set executable premissions if result is file
         """
-        if self._resource_type.startswith("sbr"):
+        if resource_type.startswith("sbr"):
             os.chmod(dst, os.stat(dst).st_mode | stat.S_IWUSR)
 
             if os.path.isdir(dst):
@@ -267,7 +271,7 @@ class UFetcherDownloader:
                 for root, dirs, files in os.walk(dst):
                     for file_name in files:
                         extracted_path = os.path.join(root, file_name)
-                        perms = self._get_sandbox_file_permissions(extracted_path, not dirs and executable)
+                        perms = cls._get_sandbox_file_permissions(extracted_path, not dirs and executable)
                         os.chmod(extracted_path, perms)
 
                     for dir_name in dirs:
@@ -275,9 +279,9 @@ class UFetcherDownloader:
                         os.chmod(extracted_dir, os.stat(extracted_dir).st_mode | stat.S_IWUSR)
 
             else:
-                perms = self._get_sandbox_file_permissions(dst, executable)
+                perms = cls._get_sandbox_file_permissions(dst, executable)
                 os.chmod(dst, perms)
-        elif self._resource_type.startswith("http"):
+        elif resource_type.startswith("http"):
             os.chmod(dst, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
     @staticmethod
@@ -291,7 +295,7 @@ class UFetcherDownloader:
 
         if executable:
             logger.debug("Setting exec premissions for %s", dst)
-            perms |= stat.S_IXUSR | stat.S_IXGRP
+            perms |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
 
         return perms
 

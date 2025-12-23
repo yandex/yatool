@@ -67,9 +67,18 @@ from devtools.ya.build.build_opts import (
     ContinueOnFailOptions,
 )
 from devtools.ya.build.build_opts import YMakeRetryOptions, ConfigurationPresetsOptions, ArcPrefetchOptions
-from devtools.ya.core.common_opts import CrossCompilationOptions, YaBin3Options, OutputStyleOptions
+from devtools.ya.core.common_opts import (
+    BeVerboseOptions,
+    CrossCompilationOptions,
+    YaBin3Options,
+    OutputStyleOptions,
+    LogFileOptions,
+    EventLogFileOptions,
+)
 from devtools.ya.test.explore import generate_tests_by_dart
 from devtools.ya.test.dartfile import decode_recipe_cmdline
+
+from devtools.ya.build.ya_make import DisplayMessageSubscriber, YmakeEvlogSubscriber
 
 import devtools.ya.app
 import app_config
@@ -78,7 +87,11 @@ logger = logging.getLogger(__name__)
 
 
 class DumpYaHandler(CompositeHandler):
-    common_opts = [ShowHelpOptions()]
+    common_opts = [
+        ShowHelpOptions(),
+        LogFileOptions(),
+        EventLogFileOptions(),
+    ]
 
     @staticmethod
     def common_build_facade_opts(with_free_targets=True):
@@ -384,6 +397,25 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
         if hasattr(params, name):
             debug_options.extend(getattr(params, name))
     logger.debug('abs_targets: %s', params.abs_targets)
+
+    try:
+        import app_ctx
+
+        subscribers = [
+            DisplayMessageSubscriber(BeVerboseOptions(False), getattr(app_ctx, 'display', None)),
+        ]
+
+        if hasattr(app_ctx, 'evlog'):
+            subscribers.append(
+                YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')),
+            )
+
+        if hasattr(app_ctx, 'event_queue'):
+            app_ctx.event_queue.subscribe(*subscribers)
+
+    except ImportError:
+        pass
+
     with temp_dir() as tmp:
         res = gen_func(
             build_root=build_root or tmp,
@@ -1082,7 +1114,6 @@ def do_imprint(params):
         writer.writerow(line)
 
 
-# TODO: support host/target platforms opts
 def do_uids(params):
     uids = gen_uids(
         arc_root=params.arc_root,
@@ -1090,8 +1121,10 @@ def do_uids(params):
         build_type=params.build_type,
         build_targets=params.abs_targets,
         debug_options=[],
-        flags={},
+        flags=params.flags,
         ymake_bin=None,
+        host_platform=params.host_platform,
+        target_platforms=params.target_platforms,
     )
     json.dump(uids, sys.stdout, indent=4, sort_keys=True)
 

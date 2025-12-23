@@ -66,7 +66,7 @@ TMakeModuleState::TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& g
     GlobalSrcs = &restorer.GetGlobalSrcsIds();
 }
 
-TMakeModuleStatePtr TMakeModuleStates::GetState(TNodeId moduleId) {
+TMakeModuleStatePtr TMakeModuleSequentialStates::GetState(TNodeId moduleId) {
     GetStats().Inc(NStats::EMakeCommandStats::InitModuleEnvCalls);
     if (LastStateId_ != moduleId) {
         LastStateId_ = moduleId;
@@ -77,6 +77,11 @@ TMakeModuleStatePtr TMakeModuleStates::GetState(TNodeId moduleId) {
     return LastState_;
 }
 
+void TMakeModuleSequentialStates::ClearState(TNodeId) {
+    LastStateId_ = TNodeId::Invalid;
+    LastState_.Reset();
+}
+
 inline NStats::TMakeCommandStats& TMakeModuleStates::GetStats() {
     static NStats::TMakeCommandStats stats{"TMakeCommand stats"};
     return stats;
@@ -85,6 +90,26 @@ inline NStats::TMakeCommandStats& TMakeModuleStates::GetStats() {
 TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake)
     : TMakeCommand(modulesStatesCache, yMake, nullptr)
 {
+}
+
+TMakeModuleStatePtr TMakeModuleParallelStates::GetState(TNodeId moduleId) {
+    return States_.InsertIfAbsentWithInit(moduleId, [&]() {
+        {
+            // we have to serialize all operations on TNodeListStore since it's not divided by modules
+            // for now it's enough to serialize only MinePeers
+            // TODO: make TNodeListStore more thread-safe
+            std::unique_lock<TAdaptiveLock> lock(NodeListsLock_);
+            TModuleRestorer restorer({Conf_, Graph_, Modules_}, Graph_[moduleId]);
+            restorer.RestoreModule();
+            restorer.MinePeers();
+        }
+        return new TMakeModuleState{Conf_, Graph_, Modules_, moduleId};
+    });
+}
+
+void TMakeModuleParallelStates::ClearState(TNodeId moduleId) {
+    TMakeModuleStatePtr state;
+    States_.TryRemove(moduleId, state);
 }
 
 TMakeCommand::TMakeCommand(TMakeModuleStates& modulesStatesCache, TYMake& yMake, const TVars* base0)
@@ -119,7 +144,7 @@ TString TMakeCommand::RealPathEx(const TConstDepNodeRef& node) const {
     return Conf.RealPathEx(resolvedNode);
 }
 
-void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFormat, TDumpInfoEx* addInfo, bool skipRender, bool isGlobalNode) {
+void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, TDumpInfoEx* addInfo, bool skipRender, bool isGlobalNode) {
     InitModuleEnv(modId);
     RequirePeers = (nodeId == modId) && Modules.Get(Graph[modId]->ElemId)->GetAttrs().UsePeers;
     if (isGlobalNode) {
@@ -129,9 +154,12 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, ECmdFormat cmdFor
         MineInputsAndOutputs(nodeId, modId);
         MineVarsAndExtras(addInfo, nodeId, modId);
         CmdInfo.KeepTargetPlatform = Graph.Names().CommandConf.GetById(TVersionedCmdId(Graph[CmdNode]->ElemId).CmdId()).KeepTargetPlatform;
+        if (CmdInfo.KeepTargetPlatform) {
+            YDebug() << "TMakeCommand::GetFromGraph: KeepTargetPlatform is set for " << Graph.ToTargetStringBuf(nodeId) << Endl;
+        }
         if (!skipRender) {
             auto ignoreErrors = TErrorShowerState(TDebugOptions::EShowExpressionErrors::None);
-            RenderCmdStr(cmdFormat, &ignoreErrors);
+            RenderCmdStr(&ignoreErrors);
         }
     }
 }
@@ -150,7 +178,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
     Y_ASSERT(UseFileId(node->NodeType)); //
     auto mainFileView = Graph.GetFileName(node);
     MainFileName = mainFileView.GetTargetStr();
-    YDIAG(MkCmd) << "Build: " << MainFileName << Endl;
+    YDIAG(MkCmd) << "Build: " << (mainFileView.IsLink() ? ELinkTypeHelper::LinkToTargetString(mainFileView.GetLinkType(), mainFileView.GetTargetStr()) : MainFileName) << Endl;
     bool isModule = nodeId == modId;
     TVarStrEx mainOut = TVarStrEx(RealPathEx(node), node->ElemId, true);
 
@@ -217,7 +245,7 @@ void TMakeCommand::MineInputsAndOutputs(TNodeId nodeId, TNodeId modId) {
     ProcessInputsAndOutputs<false>(node, isModule, Modules, addInput, isGlobalSrc, addSpanInput, addOutput, setCmd);
 
     if (!cmdfound) {
-        throw TMakeError() << "No pattern for node " << MainFileName;
+        throw TMakeError() << "No pattern for node " << (mainFileView.IsLink() ? ELinkTypeHelper::LinkToTargetString(mainFileView.GetLinkType(), mainFileView.GetTargetStr()) : MainFileName);
     }
 
     // TODO: INPUT, OUTPUT has to be released as internal variables.
@@ -322,32 +350,18 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
     addInfo->LateOuts.insert(addInfo->LateOuts.end(), lateOuts.begin(), lateOuts.end());
 }
 
-void TMakeCommand::RenderCmdStr(ECmdFormat cmdFormat, TErrorShowerState* errorShower) {
-    //recursively add command parts!
-    if (Graph.Names().CmdNameById(Graph[CmdNode]->ElemId).IsNewFormat()) {
-        auto expr = Commands->GetByElemId(Graph[CmdNode]->ElemId);
-        YDIAG(MkCmd) << "CS for: " << Commands->PrintCmd(*expr) << "\n";
-        if (!CmdInfo.MkCmdAcceptor) {
-            // TBD: we can get here, e.g., from the MSVS generator; what's the goal?
-            return;
-        }
-        auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
-        Y_ABORT_UNLESS(acceptor);
-        Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, Conf, errorShower);
-        acceptor->PostScript(Vars);
-    } else {
-        YDIAG(MkCmd) << "CS for: " << CmdString << "\n";
-        CmdString = CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, ECF_ExpandSimpleVars, true);
-        CmdInfo.SubstMacro(nullptr, CmdString, ESM_DoSubst, Vars, cmdFormat, false);
-        const auto& cmdInfo = CmdInfo;
-
-        TYVar& toolVar = Vars[NVariableDefs::VAR_TOOLS];
-        if (cmdInfo.ToolPaths) {
-            for (const auto& tool : *cmdInfo.ToolPaths) {
-                toolVar.push_back(TVarStr(tool.second, true, false));
-            }
-        }
+void TMakeCommand::RenderCmdStr(TErrorShowerState* errorShower) {
+    Y_ABORT_UNLESS (Graph.Names().CmdNameById(Graph[CmdNode]->ElemId).IsNewFormat());
+    auto expr = Commands->GetByElemId(Graph[CmdNode]->ElemId);
+    YDIAG(MkCmd) << "CS for: " << Commands->PrintCmd(*expr) << "\n";
+    if (!CmdInfo.MkCmdAcceptor) {
+        // TBD: we can get here, e.g., from the MSVS generator; what's the goal?
+        return;
     }
+    auto acceptor = CmdInfo.MkCmdAcceptor->Upgrade();
+    Y_ABORT_UNLESS(acceptor);
+    Commands->WriteShellCmd(acceptor, *expr, Vars, Inputs, CmdInfo, &Graph.Names().CommandConf, Conf, errorShower);
+    acceptor->PostScript(Vars);
 }
 
 void TMakeCommand::ReportStats() {

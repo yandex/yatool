@@ -126,13 +126,13 @@ std::unique_ptr<IHeterogenousFilterConsumer> CreateFilteringConsumerImpl(
                 // But just in case, let async writer do the job on concatenating these segments.
                 asyncYson = AsyncWriter_.Finish();
             } else {
-                asyncYson = asyncSegments.front().ApplyUnique(BIND([] (std::pair<TYsonString, bool>&& pair) {
+                asyncYson = asyncSegments.front().AsUnique().Apply(BIND([] (std::pair<TYsonString, bool>&& pair) {
                     return std::move(pair.first);
                 }));
             }
 
             // Second, perform actual filtration.
-            auto asyncFilteredYson = asyncYson.ApplyUnique(BIND([paths = std::move(Paths_), sync = Sync_] (TYsonString&& yson) {
+            auto asyncFilteredYson = asyncYson.AsUnique().Apply(BIND([paths = std::move(Paths_), sync = Sync_] (TYsonString&& yson) {
                 // Note the special case when there are no matches. Ideally we would like to not emit
                 // our attribute at all, but the possibility to do so depends on whether we are in sync or async case.
                 //
@@ -199,22 +199,22 @@ std::unique_ptr<IHeterogenousFilterConsumer> CreateFilteringConsumerImpl(
 TAttributeFilter::TAttributeFilter(std::vector<IAttributeDictionary::TKey> keys, std::vector<TYPath> paths)
     : Keys_(std::move(keys))
     , Paths_(std::move(paths))
-    , Universal(false)
+    , Universal_(false)
 { }
 
 TAttributeFilter::TAttributeFilter(std::initializer_list<TString> keys)
     : Keys_({keys.begin(), keys.end()})
-    , Universal(false)
+    , Universal_(false)
 { }
 
 TAttributeFilter::TAttributeFilter(const std::vector<TString>& keys)
     : Keys_({keys.begin(), keys.end()})
-    , Universal(false)
+    , Universal_(false)
 { }
 
 TAttributeFilter::operator bool() const
 {
-    return !Universal;
+    return !Universal_;
 }
 
 void TAttributeFilter::ValidateKeysOnly(TStringBuf context) const
@@ -226,18 +226,7 @@ void TAttributeFilter::ValidateKeysOnly(TStringBuf context) const
 
 bool TAttributeFilter::IsEmpty() const
 {
-    return !Universal && Keys_.empty() && Paths_.empty();
-}
-
-void TAttributeFilter::AddKey(IAttributeDictionary::TKey key)
-{
-    Universal = false;
-    Keys_.emplace_back(std::move(key));
-}
-
-void TAttributeFilter::ReserveKeys(size_t capacity)
-{
-    Keys_.reserve(capacity);
+    return !Universal_ && Keys_.empty() && Paths_.empty();
 }
 
 bool TAttributeFilter::AdmitsKeySlow(TStringBuf key) const
@@ -344,6 +333,31 @@ TAttributeFilter::TKeyToFilter TAttributeFilter::Normalize() const
     }
 
     return result;
+}
+
+void TAttributeFilter::Remove(const std::vector<IAttributeDictionary::TKey>& keys)
+{
+    std::erase_if(
+        Keys_,
+        [&] (const auto& key) {
+            return std::find(keys.begin(), keys.end(), key) != keys.end();
+        }
+    );
+    auto keyPaths = keys | std::views::transform([] (const auto& key) {
+        return "/" + ToYPathLiteral(key);
+    });
+
+    std::erase_if(
+        Paths_,
+        [&] (const auto& path) {
+            for (const auto& keyPath : keyPaths) {
+                if (path.StartsWith(std::string_view(keyPath))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    );
 }
 
 std::unique_ptr<TAttributeFilter::IFilteringConsumer> TAttributeFilter::CreateFilteringConsumer(

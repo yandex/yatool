@@ -437,3 +437,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
 
 class Junit5TestSuite(JavaTestSuite):
     pass
+
+
+class Junit6TestSuite(JavaTestSuite):
+    pass

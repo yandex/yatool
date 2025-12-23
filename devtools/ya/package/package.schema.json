@@ -677,6 +677,13 @@
                     "description": "Save docker image to archive",
                     "type": "boolean"
                 },
+                "docker_labels": {
+                    "description": "Allows to pass labels to docker similar to `docker --label`",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "docker_target": {
                     "description": "Specifying target build stage (--target)",
                     "type": "string"

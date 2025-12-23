@@ -36,13 +36,8 @@ def inject_download_sandbox_resource_node(graph, resource, opts, global_resource
             "$(RESOURCE_ROOT)/sbr/{}/resource".format(resource_id),
         ]
 
-        if not app_config.have_sandbox_fetcher:
-            node_requirements = gen_plan.get_requirements(opts)
-        else:
-            node_requirements = gen_plan.get_requirements(
-                opts,
-                {"network": "full"},
-            )
+        extra_reqs = {"network": "full"} if app_config.in_house else None
+        node_requirements = gen_plan.get_requirements(opts, extra_reqs)
 
         if opts.dir_outputs_in_nodes:
             resource_dir_output = storage.get_dir_outputs_resource_dir_path(resource_id)

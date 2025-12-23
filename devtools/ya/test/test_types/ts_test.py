@@ -14,8 +14,8 @@ HERMIONE_TEST_TYPE = "hermione"
 PLAYWRIGHT_TEST_TYPE = "playwright"
 PLAYWRIGHT_LARGE_TEST_TYPE = "playwright_large"
 
-TS_MODULE_TAGS = ("ts", "ts_proto")
-TS_TRANSIENT_MODULE_TAGS = ("ts", "ts_proto", "ts_prepare_deps")
+TS_MODULE_TAGS = ("ts", "ts_proto", "ts_proto_from_schema", "ts_proto_auto")
+TS_TRANSIENT_MODULE_TAGS = TS_MODULE_TAGS + ("ts_prepare_deps",)
 
 
 def get_nodejs_res(meta):
@@ -36,6 +36,14 @@ class BaseFrontendSuite(common_types.AbstractTestSuite):
     @property
     def supports_clean_environment(self):
         return False
+
+    @property
+    def target_path(self):
+        return self.meta.ts_test_for_path if self.meta and self.meta.ts_test_for_path else self.project_path
+
+    @property
+    def test_for_path(self):
+        return os.path.join(yalibrary.graph.const.BUILD_ROOT, self.target_path)
 
     def setup_dependencies(self, graph):
         super(BaseFrontendSuite, self).setup_dependencies(graph)
@@ -86,10 +94,6 @@ class BaseFrontendRegularSuite(BaseFrontendSuite):
     def support_retries(self):
         return True
 
-    @property
-    def test_for_path(self):
-        return os.path.join(yalibrary.graph.const.BUILD_ROOT, self.meta.ts_test_for_path)
-
     def _get_run_cmd_opts(self, opts, retry=None, for_dist_build=True):
         test_work_dir = test_common.get_test_suite_work_dir(
             yalibrary.graph.const.BUILD_ROOT,
@@ -136,6 +140,14 @@ class BaseFrontendRegularSuite(BaseFrontendSuite):
 
         return opts
 
+    def get_test_dependencies(self):
+        base_deps = super().get_test_dependencies()
+        return sorted(set([os.path.join(self.target_path, "pre.pnpm-lock.yaml")] + base_deps))
+
+    def get_run_cmd_inputs(self, opts):
+        base_deps = super().get_run_cmd_inputs(opts)
+        return sorted(set([os.path.join(self.target_path, "pre.pnpm-lock.yaml")] + base_deps))
+
 
 class JestTestSuite(BaseFrontendRegularSuite):
     def get_type(self):
@@ -165,6 +177,50 @@ class JestTestSuite(BaseFrontendRegularSuite):
             + [
                 "--config",
                 self.meta.config_path,
+                "--ts-config-path",
+                self.meta.ts_config_path,
+                "--timeout",
+                str(self.timeout),
+                "--verbose",
+            ]
+        )
+
+        return cmd
+
+    @property
+    def supports_coverage(self):
+        return True
+
+
+class VitestTestSuite(BaseFrontendRegularSuite):
+    def get_type(self):
+        return "vitest"
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.REGULAR
+
+    def support_splitting(self, opts=None):
+        return False
+
+    def get_run_cmd(self, opts, retry=None, for_dist_build=True):
+        common_cmd_opts = self._get_run_cmd_opts(opts, retry, for_dist_build)
+        generic_cmd = test_tools.get_test_tool_cmd(
+            opts,
+            "run_vitest",
+            self.global_resources,
+            wrapper=True,
+            run_on_target_platform=True,
+        )
+
+        cmd = (
+            generic_cmd
+            + common_cmd_opts
+            + [
+                "--config",
+                self.meta.config_path,
+                "--ts-config-path",
+                self.meta.ts_config_path,
                 "--timeout",
                 str(self.timeout),
                 "--verbose",
@@ -321,9 +377,8 @@ class PlaywrightTestSuite(BaseFrontendRegularSuite):
             + [
                 "--config",
                 self.meta.config_path,
-                "--timeout",
-                str(self.timeout),
-                "--verbose",
+                "--ts-config-path",
+                self.meta.ts_config_path,
             ]
         )
 
@@ -481,6 +536,8 @@ class EslintTestSuite(AbstractFrontendStyleSuite):
             get_nodejs_res(self.meta),
             "--eslint-config-path",
             self._eslint_config_path,
+            "--ts-config-path",
+            self.meta.ts_config_path,
             "--tracefile",
             os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
         ]
@@ -633,3 +690,77 @@ class StylelintTestSuite(AbstractFrontendStyleSuite):
     @classmethod
     def list(cls, cmd, cwd):
         return [test_common.SubtestInfo(f, "ts_stylelint") for f in cmd]
+
+
+class BiomeTestSuite(AbstractFrontendStyleSuite):
+    def __init__(
+        self,
+        meta,
+        modulo=1,
+        modulo_index=0,
+        target_platform_descriptor=None,
+        multi_target_platform_run=False,
+    ):
+        super(BiomeTestSuite, self).__init__(
+            meta,
+            modulo,
+            modulo_index,
+            target_platform_descriptor,
+            split_file_name=None,
+            multi_target_platform_run=multi_target_platform_run,
+        )
+        self._files = self.meta.test_files
+
+    def get_type(self):
+        return "ts_biome"
+
+    @property
+    def class_type(self):
+        return test_const.SuiteClassType.STYLE
+
+    def _get_config_files(self):
+        return [self.meta.ts_biome_config]
+
+    def get_run_cmd(self, opts, retry=None, for_dist_build=True):
+        test_work_dir = test_common.get_test_suite_work_dir(
+            yalibrary.graph.const.BUILD_ROOT,
+            self.project_path,
+            self.name,
+            retry,
+            split_count=self._modulo,
+            split_index=self._modulo_index,
+            target_platform_descriptor=self.target_platform_descriptor,
+            multi_target_platform_run=self.multi_target_platform_run,
+            remove_tos=opts.remove_tos,
+        )
+        cmd = test_tools.get_test_tool_cmd(
+            opts,
+            "run_biome",
+            self.global_resources,
+            wrapper=True,
+            run_on_target_platform=True,
+        )
+
+        cmd_args = [
+            "--source-root",
+            yalibrary.graph.const.SOURCE_ROOT,
+            "--build-root",
+            yalibrary.graph.const.BUILD_ROOT,
+            "--project-path",
+            self.meta.source_folder_path,
+            "--nodejs-dir",
+            get_nodejs_res(self.meta),
+            "--test-config",
+            self.meta.ts_biome_config,
+            "--trace",
+            os.path.join(test_work_dir, test_const.TRACE_FILE_NAME),
+        ]
+
+        return cmd + cmd_args + self._files[self._modulo_index :: self._modulo]
+
+    def get_list_cmd(self, arc_root, build_root, opts):
+        return self._files
+
+    @classmethod
+    def list(cls, cmd, cwd):
+        return [test_common.SubtestInfo(f, "ts_biome") for f in cmd]

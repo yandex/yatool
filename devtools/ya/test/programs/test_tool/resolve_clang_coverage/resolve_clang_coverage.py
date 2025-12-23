@@ -10,7 +10,6 @@ import re
 import signal
 
 import exts.fs
-import exts.func
 import exts.archive
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 from devtools.common import libmagic
@@ -33,6 +32,8 @@ def parse_args():
     parser.add_argument('--llvm-cov-tool', required=True)
     parser.add_argument('--coverage-path', required=True)
     parser.add_argument('--source-root')
+    parser.add_argument('--mcdc-coverage', action='store_true')
+    parser.add_argument('--branch-coverage', action='store_true')
     parser.add_argument('--log-path')
     parser.add_argument(
         "--log-level",
@@ -64,7 +65,18 @@ def merge_segments(s1, s2):
 
 
 @shared.timeit
-def saturate_coverage(covtype, covdata, source_root, cache):
+def merge_branches(b1, b2):
+    return lib_coverage.merge.merge_clang_branches([b1, b2])
+
+
+@shared.timeit
+def merge_mcdc_records(r1, r2):
+    mcdc_records = lib_coverage.merge.merge_clang_mcdc_records([r1, r2])
+    return list(record.dump() for record in mcdc_records)
+
+
+@shared.timeit
+def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches=False):
     if covtype == 'files':
         filename = covdata['filename']
     elif covtype == 'functions':
@@ -83,9 +95,34 @@ def saturate_coverage(covtype, covdata, source_root, cache):
             'segments': [],
             'functions': {},
         }
+        if branches:
+            cache[relfilename]['branches'] = []
+
+        if mcdc:
+            cache[relfilename]['mcdc'] = []
+
     cache_entry = cache[relfilename]
 
     if covtype == 'files':
+        if 'summary' in covdata:
+            if 'summary' in cache_entry:
+                logger.warning(
+                    f"Found summary report duplicate for '{relfilename}': cache_entry={cache_entry}, covdata={covdata}"
+                )
+            cache_entry['summary'] = covdata['summary']
+
+        if mcdc:
+            if not cache_entry['mcdc']:
+                cache_entry['mcdc'] = covdata['mcdc_records']
+            else:
+                cache_entry['mcdc'] = merge_mcdc_records(cache_entry['mcdc'], covdata['mcdc_records'])
+
+        if branches:
+            if not cache_entry['branches']:
+                cache_entry['branches'] = covdata['branches']
+            else:
+                cache_entry['branches'] = merge_branches(cache_entry['branches'], covdata['branches'])
+
         if not cache_entry['segments']:
             cache_entry['segments'] = covdata['segments']
         else:
@@ -117,7 +154,7 @@ def extract(filename):
 def merge_covdata(profdata_tool, bin_name, filenames):
     assert filenames
     output = os.path.abspath(bin_name + ".profdata")
-    cmd = [profdata_tool, 'merge', '-sparse', '-o', output] + filenames
+    cmd = [profdata_tool, 'merge', '--sparse', '-o', output] + filenames
     process.execute(cmd, check_sanitizer=False)
     return output
 
@@ -208,11 +245,16 @@ def main():
         'export',
         '-j',
         '4',
-        '-instr-profile',
+        '--instr-profile',
         profdata_path,
-        '-object',
+        '--object',
         args.target_binary,
-    ] + lib_coverage.util.get_default_llvm_export_args()
+    ]
+
+    if args.mcdc_coverage:
+        cmd.append('--show-mcdc-summary')
+
+    cmd += lib_coverage.util.get_default_llvm_export_args()
 
     def process_block(covtype, filename, data):
         # XXX temporary hack till https://st.yandex-team.ru/DEVTOOLS-3757 is done
@@ -221,7 +263,14 @@ def main():
             if is_generated_code(filename, args.source_root):
                 return
 
-        saturate_coverage(covtype, load_block(data), args.source_root, coverage)
+        saturate_coverage(
+            covtype,
+            load_block(data),
+            args.source_root,
+            coverage,
+            mcdc=args.mcdc_coverage,
+            branches=args.branch_coverage,
+        )
 
     lib_coverage.export.export_llvm_coverage(cmd, process_block, cancel_func=is_shutdown_requested)
 
