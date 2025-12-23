@@ -108,6 +108,9 @@ class PreparePattern(object):
                 force_universal_fetcher=self._shloud_use_universal_fetcher,
             )
 
+            if res.install_stat and res.install_stat.get('multifile'):
+                raise Exception('Tool cannot be a multifile. Is must be an archive.')
+
             transport_history = deepget.deepget(res.install_stat, ("last_attempt", "result", "transport_history"))
             if transport_history:
                 self._download_transport = transport_history[-1]["transport"]
