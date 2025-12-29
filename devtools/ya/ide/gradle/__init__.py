@@ -70,7 +70,7 @@ def _do_export(
     sem_graph: _JavaSemGraph,
     exists_symlinks: _ExistsSymlinkCollector,
     remove_symlinks: _RemoveSymlinkCollector,
-) -> None:
+) -> str:
     with tracer.scope('export & build>||export'):
         exporter = _Exporter(config, sem_graph)
         exporter.export()
@@ -78,13 +78,13 @@ def _do_export(
         with tracer.scope('export & build>||export>make symlinks'):
             new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
             new_symlinks.collect()
-
-            remove_symlinks.remove()
-            new_symlinks.create()
-            exists_symlinks.save()
-
             if new_symlinks.has_errors:
-                raise YaIdeGradleException('Some errors during creating symlinks, read the logs for more information')
+                return 'Some errors during creating symlinks, read the logs for more information'
+            else:
+                remove_symlinks.remove()
+                new_symlinks.create()
+                exists_symlinks.save()
+                return ''
 
 
 def _async_export(
@@ -96,10 +96,10 @@ def _async_export(
     return core_async.future(lambda: _do_export(config, sem_graph, exists_symlinks, remove_symlinks), daemon=False)
 
 
-def _do_build(config: _JavaSemConfig, sem_graph: _JavaSemGraph) -> None:
+def _do_build(config: _JavaSemConfig, sem_graph: _JavaSemGraph) -> str:
     with tracer.scope('export & build>||build'):
         builder = _Builder(config, sem_graph)
-        builder.build()
+        return builder.build()
 
 
 def _async_build(config: _JavaSemConfig, sem_graph: _JavaSemGraph):
@@ -134,8 +134,12 @@ def do_gradle(params) -> int:
                 wait_build = _async_build(config, sem_graph)
 
                 wait_ya_settings()
-                wait_export()
-                wait_build()
+                export_error = wait_export()
+                build_error = wait_build()
+                if export_error or build_error:
+                    raise YaIdeGradleException(
+                        ', '.join(([export_error] if export_error else []) + ([build_error] if build_error else []))
+                    )
 
         except (SemException, YaIdeGradleException) as e:
             logging.error("%s", str(e))

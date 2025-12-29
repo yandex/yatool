@@ -18,7 +18,7 @@ class _Builder:
         self.config: _JavaSemConfig = java_sem_config
         self.sem_graph: _JavaSemGraph = java_sem_graph
 
-    def build(self) -> None:
+    def build(self) -> str:
         """Extract build targets from sem-graph and build they"""
         try:
             build_rel_targets: list[Path] = list(set(self.sem_graph.get_run_java_program_rel_targets()))
@@ -45,9 +45,7 @@ class _Builder:
                     # Collect other targets
                     build_rel_targets.append(rel_target)
         except Exception as e:
-            raise YaIdeGradleException(
-                f'Fail extract build targets from sem-graph {self.sem_graph.sem_graph_file}: {e}'
-            ) from e
+            return f'Fail extract build targets from sem-graph {self.sem_graph.sem_graph_file}: {e}'
 
         if build_rel_targets:
             with tracer.scope('export & build>||build>java'):
@@ -56,6 +54,7 @@ class _Builder:
         if self.config.params.build_foreign and self.sem_graph.foreign_targets:
             with tracer.scope('export & build>||build>foreign'):
                 self._build_rel_targets(self.sem_graph.foreign_targets, build_all_langs=True)
+        return None
 
     def _build_rel_targets(
         self, build_rel_targets: list[Path], proto_rel_targets: list[Path] = None, build_all_langs: bool = False
