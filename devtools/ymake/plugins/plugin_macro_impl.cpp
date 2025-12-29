@@ -34,8 +34,13 @@ namespace NYMake::NPlugins {
     }
 
     void RegisterMacro(TBuildConfiguration& conf, const char* name, PyObject* func) {
-        if (!PyFunction_Check(func))
+        if (!PyFunction_Check(func)) {
+            Py_ssize_t size = 0;
+            auto *pystr = PyType_GetName(Py_TYPE(func));
+            const char *data = PyUnicode_AsUTF8AndSize(pystr, &size);
+            YErr() << "Attempt to register plugin macro '" << name << "' with implementation of type '" <<  TStringBuf{data, static_cast<size_t>(size)} << "' which is not a function.";
             return;
+        }
 
         PyCodeObject* code = (PyCodeObject*) PyFunction_GetCode(func);
         TFsPath path = TFsPath(PyUnicode_AsUTF8(code->co_filename));
