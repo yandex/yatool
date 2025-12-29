@@ -119,7 +119,13 @@ namespace {
 
     protected:
         void OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInfo& cmdInfo[[maybe_unused]], const TVars& vars[[maybe_unused]]) override {
-            FormattedCommands = commands;
+            for (const auto& command: commands) {
+                const auto *pString = std::get_if<TString>(&command.CmdStr);
+                const auto *pVector = std::get_if<TVector<TString>>(&command.CmdStr);
+                if ((pString && *pString != "[]") || (pVector && !pVector->empty())) { // return only non-empty semantics
+                    FormattedCommands.push_back(command);
+                }
+            }
         }
 
     private:
