@@ -193,16 +193,16 @@ class SemNode:
                 raise SemException(f"Field '{SemNode.SEMANTICS}' is not list")
             if not data_semantics:
                 raise SemException(f"Field '{SemNode.SEMANTICS}' is empty list")
-            try:
-                self.semantics: list[Semantic] = []
-                for data_semantic in data_semantics:
+            self.semantics: list[Semantic] = []
+            for data_semantic in data_semantics:
+                try:
                     self.semantics.append(Semantic(data_semantic))
-            except SemException as e:
-                if skip_invalid:
-                    if logger is not None:
-                        logger.warning("Skip invalid semantic %s of node %s: %s", data_semantic, data, e)
-                else:
-                    raise SemException(f'Fail parse semantic {data_semantic}: {e}') from e
+                except SemException as e:
+                    if skip_invalid:
+                        if logger is not None:
+                            logger.warning("Skip invalid semantic %s of node %s: %s", data_semantic, data, e)
+                    else:
+                        raise SemException(f'Fail parse semantic {data_semantic}: {e}') from e
 
     def has_semantics(self) -> bool:
         return self.semantics is not None and len(self.semantics) > 0
