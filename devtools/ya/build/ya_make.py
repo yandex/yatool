@@ -721,6 +721,9 @@ def is_dist_cache_suitable(node, result, opts):
     if module_tag in ('jar_runable', 'jar_runnable', 'jar_testable'):
         return False
 
+    if opts.dist_cache_evict_test_runs and node.get('kv', {}).get('run_test_node', False):
+        return False
+
     if get_module_type(node):
         return True
 
@@ -993,7 +996,7 @@ class Context:
         self.total_nodes_before_strip = len(self.graph.get('graph', []))
 
         # XXX see YA-1354
-        if opts.bazel_remote_store and (not opts.bazel_remote_readonly or opts.dist_cache_evict_cached):
+        if opts.bazel_remote_store and opts.dist_cache_evict_cached:
             self.graph['result'] = replace_dist_cache_results(self.graph, opts, self.dist_cache, app_ctx)
             logger.debug("Strip graph due bazel_remote_store mode")
             self.graph = lg.strip_graph(self.graph)

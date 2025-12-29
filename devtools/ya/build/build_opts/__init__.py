@@ -2844,6 +2844,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.dist_cache_evict_binaries = False
         self.dist_cache_evict_bundles = False
         self.dist_cache_evict_cached = False
+        self.dist_cache_evict_test_runs = False
         self.dist_cache_max_file_size = 0
         self.dist_store_threads = min(get_cpu_count() * 2, get_cpu_count() + 12)
         self.dist_cache_late_fetch = False
@@ -2902,6 +2903,14 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.ADVANCED,
                 ),
                 ConfigConsumer('dist_cache_evict_cached'),
+                ArgConsumer(
+                    ['--dist-cache-evict-test-runs'],
+                    help="Remove all test_runs from build results. Works only with --bazel-remote-put mode",
+                    hook=SetConstValueHook('dist_cache_evict_test_runs', True),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.ADVANCED,
+                ),
+                ConfigConsumer('dist_cache_evict_test_runs'),
                 ArgConsumer(
                     ['--dist-store-threads'],
                     help='dist store max threads',

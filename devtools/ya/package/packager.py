@@ -355,6 +355,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.yt_replace_result_add_objects = params.yt_replace_result_add_objects
     build_options.dist_cache_evict_binaries = params.dist_cache_evict_binaries
     build_options.dist_cache_evict_bundles = params.dist_cache_evict_bundles
+    build_options.dist_cache_evict_cached = params.dist_cache_evict_cached
 
     build_options.bazel_remote_store = params.bazel_remote_store
     build_options.bazel_remote_baseuri = params.bazel_remote_baseuri
