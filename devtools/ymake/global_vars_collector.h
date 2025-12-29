@@ -4,6 +4,7 @@
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/compact_graph/iter.h>
+#include <devtools/ymake/json_entry_stats.h>
 
 class TGlobalVarsCollector {
 private:
@@ -16,5 +17,6 @@ public:
 
     bool Start(const TStateItem& parentItem);
     void Finish(const TStateItem& parentItem, TEntryStatsData* parentData);
+    void Finish(const TStateItem& parentItem, TJSONEntryStats* parentData);
     void Collect(const TStateItem& parentItem, TConstDepNodeRef peerNode);
 };

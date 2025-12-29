@@ -51,25 +51,54 @@ public:
         }
     }
 
+private:
+    struct TURVScratchpad {
+        TURVScratchpad() {
+            varNodeName.reserve(1024);
+            varNodeName.append(NProps::USED_RESERVED_VAR);
+            varNodeName.append('=');
+            namePrefixSize = varNodeName.size();
+        }
+        TString varNodeName;
+        size_t namePrefixSize;
+    };
+
+    ui32 FindUsedReservedVar(TURVScratchpad& scratchpad, TStringBuf varName, const TDepGraph& graph) {
+        // "USED_RESERVED_VAR=" + varName
+        scratchpad.varNodeName.replace(scratchpad.namePrefixSize, scratchpad.varNodeName.size() - scratchpad.namePrefixSize, varName);
+
+        ui32 varElemId = graph.Names().CommandConf.GetIdNx(scratchpad.varNodeName);
+        Y_ASSERT(varElemId != 0); // guaranteed by TModuleBuilder::AddGlobalVarDep
+        return varElemId;
+    }
+
+public:
     void SaveReservedVars(const THashSet<TString>* usedReservedVars, const TDepGraph& graph) {
         if (!usedReservedVars) {
             Save<ui32>(0);
+            return;
+        }
 
-        } else {
-            Save<ui32>(usedReservedVars->size());
+        Save<ui32>(usedReservedVars->size());
+        TURVScratchpad scratchpad;
+        for (const auto& varName : *usedReservedVars) {
+            Save<ui32>(FindUsedReservedVar(scratchpad, varName, graph));
+        }
+    }
 
-            TString varNodeName{Reserve(1024)};
-            varNodeName.append(NProps::USED_RESERVED_VAR);
-            varNodeName.append('=');
-            size_t namePrefixSize = varNodeName.size();
+    void SaveReservedVarsTotals(const THashMap<TString, THashSet<TString>>* usedReservedVarsTotals, const TDepGraph& graph) {
+        if (!usedReservedVarsTotals) {
+            Save<ui32>(0);
+            return;
+        }
 
-            for (const auto& varName : *usedReservedVars) {
-                // "USED_RESERVED_VAR=" + varName
-                varNodeName.replace(namePrefixSize, varNodeName.size() - namePrefixSize, varName);
-
-                ui32 varElemId = graph.Names().CommandConf.GetIdNx(varNodeName);
-                Y_ASSERT(varElemId != 0);
-                Save<ui32>(varElemId);
+        Save<ui32>(usedReservedVarsTotals->size());
+        TURVScratchpad scratchpad;
+        for (const auto& usedReservedVars : *usedReservedVarsTotals) {
+            Save<ui32>(FindUsedReservedVar(scratchpad, usedReservedVars.first, graph));
+            Save<ui32>(usedReservedVars.second.size());
+            for (const auto& varName : usedReservedVars.second) {
+                Save<ui32>(FindUsedReservedVar(scratchpad, varName, graph));
             }
         }
     }
@@ -238,38 +267,86 @@ public:
         }
     }
 
+private:
+    struct TURVHelpers {
+        TURVHelpers() {
+            prefix.reserve(64);
+            prefix.append(NProps::USED_RESERVED_VAR);
+            prefix.append('=');
+            prefixSize = prefix.size();
+        }
+        TString prefix;
+        size_t prefixSize;
+    };
+
+    TMaybe<TString> FindUsedReservedVar(const TURVHelpers& helpers, ui32 elemId, const TDepGraph& graph) {
+        auto cmdView = graph.Names().CommandConf.GetName(elemId);
+        if (!cmdView.IsValid())
+            return {};
+
+        TStringBuf cmd = cmdView.GetStr();
+        if (!cmd.StartsWith(helpers.prefix))
+            return {};
+
+        TStringBuf varName = cmd.SubString(helpers.prefixSize, cmd.size() - helpers.prefixSize);
+        return TString{varName};
+    }
+
+public:
     bool LoadReservedVars(THolder<THashSet<TString>>* varsHolder, const TDepGraph& graph) {
         ui32 count = Load<ui32>();
 
         if (count == 0) {
             varsHolder->Reset();
             return true;
-        } else {
-            varsHolder->Reset(new THashSet<TString>());
-            auto* vars = varsHolder->Get();
+        }
 
-            TString prefix{Reserve(64)};
-            prefix.append(NProps::USED_RESERVED_VAR);
-            prefix.append('=');
-            size_t prefixSize = prefix.size();
+        varsHolder->Reset(new THashSet<TString>());
+        auto* vars = varsHolder->Get();
 
-            for (size_t i = 0; i < count; ++i) {
-                ui32 elemId = Load<ui32>();
+        TURVHelpers helpers;
 
-                auto cmdView = graph.Names().CommandConf.GetName(elemId);
-                if (!cmdView.IsValid())
-                    return false;
+        for (size_t i = 0; i < count; ++i) {
+            ui32 elemId = Load<ui32>();
+            auto var = FindUsedReservedVar(helpers, elemId, graph);
+            if (!var)
+                return false;
+            vars->insert(*var);
+        }
 
-                TStringBuf cmd = cmdView.GetStr();
-                if (!cmd.StartsWith(prefix))
-                    return false;
+        return true;
+    }
 
-                TStringBuf varName = cmd.SubString(prefixSize, cmd.size() - prefixSize);
-                vars->insert(TString{varName});
-            }
+    bool LoadReservedVarsTotals(THolder<THashMap<TString, THashSet<TString>>>* varsHolder, const TDepGraph& graph) {
+        ui32 count = Load<ui32>();
 
+        if (count == 0) {
+            varsHolder->Reset();
             return true;
         }
+
+        varsHolder->Reset(new THashMap<TString, THashSet<TString>>());
+        auto* vars = varsHolder->Get();
+
+        TURVHelpers helpers;
+
+        for (size_t i = 0; i < count; ++i) {
+            ui32 elemId = Load<ui32>();
+            auto var = FindUsedReservedVar(helpers, elemId, graph);
+            if (!var)
+                return false;
+            auto varInserted = vars->insert({*var, {}});
+            ui32 subCount = Load<ui32>();
+            for (size_t j = 0; j < subCount; ++j) {
+                ui32 subElemId = Load<ui32>();
+                auto subVar = FindUsedReservedVar(helpers, subElemId, graph);
+                if (!subVar)
+                    return false;
+                varInserted.first->second.insert(*subVar);
+            }
+        }
+
+        return true;
     }
 
     void LoadMd5(TMd5SigValue* result) {

@@ -345,20 +345,37 @@ void TModuleBuilder::AddInputVarDep(TVarStrEx& input, TAddDepAdaptor& inputNode)
 }
 
 void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node) {
-    if (Vars.Get1(varName).size() && GetCmdValue(Vars.Get1(varName)).size()) {
-        ui64 id;
-        TStringBuf cmdName;
-        TStringBuf cmdValue;
-        ParseCommandLikeVariable(Vars.Get1(varName), id, cmdName, cmdValue);
-        const TString res = [&]() {
+    // enforce the existence of an elemId for a USED_RESERVED_VAR prop node
+    // to be used by the cache, see TSaveBuffer::FindUsedReservedVar
+    Graph.Names().AddName(EMNT_BuildCommand, TString::Join(NProps::USED_RESERVED_VAR, "=", varName));
+
+    auto var = Vars.Lookup(varName);
+    if (!var)
+        return;
+
+    auto varText = Get1(var);
+    if (varText.size() && GetCmdValue(varText).size()) {
+        auto res = [&]() {
+            ui64 id;
+            TStringBuf cmdName;
+            TStringBuf cmdValue;
+            ParseCommandLikeVariable(varText, id, cmdName, cmdValue);
+
             auto compiled = Commands.Compile(cmdValue, Conf, Vars, false, {});
             // TODO: there's no point in allocating cmdElemId for expressions
             // that do _not_ have directly corresponding nodes
             // (and are linked as "0:VARNAME=S:123" instead)
             auto cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
             auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
-            return FormatCmd(id, cmdName, value);
+            auto compiledVarText = FormatCmd(id, cmdName, value);
+            auto compiledVarElemId = Graph.Names().AddName(EMNT_BuildCommand, compiledVarText);
+
+            TCommandInfo cmdInfo(Conf, &Graph, &UpdIter, &Module);
+            cmdInfo.GetCommandInfoFromStructVar(compiledVarElemId, cmdElemId, Commands, Conf.CommandConf);
+
+            return compiledVarElemId;
         }();
+
         if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
             // duplication comes from adding locally referenced vars
             // via TCommandInfo::GlobalVars, then the whole list through here

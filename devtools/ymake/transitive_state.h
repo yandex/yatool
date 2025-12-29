@@ -3,6 +3,7 @@
 #include <devtools/ymake/compact_graph/graph.h>
 #include <devtools/ymake/options/roots_options.h>
 #include <devtools/ymake/common/uniq_vector.h>
+#include <devtools/ymake/used_reserved_vars.h>
 #include <library/cpp/containers/absl_flat_hash/flat_hash_set.h>
 #include <util/generic/hash_set.h>
 #include <util/folder/path.h>
@@ -150,8 +151,16 @@ public:
         return Vars;
     }
 
+    TUsedReservedVars& GetUsedReservedVars() {
+        return UsedReservedVars;
+    }
+
+    const TUsedReservedVars& GetUsedReservedVars() const {
+        return UsedReservedVars;
+    }
 private:
     TVars Vars;
+    TUsedReservedVars UsedReservedVars;
     TRealPathRoots Roots;
     bool VarsComplete = false;
 };

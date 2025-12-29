@@ -495,7 +495,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         // that do _not_ have directly corresponding nodes
         // (and are linked as "0:VARNAME=S:123" instead)
         auto cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
-        return std::make_tuple(cmdName, Graph->Names().CmdNameById(cmdElemId).GetStr(), id);
+        return std::make_tuple(cmdName, Graph->Names().CmdNameById(cmdElemId).GetStr(), id, cmdElemId);
     };
 
     auto exprVars = commands.GetCommandVars(srcExpr);
@@ -508,7 +508,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         }
 
         if (exprVarName.ends_with("__LATEOUT__")) {
-            auto [_ignore_cmdName, value, _ignore_id] = mkCmd(exprVarName);
+            auto [_ignore_cmdName, value, _ignore_id, _ignore_elemId] = mkCmd(exprVarName);
             GetAddCtx(dstBinding)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::LATE_OUT, value));
         }
 
@@ -524,12 +524,16 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         if (isGlobalReservedVar) {
             if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
                 auto [it, added] = GetOrInit(GlobalVars).emplace(exprVarName, TYVar{});
-                if (added) {
-                    auto [cmdName, value, id] = mkCmd(exprVarName);
-                    it->second.SetSingleVal(cmdName, value, id);
-                    if (TVersionedCmdId(Graph->Names().CommandConf.GetId(value)).IsNewFormat())
-                        it->second[0].StructCmdForVars = true;
-                }
+                if (!added)
+                    continue;
+                auto& subBinding = it->second;
+                auto [cmdName, value, id, elemId] = mkCmd(exprVarName);
+                const ui32 subExpr = elemId;
+                subBinding.SetSingleVal(cmdName, value, id);
+                if (TVersionedCmdId(Graph->Names().CommandConf.GetId(value)).IsNewFormat())
+                    subBinding[0].StructCmdForVars = true;
+                InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
+                CollectVarsDeep(commands, subExpr, subBinding, varDefinitionSources);
             }
 
             continue;
@@ -627,6 +631,24 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
         GetOrInit(AddPeers).insert(AddPeers->end(), compiled.AddPeers->begin(), compiled.AddPeers->end());
 
     CollectVarsDeep(commands, cmdElemId, Cmd, vars);
+
+    return true;
+}
+
+bool TCommandInfo::GetCommandInfoFromStructVar(
+    ui32 varElemId,
+    ui32 cmdElemId,
+    TCommands& commands,
+    const TVars& vars
+) {
+    Cmd.SetSingleVal(Graph->Names().CmdNameById(varElemId).GetStr(), true);
+    Cmd[0].StructCmdForVars = true;
+    AddCmdNode(Cmd, varElemId, EStructCmd::Yes, EExprRole::Var);
+
+    auto exprVars = commands.GetCommandVars(cmdElemId);
+    for (auto&& exprVar : exprVars)
+        if (IsGlobalReservedVar(exprVar, vars))
+            GetAddCtx(Cmd)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, exprVar));
 
     return true;
 }

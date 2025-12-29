@@ -5,9 +5,32 @@
 #include "module_restorer.h"
 #include "macro_processor.h"
 #include "mine_variables.h"
+#include "used_reserved_vars.h"
 
 #include <devtools/ymake/compact_graph/query.h>
 
+namespace {
+    auto FormatURV(const TUsedReservedVars& urv) {
+        TStringBuilder result;
+        if (urv.FromCmd) {
+            result << "fromCmd =";
+            for (auto& x : *urv.FromCmd)
+                result << " " << x;
+        }
+        if (urv.FromVars) {
+            if (!result.empty())
+                result << "; ";
+            result << "fromVars =";
+            for (auto& x : *urv.FromVars) {
+                result << " " << x.first << "[";
+                for (auto& y : x.second)
+                    result << (&y == &*x.second.begin() ? "" : "; ") << y;
+                result << "]";
+            }
+        }
+        return result;
+    };
+}
 
 bool TGlobalVarsCollector::Start(const TStateItem& parentItem) {
     TModule& parent = InitModule(RestoreContext.Modules, RestoreContext.Conf.CommandConf, parentItem.Node());
@@ -53,6 +76,43 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData*
     parentVars.SetVarsComplete();
 }
 
+void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TJSONEntryStats* parentData) {
+    Finish(parentItem, static_cast<TEntryStatsData*>(parentData));
+
+    auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
+    auto& urvLocal = parentData->UsedReservedVarsLocal;
+    auto& urvTotal = parentData->UsedReservedVarsTotal;
+    YDIAG(UIDs)
+        << "TGlobalVarsCollector::Finish \"" << parentItem.Print() << "\", old globals: "
+        << FormatURV(parentVars.GetUsedReservedVars())
+        << Endl;
+    YDIAG(UIDs)
+        << "TGlobalVarsCollector::Finish \"" << parentItem.Print() << "\", locals: "
+        << FormatURV(urvLocal)
+        << Endl;
+
+    auto& urvGlobal = parentVars.GetUsedReservedVars();
+    if (urvLocal.FromVars) {
+        TUsedReservedVars::Expand(GetOrInit(urvGlobal.FromVars), *urvLocal.FromVars);
+    }
+    if (urvLocal.FromCmd) {
+        Y_ASSERT(!urvGlobal.FromCmd);
+        GetOrInit(urvGlobal.FromCmd) = *urvLocal.FromCmd;
+    }
+    if (urvGlobal.FromCmd && urvGlobal.FromVars) {
+        TUsedReservedVars::Expand(*urvGlobal.FromCmd, *urvGlobal.FromVars);
+    }
+    if (urvGlobal.FromCmd) {
+        Y_ASSERT(!urvTotal);
+        GetOrInit(urvTotal) = *urvGlobal.FromCmd;
+    }
+
+    YDIAG(UIDs)
+        << "TGlobalVarsCollector::Finish \"" << parentItem.Print() << "\", new globals: "
+        << FormatURV(parentVars.GetUsedReservedVars())
+        << Endl;
+}
+
 void TGlobalVarsCollector::Collect(const TStateItem& parentItem, TConstDepNodeRef peerNode) {
     TModule* peer = RestoreContext.Modules.Get(peerNode->ElemId);
     Y_ASSERT(peer);
@@ -66,9 +126,26 @@ void TGlobalVarsCollector::Collect(const TStateItem& parentItem, TConstDepNodeRe
         // values and values induced by peers.
         return;
     }
-    const auto& peerVars = RestoreContext.Modules.GetGlobalVars(peer->GetId()).GetVars();
-    auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId).GetVars();
-    for (const auto& peerVar : peerVars) {
-        parentVars[peerVar.first].AppendUnique(peerVar.second);
+    const auto& peerVars = RestoreContext.Modules.GetGlobalVars(peer->GetId());
+    auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
+    for (const auto& peerVar : peerVars.GetVars()) {
+        parentVars.GetVars()[peerVar.first].AppendUnique(peerVar.second);
     }
+    YDIAG(UIDs)
+        << "TGlobalVarsCollector::Collect \"" << parentItem.Print() << "\" from " << RestoreContext.Graph.ToString(peerNode)
+        << Endl;
+    YDIAG(UIDs)
+        << "TGlobalVarsCollector::Collect \"" << parentItem.Print() << "\", old globals: "
+        << FormatURV(parentVars.GetUsedReservedVars())
+        << Endl;
+    YDIAG(UIDs)
+        << "TGlobalVarsCollector::Collect \"" << parentItem.Print() << "\", peer globals: "
+        << FormatURV(peerVars.GetUsedReservedVars())
+        << Endl;
+    if (peerVars.GetUsedReservedVars().FromVars)
+        TUsedReservedVars::Expand(GetOrInit(parentVars.GetUsedReservedVars().FromVars), *peerVars.GetUsedReservedVars().FromVars);
+    YDIAG(UIDs)
+        << "TGlobalVarsCollector::Collect \"" << parentItem.Print() << "\", new globals: "
+        << FormatURV(parentVars.GetUsedReservedVars())
+        << Endl;
 }

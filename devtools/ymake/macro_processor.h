@@ -158,6 +158,12 @@ public:
         bool skipMainOutput,
         const TVars& vars
     );
+    bool GetCommandInfoFromStructVar(
+        ui32 varElemId,
+        ui32 cmdElemId,
+        TCommands& commands,
+        const TVars& vars
+    );
     bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id);
     TString SubstMacro(const TYVar* origin, TStringBuf pattern, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, bool patHasPrefix, ECmdFormat formatFor = ECF_Unset);
 

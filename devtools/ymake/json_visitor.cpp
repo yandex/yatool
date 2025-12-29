@@ -129,6 +129,7 @@ void TUidsData::SaveCache(IOutputStream* output, const TDepGraph& graph) {
     CacheStats.Set(NStats::EUidsCacheStats::SavedNodes, nodesCount);
 
     for (const auto& [nodeId, nodeData] : Nodes) {
+        YDIAG(UIDs) << "Saving node " << graph.Get(nodeId)->ElemId << Endl;
         if (!nodeData.Completed) {
             continue;
         }
@@ -189,6 +190,7 @@ void TUidsData::LoadCache(IInputStream* input, const TDepGraph& graph) {
 
         Y_ASSERT(loadResult == TLoadBuffer::NodeLoaded);
 
+        YDIAG(UIDs) << "Loading node " << nodeRef->ElemId << Endl;
         if (!nodeData.Load(&buffer, graph)) {
             ++nodesDiscarded;
             Nodes.erase(nodeRef.Id());
@@ -385,7 +387,7 @@ bool TJSONVisitor::AcceptDep(TState& state) {
                     HostResources.emplace_back(mapJson);
                 } else {
                     if (!currDone && (currNodeType == EMNT_BuildCommand || currNodeType == EMNT_BuildVariable) && name == NProps::USED_RESERVED_VAR) {
-                        GetOrInit(currData.UsedReservedVars).emplace(GetPropertyValue(propVal));
+                        GetOrInit(currData.UsedReservedVarsLocal.FromCmd).emplace(GetPropertyValue(propVal));
                     }
                 }
             } else if (chldNode->NodeType == EMNT_File) {
@@ -613,7 +615,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
     }
 
     if (IsModule(*CurrState) && std::exchange(CurrData->IsGlobalVarsCollectorStarted, false)) {
-        GlobalVarsCollector.Finish(*CurrState, CurrData);
+        GlobalVarsCollector.Finish(*CurrState, VisitorEntry(*CurrState));
     }
 
     // Note that the following code should be unified with Left()
@@ -801,10 +803,10 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
         IsBuildCommandDep(state.IncomingDep()) ||
         IsLocalVariableDep(state.IncomingDep())
     )) {
-        const auto usedVars = CurrData->UsedReservedVars.Get();
+        const auto usedVars = CurrData->UsedReservedVarsLocal.FromCmd.Get();
         if (usedVars) {
             if (!prntDone) {
-                GetOrInit(PrntData->UsedReservedVars).insert(usedVars->begin(), usedVars->end());
+                GetOrInit(PrntData->UsedReservedVarsLocal.FromCmd).insert(usedVars->begin(), usedVars->end());
             }
         }
     }
@@ -1098,6 +1100,19 @@ void TJSONVisitor::PassToParent(TState& state) {
         UpdateParent(state, CurrData->GetStructureUid(), "Include local variables");
     }
 
+    // propagate URVs from individual vars to their owner buildables
+    if (*Edge == EDT_Include && CurrNode->NodeType == EMNT_BuildCommand) {
+        if (auto& src = CurrData->UsedReservedVarsLocal.FromCmd) {
+            TStringBuf nodeName = Graph.ToTargetStringBuf(CurrNode);
+            ui64 varId;
+            TStringBuf varName;
+            TStringBuf varValue;
+            ParseCommandLikeVariable(nodeName, varId, varName, varValue);
+            auto& dst = GetOrInit(PrntData->UsedReservedVarsLocal.FromVars);
+            dst[varName].insert(src->begin(), src->end());
+        }
+    }
+
     // global variables in non-modules
     if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
         if (Edge.From()->NodeType == EMNT_NonParsedFile && *Edge == EDT_Include && CurrNode->NodeType == EMNT_BuildCommand) {
@@ -1190,12 +1205,12 @@ void TJSONVisitor::UpdateCurrent(TState& state, TStringBuf value, TStringBuf des
 void TJSONVisitor::AddAddincls(TState& state) {
     const auto moduleIt = FindModule(state);
     bool hasModule = moduleIt != state.end();
-    if (!hasModule || !moduleIt->Module || !CurrData->UsedReservedVars) {
+    if (!hasModule || !moduleIt->Module || !CurrData->UsedReservedVarsLocal.FromCmd) {
         return;
     }
 
     const auto& includesMap = moduleIt->Module->IncDirs.GetAll();
-    const auto& usedVars = *CurrData->UsedReservedVars;
+    const auto& usedVars = *CurrData->UsedReservedVarsLocal.FromCmd;
     for (size_t lang = 0; lang < NLanguages::LanguagesCount(); lang++) {
         auto&& includeVarName = TModuleIncDirs::GetIncludeVarName(static_cast<TLangId>(lang));
         if (!usedVars.contains(includeVarName)) {
@@ -1216,15 +1231,55 @@ void TJSONVisitor::AddAddincls(TState& state) {
 void TJSONVisitor::AddGlobalVars(TState& state) {
     const auto moduleIt = FindModule(state);
     bool hasModule = moduleIt != state.end();
-    if (!hasModule || !moduleIt->Module || !CurrData->UsedReservedVars) {
+    if (!hasModule || !moduleIt->Module) {
+        return;
+    }
+
+    ui32 moduleElemId = moduleIt->Module->GetId();
+
+    if (CurrState->Node()->NodeType == EMNT_NonParsedFile) {
+        // TGlobalVarsCollector propagates data through modules;
+        // this is the non-module URV-set evaluation
+        auto& urvLocal = CurrData->UsedReservedVarsLocal;
+        auto& urvTotal = CurrData->UsedReservedVarsTotal;
+        auto& urvGlobal = RestoreContext.Modules.GetGlobalVars(moduleElemId).GetUsedReservedVars();
+        Y_ASSERT(!urvTotal);
+        if (urvLocal.FromCmd)
+            GetOrInit(urvTotal) = *urvLocal.FromCmd;
+        if (urvTotal && urvGlobal.FromVars)
+            TUsedReservedVars::Expand(*urvTotal, *urvGlobal.FromVars);
+    }
+    if (!CurrData->UsedReservedVarsTotal) {
         return;
     }
 
     TAutoPtr<THashSet<TString>> seenVars;
 
+    static auto fmtGlobalVarLists = [](const TJSONVisitor& self, const THolder<TUsedReservedVars::TSet>& urv, const TVars& gv) {
+        TStringBuilder result;
+        result << "urv =";
+        for (auto& x : *urv)
+            result << " " << x;
+        result << "; gv =";
+        for (auto& x : gv) {
+            result << " " << x.first << "[";
+            for (auto& y : x.second) {
+                result << (&y == x.second.begin() ? "" : "; ") << self.Commands.PrintCmd(*self.Commands.Get(y.Name, &self.CmdConf));
+            }
+            result << "]";
+        }
+        return result;
+    };
+
     auto addVarsFromModule = [&](ui32 moduleElemId) {
-        for (const auto& [varName, varValue] : RestoreContext.Modules.GetGlobalVars(moduleElemId).GetVars()) {
-            if (CurrData->UsedReservedVars->contains(varName)) {
+        auto& vars = RestoreContext.Modules.GetGlobalVars(moduleElemId).GetVars();
+        YDIAG(UIDs)
+            << "AddGlobalVars \"" << state.Top().Print() << "\": "
+            << fmtGlobalVarLists(*this, CurrData->UsedReservedVarsTotal, vars)
+            << Endl;
+        for (const auto& [varName, varValue] : vars) {
+            auto& urv = CurrData->UsedReservedVarsTotal;
+            if (urv && urv->contains(varName)) {
                 if (seenVars) {
                     auto [_, added] = seenVars->insert(varName);
                     if (!added)
@@ -1253,7 +1308,6 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
         }
     };
 
-    ui32 moduleElemId = moduleIt->Module->GetId();
     addVarsFromModule(moduleElemId);
 
     // Here we also look at GlobalVars from peers under dependency management.
@@ -1294,11 +1348,11 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
 }
 
 void TJSONVisitor::AddGlobalSrcs() {
-    if(!IsModuleType(CurrType) || !CurrData->UsedReservedVars) {
+    if(!IsModuleType(CurrType) || !CurrData->UsedReservedVarsTotal) {
         return;
     }
 
-    if (CurrData->UsedReservedVars->contains("SRCS_GLOBAL")) {
+    if (CurrData->UsedReservedVarsTotal->contains("SRCS_GLOBAL")) {
         TModuleRestorer restorer(RestoreContext, CurrNode);
         restorer.RestoreModule();
         for (TNodeId globalSrcNodeId : restorer.GetGlobalSrcsIds()) {

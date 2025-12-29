@@ -3,6 +3,8 @@
 #include <devtools/ymake/node_debug.h>
 #include <devtools/ymake/md5.h>
 #include <devtools/ymake/json_md5.h>
+#include <devtools/ymake/used_reserved_vars.h>
+#include <devtools/ymake/vars.h>
 
 #include <devtools/ymake/compact_graph/iter.h>
 
@@ -89,7 +91,8 @@ struct TJSONEntryStats : public TEntryStats, public TNodeDebugOnly  {
     TJsonDeps NodeToolDeps;
     THolder<TUniqVector<TNodeId>> ExtraOuts;
 
-    THolder<THashSet<TString>> UsedReservedVars;
+    TUsedReservedVars UsedReservedVarsLocal;
+    THolder<THashSet<TString>> UsedReservedVarsTotal;
     bool IsGlobalVarsCollectorStarted;
 
 public:

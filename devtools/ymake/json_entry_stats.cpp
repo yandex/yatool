@@ -2,6 +2,34 @@
 
 #include "json_saveload.h"
 
+namespace {
+
+    TString FormatURV(const TUsedReservedVars::TSet* x) {
+        if (!x)
+            return "<null>";
+        TStringBuilder result;
+        result << "[";
+        for (auto& y : *x) {
+            result << (&y == &*x->begin() ? "" : ", ") << y;
+        }
+        result << "]";
+        return result;
+    }
+
+    TString FormatURV(const TUsedReservedVars::TMap* x) {
+        if (!x)
+            return "<null>";
+        TStringBuilder result;
+        result << "[";
+        for (auto& y : *x) {
+            result << (&y == &*x->begin() ? "" : ", ") << y.first << " = " << FormatURV(&y.second);
+        }
+        result << "]";
+        return result;
+    }
+
+}
+
 void TJSONEntryStats::SetStructureUid(const TMd5SigValue& md5) {
     StructureUID = md5;
     YDIAG(Dev) << "Set StructureUID, value is " << StructureUID.ToBase64() << Endl;
@@ -96,12 +124,17 @@ void TJSONEntryStats::Save(TSaveBuffer* buffer, const TDepGraph& graph) const no
     buffer->SaveElemIds(NodeDeps, graph);
     buffer->SaveElemIds(NodeToolDeps, graph);
     buffer->SaveElemIds(ExtraOuts, graph);
-    buffer->SaveReservedVars(UsedReservedVars.Get(), graph);
+    buffer->SaveReservedVars(UsedReservedVarsLocal.FromCmd.Get(), graph);
+    buffer->SaveReservedVarsTotals(UsedReservedVarsLocal.FromVars.Get(), graph);
     buffer->Save(IncludeStructureUID.GetRawSig());
     buffer->Save(ContentUID.GetRawSig());
     buffer->Save(IncludeContentUID.GetRawSig());
     buffer->Save(FullUID.GetRawSig());
     buffer->Save(SelfUID.GetRawSig());
+
+    YDIAG(UIDs) << "Saving URVTT " << FormatURV(UsedReservedVarsLocal.FromCmd.Get()) << Endl;
+    YDIAG(UIDs) << "Saving URVLC " << FormatURV(UsedReservedVarsLocal.FromCmd.Get()) << Endl;
+    YDIAG(UIDs) << "Saving URVLV " << FormatURV(UsedReservedVarsLocal.FromVars.Get()) << Endl;
 }
 
 void TJSONEntryStats::LoadStructureUid(TLoadBuffer* buffer, bool asPre) noexcept {
@@ -127,8 +160,14 @@ bool TJSONEntryStats::Load(TLoadBuffer* buffer, const TDepGraph& graph) noexcept
         return false;
     if (!buffer->LoadElemIds(&ExtraOuts, graph))
         return false;
-    if (!buffer->LoadReservedVars(&UsedReservedVars, graph))
+    if (!buffer->LoadReservedVars(&UsedReservedVarsLocal.FromCmd, graph))
         return false;
+    if (!buffer->LoadReservedVarsTotals(&UsedReservedVarsLocal.FromVars, graph))
+        return false;
+
+    YDIAG(UIDs) << "Loaded URVTT " << FormatURV(UsedReservedVarsTotal.Get()) << Endl;
+    YDIAG(UIDs) << "Loaded URVLC " << FormatURV(UsedReservedVarsLocal.FromCmd.Get()) << Endl;
+    YDIAG(UIDs) << "Loaded URVLV " << FormatURV(UsedReservedVarsLocal.FromVars.Get()) << Endl;
 
     buffer->LoadMd5(&IncludeStructureUID);
     buffer->LoadMd5(&ContentUID);
