@@ -14,14 +14,6 @@ struct THash<fs::path>: public THash<TStringBuf> {
     }
 };
 
-template<>
-struct TEqualTo<std::string> {
-    template <class TOther>
-    inline bool operator()(const std::string& a, const TOther& b) const {
-        return a == b;
-    }
-};
-
 namespace NYexport {
     fs::path ArcadiaSourceRootPath();
 }
