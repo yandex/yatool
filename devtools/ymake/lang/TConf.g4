@@ -346,7 +346,7 @@ stringContent:
     ;
 
 ID: [a-zA-Z_]([\-]*[a-zA-Z_0-9]+)*;
-RVAL_SYMBOL: [0-9a-zA-Z_$(){}/\\[\]\-+=*?!@.,;:'"`|><~];
+RVAL_SYMBOL: [0-9a-zA-Z_$(){}/\\[\]\-+=*%?!@.,;:'"`|><~];
 DOC_COMMENT: '###' ~[\n]*;
 COMMENT: '#' ~[\n]*;
 SP: ( ' ' | '\t' )+;
