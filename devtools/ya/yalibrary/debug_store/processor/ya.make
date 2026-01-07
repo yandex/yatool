@@ -12,6 +12,7 @@ PEERDIR(
     devtools/ya/core/config
     devtools/ya/exts
     devtools/ya/yalibrary/evlog
+    library/python/resource
 )
 
 RESOURCE_FILES(
