@@ -49,12 +49,13 @@ namespace {
                 continue;
             }
             TStringBuf attrName = PyBytes_AsString(asciiAttrName);
-            if (attrName.StartsWith("on"sv)) {
+            constexpr TStringBuf pluginMacroPreffix = "on"sv;
+            if (attrName.StartsWith(pluginMacroPreffix)) {
                 TScopedPyObjectPtr func = PyObject_GetAttr(mod, attr);
                 if (!PyFunction_Check(func)) {
                     continue;
                 }
-                auto macroName = ToUpperUTF8(attrName.SubStr(2));
+                auto macroName = ToUpperUTF8(attrName.SubStr(pluginMacroPreffix.size()));
                 RegisterMacro(conf, macroName.c_str(), func);
             }
         }
