@@ -33,7 +33,7 @@ namespace NYMake::NPlugins {
         Py_XDECREF(Obj_);
     }
 
-    void RegisterMacro(TBuildConfiguration& conf, const char* name, PyObject* func) {
+    void RegisterMacro(TBuildConfiguration& conf, const TString& name, PyObject* func) {
         if (!PyFunction_Check(func)) {
             Py_ssize_t size = 0;
             auto *pystr = PyType_GetName(Py_TYPE(func));

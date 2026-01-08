@@ -19,6 +19,6 @@ namespace NYMake {
 
             ~TPluginMacroImpl() override;
         };
-        void RegisterMacro(TBuildConfiguration& conf, const char* name, PyObject* func);
+        void RegisterMacro(TBuildConfiguration& conf, const TString& name, PyObject* func);
     }
 }
