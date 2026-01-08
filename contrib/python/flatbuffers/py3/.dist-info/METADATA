@@ -1,6 +1,6 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: flatbuffers
-Version: 25.9.23
+Version: 25.12.19
 Summary: The FlatBuffers serialization format for Python
 Home-page: https://google.github.io/flatbuffers/
 Author: Derek Bailey
@@ -15,6 +15,13 @@ Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 2
 Classifier: Programming Language :: Python :: 3
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
-License-File: ../LICENSE
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: license
+Dynamic: project-url
+Dynamic: summary
 
 Python runtime library for use with the `Flatbuffers <https://google.github.io/flatbuffers/>`_ serialization format.
