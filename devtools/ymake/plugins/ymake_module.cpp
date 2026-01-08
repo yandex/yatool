@@ -272,38 +272,12 @@ namespace {
         Py_RETURN_NONE;
     }
 
-    PyObject* MethodReportConfigureError(PyObject* /*self*/, PyObject* args, PyObject* kwargs) {
+    PyObject* MethodReportConfigureError(PyObject* /*self*/, PyObject* args) {
         const char* errorMessage = nullptr;
-        const char* missingDir = nullptr;
-        const char* keys[] = {
-            "",
-            "missing_dir",
-            nullptr
-        };
-        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|$s:ymake.report_configure_error", (char**)keys, &errorMessage, &missingDir) || PyErr_Occurred()) {
+        if (!PyArg_ParseTuple(args, "s:ymake.report_configure_error", &errorMessage) || PyErr_Occurred()) {
             return nullptr;
         }
-        if (missingDir) {
-            // It seems that we can get rid of the second argument for report_configure_error,
-            // since calls to report_configure_error with two arguments is currently used in tests
-            // only.
-            TScopedPyObjectPtr formatObj = Py_BuildValue("s", "format");
-            TScopedPyObjectPtr errorMessageObj = Py_BuildValue("s", errorMessage);
-            TScopedPyObjectPtr missingDirObj = Py_BuildValue("s", missingDir);
-            TScopedPyObjectPtr result = PyObject_CallMethodObjArgs(errorMessageObj, formatObj.Get(), missingDirObj.Get(), nullptr);
-            if (!result || PyErr_Occurred()) {
-                return nullptr;
-            }
-
-            const char* message = PyUnicode_AsUTF8AndSize(result, nullptr);
-            if (!message || PyErr_Occurred()) {
-                return nullptr;
-            }
-
-            OnBadDirError(message, missingDir);
-        } else {
-            OnConfigureError(errorMessage);
-        }
+        OnConfigureError(errorMessage);
         Py_RETURN_NONE;
     }
 
@@ -564,7 +538,7 @@ namespace {
     PyMethodDef YMakeMethods[] = {
         {"add_parser", (PyCFunction)MethodAddParser, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Add a parser for files with the given extension")},
         {"macro", (PyCFunction)WrapMember<&YMakeState::MacroDecorator>, METH_FASTCALL, PyDoc_STR("Register function as ya.make macro")},
-        {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Report configure error")},
+        {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS, PyDoc_STR("Report configure error")},
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},
         {"get_artifact_id_from_pom_xml", (PyCFunction)MethodGetArtifactIdFromPomXml, METH_FASTCALL, PyDoc_STR("Get artifactId from pom.xml")},
         {"parse_ssqls_from_string", (PyCFunction)MethodParseSsqlsFromString, METH_FASTCALL, PyDoc_STR("Parse SSQLS")},
