@@ -1,6 +1,7 @@
 #include "error.h"
 #include "plugin_macro_impl.h"
 #include "ymake_module.h"
+#include "scoped_py_object_ptr.h"
 
 #include <devtools/ymake/conf.h>
 #include <devtools/ymake/yndex/yndex.h>
@@ -8,30 +9,31 @@
 #include <library/cpp/pybind/cast.h>
 
 namespace NYMake::NPlugins {
-    void TPluginMacroImpl::Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) {
-        PyObject* tupleArgs = PyTuple_New(params.size() + 1);
-
-        PyTuple_SetItem(tupleArgs, 0, CreateContextObject(&unit));
-        CheckForError();
-
-        for (size_t i = 0; i < params.size(); ++i) {
-            PyTuple_SetItem(tupleArgs, i + 1, PyUnicode_FromString(TString{params[i]}.data()));
+    class TPluginMacroImpl: public TMacroImpl, private TNonCopyable {
+    public:
+        TPluginMacroImpl(PyObject* obj) noexcept
+            : Obj_{obj}
+        {
+            Py_XINCREF(obj);
         }
 
-        PyObject_CallObject(Obj_, tupleArgs);
-        CheckForError();
-        Py_DecRef(tupleArgs);
-    }
+        void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) override {
+            TScopedPyObjectPtr tupleArgs{PyTuple_New(params.size() + 1)};
 
-    TPluginMacroImpl::TPluginMacroImpl(PyObject* obj)
-        : Obj_(obj)
-    {
-        Py_XINCREF(Obj_);
-    }
+            PyTuple_SetItem(tupleArgs.Get(), 0, CreateContextObject(&unit));
+            CheckForError();
 
-    TPluginMacroImpl::~TPluginMacroImpl() {
-        Py_XDECREF(Obj_);
-    }
+            for (size_t i = 0; i < params.size(); ++i) {
+                PyTuple_SetItem(tupleArgs.Get(), i + 1, PyUnicode_FromString(TString{params[i]}.data()));
+            }
+
+            PyObject_CallObject(Obj_, tupleArgs.Get());
+            CheckForError();
+        }
+
+    private:
+        TScopedPyObjectPtr Obj_ = nullptr;
+    };
 
     void RegisterMacro(TBuildConfiguration& conf, const TString& name, PyObject* func) {
         if (!PyFunction_Check(func)) {

@@ -1,7 +1,5 @@
 #pragma once
 
-namespace NYMake {
-    namespace NPlugins {
-        void CheckForError();
-    }
+namespace NYMake::NPlugins {
+    void CheckForError();
 }

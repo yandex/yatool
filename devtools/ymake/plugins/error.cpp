@@ -4,13 +4,11 @@
 
 #include <Python.h>
 
-namespace NYMake {
-    namespace NPlugins {
-        void CheckForError() {
-            if (PyErr_Occurred()) {
-                PyErr_Print();
-                ythrow yexception() << "Error in plugin";
-            }
+namespace NYMake::NPlugins {
+    void CheckForError() {
+        if (PyErr_Occurred()) {
+            PyErr_Print();
+            ythrow yexception() << "Error in plugin";
         }
     }
 }
