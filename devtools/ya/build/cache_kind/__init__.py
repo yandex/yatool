@@ -3,8 +3,13 @@ import enum
 
 class CacheKind(enum.StrEnum):
     parser = 'parser'
+    parser_experimental = 'parser_experimental'
+
     parser_json = 'parser_json'
+    parser_json_experimental = 'parser_json_experimental'
+
     parser_deps_json = 'parser_deps_json'
+    parser_deps_json_experimental = 'parser_deps_json_experimental'
 
     @staticmethod
     def get_ymake_option(kind):
@@ -18,8 +23,11 @@ class CacheKind(enum.StrEnum):
 
 CacheKind._ymake_option_by_kind = {
     CacheKind.parser: 'CC=f:r,d:n,j:n',
+    CacheKind.parser_experimental: 'CC=f:r,d:n,j:n',
     CacheKind.parser_json: 'CC=f:r,d:n,j:r',
+    CacheKind.parser_json_experimental: 'CC=f:r,d:n,j:r',
     CacheKind.parser_deps_json: 'CC=f:r,d:r,j:r',
+    CacheKind.parser_deps_json_experimental: 'CC=f:r,d:r,j:r',
 }
 # All cache kinds must have the appropriate options
 assert {k for k in CacheKind._ymake_option_by_kind.keys()} == {k for k in CacheKind}
