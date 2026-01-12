@@ -11,7 +11,7 @@ import devtools.ya.test.util.shared as util_shared
 import devtools.ya.test.filter
 import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
 
-from build.plugins.lib.nots.package_manager.base.constants import (
+from build.plugins.lib.nots.package_manager.constants import (
     BUILD_DIRNAME,
     BUNDLE_DIRNAME,
     NODE_MODULES_DIRNAME,

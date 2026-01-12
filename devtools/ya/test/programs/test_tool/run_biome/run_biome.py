@@ -4,8 +4,7 @@ import logging
 import os
 import re
 
-import build.plugins.lib.nots.package_manager.base.constants as pm_const
-import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
+import build.plugins.lib.nots.package_manager.constants as pm_const
 import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
 
 import devtools.ya.test
@@ -214,7 +213,7 @@ def main():
             pm_const.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             pm_const.OUTPUT_TAR_FILENAME,
             pm_const.PACKAGE_JSON_FILENAME,
-            pnpm_const.PNPM_LOCKFILE_FILENAME,
+            pm_const.PNPM_LOCKFILE_FILENAME,
         ],
     )
 

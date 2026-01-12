@@ -11,17 +11,18 @@ from devtools.ya.test.util import shared
 from devtools.ya.test.test_types.common import PerformedTestSuite
 from devtools.ya.test import facility
 from build.plugins.lib.nots.test_utils import ts_utils
-from build.plugins.lib.nots.package_manager.base.constants import (
+from build.plugins.lib.nots.package_manager.constants import (
     BUILD_DIRNAME,
     BUNDLE_DIRNAME,
     NODE_MODULES_DIRNAME,
     NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
     PACKAGE_JSON_FILENAME,
+    PNPM_LOCKFILE_FILENAME,
+    VIRTUAL_STORE_DIRNAME,
 )
-from build.plugins.lib.nots.package_manager.base.utils import (
+from build.plugins.lib.nots.package_manager.utils import (
     build_vs_store_path,
 )
-from build.plugins.lib.nots.package_manager.pnpm.constants import PNPM_LOCKFILE_FILENAME, VIRTUAL_STORE_DIRNAME
 
 from .parse_json_report import parse_json_report
 

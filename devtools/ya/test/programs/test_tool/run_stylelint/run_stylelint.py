@@ -3,9 +3,8 @@ import json
 import logging
 import os
 
-import build.plugins.lib.nots.package_manager.base.constants as pm_const
-import build.plugins.lib.nots.package_manager.base.utils as pm_utils
-import build.plugins.lib.nots.package_manager.pnpm.constants as pnpm_const
+import build.plugins.lib.nots.package_manager.constants as pm_const
+import build.plugins.lib.nots.package_manager.utils as pm_utils
 import build.plugins.lib.nots.test_utils.ts_utils as ts_utils
 from devtools.ya.test.const import Status
 from devtools.ya.test.facility import TestCase
@@ -52,7 +51,7 @@ def get_env(args):
     node_path = [
         os.path.join(pm_utils.build_vs_store_path(args.build_root, args.project_path), pm_const.NODE_MODULES_DIRNAME),
         # TODO: remove - no longer needed
-        os.path.join(bindir_node_modules_path, pnpm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+        os.path.join(bindir_node_modules_path, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
         bindir_node_modules_path,
     ]
     env = os.environ.copy()
@@ -133,7 +132,7 @@ def main():
             pm_const.NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
             pm_const.OUTPUT_TAR_UUID_FILENAME,
             pm_const.PACKAGE_JSON_FILENAME,
-            pnpm_const.PNPM_LOCKFILE_FILENAME,
+            pm_const.PNPM_LOCKFILE_FILENAME,
         ],
     )
 

@@ -5,18 +5,16 @@ import os
 import re
 
 import devtools.ya.test.system.process
-from build.plugins.lib.nots.package_manager.base.constants import (
+from build.plugins.lib.nots.package_manager.constants import (
     BUILD_DIRNAME,
     BUNDLE_DIRNAME,
     NODE_MODULES_DIRNAME,
     NODE_MODULES_WORKSPACE_BUNDLE_FILENAME,
     PACKAGE_JSON_FILENAME,
-)
-from build.plugins.lib.nots.package_manager.pnpm.constants import (
     PNPM_LOCKFILE_FILENAME,
     VIRTUAL_STORE_DIRNAME,
 )
-from build.plugins.lib.nots.package_manager.base.utils import (
+from build.plugins.lib.nots.package_manager.utils import (
     build_vs_store_path,
 )
 from build.plugins.lib.nots.test_utils import ts_utils
