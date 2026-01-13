@@ -478,7 +478,7 @@ namespace {
                 return nullptr;
             }
 
-            NYMake::NPlugins::RegisterMacro(*Conf, macroName, args[0]);
+            NYMake::NPlugins::RegisterMacro(*Conf, macroName, TScopedPyObjectPtr::FromBorrowedRef(args[0]));
 
             Py_INCREF(args[0]);
             return args[0];

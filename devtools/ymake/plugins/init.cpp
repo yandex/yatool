@@ -56,7 +56,7 @@ namespace {
                     continue;
                 }
                 auto macroName = ToUpperUTF8(attrName.SubStr(pluginMacroPreffix.size()));
-                RegisterMacro(conf, macroName, func);
+                RegisterMacro(conf, macroName, std::move(func));
             }
         }
     }

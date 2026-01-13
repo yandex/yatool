@@ -1,7 +1,6 @@
 #include "error.h"
 #include "plugin_macro_impl.h"
 #include "ymake_module.h"
-#include "scoped_py_object_ptr.h"
 
 #include <devtools/ymake/conf.h>
 #include <devtools/ymake/yndex/yndex.h>
@@ -11,11 +10,9 @@
 namespace NYMake::NPlugins {
     class TPluginMacroImpl: public TMacroImpl, private TNonCopyable {
     public:
-        TPluginMacroImpl(PyObject* obj) noexcept
-            : Obj_{obj}
-        {
-            Py_XINCREF(obj);
-        }
+        TPluginMacroImpl(TScopedPyObjectPtr&& obj) noexcept
+            : Obj_{std::move(obj)}
+        {}
 
         void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) override {
             TScopedPyObjectPtr tupleArgs{PyTuple_New(params.size() + 1)};
@@ -32,10 +29,10 @@ namespace NYMake::NPlugins {
         }
 
     private:
-        TScopedPyObjectPtr Obj_ = nullptr;
+        TScopedPyObjectPtr Obj_;
     };
 
-    void RegisterMacro(TBuildConfiguration& conf, const TString& name, PyObject* func) {
+    void RegisterMacro(TBuildConfiguration& conf, const TString& name, TScopedPyObjectPtr&& func) {
         if (!PyFunction_Check(func)) {
             Py_ssize_t size = 0;
             auto *pystr = PyType_GetName(Py_TYPE(func));
@@ -48,12 +45,12 @@ namespace NYMake::NPlugins {
         TFsPath path = TFsPath(PyUnicode_AsUTF8(code->co_filename));
 
         TString docText;
-        PyObject* doc = ((PyFunctionObject*)func)->func_doc;
+        PyObject* doc = ((PyFunctionObject*)func.Get())->func_doc;
         if (PyUnicode_Check(doc)) {
             docText = PyUnicode_AsUTF8(doc);
         }
 
-        auto macro = MakeSimpleShared<TPluginMacroImpl>(func);
+        auto macro = MakeSimpleShared<TPluginMacroImpl>(std::move(func));
         macro->Definition = {
             std::move(docText),
             path.RelativePath(conf.SourceRoot),
