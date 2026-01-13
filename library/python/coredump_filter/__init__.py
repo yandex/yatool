@@ -382,7 +382,8 @@ class FrameBase(object):
         return self.source
 
     def raw(self):
-        return "{frame: <3} {func} {source}".format(
+        template = "{frame: <3} {func} {source}"
+        return six.text_type(template).format(
             frame=self.frame_no,
             func=self.func,
             source=self.source,
@@ -390,15 +391,16 @@ class FrameBase(object):
 
     def html(self):
         source, source_fmt = self.find_source()
-        return (
+        template = (
             '<span class="frame">{frame}</span>'
             '<span class="func">{func}</span> '
-            '<span class="source">{source}</span>{source_fmt}\n'.format(
-                frame=self.frame_no,
-                func=highlight_func(self.func.replace("&", "&amp;").replace("<", "&lt;")),
-                source=source,
-                source_fmt=source_fmt,
-            )
+            '<span class="source">{source}</span>{source_fmt}\n'
+        )
+        return six.text_type(template).format(
+            frame=self.frame_no,
+            func=highlight_func(self.func.replace("&", "&amp;").replace("<", "&lt;")),
+            source=source,
+            source_fmt=source_fmt,
         )
 
     def build_arcadia_link(self, source):
@@ -1160,8 +1162,8 @@ def stack_factory(stack):
 
 
 def _read_file(file_name):
-    with open(file_name) as f:
-        return f.read()
+    with open(file_name, "rb") as f:
+        return six.ensure_text(f.read(), encoding="utf-8")
 
 
 def _file_contents(file_name):
