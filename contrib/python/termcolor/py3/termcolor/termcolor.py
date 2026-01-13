@@ -24,7 +24,6 @@
 
 from __future__ import annotations
 
-import io
 import os
 import sys
 from functools import cache
@@ -38,6 +37,7 @@ if TYPE_CHECKING:
 ATTRIBUTES: dict[str, int] = {
     "bold": 1,
     "dark": 2,
+    "italic": 3,
     "underline": 4,
     "blink": 5,
     "reverse": 7,
@@ -121,7 +121,7 @@ def can_colorize(
 
     try:
         return os.isatty(sys.stdout.fileno())
-    except io.UnsupportedOperation:
+    except OSError:
         return sys.stdout.isatty()
 
 
@@ -150,7 +150,7 @@ def colored(
     be specified via a tuple of 0-255 ints (R, G, B).
 
     Available attributes:
-        bold, dark, underline, blink, reverse, concealed.
+        bold, dark, italic, underline, blink, reverse, concealed, strike.
 
     Example:
         colored('Hello, World!', 'red', 'on_black', ['bold', 'blink'])
