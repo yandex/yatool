@@ -7,16 +7,23 @@ VERSION(Service-proxy-version)
 
 PEERDIR(
     build/plugins/lib/test_const
-    contrib/tools/cython/Cython
     library/python/testing/coverage_utils
 )
 
+IF (PYTHON2)
+    PEERDIR(contrib/tools/cython_py2/Cython)
+    RESOURCE(
+        coveragerc_py2.txt /coverage_plugins/coveragerc.txt
+    )
+ELSE()
+    PEERDIR(contrib/tools/cython/Cython)
+    RESOURCE(
+        coveragerc.txt /coverage_plugins/coveragerc.txt
+    )
+ENDIF()
+
 PY_SRCS(
     yarcadia/plugin.py
-)
-
-RESOURCE(
-    coveragerc.txt /coverage_plugins/coveragerc.txt
 )
 
 END()
