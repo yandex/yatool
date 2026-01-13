@@ -237,7 +237,7 @@ public:
     }
 
     bool ShouldLoadPLuginsLazily() const noexcept {
-        return LoadPLuginsLazily_;
+        return LoadPLuginsLazily_  && WriteYdx.empty();  // yndex mode requires plugins to be loaded before creating TYndex instance
     }
 
 public:
