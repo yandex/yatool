@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 _CACHE_FILE_NAME = ".platform.cache"
-_SB_REST_API_TIMEOUT = 30
+_SB_REST_API_TIMEOUT = 1 * 60
 
 
 class ResourceNotFound(RuntimeError):
