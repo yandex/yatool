@@ -131,7 +131,9 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
             input_file,
         ]
 
-        if opts.enable_contrib_ydb_coverage:
+        if opts.enable_contrib_coverage:
+            stool_cmd += ['--enable-contrib-coverage']
+        elif opts.enable_contrib_ydb_coverage:
             stool_cmd += ['--enable-contrib-ydb-coverage']
 
         cmds.append({"cmd_args": stool_cmd, "cwd": "$(BUILD_ROOT)"})
