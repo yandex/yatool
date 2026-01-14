@@ -1,6 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/plugins/ymake_module.h>
+#include <devtools/ymake/plugins/pybridge/raii.h>
 
 #include <util/generic/noncopyable.h>
 #include <util/generic/vector.h>
@@ -8,6 +9,8 @@
 #include <util/system/guard.h>
 #include <util/system/spinlock.h>
 #include <util/system/yassert.h>
+
+#include <optional>
 
 #include <Python.h>
 
@@ -60,20 +63,11 @@ namespace NYMake {
 
             PyEval_RestoreThread(SavedState_);
 
-            for (auto sub : Subinterpreters_) {
-                if (sub) {
-                    PyThreadState_Swap(sub);
-                    NoopThreadsShutdown();
-                    Py_EndInterpreter(sub);
-                }
-            }
+            Subinterpreters_.clear();
 
             PyThreadState_Swap(MainState_);
 
-            NoopThreadsShutdown();
-
-            Py_Finalize();
-
+            Python_.reset();
             Initialized_ = false;
         }
 
@@ -116,7 +110,7 @@ namespace NYMake {
                 Py_ExitStatusException(status);
             }
 
-            Py_InitializeEx(0);
+            Python_.emplace();
 
             MainState_ = PyThreadState_Get();
 
@@ -130,9 +124,11 @@ namespace NYMake {
                 .gil = PyInterpreterConfig_OWN_GIL,
             };
 
-            Subinterpreters_.resize(SubinterpretersCount_, nullptr);
-            for (auto& sub : Subinterpreters_) {
-                Py_NewInterpreterFromConfig(&sub, &cfg);
+            Subinterpreters_.reserve(SubinterpretersCount_);
+            for (size_t i = 0; i < SubinterpretersCount_; ++i) {
+                PyThreadState* state = nullptr;
+                Py_NewInterpreterFromConfig(&state, &cfg);
+                Subinterpreters_.emplace_back(state);
             }
             PyThreadState_Swap(MainState_);
 
@@ -141,21 +137,10 @@ namespace NYMake {
             Initialized_ = true;
         }
 
-        void NoopThreadsShutdown() {
-            // when C threads call PyEval_RestoreThread, Python's threading module creates _DummyThread
-            // objects to track them. Even after PyThreadState_DeleteCurrent() is called,
-            // these tracking objects may persist, and their _tstate_lock cleanup may not work correctly with OWN_GIL subinterpreters.
-            PyRun_SimpleString(
-                "import sys\n"
-                "if 'threading' in sys.modules:\n"
-                "    import threading\n"
-                "    threading._shutdown = lambda: None\n"
-            );
-        }
-
+        std::optional<NYmake::NPy::TPython> Python_;
         PyThreadState* MainState_ = nullptr;
         PyThreadState* SavedState_ = nullptr;
-        TVector<PyThreadState*> Subinterpreters_;
+        TVector<NYmake::NPy::OwnedRef<PyThreadState>> Subinterpreters_;
         bool Initialized_ = false;
         size_t SubinterpretersCount_ = 0;
         TAdaptiveLock InitializedLock_;

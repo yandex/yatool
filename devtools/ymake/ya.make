@@ -23,6 +23,7 @@ PEERDIR(
     devtools/ymake/libs/ymakeyaml
     devtools/ymake/make_plan
     devtools/ymake/options
+    devtools/ymake/plugins/pybridge
     devtools/ymake/resolver
     devtools/ymake/symbols
     devtools/ymake/yndex
@@ -224,6 +225,7 @@ RECURSE(
     lang/expansion_fuzz
     lang/confreader_fuzz
     options
+    plugins/pybridge
     polexpr
     resolver
     stub
