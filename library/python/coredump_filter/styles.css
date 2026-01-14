@@ -11,7 +11,8 @@ a {
 .frame {
     color: #7f7f7f;
     display: inline-block;
-    width: 30px;
+    min-width: 30px;
+    padding-right: 5px;
 }
 
 .addr {
@@ -113,4 +114,10 @@ div.legend {
 
 div.legend ul {
     margin: 3px 0px 3px 0px;
+}
+
+.truncated-frames {
+    display: inline-block;
+    color: #cc0000;
+    font-weight: bold;
 }

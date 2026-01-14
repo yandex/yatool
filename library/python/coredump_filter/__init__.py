@@ -670,6 +670,7 @@ class Stack(object):
     mode = CoredumpMode.GDB
 
     max_depth = None
+    FRAMES_COUNT_IN_HTML = 1000
 
     fingerprint_blacklist = [
         # bottom frames
@@ -887,8 +888,23 @@ class Stack(object):
                 same_count,
             )
 
-        for f in self.frames:
-            ans += f.html()
+        truncated = len(self.frames) > self.FRAMES_COUNT_IN_HTML
+        if truncated:
+            first_frames = self.frames[: self.FRAMES_COUNT_IN_HTML // 2]
+            last_frames = self.frames[-self.FRAMES_COUNT_IN_HTML // 2 :]
+            for f in first_frames:
+                ans += f.html()
+            alert_line = '<div class="truncated-frames">...</div>\n'
+            ans += alert_line
+            ans += '<div class="truncated-frames">...  {frames_count} frames truncated! Full stack is available in raw format.</div>\n'.format(
+                frames_count=len(self.frames) - self.FRAMES_COUNT_IN_HTML,
+            )
+            ans += alert_line
+            for f in last_frames:
+                ans += f.html()
+        else:
+            for f in self.frames:
+                ans += f.html()
         ans += "</pre>\n"
 
         if return_result:
