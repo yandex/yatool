@@ -5,7 +5,6 @@ VERBOSE_LEVEL = logging.INFO
 
 
 def level():
-    global VERBOSE_LEVEL
     return VERBOSE_LEVEL
 
 
