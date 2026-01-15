@@ -10,6 +10,7 @@
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/include_parsers/cython_parser.h>
 #include <devtools/ymake/lang/plugin_facade.h>
+#include <devtools/ymake/plugins/pybridge/raii.h>
 
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -22,15 +23,6 @@
 using namespace NYMake::NPlugins;
 
 namespace {
-    struct TPyDestroyer {
-        static void Destroy(PyTypeObject* obj) noexcept {
-            Py_DECREF(obj);
-        }
-    };
-
-    template<typename TPythonObject>
-    using TPyHolder = THolder<TPythonObject, TPyDestroyer>;
-
     template<typename T>
     struct TMemberTraits {
         constexpr static  bool IsMember = false;
@@ -434,8 +426,8 @@ namespace {
     }
 
     struct YMakeState {
-        TPyHolder<PyTypeObject> ContextType;
-        TPyHolder<PyTypeObject> CmdContextType;
+        NYMake::NPy::OwnedRef<PyTypeObject> ContextType;
+        NYMake::NPy::OwnedRef<PyTypeObject> CmdContextType;
         TBuildConfiguration* Conf = nullptr;
 
         int Clear() noexcept {

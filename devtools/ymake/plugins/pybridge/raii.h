@@ -5,13 +5,17 @@
 
 #include <Python.h>
 
-namespace NYmake::NPy::NDetail {
+namespace NYMake::NPy::NDetail {
 struct TDeleter {
     static void Destroy(PyThreadState* obj) noexcept;
+
+    static void Destroy(PyTypeObject* obj) noexcept {
+        Py_DECREF(obj);
+    }
 };
 }
 
-namespace NYmake::NPy {
+namespace NYMake::NPy {
 
 class TPython: public TNonCopyable {
 public:

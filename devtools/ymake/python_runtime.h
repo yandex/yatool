@@ -137,10 +137,10 @@ namespace NYMake {
             Initialized_ = true;
         }
 
-        std::optional<NYmake::NPy::TPython> Python_;
+        std::optional<NYMake::NPy::TPython> Python_;
         PyThreadState* MainState_ = nullptr;
         PyThreadState* SavedState_ = nullptr;
-        TVector<NYmake::NPy::OwnedRef<PyThreadState>> Subinterpreters_;
+        TVector<NYMake::NPy::OwnedRef<PyThreadState>> Subinterpreters_;
         bool Initialized_ = false;
         size_t SubinterpretersCount_ = 0;
         TAdaptiveLock InitializedLock_;

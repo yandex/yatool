@@ -16,7 +16,7 @@ void NoopThreadsShutdown() noexcept {
 
 }
 
-namespace NYmake::NPy::NDetail {
+namespace NYMake::NPy::NDetail {
 
 void TDeleter::Destroy(PyThreadState* obj) noexcept {
     auto* prev = PyThreadState_Swap(obj);
@@ -27,7 +27,7 @@ void TDeleter::Destroy(PyThreadState* obj) noexcept {
 
 }
 
-namespace NYmake::NPy {
+namespace NYMake::NPy {
 
 TPython::TPython() noexcept {
     Py_InitializeEx(0);
