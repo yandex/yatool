@@ -167,7 +167,6 @@ SRCS(
     plugins/ymake_module.cpp
     plugins/plugin_macro_impl.cpp
     plugins/resource_handler/impl.cpp
-    plugins/scoped_py_object_ptr.cpp
     plugins/ymake_module_adapter.cpp
     propagate_change_flags.cpp
     python_runtime.cpp

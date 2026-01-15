@@ -3,7 +3,6 @@
 #include "convert.h"
 #include "error.h"
 #include "plugin_macro_impl.h"
-#include "scoped_py_object_ptr.h"
 #include "ymake_module_adapter.h"
 
 #include <devtools/ymake/diag/diag.h>
@@ -281,9 +280,9 @@ namespace {
         TVector<TString> includes;
         ParseCythonIncludes(data, includes);
         Py_ssize_t size = static_cast<Py_ssize_t>(includes.size());
-        TScopedPyObjectPtr list = PyList_New(size);
+        NYMake::NPy::OwnedRef list{PyList_New(size)};
         for (Py_ssize_t index = 0; index < size; ++index) {
-            if (PyList_SetItem(list, index, Py_BuildValue("y", includes[index].data())) < 0 || PyErr_Occurred()) {
+            if (PyList_SetItem(list.get(), index, Py_BuildValue("y", includes[index].data())) < 0 || PyErr_Occurred()) {
                 return nullptr;
             }
         }
@@ -299,7 +298,7 @@ namespace {
         const char* data = nullptr;
         Py_ssize_t size = 0;
         PyObject* xmlDocObject{args[0]};
-        TScopedPyObjectPtr asUnicode{};
+        NYMake::NPy::OwnedRef asUnicode{};
         if (PyUnicode_Check(xmlDocObject)) {
             data = PyUnicode_AsUTF8AndSize(xmlDocObject, &size);
             if (data == nullptr) {
@@ -310,7 +309,7 @@ namespace {
             if (asUnicode == nullptr) {
                 return nullptr;
             }
-            data = PyUnicode_AsUTF8AndSize(asUnicode, &size);
+            data = PyUnicode_AsUTF8AndSize(asUnicode.get(), &size);
             if (data == nullptr) {
                 return nullptr;
             }
@@ -345,7 +344,7 @@ namespace {
         const char* data = nullptr;
         Py_ssize_t dataSize = 0;
         PyObject* xmlDocObject{args[0]};
-        TScopedPyObjectPtr dataAsUnicode{};
+        NYMake::NPy::OwnedRef dataAsUnicode{};
         if (PyUnicode_Check(xmlDocObject)) {
             data = PyUnicode_AsUTF8AndSize(xmlDocObject, &dataSize);
             if (data == nullptr) {
@@ -356,7 +355,7 @@ namespace {
             if (dataAsUnicode == nullptr) {
                 return nullptr;
             }
-            data = PyUnicode_AsUTF8AndSize(dataAsUnicode, &dataSize);
+            data = PyUnicode_AsUTF8AndSize(dataAsUnicode.get(), &dataSize);
             if (data == nullptr) {
                 return nullptr;
             }
@@ -393,26 +392,26 @@ namespace {
             }
 
             Py_ssize_t index{0};
-            TScopedPyObjectPtr xmlsList = PyList_New(xmls.size());
+            NYMake::NPy::OwnedRef xmlsList{PyList_New(xmls.size())};
             for (const auto& xml : xmls) {
-                if (PyList_SetItem(xmlsList, index++, Py_BuildValue("s", xml.c_str()))) {
+                if (PyList_SetItem(xmlsList.get(), index++, Py_BuildValue("s", xml.c_str()))) {
                     return nullptr;
                 }
             }
 
             index = 0;
-            TScopedPyObjectPtr headersList = PyList_New(headers.size());
+            NYMake::NPy::OwnedRef headersList{PyList_New(headers.size())};
             for (const auto& header : headers) {
-                if (PyList_SetItem(headersList, index++, Py_BuildValue("s", header.c_str()))) {
+                if (PyList_SetItem(headersList.get(), index++, Py_BuildValue("s", header.c_str()))) {
                     return nullptr;
                 }
             }
 
-            TScopedPyObjectPtr result = PyTuple_New(2);
-            if (PyTuple_SetItem(result, 0, xmlsList.Release())) {
+            NYMake::NPy::OwnedRef result{PyTuple_New(2)};
+            if (PyTuple_SetItem(result.get(), 0, xmlsList.Release())) {
                 return nullptr;
             }
-            if (PyTuple_SetItem(result, 1, headersList.Release())) {
+            if (PyTuple_SetItem(result.get(), 1, headersList.Release())) {
                 return nullptr;
             }
 
@@ -453,10 +452,10 @@ namespace {
 
             TString macroName;
             {
-                TScopedPyObjectPtr name{PyObject_GetAttrString(args[0], "__name__")};
+                NYMake::NPy::OwnedRef name{PyObject_GetAttrString(args[0], "__name__")};
                 Y_ASSERT(PyUnicode_Check(name.Get()));
                 Py_ssize_t size;
-                const char *data = PyUnicode_AsUTF8AndSize(name.Get(), &size);
+                const char *data = PyUnicode_AsUTF8AndSize(name.get(), &size);
                 if (!data) {
                     Y_ASSERT(PyErr_Occurred());
                     return nullptr;
@@ -470,7 +469,7 @@ namespace {
                 return nullptr;
             }
 
-            NYMake::NPlugins::RegisterMacro(*Conf, macroName, TScopedPyObjectPtr::FromBorrowedRef(args[0]));
+            NYMake::NPlugins::RegisterMacro(*Conf, macroName, NYMake::NPy::FromBorrowedRef(args[0]));
 
             Py_INCREF(args[0]);
             return args[0];
@@ -560,17 +559,17 @@ namespace NYMake::NPlugins {
     }
 
     void BindYmakeConf(TBuildConfiguration& conf) {
-        TScopedPyObjectPtr mod{PyImport_ImportModule("ymake")};
-        Y_ASSERT(GetYMakeState(mod.Get())->Conf == nullptr);
-        GetYMakeState(mod.Get())->Conf = &conf;
+        NYMake::NPy::OwnedRef mod{PyImport_ImportModule("ymake")};
+        Y_ASSERT(GetYMakeState(mod.get())->Conf == nullptr);
+        GetYMakeState(mod.get())->Conf = &conf;
     }
 
     PyObject* CreateContextObject(TPluginUnit* unit) {
-        TScopedPyObjectPtr args = Py_BuildValue("()");
-        TScopedPyObjectPtr ymakeModule = PyImport_ImportModule("ymake");
+        NYMake::NPy::OwnedRef args{Py_BuildValue("()")};
+        NYMake::NPy::OwnedRef ymakeModule{PyImport_ImportModule("ymake")};
         CheckForError();
-        YMakeState* state = GetYMakeState(ymakeModule);
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->ContextType.Get()), args);
+        YMakeState* state = GetYMakeState(ymakeModule.get());
+        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->ContextType.Get()), args.get());
         if (obj) {
             Context* context = reinterpret_cast<Context*>(obj);
             context->Unit = unit;
@@ -579,11 +578,11 @@ namespace NYMake::NPlugins {
     }
 
     PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName) {
-        TScopedPyObjectPtr args = Py_BuildValue("(s)", attrName);
-        TScopedPyObjectPtr ymakeModule = PyImport_ImportModule("ymake");
+        NYMake::NPy::OwnedRef args{Py_BuildValue("(s)", attrName)};
+        NYMake::NPy::OwnedRef ymakeModule{PyImport_ImportModule("ymake")};
         CheckForError();
-        YMakeState* state = GetYMakeState(ymakeModule);
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->CmdContextType.Get()), args);
+        YMakeState* state = GetYMakeState(ymakeModule.get());
+        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->CmdContextType.Get()), args.get());
         if (obj) {
             CmdContext* cmdContext = reinterpret_cast<CmdContext*>(obj);
             cmdContext->Unit = unit;

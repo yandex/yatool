@@ -12,6 +12,10 @@ struct TDeleter {
     static void Destroy(PyTypeObject* obj) noexcept {
         Py_DECREF(obj);
     }
+
+    static void Destroy(PyObject* obj) noexcept {
+        Py_DECREF(obj);
+    }
 };
 }
 
@@ -23,7 +27,13 @@ public:
     ~TPython() noexcept;
 };
 
-template<typename TPyObj>
+template<typename TPyObj = PyObject>
 using OwnedRef = THolder<TPyObj, NDetail::TDeleter>;
+
+template<typename TPyObj>
+OwnedRef<TPyObj> FromBorrowedRef(TPyObj* ref) noexcept {
+    Py_XINCREF(ref);
+    return OwnedRef<TPyObj>{ref};
+}
 
 }

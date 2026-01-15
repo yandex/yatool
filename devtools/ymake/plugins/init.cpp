@@ -1,7 +1,8 @@
 #include "error.h"
 #include "plugin_macro_impl.h"
-#include "scoped_py_object_ptr.h"
 #include "ymake_module.h"
+
+#include <devtools/ymake/plugins/pybridge/raii.h>
 
 #include <util/folder/path.h>
 #include <util/generic/algorithm.h>
@@ -21,9 +22,9 @@ namespace {
         if (!PyObject_HasAttrString(mod, "register_parsers"))
             return true;
 
-        if (TScopedPyObjectPtr initFunc = PyObject_GetAttrString(mod, "register_parsers"); PyCallable_Check(initFunc)) {
-            TScopedPyObjectPtr confPtr = PyCapsule_New(&conf, BuildConfigurationName, NULL);
-            PyObject_CallOneArg(initFunc, confPtr);
+        if (NYMake::NPy::OwnedRef initFunc{PyObject_GetAttrString(mod, "register_parsers")}; PyCallable_Check(initFunc.get())) {
+            NYMake::NPy::OwnedRef confPtr{PyCapsule_New(&conf, BuildConfigurationName, nullptr)};
+            PyObject_CallOneArg(initFunc.get(), confPtr.get());
             if (PyErr_Occurred()) {
                 PyErr_Print();
                 return false;
@@ -33,26 +34,26 @@ namespace {
     }
 
     void RegisterMacrosFromModule(TBuildConfiguration& conf, PyObject* mod) {
-        TScopedPyObjectPtr attrs = PyObject_Dir(mod);
+        NYMake::NPy::OwnedRef attrs{PyObject_Dir(mod)};
         if (attrs == nullptr) {
             return;
         }
 
-        Py_ssize_t size = PyList_Size(attrs);
+        Py_ssize_t size = PyList_Size(attrs.get());
         for (Py_ssize_t i = 0; i < size; i++) {
-            TScopedPyObjectPtr attr = PyList_GetItem(attrs, i);
-            if (!PyUnicode_Check(attr)) {
+            NYMake::NPy::OwnedRef attr{PyList_GetItem(attrs.get(), i)};
+            if (!PyUnicode_Check(attr.get())) {
                 continue;
             }
-            TScopedPyObjectPtr asciiAttrName = PyUnicode_AsASCIIString(attr);
-            if (!PyBytes_Check(asciiAttrName)) {
+            NYMake::NPy::OwnedRef asciiAttrName{PyUnicode_AsASCIIString(attr.get())};
+            if (!PyBytes_Check(asciiAttrName.get())) {
                 continue;
             }
-            TStringBuf attrName = PyBytes_AsString(asciiAttrName);
+            TStringBuf attrName = PyBytes_AsString(asciiAttrName.get());
             constexpr TStringBuf pluginMacroPreffix = "on"sv;
             if (attrName.StartsWith(pluginMacroPreffix)) {
-                TScopedPyObjectPtr func = PyObject_GetAttr(mod, attr);
-                if (!PyFunction_Check(func)) {
+                NYMake::NPy::OwnedRef func{PyObject_GetAttr(mod, attr.get())};
+                if (!PyFunction_Check(func.get())) {
                     continue;
                 }
                 auto macroName = ToUpperUTF8(attrName.SubStr(pluginMacroPreffix.size()));
@@ -73,7 +74,7 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &p
 
     if (pycache.Exists()) {
         PySys_SetObject("dont_write_bytecode", Py_False);
-        NYMake::NPlugins::TScopedPyObjectPtr cachePath{PyUnicode_FromString(pycache.c_str())};
+        NYMake::NPy::OwnedRef cachePath{PyUnicode_FromString(pycache.c_str())};
         PySys_SetObject("pycache_prefix", cachePath.Get());
     } else {
         PySys_SetObject("dont_write_bytecode", Py_True);
@@ -84,23 +85,23 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &p
     // The order of plugin roots does really matter - 'build/plugins' should go first
     for (const auto& root : pluginsRoots) {
         if (root.Exists()) {
-            TScopedPyObjectPtr pluginsPath = PyUnicode_FromString(root.GetPath().c_str());
-            PyList_Insert(PySys_GetObject("path"), 0, pluginsPath);
+            NYMake::NPy::OwnedRef pluginsPath{PyUnicode_FromString(root.GetPath().c_str())};
+            PyList_Insert(PySys_GetObject("path"), 0, pluginsPath.get());
         }
     }
 
     for (const auto& file : pluginFiles) {
         auto baseName = file.Basename();
         TString modName = baseName.substr(0, baseName.size() - 3);
-        TScopedPyObjectPtr mod = PyImport_ImportModule(modName.data());
+        NYMake::NPy::OwnedRef mod{PyImport_ImportModule(modName.data())};
         if (PyErr_Occurred()) {
             PyErr_Print();
             continue;
         }
 
-        if (!RegisterParsersFromModule(*conf, mod))
+        if (!RegisterParsersFromModule(*conf, mod.get()))
             continue;
-        RegisterMacrosFromModule(*conf, mod);
+        RegisterMacrosFromModule(*conf, mod.get());
     }
 
     CheckForError();
