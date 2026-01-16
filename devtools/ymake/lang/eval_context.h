@@ -2,7 +2,6 @@
 
 #include "config_conditions.h"
 
-#include <devtools/ymake/compact_graph/dep_types.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/trace.ev.pb.h>
 #include <devtools/ymake/lang/makelists/statement_location.h>

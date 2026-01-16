@@ -7,7 +7,6 @@ ENDIF()
 PEERDIR(
     library/cpp/string_utils/base64
     devtools/ymake/common
-    devtools/ymake/compact_graph
     devtools/ymake/diag
     devtools/ymake/lang/makelists
     devtools/ymake/options
