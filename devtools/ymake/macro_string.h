@@ -7,8 +7,6 @@
 #include <util/generic/vector.h>
 #include <util/system/types.h>
 
-#include <expected>
-
 struct TVars;
 
 // id:name=value ("id" is usually a module id, sometimes a node's ElemId, see FormatCmd invocations)

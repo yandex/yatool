@@ -9,6 +9,7 @@
 #include "tools_miner.h"
 #include "isolated_projects.h"
 #include "command_store.h"
+#include "var_eval.h"
 
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/diag.h>
@@ -24,7 +25,6 @@
 #include <devtools/ymake/managed_deps_iter.h>
 #include <devtools/ymake/resolver/path_resolver.h>
 #include <devtools/ymake/resolver/resolve_ctx.h>
-#include <devtools/ymake/vars.h>
 
 #include <library/cpp/containers/top_keeper/top_keeper.h>
 #include <library/cpp/json/json_reader.h>

@@ -184,6 +184,7 @@ SRCS(
     transitive_requirements_check.cpp
     transitive_state.cpp
     vars.cpp
+    var_eval.cpp
     ymake.cpp
 )
 
