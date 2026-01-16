@@ -31,7 +31,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.clang_tidy_enabled = True
         self.use_tool_clangd = True
         self.clangd_extra_args = []
-        self.clangd_index_mode = "only-targets"
+        self.clangd_index_mode = "full"
         self.clangd_index_threads = 0
         self.use_arcadia_root = False
         self.files_visibility = None
@@ -150,9 +150,18 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetValueHook(
                     "clangd_index_mode",
                     values=("full", "only-targets", "disabled"),
-                    default_value=lambda _: "only-targets",
+                    default_value=lambda _: "full",
                 ),
                 group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer(
+                'clangd_index_mode',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    "clangd_index_mode",
+                    values=("full", "only-targets", "disabled"),
+                    default_value=lambda _: "full",
+                ),
+                help="Configure clangd background indexing",
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--clangd-index-threads"],
