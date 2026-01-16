@@ -95,7 +95,9 @@ public:
     {}
 
     ~TQueueLineWriter() {
-        WriteLineInt(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
+        if (!FinalSent_) {
+            WriteLineInt(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
+        }
     }
 
     void WriteLine(const TString& target) override {
@@ -149,6 +151,7 @@ private:
 
         asio::error_code ec;
         if (evtype == "NEvent.TAllForeignPlatformsReported") {
+            FinalSent_ = true;
             for (auto& [_, dst] : Destinations_) {
                 dst->try_send(ec, target);
             }
@@ -182,6 +185,7 @@ private:
 
     THashMap<ETransition, TAtomicSharedPtr<Queue>> Destinations_;
     THashSet<std::pair<ui32, ETraceEvent>> LinesWritten_;
+    bool FinalSent_ = false;
 };
 
 class TDummyLineWriter : public TLineWriter {
@@ -238,10 +242,12 @@ bool TForeignTargetPipelineInternal::RegisterConfig(const TVector<const char*>& 
             break;
         case ETransition::Tool:
         case ETransition::None:
+            size_t totalSubscriptions = 0;
             for (auto& [targetPlatform, platformQueues] : PipesByTargetPlatformId_) {
                 platformQueues[ETransition::Tool] = queue;
-                Subscriptions_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)] += Subscriptions_[std::make_pair(targetPlatform, ETransition::Tool)];
+                totalSubscriptions += Subscriptions_[std::make_pair(targetPlatform, ETransition::Tool)];
             }
+            Subscriptions_[std::make_pair(conf.TargetPlatformId, conf.TransitionSource)] = totalSubscriptions;
             break;
     }
 
