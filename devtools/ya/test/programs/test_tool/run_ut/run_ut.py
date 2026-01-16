@@ -591,7 +591,6 @@ def execute_ut(
         if gdb_debug:
             proc = shared.run_under_gdb(cmd, gdb_path, '/dev/null' if test_mode else '/dev/tty')
         else:
-            global SHUTDOWN_REQUESTED
             buff = ""
             buff_size = 64 * 1024
             close_fds = []
@@ -863,7 +862,6 @@ def launch_tests(
             if backtrace:
                 msg += '\n{}'.format(cores.colorize_backtrace(cores.get_problem_stack(backtrace), TEST_BT_COLORS))
 
-            global SHUTDOWN_REQUESTED
             if SHUTDOWN_REQUESTED and -res.rc == signal.SIGQUIT:
                 performed_suite.add_chunk_error(msg, Status.TIMEOUT)
             else:
@@ -1122,7 +1120,6 @@ def main():
         return res
 
     try:
-        global SHUTDOWN_REQUESTED
         if args.sequential_launch:
             for test_name in test_names:
                 launch([test_name])
