@@ -1777,6 +1777,64 @@ def filter_last_failed(tests: list[AbstractTestSuite], opts) -> list[AbstractTes
         return suites_to_rerun
 
 
+def filter_blacklist(tests: list[AbstractTestSuite], opts) -> list[AbstractTestSuite]:
+    if not opts.test_blacklist_path:
+        return tests
+    logger.debug("Going to apply `blacklist` filter from last run for %d suites", len(tests))
+    filters_manager = test_filter.SuiteFiltersManager(opts.test_blacklist_path)
+    result = []
+    for suite in tests:
+        name_filter = filters_manager.get_test_filter(suite)
+        if name_filter is None:
+            logger.debug("Add suite as is %s", suite)
+            result.append(suite)
+            continue
+        tests = suite.get_additional_filters()
+        if not tests:
+            tests = suite.get_computed_test_names(opts)
+        if not tests:
+            logger.debug("Suite is empty, skip %s", suite)
+            continue
+        tests = list(filter(lambda x: not name_filter(x), tests))
+        if tests:
+            logger.debug("Add suite %s with %d tests", suite, len(tests))
+            suite._additional_filters = tests
+            result.append(suite)
+        else:
+            logger.debug("Suite is empty now, skip %s", suite)
+    return result
+
+
+def filter_whitelist(tests: list[AbstractTestSuite], opts) -> list[AbstractTestSuite]:
+    if not opts.test_whitelist_path:
+        return tests
+    logger.debug("Going to apply `whitelist` filter from last run for %d suites", len(tests))
+    filters_manager = test_filter.SuiteFiltersManager(opts.test_whitelist_path)
+    result = []
+    for suite in tests:
+        name_filter = filters_manager.get_test_filter(suite)
+        if name_filter is None:
+            logger.debug("Suite not in list %s", suite)
+            continue
+        tests = suite.get_additional_filters()
+        if not tests:
+            tests = suite.get_computed_test_names(opts)
+        if not tests:
+            suite.insert_additional_filters(name_filter.filter_list)
+            logger.debug("Suite has not testnames, added %d %s", len(name_filter.filter_list), suite)
+            result.append(suite)
+        else:
+            tests = list(filter(name_filter, tests))
+            if tests:
+                logger.debug("Add suite %s with %d tests", suite, len(tests))
+                suite._additional_filters = tests
+                result.append(suite)
+            else:
+                logger.debug("Suite is empty now, skip %s", suite)
+
+    return result
+
+
 def configure_suites(suites, process, stage, add_error_func):
     def _p(data, p):
         return data[max(int(round(p * len(data))) - 1, 0)][1]

@@ -236,6 +236,8 @@ class ListingOptions(devtools.ya.core.yarg.Options):
 class FilteringOptions(devtools.ya.core.yarg.Options):
     def __init__(self, test_size_filters=None):
         self.last_failed_tests = False
+        self.test_blacklist_path = ''
+        self.test_whitelist_path = ''
         self.test_files_filter = []
         self.test_size_filters = test_size_filters or []
         self.test_size_timeouts = {}
@@ -258,6 +260,22 @@ class FilteringOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.BASIC,
             ),
             devtools.ya.core.yarg.ConfigConsumer('last_failed_tests'),
+            TestArgConsumer(
+                ['--test-blacklist-path'],
+                help='Path to the file containing a list of tests that will be excluded from running. Works only with --last-failed-tests',
+                hook=devtools.ya.core.yarg.SetValueHook('test_blacklist_path'),
+                subgroup=FILTERING_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('test_blacklist_path'),
+            TestArgConsumer(
+                ['--test-whitelist-path'],
+                help='Path to the file containing a list of tests that will be allowed to run',
+                hook=devtools.ya.core.yarg.SetValueHook('test_whitelist_path'),
+                subgroup=FILTERING_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('test_whitelist_path'),
             TestArgConsumer(
                 ['-F', '--test-filter'],
                 help="Run only test that matches <tests-filter>. Asterics '*' can be used in filter to match test subsets. Chunks can be filtered as well using pattern that matches '[*] chunk'",

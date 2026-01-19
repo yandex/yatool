@@ -3372,8 +3372,11 @@ def _inject_tests(
     print_status("Configuring tests execution")
 
     tests = test_filter.filter_suites(tests, test_opts, tpc)
-    if test_opts.last_failed_tests and not test_opts.tests_filters:
-        tests = devtools.ya.test.test_node.filter_last_failed(tests, opts)
+    if not test_opts.tests_filters:
+        if test_opts.last_failed_tests:
+            tests = devtools.ya.test.test_node.filter_last_failed(tests, opts)
+        tests = devtools.ya.test.test_node.filter_whitelist(tests, opts)
+        tests = devtools.ya.test.test_node.filter_blacklist(tests, opts)
 
     logger.debug("Generating build plan")
     plan = devtools.ya.build.build_plan.BuildPlan(graph)
