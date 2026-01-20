@@ -5,6 +5,7 @@ PY_SRCS(
     __init__.py
     matcher.pyx
     platform_params.py
+    platform_params_core.py
 )
 
 PEERDIR(
