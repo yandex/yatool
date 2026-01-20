@@ -62,6 +62,7 @@ END()
 RECURSE(
     fsnotifier
     yigck
+    tasklets
 )
 
 RECURSE_FOR_TESTS(
