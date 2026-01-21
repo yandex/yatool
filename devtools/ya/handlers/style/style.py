@@ -77,7 +77,7 @@ def _style(style_opts: StyleOptions, stylers: list[stlr.Styler], target: trgt.Ta
     if target.stdin:
         for styler in stylers:
             content = styler.format(target_path, content, target.stdin).content
-        print(content)
+        print(content, end='')
         return 0
 
     target_path = tp.cast(Path, target_path)  # could be PurePath only when from stdin
