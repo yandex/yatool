@@ -291,7 +291,7 @@ def _do_collect_cache(cache, build_root, opts):
         if hasattr(cache, 'strip'):
             cache.strip(FilterBySize(opts.cache_size))
         elif hasattr(cache, 'strip_total_size'):
-            cache.strip_total_size(opts.cache_size)
+            cache.strip_total_size(float(opts.cache_size))
 
         from yalibrary.toolscache import tc_force_gc
 
