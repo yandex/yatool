@@ -23,6 +23,8 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.use_clang_format_18_vanilla = False
         self.internal_enable_implicit_taxi_formatters = False
         self.internal_paths_with_integrations: list[str] = []
+        self.smart = False
+        self.smart_staged = False
 
     @staticmethod
     def consumer():
@@ -94,6 +96,18 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 ['--vanilla-cf18'],
                 help="Use vanilla clang-format-18 for cpp files. Only works with custom linter configs and linters.make.inc mechanism.",
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_18_vanilla', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['-s', '--smart'],
+                help="Check only git/arc modified files from the last commit",
+                hook=devtools.ya.core.yarg.SetConstValueHook('smart', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['-S', '--smart-staged'],
+                help="Check only staged files in git/arc directories.",
+                hook=devtools.ya.core.yarg.SetConstValueHook('smart_staged', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
             devtools.ya.core.yarg.ConfigConsumer('internal_enable_implicit_taxi_formatters'),

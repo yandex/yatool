@@ -137,6 +137,8 @@ def run_style(args) -> int:
         stdin_filename=args.stdin_filename,
         enable_implicit_taxi_formatters=args.internal_enable_implicit_taxi_formatters,
         paths_with_integrations=tuple(args.internal_paths_with_integrations),
+        smart=args.smart,
+        smart_staged=args.smart_staged,
     )
     disambiguation_opts = disambiguate.DisambiguationOptions(
         use_ruff=args.use_ruff,
