@@ -1521,40 +1521,47 @@ bool TUpdIter::DirectDepsNeedUpdate(const TDGIterAddable& st, const TDepTreeNode
 
 TGetPeerNodeResult TUpdIter::GetPeerNodeIfNeeded(const TDGIterAddable& st){
     const auto node = st.Add.Get();
-    if (node != nullptr && node->IsModule && IsPeerdirDep(st.Node.NodeType, st.Dep.DepType, st.Dep.DepNode.NodeType)) {
-        const auto dirNode = Graph.GetNodeById(LastType, LastElem);
-        if (!dirNode.IsValid() || !IsDirType(dirNode->NodeType)) {
-            return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Error};
-        }
+    if (node == nullptr || !node->IsModule || !IsPeerdirDep(st.Node.NodeType, st.Dep.DepType, st.Dep.DepNode.NodeType))
+        return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Match};
 
-        TStringBuf dir = Graph.GetFileName(dirNode).GetTargetStr();
-        auto isUserSpecifiedPeerdir = st.Add->ModuleDef && st.Add->ModuleDef->IsMakelistPeer(dir);
-        isUserSpecifiedPeerdir |= st.Add->GetModuleData().IsParsedPeer(dirNode->ElemId);
-
-        const auto nodeModule = node->Module;
-
-        if (nodeModule != nullptr) {
-            auto checkAllTags = isUserSpecifiedPeerdir && !nodeModule->GetTag().empty();
-            auto request = isUserSpecifiedPeerdir ? (checkAllTags? TMatchPeerRequest::CheckAll() : TMatchPeerRequest{true, false, {EPeerSearchStatus::DeprecatedByTags}}) : TMatchPeerRequest{false, false, {EPeerSearchStatus::DeprecatedByFilter}};
-            auto peerNode = NPeers::GetPeerNode(YMake.Modules, dirNode, nodeModule, std::move(request));
-
-            if (!isUserSpecifiedPeerdir && peerNode.Status != EPeerSearchStatus::Match) {
-                peerNode.Status = EPeerSearchStatus::Match;
-                YDIAG(IPRP) << "Ignore bad PEERDIR to " << dir << " because it is not user-specified" << Endl;
-            }
-            return peerNode;
-        }
-
-        if (!isUserSpecifiedPeerdir) {
-            // FIXME: stop to silently ignore this case
-            YDIAG(IPRP) << "Ignore PEERDIR from bad module to " << dir << " because it is not user-specified" << Endl;
-            return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Match};
-        }
-
-        return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Unknown};
+    const auto dirNode = Graph.GetNodeById(LastType, LastElem);
+    if (!dirNode.IsValid() || !IsDirType(dirNode->NodeType)) {
+        return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Error};
     }
 
-    return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Match};
+    TStringBuf dir = Graph.GetFileName(dirNode).GetTargetStr();
+    auto isUserSpecifiedPeerdir = st.Add->ModuleDef && st.Add->ModuleDef->IsMakelistPeer(dir);
+    isUserSpecifiedPeerdir |= st.Add->GetModuleData().IsParsedPeer(dirNode->ElemId);
+
+    const auto nodeModule = node->Module;
+
+    if (nodeModule != nullptr) {
+        auto checkAllTags = isUserSpecifiedPeerdir && !nodeModule->GetTag().empty();
+        auto request = [&] {
+            if (!isUserSpecifiedPeerdir)
+                return TMatchPeerRequest{false, false, {EPeerSearchStatus::DeprecatedByFilter}};
+
+            if (checkAllTags)
+                return TMatchPeerRequest::CheckAll();
+
+            return TMatchPeerRequest{true, false, {EPeerSearchStatus::DeprecatedByTags}};
+        }();
+        auto peerNode = NPeers::GetPeerNode(YMake.Modules, dirNode, nodeModule, std::move(request));
+
+        if (!isUserSpecifiedPeerdir && peerNode.Status != EPeerSearchStatus::Match) {
+            peerNode.Status = EPeerSearchStatus::Match;
+            YDIAG(IPRP) << "Ignore bad PEERDIR to " << dir << " because it is not user-specified" << Endl;
+        }
+        return peerNode;
+    }
+
+    if (!isUserSpecifiedPeerdir) {
+        // FIXME: stop to silently ignore this case
+        YDIAG(IPRP) << "Ignore PEERDIR from bad module to " << dir << " because it is not user-specified" << Endl;
+        return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Match};
+    }
+
+    return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Unknown};
 }
 
 void TUpdIter::PropagateIncDirs(const TDGIterAddable& st) const {
