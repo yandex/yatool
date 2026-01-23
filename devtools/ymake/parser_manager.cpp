@@ -105,7 +105,7 @@ namespace {
         std::make_tuple(EIncludesParserType::EmptyParser, "other", TVector<TStringBuf>({"fml", "fml2", "fml3", "pln", "info", "a", "lua", "sh"}), ParserConstructor<MakeEmptyParser>(false)),
         std::make_tuple(EIncludesParserType::EmptyParser, "other", TVector<TStringBuf>({"bin", "py", "pyi", "pysrc"}), ParserConstructor<MakeEmptyParser>(true)),
         std::make_tuple(EIncludesParserType::CppOnlyParser, "c", TVector<TStringBuf>({"cpp", "cc", "cxx", "c", "C", "auxcpp"}), ParserConstructor<MakeCLikeParser>()),
-        std::make_tuple(EIncludesParserType::CppOnlyParser, "c", TVector<TStringBuf>({"h", "hh", "hpp", "cuh", "H", "hxx", "xh", "ipp", "ixx"}), ParserConstructor<MakeCHeaderParser>()),
+        std::make_tuple(EIncludesParserType::CppOnlyParser, "c", TVector<TStringBuf>({"h", "hh", "hpp", "cuh", "H", "hxx", "xh", "ipp", "ixx", ".inl", ".vert", ".frag", ".tesc", ".tese", ".geom", ".comp"}), ParserConstructor<MakeCHeaderParser>()),
         std::make_tuple(EIncludesParserType::CppOnlyParser, "c", TVector<TStringBuf>({"cu", "S", "s", "sfdl", "m", "mm"}), ParserConstructor<MakeCppParser>()),
         std::make_tuple(EIncludesParserType::AsmParser, "asm", TVector<TStringBuf>({"asm"}), ParserConstructor<MakeAsmParser>()),
         std::make_tuple(EIncludesParserType::ProtoParser, "proto", TVector<TStringBuf>({"gzt", "gztproto"}), ParserConstructor<MakeGztParser>()),
