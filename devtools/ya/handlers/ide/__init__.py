@@ -666,6 +666,7 @@ class IdeYaHandler(yarg.CompositeHandler):
                 TidyOptions(),
                 devtools.ya.core.common_opts.YaBin3Options(),
             ],
+            visible=False,
         )
 
         self['idea'] = yarg.OptsHandler(
@@ -740,7 +741,7 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.ToolsOptions(),
                 devtools.ya.core.common_opts.YaBin3Options(),
             ],
-            visible=(pm.my_platform() != 'win32'),
+            visible=False,
         )
         self['vscode-go'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.vscode_go.gen_vscode_workspace),
@@ -755,6 +756,7 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.ToolsOptions(),
                 devtools.ya.core.common_opts.YaBin3Options(),
             ],
+            visible=False,
         )
         self['vscode-py'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.vscode_py.gen_vscode_workspace),
@@ -769,7 +771,7 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.ToolsOptions(),
                 devtools.ya.core.common_opts.YaBin3Options(),
             ],
-            visible=(pm.my_platform() != 'win32'),
+            visible=False,
         )
         self['vscode-ts'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.vscode_ts.gen_vscode_workspace),
