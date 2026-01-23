@@ -4,7 +4,7 @@ CODEGEN_CPP_TASK = (
 )
 
 CODEGEN_EXTS_BY_LANG = {
-    "CPP": [".h", ".hh", ".hpp", ".inc", ".c", ".cc", ".cpp", ".C", ".cxx"],
+    "CPP": [".h", ".hh", ".hpp", ".inc", ".c", ".cc", ".cpp", ".C", ".cxx", ".inl"],
     "PY3": [".py", ".pyi", ".pysrc"],
     "GO": [".go", ".gosrc"],
 }
