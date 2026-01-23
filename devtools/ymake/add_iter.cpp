@@ -1536,16 +1536,14 @@ TGetPeerNodeResult TUpdIter::GetPeerNodeIfNeeded(const TDGIterAddable& st){
     const auto nodeModule = node->Module;
 
     if (nodeModule != nullptr) {
-        auto checkAllTags = isUserSpecifiedPeerdir && !nodeModule->GetTag().empty();
-        auto request = [&] {
-            if (!isUserSpecifiedPeerdir)
-                return TMatchPeerRequest{false, false, {EPeerSearchStatus::DeprecatedByFilter}};
-
-            if (checkAllTags)
-                return TMatchPeerRequest::CheckAll();
-
-            return TMatchPeerRequest{true, false, {EPeerSearchStatus::DeprecatedByTags}};
-        }();
+        TMatchPeerRequest request;
+        if (!isUserSpecifiedPeerdir) {
+            request = TMatchPeerRequest{false, false, {EPeerSearchStatus::DeprecatedByFilter}};
+        } else if (!nodeModule->GetTag().empty()) {
+            request = TMatchPeerRequest::CheckAll();
+        } else {
+            request = TMatchPeerRequest{true, false, {EPeerSearchStatus::DeprecatedByTags}};
+        }
         auto peerNode = NPeers::GetPeerNode(YMake.Modules, dirNode, nodeModule, std::move(request));
 
         if (!isUserSpecifiedPeerdir && peerNode.Status != EPeerSearchStatus::Match) {
