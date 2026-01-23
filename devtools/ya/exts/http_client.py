@@ -57,8 +57,8 @@ class DownloadTimeoutException(Exception):
     temporary = True
 
 
-def make_user_agent():
-    return 'ya: {host}'.format(host=socket.gethostname())
+def make_user_agent(prefix='ya'):
+    return '{prfx}: {host}'.format(prfx=prefix, host=socket.gethostname())
 
 
 def make_headers(headers=None):

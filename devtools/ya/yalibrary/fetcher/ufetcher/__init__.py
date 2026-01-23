@@ -37,6 +37,13 @@ class UnableToFetchError(Exception):
     mute = True
 
 
+def _get_user_agent() -> str:
+    user_agent = exts.http_client.make_user_agent(prefix="universal_fetcher")
+    if distbuild_task_uid := os.getenv("DISTBUILD_TASK_UID"):
+        user_agent += f" task_uid={distbuild_task_uid}"
+    return user_agent
+
+
 def _get_sandbox_token() -> str:
     try:
         import app_ctx
@@ -113,7 +120,7 @@ def get_ufetcher(should_tar_output: bool = True) -> universal_fetcher.UniversalF
     )
 
     http_params = universal_fetcher.HttpParams(
-        user_agent=exts.http_client.make_user_agent(),
+        user_agent=_get_user_agent(),
         socket_timeout_ms=30_000,
         connect_timeout_ms=30_000,
     )
