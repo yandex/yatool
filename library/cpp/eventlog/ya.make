@@ -2,6 +2,7 @@ LIBRARY()
 
 PEERDIR(
     library/cpp/blockcodecs
+    library/cpp/deprecated/atomic
     library/cpp/eventlog/proto
     library/cpp/json
     library/cpp/logger

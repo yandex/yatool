@@ -5,6 +5,7 @@
 #include "events_extension.h"
 
 #include <library/cpp/blockcodecs/codecs.h>
+#include <library/cpp/deprecated/atomic/atomic.h>
 #include <library/cpp/logger/all.h>
 
 #include <google/protobuf/message.h>
