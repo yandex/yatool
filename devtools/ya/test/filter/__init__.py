@@ -257,17 +257,20 @@ def fixed_test_names(filters, opts):
 
 class SuiteFiltersManager:
     class SuiteFilter:
-        def __init__(self, data):
-            self._suite_filter: list[Callable[[common_suites.AbstractTestSuite], bool]] = []
-            path = data.get('path')
-            if path:
-                self._suite_filter.append(project_path_filter({path}))
+        @staticmethod
+        def _get_list(data: dict, field: str) -> list[str]:
+            result = data.get(field)
+            if not result:
+                return []
+            if not isinstance(result, list):
+                return [result]
+            return result
 
-            self.test_filter = data.get('test_filter')
-            if not self.test_filter:
-                self.test_filter = []
-            if not isinstance(self.test_filter, list):
-                self.test_filter = [self.test_filter]
+        def __init__(self, data: dict):
+            self._suite_filter: list[Callable[[common_suites.AbstractTestSuite], bool]] = []
+            self._suite_filter.append(project_path_filter(set(SuiteFiltersManager.SuiteFilter._get_list(data, 'path'))))
+            self._suite_filter.append(filter_suite_type(SuiteFiltersManager.SuiteFilter._get_list(data, 'suite_type')))
+            self.test_filter = SuiteFiltersManager.SuiteFilter._get_list(data, 'test_filter')
 
         def applicable_for(self, suite: common_suites.AbstractTestSuite) -> bool:
             return all([f(suite) for f in self._suite_filter])
