@@ -34,7 +34,7 @@ def get_env(args):
         os.path.join(bindir_node_modules_path, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
     ]
 
-    return {"NODE_PATH": os.pathsep.join(node_path)}
+    return {"NODE_PATH": os.pathsep.join(node_path), "NODE_OPTIONS": "--max-old-space-size=4096"}
 
 
 def run(args):
