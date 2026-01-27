@@ -77,14 +77,24 @@ def _mine_targets_smart(paths: Sequence[Path], only_staged: bool = False) -> Gen
     # XXX: Assuming all paths are under the same repo
     vcs, root = _get_vcs_root(paths[0])
     for path in paths:
-        output = subprocess.check_output(
-            [vcs, 'diff', '--staged' if only_staged else 'HEAD', '--name-status', path],
-            encoding='utf-8',
-        )
+        if only_staged:
+            output = subprocess.check_output(
+                [vcs, 'diff', '--staged', 'HEAD', '--name-status', path],
+                encoding='utf-8',
+            )
+            relative = root
+        else:
+            if vcs == 'git':
+                cmd = [vcs, 'status', '-uall', '--porcelain', '--short', path]
+                relative = root
+            else:
+                cmd = [vcs, 'status', '-uall', '--short', path]
+                relative = Path.cwd()
+            output = subprocess.check_output(cmd, encoding='utf-8')
         for name_status in output.strip().splitlines():
             status, name = name_status.split(maxsplit=1)
             if status != 'D':
-                target_path = Path(root, name).resolve(strict=True)
+                target_path = Path(relative, name).resolve(strict=True)
                 yield Target(target_path, target_path.read_text, passed_directly=path.is_file())
 
 
