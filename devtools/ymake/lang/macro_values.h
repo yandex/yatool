@@ -1,5 +1,7 @@
 #pragma once
 
+#include "value_storage.h"
+
 #include <devtools/ymake/polexpr/ids.h>
 #include <devtools/ymake/symbols/name_store.h>
 
@@ -86,7 +88,7 @@ enum class EMacroFunction: ui32 {
     //
     Count
 };
-static_assert(std::underlying_type_t<EMacroFunction>(EMacroFunction::Count) <= (1 << NPolexpr::TFuncId::IDX_BITS));
+static_assert(ToUnderlying(EMacroFunction::Count) <= (1 << NPolexpr::TFuncId::IDX_BITS));
 
 template <>
 struct std::formatter<EMacroFunction>: std::formatter<std::string_view> {
@@ -164,22 +166,23 @@ public:
         TLegacyLateGlobPatterns
     >;
 
-    enum EStorageType {
-        ST_LITERALS,
-        ST_TOOLS,
-        ST_INPUTS,
-        ST_OUTPUTS,
-        ST_GLOB,
-        ST_INPUT_ARRAYS,
-        ST_OUTPUT_ARRAYS,
-        ST_LEGACY_LATE_GLOB,
-        ST_STRING_ARRAYS,
-        ST_BOOL,
-        ST_TOOL_ARRAYS,
-        ST_RESULTS,
-        ST_COUNT
+public:
+
+    class TInlineStorage {
+    public:
+        constexpr static size_t TypeBits = 2;
+        constexpr static size_t DataBits = 26;
+        static_assert(ToUnderlying(EDataType::CountInline) <= (1 << TypeBits));
+        static_assert(TypeBits + DataBits == NPolexpr::TConstId::IDX_BITS);
+    public:
+        static NPolexpr::TConstId Put(EDataType type, auto data) {
+            return NPolexpr::TConstId(ToUnderlying(EStorageType::Inline), (ToUnderlying(type) << DataBits) | data);
+        }
+        static std::pair<EDataType, ui32> Get(NPolexpr::TConstId id) {
+            Y_ASSERT(id.GetStorage() == ToUnderlying(EStorageType::Inline));
+            return {static_cast<EDataType>(id.GetIdx() >> DataBits), id.GetIdx() & ((1 << DataBits) - 1)};
+        }
     };
-    static_assert(ST_COUNT <= (1 << NPolexpr::TConstId::STORAGE_BITS));
 
 public:
 
@@ -190,14 +193,14 @@ public:
     TValue GetValue(NPolexpr::TConstId id) const;
     TStringBuf Internalize(TStringBuf s);
 
+    EDataType GetType(NPolexpr::TConstId id) const;
+
     void Save(TMultiBlobBuilder& builder) const;
     void Load(TBlob& multi);
 
 private:
 
-    TNameStore CmdPattern;
-    TNameStore Strings;
-    TNameStore Refs;
+    TValueStorage Values;
     TNameStore Vars;
 
 };

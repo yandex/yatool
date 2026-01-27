@@ -48,6 +48,7 @@ SRCS(
     macro_values.cpp
     makefile_reader.cpp
     resolve_include.cpp
+    value_storage.cpp
 )
 
 GENERATE_ENUM_SERIALIZATION(confreader_cache.h)

@@ -1110,28 +1110,27 @@ TToolsAndResults TCommands::GetCommandToolsEtc(ui32 elemId) const {
         if (node.GetType() != NPolexpr::TExpression::TNode::EType::Constant)
             continue;
         auto id = NPolexpr::TConstId::FromRepr(node.GetIdx());
-        switch (id.GetStorage()) {
-        case TMacroValues::ST_TOOLS:
-            {
+        switch (Values.GetType(id)) {
+            case EDataType::Tool: {
                 auto tool = std::get<TMacroValues::TTool>(Values.GetValue(id)).Data;
                 if (!tool.empty())
                     tools.Push(tool);
                 break;
             }
-        case TMacroValues::ST_TOOL_ARRAYS:
-            {
+            case EDataType::ToolArray: {
                 auto _tools = std::get<TMacroValues::TTools>(Values.GetValue(id)).Data;
                 for (auto& tool : _tools)
                     tools.Push(tool);
                 break;
             }
-        case TMacroValues::ST_RESULTS:
-            {
+            case EDataType::Result: {
                 auto result = std::get<TMacroValues::TResult>(Values.GetValue(id)).Data;
                 if (!result.empty())
                     results.Push(result);
                 break;
             }
+            default:
+                ; // fall out
         }
     }
     return {tools.Take(), results.Take()};
