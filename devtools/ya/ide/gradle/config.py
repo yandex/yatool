@@ -103,7 +103,7 @@ class _JavaSemConfig(SemConfig):
                 raise SemException(f"Not exclude target {exclude_target} not in {self.arcadia_root}")
             rel_exclude_target = exclude_target.relative_to(self.arcadia_root)
             if not self.in_rel_targets(rel_exclude_target):
-                raise SemException(f"Exclude target {rel_exclude_target} not in any export targets")
+                self.logger.warning(f"Skip exclude {rel_exclude_target}: not in any export targets")
             if str(rel_exclude_target) in self.params.rel_targets:
                 raise SemException(f"Exclude target {rel_exclude_target} can't be same as any export targets")
             self.rel_exclude_targets.append(str(rel_exclude_target))
