@@ -46,6 +46,7 @@ class ReportTypes(object):
     UNIVERSAL_FETCHER = 'universal_fetcher'
     BUILD_ERRORS = 'build_errors'
     BUILD_ERRORS_COUNT = 'build_errors_count'
+    RECIPES_USAGE = 'recipes_usage'
     FINISH = 'finish'
 
 

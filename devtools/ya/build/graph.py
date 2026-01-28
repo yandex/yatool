@@ -38,6 +38,7 @@ import devtools.ya.core.event_handling
 from devtools.ya.core.imprint import imprint
 from devtools.ya.core import stage_tracer
 import devtools.ya.test.const as tconst
+import devtools.ya.test.dartfile
 
 import yalibrary.platform_matcher as pm
 import yalibrary.graph.commands as graph_cmd
@@ -3372,6 +3373,22 @@ def _inject_tests(
     print_status("Configuring tests execution")
 
     tests = test_filter.filter_suites(tests, test_opts, tpc)
+    suite_to_recipes = {}
+    uniq_recipes = set()
+    for suite in tests:
+        if suite.recipes and (recipe_cmds := devtools.ya.test.dartfile.decode_recipe_cmdline(suite.recipes)):
+            recipe_bins = {cmd[0] for cmd in recipe_cmds}
+            suite_to_recipes.setdefault(suite.project_path, []).extend(recipe_bins)
+            uniq_recipes |= recipe_bins
+    if suite_to_recipes:
+        devtools.ya.core.report.telemetry.report(
+            devtools.ya.core.report.ReportTypes.RECIPES_USAGE,
+            {
+                'suite_to_recipes': suite_to_recipes,
+                'count': len(uniq_recipes),
+                'uniq_recipes': list(uniq_recipes),
+            },
+        )
     if not test_opts.tests_filters:
         if test_opts.last_failed_tests:
             tests = devtools.ya.test.test_node.filter_last_failed(tests, opts)
