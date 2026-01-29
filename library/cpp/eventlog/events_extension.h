@@ -5,7 +5,7 @@
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/message.h>
 
-#include <library/cpp/threading/atomic/bool.h>
+#include <library/cpp/deprecated/atomic_bool/bool.h>
 #include <library/cpp/string_utils/base64/base64.h>
 
 #include <util/generic/map.h>
