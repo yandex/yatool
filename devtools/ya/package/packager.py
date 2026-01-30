@@ -1017,6 +1017,7 @@ def create_package(package_context, output_root, builds):
                     result_dir,
                     params.docker_save_image,
                     params.docker_push_image,
+                    params.docker_push_image_use_buildx,
                     params.nanny_release,
                     params.docker_build_network,
                     params.docker_build_arg,

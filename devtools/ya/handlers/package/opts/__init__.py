@@ -36,6 +36,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.docker_no_cache = False
         self.docker_pull = False
         self.docker_push_image = False
+        self.docker_push_image_use_buildx = False
         self.docker_remote_image_version = None
         self.docker_use_remote_cache = False
         self.docker_dest_remote_image_version = None
@@ -252,6 +253,13 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 subgroup=DOCKER_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-push-use-buildx'],
+                help='Push docker image to registry',
+                hook=devtools.ya.core.yarg.SetConstValueHook('docker_push_image_use_buildx', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
                 names=['--docker-no-cache'],
                 help='Disable docker cache',
                 hook=devtools.ya.core.yarg.SetConstValueHook('docker_no_cache', True),
@@ -334,6 +342,10 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         if self.nanny_release and not self.docker_push_image:
             raise devtools.ya.core.yarg.ArgsValidatingException(
                 "Using --nanny-release without --docker-push is pointless"
+            )
+        if self.docker_push_image and self.docker_push_image_use_buildx:
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                "Using --docker-push-image with --docker-push-image-use-buildx pushes the image to the registry twice. Use only one option. For rootless builds without Docker daemon use buildx"
             )
 
     def postprocess2(self, params):

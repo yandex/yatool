@@ -57,6 +57,7 @@ def create_package(
     result_dir,
     save_docker_image,
     push,
+    push_use_buildx,
     nanny_release,
     network,
     build_args,
@@ -133,6 +134,8 @@ def create_package(
         build_command += ["--label", "{}={}".format(k, v)]
 
     if buildx_required or docker_use_buildx:
+        if push_use_buildx:
+            build_command += ["--push"]
         build_command = ["buildx"] + build_command
 
     build_out, _ = package.process.run_process(
