@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def enrich_with_licenses(meta):
     for data in meta:
-        if "pom_file" not in data:
+        if 'licenses' in data or "pom_file" not in data:
             continue
 
         contrib_dir = os.path.dirname(data.get("pom_file"))
