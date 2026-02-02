@@ -718,7 +718,7 @@ def process_test_results(args, ytexec_config: YtexecConfig, exit_code, start_tim
                 msg += "Operation was not created. " + long_prep_msg
             else:
                 msg += (
-                    "Operation was created but we could not wait for it any longer and haulted ytexec. " + long_prep_msg
+                    "Operation was created but we could not wait for it any longer and halted ytexec. " + long_prep_msg
                 )
             status = const.Status.TIMEOUT
         else:
