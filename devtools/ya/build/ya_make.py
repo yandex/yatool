@@ -550,6 +550,10 @@ def configure_build_graph_cache_dir(app_ctx, opts):
         logger.debug('Build graph cache is not available in opensource')
         return
 
+    if opts.build_graph_cache_cl_for_resource:
+        logger.debug('Ymake cache resource and path to changlists file are taken from command options')
+        return
+
     _, _, sandbox_token = app_ctx.fetcher_params
     build_graph_cache_resource_dir = build_graph_cache.BuildGraphCacheResourceDir(
         opts, app_ctx.legacy_sandbox_fetcher, sandbox_token

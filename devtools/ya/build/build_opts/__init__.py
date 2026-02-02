@@ -3753,6 +3753,7 @@ def build_graph_cache_config_opts():
                 self.build_graph_cache_cl = None
                 self.build_graph_cache_trust_cl = False
                 # or DistbsOptions.distbuild_patch
+                self.build_graph_cache_cl_for_resource = False
 
                 # Build graph cache specification
                 self.build_graph_autocheck_params = None
