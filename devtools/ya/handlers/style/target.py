@@ -94,6 +94,8 @@ def _mine_targets_smart(paths: Sequence[Path], only_staged: bool = False) -> Gen
         for name_status in output.strip().splitlines():
             status, name = name_status.split(maxsplit=1)
             if status != 'D':
+                if '->' in name:
+                    name = name.rsplit('->', maxsplit=1)[-1].strip()
                 target_path = Path(relative, name).resolve(strict=True)
                 yield Target(target_path, target_path.read_text, passed_directly=path.is_file())
 
