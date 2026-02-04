@@ -47,15 +47,3 @@ bool TCmdProperty::AddMacroCall(const TStringBuf& name, const TStringBuf& argLis
     MacroCalls_.emplace_back(name, SpecVars_.size() ? TCommandInfo().SubstMacroDeeply(nullptr, argList, SpecVars_, false) : argList);
     return true;
 }
-
-bool TCmdProperty::IsBaseMacroCall(const TStringBuf& name) {
-    return name == NMacro::SET
-        || name == NMacro::SET_APPEND
-        || name == NMacro::SET_APPEND_WITH_GLOBAL
-        || name == NMacro::DEFAULT
-        || name == NMacro::ENABLE
-        || name == NMacro::DISABLE
-        || name == NMacro::_GLOB
-        || name == NMacro::_LATE_GLOB
-        || name == NMacro::_NEVERCACHE;
-}

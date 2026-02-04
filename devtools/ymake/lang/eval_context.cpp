@@ -332,8 +332,6 @@ bool TEvalContext::SetStatement(const TStringBuf& name, const TVector<TStringBuf
         } else {
             vars.SetAppendStoreOriginals(args[0], EvalExpr(vars, JoinStrings(args.begin() + 1, args.end(), " ")), orig);
         }
-    } else if (name == NMacro::SET_APPEND_WITH_GLOBAL) {
-        vars.SetAppendWithGl(args, orig);
     } else if (name == NMacro::DEFAULT) {
         // AssertEx(+args == 2);
         AssertEx(args.size(), "need var name");
@@ -352,7 +350,7 @@ bool TEvalContext::SetStatement(const TStringBuf& name, const TVector<TStringBuf
 }
 
 bool TEvalContext::VarStatement(const TStringBuf& name, TVector<TStringBuf>& args, TSSPool& pool) {
-    if (SetStatement(name, args, Vars(), OrigVars())) {
+    if (SetStatement(name, args, Vars(), OrigVars()) || (NsExtraSetters && NsExtraSetters(name, args))) {
         //recalc variables
         YDIAG(V) << "Need to recalc conditions with " << args[0] << Endl;
         Condition.RecalcVars(TString::Join("$", args[0]), Vars(), OrigVars());

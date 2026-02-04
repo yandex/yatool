@@ -108,9 +108,39 @@ TStringBuf TModuleDef::PrepareMacroCall(const TMacroCall& macroCall, const TVars
     return macroName;
 }
 
-bool TModuleDef::ProcessBaseMacro(const TStringBuf& macroName, const TVector<TStringBuf>& args, const TStringBuf& name) {
-    if (TCmdProperty::IsBaseMacroCall(macroName) && (TDirParser::SetStatement(macroName, args, Vars, OrigVars) ||
-            ProcessGlobStatement(macroName, args, Vars, OrigVars))) {
+bool TModuleDef::ProcessSetAppendWithGlobal(TStringBuf macroName, const TVector<TStringBuf>& args) {
+    if (macroName != NMacro::SET_APPEND_WITH_GLOBAL)
+        return false;
+
+    if (!args.empty()) {
+        const TStringBuf& name = args[0];
+        TVector<TStringBuf> loc, glob;
+        bool modGlobal = false;
+        for (TStringBuf arg: std::span{args}.subspan(1)) {
+            if (arg == "GLOBAL") {
+                modGlobal = true;
+            } else {
+                (std::exchange(modGlobal, false) ? glob : loc).push_back(arg);
+            }
+        }
+        if (loc.size())
+            Vars.SetAppendStoreOriginals(name, JoinStrings(loc.begin(), loc.end(), " "), OrigVars);
+        if (glob.size()) {
+            CheckEx(ModuleConf.Globals.contains(name),
+                "SET_APPEND with GLOBAL for " << name << " is not applied in this kind of module. Skip this options: "
+                << TVecDumpSb(glob));
+            Vars.SetAppendStoreOriginals(TString::Join(name, "_GLOBAL"), JoinStrings(glob.begin(), glob.end(), " "), OrigVars);
+        }
+    }
+
+    return true;
+}
+
+bool TModuleDef::ProcessBaseMacro(TStringBuf macroName, const TVector<TStringBuf>& args, TStringBuf name) {
+    if (TDirParser::SetStatement(macroName, args, Vars, OrigVars) ||
+        ProcessSetAppendWithGlobal(macroName, args) ||
+        ProcessGlobStatement(macroName, args, Vars, OrigVars)
+    ) {
         YDIAG(DG) << "Recalc conditions after base macro call: " << name << Endl;
         Conf.Conditions.RecalcVars(TString::Join("$", args[0]), Vars, OrigVars);
         return true;
@@ -166,8 +196,6 @@ void TModuleDef::InitModule(const TStringBuf& name, TArrayRef<const TStringBuf> 
         Vars.SetValue(NVariableDefs::VAR_MODULE_KIND, name);
     }
     Vars.SetValue(NVariableDefs::VAR_MODDIR, Module.GetDir().CutType());
-    const auto& moduleConf = ModuleConf;
-    Vars.AssignFilterGlobalVarsFunc([&moduleConf](const TStringBuf &varName) -> bool { return moduleConf.Globals.contains(varName); });
     OrigVars = orig;
     InitModuleSpecConditions();
     ProcessModuleCall(name, args);

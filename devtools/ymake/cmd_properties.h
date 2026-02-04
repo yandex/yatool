@@ -88,8 +88,6 @@ public:
 
     bool AddMacroCall(const TStringBuf& name, const TStringBuf& argList);
 
-    static bool IsBaseMacroCall(const TStringBuf& name);
-
     void Inherit(const TCmdProperty& parent) {
         //TODO: fix bad and slow insertion
         if (parent.MacroCalls_.size()) {

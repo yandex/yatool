@@ -1,7 +1,6 @@
 #pragma once
 
 #include "macro_string.h"
-#include "out.h"
 
 #include <devtools/ymake/compact_graph/dep_types.h>
 #include <devtools/ymake/diag/dbg.h>
@@ -45,7 +44,6 @@ namespace NYMake {
 struct TVars;
 struct TUpdEntryStats;
 typedef std::pair<const TDepsCacheId, TUpdEntryStats>* TUpdEntryPtr;
-typedef std::function<bool(const TStringBuf&)> TFilterGlobalVarsFunc;
 
 /// identify and dereference variables
 TString EvalExpr(const TVars& vars, const TStringBuf& expr);
@@ -321,20 +319,14 @@ public:
     ui64 Id;
 
 private:
-    TFilterGlobalVarsFunc AcceptGlobalVarWithName;
     std::function<void(const TYVar&, const TStringBuf&)> VarLookupHook;
 
 public:
     explicit TVars(const TVars* base = nullptr)
         : Base(base)
         , Id(0)
-        , AcceptGlobalVarWithName([](const TStringBuf&) -> bool { return true; })
         , VarLookupHook([](const TYVar&, const TStringBuf&) {})
     {
-    }
-
-    void AssignFilterGlobalVarsFunc(const TFilterGlobalVarsFunc& filter) {
-        AcceptGlobalVarWithName = filter;
     }
 
     void AssignVarLookupHook(const std::function<void(const TYVar&, const TStringBuf&)>& hook) {
@@ -380,31 +372,6 @@ public:
             SetValue(name, TString::Join("$", name, " ", value), baseVal);
         } else {
             SetValue(name, value);
-        }
-    }
-
-    void SetAppendWithGl(const TVector<TStringBuf>& args, TOriginalVars& orig) {
-        if (args.empty()) {
-            return;
-        }
-        const TStringBuf& name = args[0];
-        TVector<TStringBuf> loc, glob;
-        bool modGlobal = false;
-        for (size_t i = 1; i < args.size(); ++i) {
-            if (args[i] == "GLOBAL") {
-                modGlobal = true;
-            } else {
-                (modGlobal ? glob : loc).push_back(args[i]);
-                modGlobal = false;
-            }
-        }
-        if (loc.size())
-            SetAppendStoreOriginals(name, JoinStrings(loc.begin(), loc.end(), " "), orig);
-        if (glob.size()) {
-            CheckEx(AcceptGlobalVarWithName(name),
-                    "SET_APPEND with GLOBAL for " << name << " is not applied in this kind of module. Skip this options: "
-                    << TVecDumpSb(glob));
-            SetAppendStoreOriginals(TString::Join(name, "_GLOBAL"), JoinStrings(glob.begin(), glob.end(), " "), orig);
         }
     }
 

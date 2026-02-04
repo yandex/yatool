@@ -143,8 +143,11 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
         AssertEx(Module != nullptr, "Defined module left unassigned");
 
         ModulesInDir.push_back(Module);
-        SetCurrentNamespace(&Module->GetVars());
-        SetOriginalVars(&Module->GetOrigVars());
+        StartNamespace(
+            Module->GetVars(),
+            Module->GetOrigVars(),
+            [mod = Module](TStringBuf macroName, const TVector<TStringBuf> &args) {return mod->ProcessSetAppendWithGlobal(macroName, args);}
+        );
         CheckModuleSemantics();
     } else if (IsBlockDataModule(data)) {
         TString what = TString::Join("module [[alt1]]", name, "[[rst]] inside module ", Module->GetModuleConf().Name, ". Maybe you need to place ", name, " after END()?");

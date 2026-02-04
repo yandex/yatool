@@ -2,8 +2,9 @@
 
 #include "module_state.h"
 
-#include "vars.h"
 #include "conf.h"
+#include "vars.h"
+#include "out.h"
 
 #include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/common/split_string.h>
@@ -114,9 +115,9 @@ private:
     /// @return specialized name and array of arguments via callArgs
     TStringBuf PrepareMacroCall(const TMacroCall& macroCall, const TVars& locals, TSplitString& callArgs, const TStringBuf& name);
 
-    /// Executes SET macros and updates triggers
+    /// Executes base macros. For SET-alike base macros updates triggers
     /// return true if macro was handled false otherwise
-    bool ProcessBaseMacro(const TStringBuf& macroName, const TVector<TStringBuf>& args, const TStringBuf& name);
+    bool ProcessBaseMacro(TStringBuf macroName, const TVector<TStringBuf>& args, TStringBuf name);
 
     template <typename TMacroHandler>
     void ProcessConfigMacroCalls(const TStringBuf& name, TArrayRef<const TStringBuf> args, TMacroHandler&& handler, TVector<TStringBuf>& callStack, bool lintersMake = false) {
@@ -206,6 +207,7 @@ public:
     }
 
     bool ProcessGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args, TVars& vars, TOriginalVars& orig, std::pair<size_t, size_t> location = {0, 0});
+    bool ProcessSetAppendWithGlobal(TStringBuf macroName, const TVector<TStringBuf>& args);
     bool IsExtendGlobRestriction() const;
 
     TFileView GetName() const {

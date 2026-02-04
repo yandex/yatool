@@ -82,12 +82,14 @@ private:
 class TEvalContext {
 private:
     using TSSPool = IMemoryPool;
+    using TExtraSetters = std::function<bool(TStringBuf, const TVector<TStringBuf>&)>;
 
     TCondition& Condition;
     TVars LocalVars;
     TVars* CurrentNs;
     TOriginalVars OriginalVars; //stores original value of variables that can be recalculated in config conditions
     TOriginalVars* CurrentOriginal;
+    TExtraSetters NsExtraSetters;
     enum EIfState {
         IfProcessing,      // IF() is false AND all previous ELSEIF() are false, searching some true or ELSE()
         IfProcessed,       // IF() is true OR some previous ELSEIF() is true - already processed
@@ -123,15 +125,15 @@ protected:
         // throw
         return false;
     }
-    void SetCurrentNamespace(TVars* ns) {
-        CurrentNs = ns;
-    }
-    void SetOriginalVars(TOriginalVars* ov) {
-        CurrentOriginal = ov;
+    void StartNamespace(TVars& vars, TOriginalVars& orig, TExtraSetters&& setters = {}) {
+        CurrentNs = &vars;
+        CurrentOriginal = &orig;
+        NsExtraSetters = std::move(setters);
     }
     void RestoreDirNamespace() {
         CurrentNs = &LocalVars;
         CurrentOriginal = &OriginalVars;
+        NsExtraSetters = {};
     }
 
     bool IsCondStatement(TStringBuf command) const;
