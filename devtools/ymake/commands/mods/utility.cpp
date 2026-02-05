@@ -80,7 +80,7 @@ namespace {
 
     class THide: public TBasicModImpl {
     public:
-        THide(): TBasicModImpl({.Id = EMacroFunction::Hide, .Name = "hide", .Arity = 1, .CanEvaluate = true}) {
+        THide(): TBasicModImpl({.Id = EMacroFunction::Hide, .Name = "hide", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -98,7 +98,7 @@ namespace {
 
     class THideEmpty: public TBasicModImpl {
     public:
-        THideEmpty(): TBasicModImpl({.Id = EMacroFunction::HideEmpty, .Name = "hideempty", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        THideEmpty(): TBasicModImpl({.Id = EMacroFunction::HideEmpty, .Name = "hideempty", .Arity = 1}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -127,7 +127,7 @@ namespace {
 
     class TEmpty: public TBasicModImpl {
     public:
-        TEmpty(): TBasicModImpl({.Id = EMacroFunction::Empty, .Name = "empty", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TEmpty(): TBasicModImpl({.Id = EMacroFunction::Empty, .Name = "empty", .Arity = 1}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -152,7 +152,7 @@ namespace {
 
     class TClear: public TBasicModImpl {
     public:
-        TClear(): TBasicModImpl({.Id = EMacroFunction::Clear, .Name = "clear", .Arity = 1, .CanEvaluate = true}) {
+        TClear(): TBasicModImpl({.Id = EMacroFunction::Clear, .Name = "clear", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -170,7 +170,7 @@ namespace {
 
     class TNot: public TBasicModImpl {
     public:
-        TNot(): TBasicModImpl({.Id = EMacroFunction::Not, .Name = "not", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TNot(): TBasicModImpl({.Id = EMacroFunction::Not, .Name = "not", .Arity = 1}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -195,7 +195,7 @@ namespace {
 
     class TParseBool: public TBasicModImpl {
     public:
-        TParseBool(): TBasicModImpl({.Id = EMacroFunction::ParseBool, .Name = "parse_bool", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TParseBool(): TBasicModImpl({.Id = EMacroFunction::ParseBool, .Name = "parse_bool", .Arity = 1}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -244,7 +244,7 @@ namespace {
 
     class TCwd: public TBasicModImpl {
     public:
-        TCwd(): TBasicModImpl({.Id = EMacroFunction::Cwd, .Name = "cwd", .Arity = 1, .CanEvaluate = true}) {
+        TCwd(): TBasicModImpl({.Id = EMacroFunction::Cwd, .Name = "cwd", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -284,7 +284,7 @@ namespace {
 
     class TStdout: public TBasicModImpl {
     public:
-        TStdout(): TBasicModImpl({.Id = EMacroFunction::AsStdout, .Name = "stdout", .Arity = 1, .CanEvaluate = true}) {
+        TStdout(): TBasicModImpl({.Id = EMacroFunction::AsStdout, .Name = "stdout", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -324,7 +324,7 @@ namespace {
 
     class TEnv: public TBasicModImpl {
     public:
-        TEnv(): TBasicModImpl({.Id = EMacroFunction::SetEnv, .Name = "env", .Arity = 1, .CanEvaluate = true}) {
+        TEnv(): TBasicModImpl({.Id = EMacroFunction::SetEnv, .Name = "env", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -361,7 +361,7 @@ namespace {
 
     class TResource: public TBasicModImpl {
     public:
-        TResource(): TBasicModImpl({.Id = EMacroFunction::ResourceUri, .Name = "resource", .Arity = 1, .CanEvaluate = true}) {
+        TResource(): TBasicModImpl({.Id = EMacroFunction::ResourceUri, .Name = "resource", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -401,7 +401,7 @@ namespace {
 
     class TTared: public TBasicModImpl {
     public:
-        TTared(): TBasicModImpl({.Id = EMacroFunction::Tared, .Name = "tared", .Arity = 1, .CanEvaluate = true}) {
+        TTared(): TBasicModImpl({.Id = EMacroFunction::Tared, .Name = "tared", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -443,7 +443,7 @@ namespace {
 
     class TRequirements: public TBasicModImpl {
     public:
-        TRequirements(): TBasicModImpl({.Id = EMacroFunction::Requirements, .Name = "requirements", .Arity = 1, .CanEvaluate = true}) {
+        TRequirements(): TBasicModImpl({.Id = EMacroFunction::Requirements, .Name = "requirements", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -483,7 +483,7 @@ namespace {
 
     class TKeyValue: public TBasicModImpl {
     public:
-        TKeyValue(): TBasicModImpl({.Id = EMacroFunction::KeyValue, .Name = "kv", .Arity = 1, .CanEvaluate = true}) {
+        TKeyValue(): TBasicModImpl({.Id = EMacroFunction::KeyValue, .Name = "kv", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,

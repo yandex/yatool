@@ -38,7 +38,7 @@ namespace {
     class TTagsFlt: public TBasicModImpl {
     public:
         TTagsFlt(EMacroFunction id, TStringBuf name, bool exclude):
-            TBasicModImpl({.Id = id, .Name = name, .Arity = 2, .CanEvaluate = true}),
+            TBasicModImpl({.Id = id, .Name = name, .Arity = 2}),
             Exclude(exclude)
         {
         }
@@ -97,7 +97,7 @@ namespace {
 
     class TTagsCut: public TBasicModImpl {
     public:
-        TTagsCut(): TBasicModImpl({.Id = EMacroFunction::TagsCut, .Name = "tags_cut", .Arity = 1, .CanEvaluate = true}) {
+        TTagsCut(): TBasicModImpl({.Id = EMacroFunction::TagsCut, .Name = "tags_cut", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,

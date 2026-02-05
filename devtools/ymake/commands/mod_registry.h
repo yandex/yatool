@@ -6,7 +6,6 @@
 #include <util/generic/cast.h>
 
 #include <span>
-#include <ranges>
 
 namespace NCommands {
 
@@ -16,9 +15,10 @@ namespace NCommands {
         int Arity;
         bool Internal = false;
         bool MustPreevaluate = false;
-        bool CanPreevaluate = false;
-        bool CanEvaluate = false;
     };
+
+    struct TPseudoException {};
+    struct TNotSupported: public TPseudoException {};
 
     class TModImpl: public TModMetadata {
     public:
@@ -28,12 +28,16 @@ namespace NCommands {
         virtual TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
             [[maybe_unused]] std::span<TMacroValues::TValue> args
-        ) const = 0;
+        ) const {
+            throw TNotSupported();
+        }
         virtual TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
             [[maybe_unused]] const TEvalCtx& ctx,
             [[maybe_unused]] ICommandSequenceWriter* writer
-        ) const = 0;
+        ) const {
+            throw TNotSupported();
+        }
     };
 
     class TModRegistry {

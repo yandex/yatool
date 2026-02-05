@@ -16,7 +16,7 @@ namespace {
 
     class TTool: public TBasicModImpl {
     public:
-        TTool(): TBasicModImpl({.Id = EMacroFunction::Tool, .Name = "tool", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TTool(): TBasicModImpl({.Id = EMacroFunction::Tool, .Name = "tool", .Arity = 1, .MustPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -69,7 +69,7 @@ namespace {
         // this is basically `tool` without switching to the host platform;
         // so far, only single-target usage has been noticed
     public:
-        TResult(): TBasicModImpl({.Id = EMacroFunction::Result, .Name = "result", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TResult(): TBasicModImpl({.Id = EMacroFunction::Result, .Name = "result", .Arity = 1, .MustPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -116,7 +116,7 @@ namespace {
 
     class TInput: public TBasicModImpl {
     public:
-        TInput(): TBasicModImpl({.Id = EMacroFunction::Input, .Name = "input", .Arity = 0, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TInput(): TBasicModImpl({.Id = EMacroFunction::Input, .Name = "input", .Arity = 0, .MustPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -199,7 +199,7 @@ namespace {
 
     class TOutput: public TBasicModImpl {
     public:
-        TOutput(): TBasicModImpl({.Id = EMacroFunction::Output, .Name = "output", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TOutput(): TBasicModImpl({.Id = EMacroFunction::Output, .Name = "output", .Arity = 1, .MustPreevaluate = true}) {
         }
         TOutput(TModMetadata metadata): TBasicModImpl(metadata) {
         }
@@ -247,7 +247,7 @@ namespace {
 
     class TTmp: public TOutput {
     public:
-        TTmp(): TOutput({.Id = EMacroFunction::Tmp, .Name = "tmp", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TTmp(): TOutput({.Id = EMacroFunction::Tmp, .Name = "tmp", .Arity = 1, .MustPreevaluate = true}) {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -257,7 +257,7 @@ namespace {
 
     class TOutputInclude: public TBasicModImpl {
     public:
-        TOutputInclude(): TBasicModImpl({.Id = EMacroFunction::OutputInclude, .Name = "output_include", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TOutputInclude(): TBasicModImpl({.Id = EMacroFunction::OutputInclude, .Name = "output_include", .Arity = 1, .MustPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -294,7 +294,7 @@ namespace {
     class TOutInclsFromInput: public TBasicModImpl {
         // TBD: the old engine seems to also support this for induced_deps, but this feature is unused; do we want it?
     public:
-        TOutInclsFromInput(): TBasicModImpl({.Id = EMacroFunction::OutInclsFromInput, .Name = "from_input", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TOutInclsFromInput(): TBasicModImpl({.Id = EMacroFunction::OutInclsFromInput, .Name = "from_input", .Arity = 1, .MustPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -340,7 +340,7 @@ namespace {
     class TInducedDeps: public TBasicModImpl {
         // this is basically parameterized `output_include`
     public:
-        TInducedDeps(): TBasicModImpl({.Id = EMacroFunction::InducedDeps, .Name = "induced_deps", .Arity = 2, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TInducedDeps(): TBasicModImpl({.Id = EMacroFunction::InducedDeps, .Name = "induced_deps", .Arity = 2, .MustPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -382,7 +382,7 @@ namespace {
 
     class TGlob: public TBasicModImpl {
     public:
-        TGlob(): TBasicModImpl({.Id = EMacroFunction::Glob, .Name = "glob", .Arity = 1, .CanPreevaluate = true}) {
+        TGlob(): TBasicModImpl({.Id = EMacroFunction::Glob, .Name = "glob", .Arity = 1}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -413,7 +413,7 @@ namespace {
 
     class TLateOut: public TBasicModImpl {
     public:
-        TLateOut(): TBasicModImpl({.Id = EMacroFunction::LateOut, .Name = "late_out", .Arity = 1, .CanEvaluate = true}) {
+        TLateOut(): TBasicModImpl({.Id = EMacroFunction::LateOut, .Name = "late_out", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -449,7 +449,7 @@ namespace {
 
     class TContext: public TBasicModImpl {
     public:
-        TContext(): TBasicModImpl({.Id = EMacroFunction::Context_Deprecated, .Name = "context", .Arity = 2, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TContext(): TBasicModImpl({.Id = EMacroFunction::Context_Deprecated, .Name = "context", .Arity = 2, .MustPreevaluate = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -522,7 +522,7 @@ namespace {
 
     class TNoAutoSrc: public TInputOutputFlagger {
     public:
-        TNoAutoSrc(): TInputOutputFlagger({.Id = EMacroFunction::NoAutoSrc, .Name = "noauto", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TNoAutoSrc(): TInputOutputFlagger({.Id = EMacroFunction::NoAutoSrc, .Name = "noauto", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
@@ -532,7 +532,7 @@ namespace {
 
     class TNoRel: public TInputOutputFlagger {
     public:
-        TNoRel(): TInputOutputFlagger({.Id = EMacroFunction::NoRel, .Name = "norel", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TNoRel(): TInputOutputFlagger({.Id = EMacroFunction::NoRel, .Name = "norel", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
@@ -542,7 +542,7 @@ namespace {
 
     class TToBinDir: public TInputOutputFlagger {
     public:
-        TToBinDir(): TInputOutputFlagger({.Id = EMacroFunction::ResolveToBinDir, .Name = "tobindir", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TToBinDir(): TInputOutputFlagger({.Id = EMacroFunction::ResolveToBinDir, .Name = "tobindir", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TInput& input) const override {
@@ -555,7 +555,7 @@ namespace {
 
     class TNoTransformRelativeBuildDir: public TInputOutputFlagger {
     public:
-        TNoTransformRelativeBuildDir(): TInputOutputFlagger({.Id = EMacroFunction::NoTransformRelativeBuildDir, .Name = "notransformbuilddir", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TNoTransformRelativeBuildDir(): TInputOutputFlagger({.Id = EMacroFunction::NoTransformRelativeBuildDir, .Name = "notransformbuilddir", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TInput& input) const override {
@@ -565,7 +565,7 @@ namespace {
 
     class TDirAllowed: public TInputOutputFlagger {
     public:
-        TDirAllowed(): TInputOutputFlagger({.Id = EMacroFunction::DirAllowed, .Name = "dirallowed", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TDirAllowed(): TInputOutputFlagger({.Id = EMacroFunction::DirAllowed, .Name = "dirallowed", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TInput& input) const override {
@@ -575,7 +575,7 @@ namespace {
 
     class TAddToIncl: public TInputOutputFlagger {
     public:
-        TAddToIncl(): TInputOutputFlagger({.Id = EMacroFunction::AddToIncl, .Name = "addincl", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TAddToIncl(): TInputOutputFlagger({.Id = EMacroFunction::AddToIncl, .Name = "addincl", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
@@ -585,7 +585,7 @@ namespace {
 
     class TGlobal: public TInputOutputFlagger {
     public:
-        TGlobal(): TInputOutputFlagger({.Id = EMacroFunction::Global, .Name = "global", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TGlobal(): TInputOutputFlagger({.Id = EMacroFunction::Global, .Name = "global", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
@@ -595,7 +595,7 @@ namespace {
 
     class TMain: public TInputOutputFlagger {
     public:
-        TMain(): TInputOutputFlagger({.Id = EMacroFunction::Main, .Name = "main", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TMain(): TInputOutputFlagger({.Id = EMacroFunction::Main, .Name = "main", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {
@@ -605,7 +605,7 @@ namespace {
 
     class TAddToModOutputs: public TInputOutputFlagger {
     public:
-        TAddToModOutputs(): TInputOutputFlagger({.Id = EMacroFunction::AddToModOutputs, .Name = "add_to_outs", .Arity = 1, .MustPreevaluate = true, .CanPreevaluate = true}) {
+        TAddToModOutputs(): TInputOutputFlagger({.Id = EMacroFunction::AddToModOutputs, .Name = "add_to_outs", .Arity = 1, .MustPreevaluate = true}) {
         }
     protected:
         void Do(TCompiledCommand::TOutput& output) const override {

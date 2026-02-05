@@ -18,7 +18,7 @@ namespace {
 
     public:
 
-        TDbgFail(): TBasicModImpl({.Id = EMacroFunction::DbgFail, .Name = "dbgfail", .Arity = 0, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TDbgFail(): TBasicModImpl({.Id = EMacroFunction::DbgFail, .Name = "dbgfail", .Arity = 0}) {
         }
 
         TMacroValues::TValue Preevaluate(
@@ -116,7 +116,7 @@ namespace {
     // TODO deprecate & remove
     class TComma: public TBasicModImpl {
         public:
-            TComma(): TBasicModImpl({.Id = EMacroFunction::Comma, .Name = "comma", .Arity = 1, .CanEvaluate = true}) {
+            TComma(): TBasicModImpl({.Id = EMacroFunction::Comma, .Name = "comma", .Arity = 1}) {
             }
             TTermValue Evaluate(
                 [[maybe_unused]] std::span<const TTermValue> args,

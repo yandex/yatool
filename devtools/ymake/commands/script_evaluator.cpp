@@ -343,9 +343,13 @@ TTermValue TScriptEvaluator::EvalFn(
     auto fn = Commands->Mods.Id2Func(id);
     try {
         auto mod = Commands->Mods.At(fn);
-        if (Y_LIKELY(mod && mod->CanEvaluate))
-            return mod->Evaluate(args, ctx, writer);
         Y_DEBUG_ABORT_UNLESS(mod);
+        try {
+            if (Y_LIKELY(mod))
+                return mod->Evaluate(args, ctx, writer);
+        } catch (TNotSupported) {
+            // fall through
+        }
         throw yexception()
             << "Don't know how to render configure time modifier "
             << fn;

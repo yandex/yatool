@@ -35,21 +35,7 @@ namespace NCommands {
 
     class TBasicModImpl: public TModImpl {
     public:
-        TBasicModImpl(TModMetadata metadata): TModImpl(metadata) {
-        }
-        TMacroValues::TValue Preevaluate(
-            [[maybe_unused]] const TPreevalCtx& ctx,
-            [[maybe_unused]] std::span<TMacroValues::TValue> args
-        ) const override {
-            Y_ABORT();
-        }
-        TTermValue Evaluate(
-            [[maybe_unused]] std::span<const TTermValue> args,
-            [[maybe_unused]] const TEvalCtx& ctx,
-            [[maybe_unused]] ICommandSequenceWriter* writer
-        ) const override {
-            Y_ABORT();
-        }
+        using TModImpl::TModImpl;
     protected:
         template<std::ranges::range A>
         void CheckArgCount(A& args) const {

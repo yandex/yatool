@@ -14,7 +14,7 @@ namespace {
 
     class TRootRel: public TBasicModImpl {
     public:
-        TRootRel(): TBasicModImpl({.Id = EMacroFunction::RootRel, .Name = "rootrel", .Arity = 1, .CanEvaluate = true}) {
+        TRootRel(): TBasicModImpl({.Id = EMacroFunction::RootRel, .Name = "rootrel", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -58,7 +58,7 @@ namespace {
 
     class TPrnOnlyRoot: public TBasicModImpl {
     public:
-        TPrnOnlyRoot(): TBasicModImpl({.Id = EMacroFunction::PrnOnlyRoot, .Name = "rootdir", .Arity = 1, .CanEvaluate = true}) {
+        TPrnOnlyRoot(): TBasicModImpl({.Id = EMacroFunction::PrnOnlyRoot, .Name = "rootdir", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -102,7 +102,7 @@ namespace {
 
     class TNoBuildRoot: public TBasicModImpl {
     public:
-        TNoBuildRoot(): TBasicModImpl({.Id = EMacroFunction::NoBuildRoot, .Name = "nobuildroot", .Arity = 1, .CanEvaluate = true}) {
+        TNoBuildRoot(): TBasicModImpl({.Id = EMacroFunction::NoBuildRoot, .Name = "nobuildroot", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -152,7 +152,7 @@ namespace {
 
     class TCutPath: public TBasicModImpl {
     public:
-        TCutPath(): TBasicModImpl({.Id = EMacroFunction::CutPath, .Name = "nopath", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TCutPath(): TBasicModImpl({.Id = EMacroFunction::CutPath, .Name = "nopath", .Arity = 1}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -304,13 +304,13 @@ namespace {
 
     class TCutExt: public TCutSomeExt {
     public:
-        TCutExt(): TCutSomeExt(false, {.Id = EMacroFunction::CutExt, .Name = "noext", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TCutExt(): TCutSomeExt(false, {.Id = EMacroFunction::CutExt, .Name = "noext", .Arity = 1}) {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
     class TCutAllExt: public TCutSomeExt {
     public:
-        TCutAllExt(): TCutSomeExt(true, {.Id = EMacroFunction::CutAllExt, .Name = "noallext", .Arity = 1, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TCutAllExt(): TCutSomeExt(true, {.Id = EMacroFunction::CutAllExt, .Name = "noallext", .Arity = 1}) {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 
@@ -320,7 +320,7 @@ namespace {
 
     class TLastExt: public TBasicModImpl {
     public:
-        TLastExt(): TBasicModImpl({.Id = EMacroFunction::LastExt, .Name = "lastext", .Arity = 1, .CanEvaluate = true}) {
+        TLastExt(): TBasicModImpl({.Id = EMacroFunction::LastExt, .Name = "lastext", .Arity = 1}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,
@@ -369,7 +369,7 @@ namespace {
 
     class THasDefaultExt: public TBasicModImpl {
     public:
-        THasDefaultExt(): TBasicModImpl({.Id = EMacroFunction::HasDefaultExt, .Name = "defext", .Arity = 2, .CanPreevaluate = true}) {
+        THasDefaultExt(): TBasicModImpl({.Id = EMacroFunction::HasDefaultExt, .Name = "defext", .Arity = 2}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -394,7 +394,7 @@ namespace {
 
     class TExtFilter: public TBasicModImpl {
     public:
-        TExtFilter(): TBasicModImpl({.Id = EMacroFunction::ExtFilter, .Name = "ext", .Arity = 2, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TExtFilter(): TBasicModImpl({.Id = EMacroFunction::ExtFilter, .Name = "ext", .Arity = 2}) {
         }
         TTermValue Evaluate(
             std::span<const TTermValue> args,
@@ -445,7 +445,7 @@ namespace {
 
     class TSkipByExtFilter: public TBasicModImpl {
     public:
-        TSkipByExtFilter(): TBasicModImpl({.Id = EMacroFunction::SkipByExtFilter, .Name = "skip_by_ext", .Arity = 2, .CanEvaluate = true}) {
+        TSkipByExtFilter(): TBasicModImpl({.Id = EMacroFunction::SkipByExtFilter, .Name = "skip_by_ext", .Arity = 2}) {
         }
         TTermValue Evaluate(
             [[maybe_unused]] std::span<const TTermValue> args,

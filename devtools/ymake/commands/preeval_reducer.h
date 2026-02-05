@@ -178,10 +178,13 @@ namespace NCommands {
         TMacroValues::TValue Evaluate(NPolexpr::TFuncId id, std::span<TMacroValues::TValue> args) {
             auto fnIdx = static_cast<EMacroFunction>(id.GetIdx());
             auto mod = Mods.At(fnIdx);
-            if (Y_LIKELY(mod && mod->CanPreevaluate)) {
-                return mod->Preevaluate({Values, Sink}, args);
-            }
             Y_DEBUG_ABORT_UNLESS(mod);
+            try {
+                if (Y_LIKELY(mod))
+                    return mod->Preevaluate({Values, Sink}, args);
+            } catch (TNotSupported) {
+                // fall through
+            }
             throw TConfigurationError()
                 << "Cannot process modifier [[bad]]" << ToString(fnIdx) << "[[rst]]"
                 << " while preevaluating [[bad]]" << ToString(RootFnIdx) << "[[rst]]";

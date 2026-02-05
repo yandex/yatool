@@ -16,7 +16,7 @@ namespace {
 
     class TArgs: public TBasicModImpl {
     public:
-        TArgs(): TBasicModImpl({.Id = EMacroFunction::Args, .Name = "args", .Arity = 0, .Internal = true, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TArgs(): TBasicModImpl({.Id = EMacroFunction::Args, .Name = "args", .Arity = 0, .Internal = true}) {
         }
         TMacroValues::TValue Preevaluate(
             [[maybe_unused]] const TPreevalCtx& ctx,
@@ -63,7 +63,7 @@ namespace {
 
     class TTerms: public TBasicModImpl {
     public:
-        TTerms(): TBasicModImpl({.Id = EMacroFunction::Terms, .Name = "terms", .Arity = 0, .Internal = true, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TTerms(): TBasicModImpl({.Id = EMacroFunction::Terms, .Name = "terms", .Arity = 0, .Internal = true}) {
         }
         TTerms(TModMetadata metadata): TBasicModImpl(metadata) {
         }
@@ -129,7 +129,7 @@ namespace {
     class TCat: public TTerms {
         // this is basically `terms` as a proper function rather than a manifestation of a syntactical element (`TSyntax::TTerm` sequence)
     public:
-        TCat(): TTerms({.Id = EMacroFunction::Cat, .Name = "cat", .Arity = 0, .Internal = true, .CanPreevaluate = true, .CanEvaluate = true}) {
+        TCat(): TTerms({.Id = EMacroFunction::Cat, .Name = "cat", .Arity = 0, .Internal = true}) {
         }
     } Y_GENERATE_UNIQUE_ID(Mod);
 

@@ -120,11 +120,14 @@ namespace NCommands {
             TCompiledCommand sink;
             auto fnIdx = static_cast<EMacroFunction>(id.GetIdx());
             auto mod = Mods.At(fnIdx);
-            if (Y_LIKELY(mod && mod->CanPreevaluate)) {
-                return mod->Preevaluate({Values, sink}, args);
-                // TODO verify that the sink did not catch any side effects
-            }
             Y_DEBUG_ABORT_UNLESS(mod);
+            try {
+                if (Y_LIKELY(mod))
+                    return mod->Preevaluate({Values, sink}, args);
+                // TODO verify that the sink did not catch any side effects
+            } catch (TNotSupported) {
+                // fall through
+            }
             throw TConfigurationError()
                 << "Cannot preevaluate modifier [[bad]]" << ToString(fnIdx) << "[[rst]]";
         }
