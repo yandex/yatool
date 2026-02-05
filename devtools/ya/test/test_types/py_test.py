@@ -336,15 +336,14 @@ class PyTestBinSuite(PyTestSuite):
         ] + self.get_run_cmd_args(opts, retry, for_dist_build)
 
         if not for_listing and self.get_parallel_tests_within_node_workers():
-            if not for_dist_build and self.get_parallel_tests_within_node_workers() > 1:
+            if self.get_parallel_tests_within_node_workers() > 1:
+                self.logger.debug("Enable parralel test in node")
                 test_tool = devtools.ya.test.util.tools.get_test_tool_cmd(
                     opts, 'run_pytest', self.global_resources, wrapper=True, run_on_target_platform=True
                 )
                 cmd = test_tool + ["--binary"] + cmd
                 cmd += ["--worker-count", str(self.get_parallel_tests_within_node_workers())]
                 cmd += ["--temp-tracefile-dir", self.get_temp_tracefile_dir(retry, opts.remove_tos)]
-            elif for_dist_build:
-                logger.info("Parallel tests execution is not available in distbuild")
 
         if self._split_file_name:
             cmd += ["--test-file-filter", self._split_file_name]
