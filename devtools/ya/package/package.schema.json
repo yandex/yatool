@@ -40,6 +40,10 @@
                         "type": "string"
                     }
                 },
+                "use_python3_prev": {
+                    "description": "Shortcut for '-DUSE_PYTHON3_PREV=yes --host-platform-flag USE_PYTHON3_PREV=yes'",
+                    "type": "boolean"
+                },
                 "lto": {
                     "description": "Build with LTO",
                     "type": "boolean"

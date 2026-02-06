@@ -239,6 +239,11 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
                 flag_value = flag['value'].format(**formatters)
                 flags[flag_name] = flag_value
 
+    use_python3_prev = build_info.get("use_python3_prev", params.use_python3_prev)
+    if use_python3_prev:
+        build_options.host_platform_flags["USE_PYTHON3_PREV"] = "yes"
+        flags["USE_PYTHON3_PREV"] = "yes"
+
     build_options.target_platforms = target_platforms
 
     build_options.build_results_report_file = params.build_results_report_file

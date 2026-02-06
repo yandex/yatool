@@ -451,6 +451,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.wheel_platform = ""
         self.wheel_limited_api = ""
         self.wheel_python3 = False
+        self.use_python3_prev = False
 
     @staticmethod
     def consumer():
@@ -871,6 +872,14 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
                 visible=devtools.ya.core.yarg.HelpLevel.INTERNAL,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--use-python3-prev'],
+                help="DON'T USE! Shortcut for '-DUSE_PYTHON3_PREV=yes --host-platform-flag USE_PYTHON3_PREV=yes'",
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_python3_prev', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=COMMON_SUBGROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.NONE,
             ),
         ]
 
