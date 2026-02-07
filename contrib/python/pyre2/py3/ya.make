@@ -2,6 +2,8 @@
 
 PY3_LIBRARY()
 
+PROVIDES(re2)
+
 VERSION(0.3.10)
 
 LICENSE(BSD-3-Clause)
