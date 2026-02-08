@@ -3,7 +3,6 @@
 #include "macro_string.h"
 
 #include <devtools/ymake/compact_graph/dep_types.h>
-#include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/lang/properties.h>
 
 #include <util/generic/fwd.h>
