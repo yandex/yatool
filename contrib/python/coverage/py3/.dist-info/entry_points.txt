@@ -1,5 +1,4 @@
 [console_scripts]
 coverage = coverage.cmdline:main
-coverage-3.9 = coverage.cmdline:main
-coverage3 = coverage.cmdline:main
-
+coverage-3.12 = coverage.cmdline:main_deprecated
+coverage3 = coverage.cmdline:main_deprecated

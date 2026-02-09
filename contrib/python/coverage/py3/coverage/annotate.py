@@ -1,20 +1,28 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
 """Source file annotation for coverage.py."""
 
-import io
+from __future__ import annotations
+
 import os
 import re
+from typing import TYPE_CHECKING
 
 from coverage.files import flat_rootname
 from coverage.misc import ensure_dir, isolate_module
-from coverage.report import get_analysis_to_report
+from coverage.plugin import FileReporter
+from coverage.report_core import get_analysis_to_report
+from coverage.results import Analysis
+from coverage.types import TMorfs
+
+if TYPE_CHECKING:
+    from coverage import Coverage
 
 os = isolate_module(os)
 
 
-class AnnotateReporter(object):
+class AnnotateReporter:
     """Generate annotated source files showing line coverage.
 
     This reporter creates annotated copies of the measured source files. Each
@@ -31,20 +39,20 @@ class AnnotateReporter(object):
 
         > h(2)
 
-    Executed lines use '>', lines not executed use '!', lines excluded from
-    consideration use '-'.
+    Executed lines use ">", lines not executed use "!", lines excluded from
+    consideration use "-".
 
     """
 
-    def __init__(self, coverage):
+    def __init__(self, coverage: Coverage) -> None:
         self.coverage = coverage
         self.config = self.coverage.config
-        self.directory = None
+        self.directory: str | None = None
 
     blank_re = re.compile(r"\s*(#|$)")
     else_re = re.compile(r"\s*else\s*:\s*(#|$)")
 
-    def report(self, morfs, directory=None):
+    def report(self, morfs: TMorfs, directory: str | None = None) -> None:
         """Run the report.
 
         See `coverage.report()` for arguments.
@@ -55,7 +63,7 @@ class AnnotateReporter(object):
         for fr, analysis in get_analysis_to_report(self.coverage, morfs):
             self.annotate_file(fr, analysis)
 
-    def annotate_file(self, fr, analysis):
+    def annotate_file(self, fr: FileReporter, analysis: Analysis) -> None:
         """Annotate a single file.
 
         `fr` is the FileReporter for the file to annotate.
@@ -68,15 +76,14 @@ class AnnotateReporter(object):
         if self.directory:
             ensure_dir(self.directory)
             dest_file = os.path.join(self.directory, flat_rootname(fr.relative_filename()))
-            if dest_file.endswith("_py"):
-                dest_file = dest_file[:-3] + ".py"
-            dest_file += ",cover"
+            assert dest_file.endswith("_py")
+            dest_file = dest_file[:-3] + ".py"
         else:
-            dest_file = fr.filename + ",cover"
+            dest_file = fr.filename
+        dest_file += ",cover"
 
-        with io.open(dest_file, 'w', encoding='utf8') as dest:
-            i = 0
-            j = 0
+        with open(dest_file, "w", encoding="utf-8") as dest:
+            i = j = 0
             covered = True
             source = fr.source()
             for lineno, line in enumerate(source.splitlines(True), start=1):
@@ -87,22 +94,20 @@ class AnnotateReporter(object):
                 if i < len(statements) and statements[i] == lineno:
                     covered = j >= len(missing) or missing[j] > lineno
                 if self.blank_re.match(line):
-                    dest.write(u'  ')
+                    dest.write("  ")
                 elif self.else_re.match(line):
-                    # Special logic for lines containing only 'else:'.
-                    if i >= len(statements) and j >= len(missing):
-                        dest.write(u'! ')
-                    elif i >= len(statements) or j >= len(missing):
-                        dest.write(u'> ')
+                    # Special logic for lines containing only "else:".
+                    if j >= len(missing):
+                        dest.write("> ")
                     elif statements[i] == missing[j]:
-                        dest.write(u'! ')
+                        dest.write("! ")
                     else:
-                        dest.write(u'> ')
+                        dest.write("> ")
                 elif lineno in excluded:
-                    dest.write(u'- ')
+                    dest.write("- ")
                 elif covered:
-                    dest.write(u'> ')
+                    dest.write("> ")
                 else:
-                    dest.write(u'! ')
+                    dest.write("! ")
 
                 dest.write(line)

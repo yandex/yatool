@@ -1,26 +1,38 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
 """TOML configuration support for coverage.py"""
 
-import io
+from __future__ import annotations
+
 import os
 import re
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
-from coverage import env
-from coverage.backward import configparser, path_types
-from coverage.misc import CoverageException, substitute_variables
+from coverage import config, env
+from coverage.exceptions import ConfigError
+from coverage.misc import import_third_party, isolate_module, substitute_variables
+from coverage.types import TConfigSectionOut, TConfigValueOut
 
-# TOML support is an install-time extra option.
-try:
-    import toml
-except ImportError:         # pragma: not covered
-    toml = None
+os = isolate_module(os)
+
+if env.PYVERSION >= (3, 11, 0, "alpha", 7):
+    import tomllib  # pylint: disable=import-error
+
+    has_tomllib = True
+else:
+    # TOML support on Python 3.10 and below is an install-time extra option.
+    tomllib, has_tomllib = import_third_party("tomli")
 
 
 class TomlDecodeError(Exception):
     """An exception class that exists even when toml isn't installed."""
+
     pass
+
+
+TWant = TypeVar("TWant")
 
 
 class TomlConfigParser:
@@ -30,39 +42,36 @@ class TomlConfigParser:
     # need for docstrings.
     # pylint: disable=missing-function-docstring
 
-    def __init__(self, our_file):
+    def __init__(self, our_file: bool) -> None:
         self.our_file = our_file
-        self.data = None
+        self.data: dict[str, Any] = {}
 
-    def read(self, filenames):
+    def read(self, filenames: Iterable[str]) -> list[str]:
         # RawConfigParser takes a filename or list of filenames, but we only
         # ever call this with a single filename.
-        assert isinstance(filenames, path_types)
-        filename = filenames
-        if env.PYVERSION >= (3, 6):
-            filename = os.fspath(filename)
+        assert isinstance(filenames, (bytes, str, os.PathLike))
+        filename = os.fspath(filenames)
 
         try:
-            with io.open(filename, encoding='utf-8') as fp:
+            with open(filename, encoding="utf-8") as fp:
                 toml_text = fp.read()
-        except IOError:
+        except OSError:
             return []
-        if toml:
-            toml_text = substitute_variables(toml_text, os.environ)
+        if has_tomllib:
             try:
-                self.data = toml.loads(toml_text)
-            except toml.TomlDecodeError as err:
-                raise TomlDecodeError(*err.args)
+                self.data = tomllib.loads(toml_text)
+            except tomllib.TOMLDecodeError as err:
+                raise TomlDecodeError(str(err)) from err
             return [filename]
         else:
-            has_toml = re.search(r"^\[tool\.coverage\.", toml_text, flags=re.MULTILINE)
+            has_toml = re.search(r"^\[tool\.coverage(\.|])", toml_text, flags=re.MULTILINE)
             if self.our_file or has_toml:
                 # Looks like they meant to read TOML, but we can't read it.
                 msg = "Can't read {!r} without TOML support. Install with [toml] extra"
-                raise CoverageException(msg.format(filename))
+                raise ConfigError(msg.format(filename))
             return []
 
-    def _get_section(self, section):
+    def _get_section(self, section: str) -> tuple[str | None, TConfigSectionOut | None]:
         """Get a section from the data.
 
         Arguments:
@@ -91,78 +100,113 @@ class TomlConfigParser:
             return None, None
         return real_section, data
 
-    def _get(self, section, option):
+    def _get(self, section: str, option: str) -> tuple[str, TConfigValueOut]:
         """Like .get, but returns the real section name and the value."""
         name, data = self._get_section(section)
         if data is None:
-            raise configparser.NoSectionError(section)
+            raise ConfigError(f"No section: {section!r}")
+        assert name is not None
         try:
-            return name, data[option]
+            value = data[option]
         except KeyError:
-            raise configparser.NoOptionError(option, name)
+            raise ConfigError(f"No option {option!r} in section: {name!r}") from None
+        return name, value
 
-    def has_option(self, section, option):
+    def _get_single(self, section: str, option: str) -> Any:
+        """Get a single-valued option.
+
+        Performs environment substitution if the value is a string. Other types
+        will be converted later as needed.
+        """
+        name, value = self._get(section, option)
+        if isinstance(value, str):
+            value = substitute_variables(value, os.environ)
+        return name, value
+
+    def has_option(self, section: str, option: str) -> bool:
         _, data = self._get_section(section)
         if data is None:
             return False
         return option in data
 
-    def has_section(self, section):
+    def real_section(self, section: str) -> str | None:
         name, _ = self._get_section(section)
         return name
 
-    def options(self, section):
+    def has_section(self, section: str) -> bool:
+        name, _ = self._get_section(section)
+        return bool(name)
+
+    def options(self, section: str) -> list[str]:
         _, data = self._get_section(section)
         if data is None:
-            raise configparser.NoSectionError(section)
+            raise ConfigError(f"No section: {section!r}")
         return list(data.keys())
 
-    def get_section(self, section):
+    def get_section(self, section: str) -> TConfigSectionOut:
         _, data = self._get_section(section)
-        return data
+        return data or {}
 
-    def get(self, section, option):
-        _, value = self._get(section, option)
+    def get(self, section: str, option: str) -> Any:
+        _, value = self._get_single(section, option)
         return value
 
-    def _check_type(self, section, option, value, type_, type_desc):
-        if not isinstance(value, type_):
-            raise ValueError(
-                'Option {!r} in section {!r} is not {}: {!r}'
-                    .format(option, section, type_desc, value)
-            )
+    def _check_type(
+        self,
+        section: str,
+        option: str,
+        value: Any,
+        type_: type[TWant],
+        converter: Callable[[Any], TWant] | None,
+        type_desc: str,
+    ) -> TWant:
+        """Check that `value` has the type we want, converting if needed.
 
-    def getboolean(self, section, option):
-        name, value = self._get(section, option)
-        self._check_type(name, option, value, bool, "a boolean")
-        return value
-
-    def getlist(self, section, option):
-        name, values = self._get(section, option)
-        self._check_type(name, option, values, list, "a list")
-        return values
-
-    def getregexlist(self, section, option):
-        name, values = self._get(section, option)
-        self._check_type(name, option, values, list, "a list")
-        for value in values:
-            value = value.strip()
+        Returns the resulting value of the desired type.
+        """
+        if isinstance(value, type_):
+            return value
+        if isinstance(value, str) and converter is not None:
             try:
-                re.compile(value)
-            except re.error as e:
-                raise CoverageException(
-                    "Invalid [%s].%s value %r: %s" % (name, option, value, e)
-                )
+                return converter(value)
+            except Exception as e:
+                raise ValueError(
+                    f"Option [{section}]{option} couldn't convert to {type_desc}: {value!r}",
+                ) from e
+        raise ValueError(
+            f"Option [{section}]{option} is not {type_desc}: {value!r}",
+        )
+
+    def getboolean(self, section: str, option: str) -> bool:
+        name, value = self._get_single(section, option)
+        bool_strings = {"true": True, "false": False}
+        return self._check_type(name, option, value, bool, bool_strings.__getitem__, "a boolean")
+
+    def getfile(self, section: str, option: str) -> str:
+        _, value = self._get_single(section, option)
+        return config.process_file_value(value)
+
+    def _get_list(self, section: str, option: str) -> tuple[str, list[str]]:
+        """Get a list of strings, substituting environment variables in the elements."""
+        name, values = self._get(section, option)
+        values = self._check_type(name, option, values, list, None, "a list")
+        values = [substitute_variables(value, os.environ) for value in values]
+        return name, values
+
+    def getlist(self, section: str, option: str) -> list[str]:
+        _, values = self._get_list(section, option)
         return values
 
-    def getint(self, section, option):
-        name, value = self._get(section, option)
-        self._check_type(name, option, value, int, "an integer")
-        return value
+    def getregexlist(self, section: str, option: str) -> list[str]:
+        name, values = self._get_list(section, option)
+        return config.process_regexlist(name, option, values)
 
-    def getfloat(self, section, option):
-        name, value = self._get(section, option)
+    def getint(self, section: str, option: str) -> int:
+        name, value = self._get_single(section, option)
+        return self._check_type(name, option, value, int, int, "an integer")
+
+    def getfloat(self, section: str, option: str) -> float:
+        name, value = self._get_single(section, option)
         if isinstance(value, int):
             value = float(value)
-        self._check_type(name, option, value, float, "a float")
-        return value
+        return self._check_type(name, option, value, float, float, "a float")

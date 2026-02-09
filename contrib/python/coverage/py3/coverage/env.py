@@ -1,130 +1,135 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
 """Determine facts about the environment."""
+
+from __future__ import annotations
 
 import os
 import platform
 import sys
+from collections.abc import Iterable
+from typing import Any, Final
+
+# debug_info() at the bottom wants to show all the globals, but not imports.
+# Grab the global names here to know which names to not show. Nothing defined
+# above this line will be in the output.
+_UNINTERESTING_GLOBALS = list(globals())
+# These names also shouldn't be shown.
+_UNINTERESTING_GLOBALS += ["PYBEHAVIOR", "debug_info"]
 
 # Operating systems.
 WINDOWS = sys.platform == "win32"
 LINUX = sys.platform.startswith("linux")
+MACOS = sys.platform == "darwin"
 
 # Python implementations.
-CPYTHON = (platform.python_implementation() == "CPython")
-PYPY = (platform.python_implementation() == "PyPy")
-JYTHON = (platform.python_implementation() == "Jython")
-IRONPYTHON = (platform.python_implementation() == "IronPython")
+CPYTHON = (platform.python_implementation() == "CPython")  # fmt: skip
+PYPY = (platform.python_implementation() == "PyPy")  # fmt: skip
 
 # Python versions. We amend version_info with one more value, a zero if an
 # official version, or 1 if built from source beyond an official version.
+# Only use sys.version_info directly where tools like mypy need it to understand
+# version-specfic code, otherwise use PYVERSION.
 PYVERSION = sys.version_info + (int(platform.python_version()[-1] == "+"),)
-PY2 = PYVERSION < (3, 0)
-PY3 = PYVERSION >= (3, 0)
 
 if PYPY:
-    PYPYVERSION = sys.pypy_version_info
+    # Minimum now is 7.3.16
+    PYPYVERSION = tuple(sys.pypy_version_info)  # type: ignore[attr-defined]
+else:
+    PYPYVERSION = (0,)
 
-PYPY2 = PYPY and PY2
-PYPY3 = PYPY and PY3
+# Do we have a GIL?
+GIL = getattr(sys, "_is_gil_enabled", lambda: True)()
+
+# Do we ship compiled coveragepy wheels for this version?
+SHIPPING_WHEELS = CPYTHON and PYVERSION[:2] <= (3, 14)
+
+# Should we default to sys.monitoring?
+SYSMON_DEFAULT = CPYTHON and PYVERSION >= (3, 14)
+
 
 # Python behavior.
-class PYBEHAVIOR(object):
+class PYBEHAVIOR:
     """Flags indicating this Python's behavior."""
 
-    pep626 = CPYTHON and (PYVERSION > (3, 10, 0, 'alpha', 4))
+    # When leaving a with-block, do we visit the with-line exactly,
+    # or the context managers in inner-out order?
+    #
+    # mwith.py:
+    #    with (
+    #        open("/tmp/one", "w") as f2,
+    #        open("/tmp/two", "w") as f3,
+    #        open("/tmp/three", "w") as f4,
+    #    ):
+    #        print("hello 6")
+    #
+    # % python3.11 -m trace -t mwith.py | grep mwith
+    #  --- modulename: mwith, funcname: <module>
+    # mwith.py(2):     open("/tmp/one", "w") as f2,
+    # mwith.py(1): with (
+    # mwith.py(2):     open("/tmp/one", "w") as f2,
+    # mwith.py(3):     open("/tmp/two", "w") as f3,
+    # mwith.py(1): with (
+    # mwith.py(3):     open("/tmp/two", "w") as f3,
+    # mwith.py(4):     open("/tmp/three", "w") as f4,
+    # mwith.py(1): with (
+    # mwith.py(4):     open("/tmp/three", "w") as f4,
+    # mwith.py(6):     print("hello 6")
+    # mwith.py(1): with (
+    #
+    # % python3.12 -m trace -t mwith.py | grep mwith
+    #  --- modulename: mwith, funcname: <module>
+    # mwith.py(2):      open("/tmp/one", "w") as f2,
+    # mwith.py(3):      open("/tmp/two", "w") as f3,
+    # mwith.py(4):      open("/tmp/three", "w") as f4,
+    # mwith.py(6):      print("hello 6")
+    # mwith.py(4):      open("/tmp/three", "w") as f4,
+    # mwith.py(3):      open("/tmp/two", "w") as f3,
+    # mwith.py(2):      open("/tmp/one", "w") as f2,
 
-    # Is "if __debug__" optimized away?
-    if PYPY3:
-        optimize_if_debug = True
-    elif PYPY2:
-        optimize_if_debug = False
-    else:
-        optimize_if_debug = not pep626
+    exit_with_through_ctxmgr = (PYVERSION >= (3, 12, 6))  # fmt: skip
 
-    # Is "if not __debug__" optimized away?
-    optimize_if_not_debug = (not PYPY) and (PYVERSION >= (3, 7, 0, 'alpha', 4))
-    if pep626:
-        optimize_if_not_debug = False
-    if PYPY3:
-        optimize_if_not_debug = True
+    # f-strings are parsed as code, pep 701
+    fstring_syntax = (PYVERSION >= (3, 12))  # fmt: skip
 
-    # Is "if not __debug__" optimized away even better?
-    optimize_if_not_debug2 = (not PYPY) and (PYVERSION >= (3, 8, 0, 'beta', 1))
-    if pep626:
-        optimize_if_not_debug2 = False
+    # PEP669 Low Impact Monitoring: https://peps.python.org/pep-0669/
+    pep669: Final[bool] = bool(getattr(sys, "monitoring", None))
 
-    # Do we have yield-from?
-    yield_from = (PYVERSION >= (3, 3))
+    # Where does frame.f_lasti point when yielding from a generator?
+    # It used to point at the YIELD, in 3.13 it points at the RESUME,
+    # then it went back to the YIELD.
+    # https://github.com/python/cpython/issues/113728
+    lasti_is_yield = (PYVERSION[:2] != (3, 13))  # fmt: skip
 
-    # Do we have PEP 420 namespace packages?
-    namespaces_pep420 = (PYVERSION >= (3, 3))
+    # PEP649 and PEP749: Deferred annotations
+    deferred_annotations = (PYVERSION >= (3, 14))  # fmt: skip
 
-    # Do .pyc files have the source file size recorded in them?
-    size_in_pyc = (PYVERSION >= (3, 3))
+    # Does sys.monitoring support BRANCH_RIGHT and BRANCH_LEFT?  The names
+    # were added in early 3.14 alphas, but didn't work entirely correctly until
+    # after 3.14.0a5.
+    branch_right_left = pep669 and (PYVERSION > (3, 14, 0, "alpha", 5, 0))
 
-    # Do we have async and await syntax?
-    async_syntax = (PYVERSION >= (3, 5))
 
-    # PEP 448 defined additional unpacking generalizations
-    unpackings_pep448 = (PYVERSION >= (3, 5))
-
-    # Can co_lnotab have negative deltas?
-    negative_lnotab = (PYVERSION >= (3, 6)) and not (PYPY and PYPYVERSION < (7, 2))
-
-    # Do .pyc files conform to PEP 552? Hash-based pyc's.
-    hashed_pyc_pep552 = (PYVERSION >= (3, 7, 0, 'alpha', 4))
-
-    # Python 3.7.0b3 changed the behavior of the sys.path[0] entry for -m. It
-    # used to be an empty string (meaning the current directory). It changed
-    # to be the actual path to the current directory, so that os.chdir wouldn't
-    # affect the outcome.
-    actual_syspath0_dash_m = CPYTHON and (PYVERSION >= (3, 7, 0, 'beta', 3))
-
-    # 3.7 changed how functions with only docstrings are numbered.
-    docstring_only_function = (not PYPY) and ((3, 7, 0, 'beta', 5) <= PYVERSION <= (3, 10))
-
-    # When a break/continue/return statement in a try block jumps to a finally
-    # block, does the finally block do the break/continue/return (pre-3.8), or
-    # does the finally jump back to the break/continue/return (3.8) to do the
-    # work?
-    finally_jumps_back = ((3, 8) <= PYVERSION < (3, 10))
-
-    # When a function is decorated, does the trace function get called for the
-    # @-line and also the def-line (new behavior in 3.8)? Or just the @-line
-    # (old behavior)?
-    trace_decorated_def = (PYVERSION >= (3, 8))
-
-    # Are while-true loops optimized into absolute jumps with no loop setup?
-    nix_while_true = (PYVERSION >= (3, 8))
-
-    # Python 3.9a1 made sys.argv[0] and other reported files absolute paths.
-    report_absolute_files = (PYVERSION >= (3, 9))
-
-    # Lines after break/continue/return/raise are no longer compiled into the
-    # bytecode.  They used to be marked as missing, now they aren't executable.
-    omit_after_jump = pep626
-
-    # PyPy has always omitted statements after return.
-    omit_after_return = omit_after_jump or PYPY
-
-    # Modules used to have firstlineno equal to the line number of the first
-    # real line of code.  Now they always start at 1.
-    module_firstline_1 = pep626
-
-    # Are "if 0:" lines (and similar) kept in the compiled code?
-    keep_constant_test = pep626
-
-# Coverage.py specifics.
-
-# Are we using the C-implemented trace function?
-C_TRACER = os.getenv('COVERAGE_TEST_TRACER', 'c') == 'c'
+# Coverage.py specifics, about testing scenarios. See tests/testenv.py also.
 
 # Are we coverage-measuring ourselves?
-METACOV = os.getenv('COVERAGE_COVERAGE', '') != ''
+METACOV = os.getenv("COVERAGE_COVERAGE") is not None
 
 # Are we running our test suite?
 # Even when running tests, you can use COVERAGE_TESTING=0 to disable the
-# test-specific behavior like contracts.
-TESTING = os.getenv('COVERAGE_TESTING', '') == 'True'
+# test-specific behavior like AST checking.
+TESTING = os.getenv("COVERAGE_TESTING") == "True"
+
+
+def debug_info() -> Iterable[tuple[str, Any]]:
+    """Return a list of (name, value) pairs for printing debug information."""
+    info = [
+        (name, value)
+        for name, value in globals().items()
+        if not name.startswith("_") and name not in _UNINTERESTING_GLOBALS
+    ]
+    info += [
+        (name, value) for name, value in PYBEHAVIOR.__dict__.items() if not name.startswith("_")
+    ]
+    return sorted(info)

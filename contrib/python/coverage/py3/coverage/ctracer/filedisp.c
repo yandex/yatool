@@ -1,5 +1,5 @@
 /* Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0 */
-/* For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt */
+/* For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt */
 
 #include "util.h"
 #include "filedisp.h"
@@ -44,7 +44,7 @@ CFileDisposition_members[] = {
 
 PyTypeObject
 CFileDispositionType = {
-    MyType_HEAD_INIT
+    PyVarObject_HEAD_INIT(NULL, 0)
     "coverage.CFileDispositionType",        /*tp_name*/
     sizeof(CFileDisposition),  /*tp_basicsize*/
     0,                         /*tp_itemsize*/

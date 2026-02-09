@@ -1,5 +1,5 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
 """A simple Python template renderer, for a nano-subset of Django syntax.
 
@@ -10,32 +10,36 @@ http://aosabook.org/en/500L/a-template-engine.html
 
 # Coincidentally named the same as http://code.activestate.com/recipes/496702/
 
-import re
+from __future__ import annotations
 
-from coverage import env
+import re
+from collections.abc import Callable
+from typing import Any, NoReturn, cast
 
 
 class TempliteSyntaxError(ValueError):
     """Raised when a template has a syntax error."""
+
     pass
 
 
 class TempliteValueError(ValueError):
     """Raised when an expression won't evaluate in a template."""
+
     pass
 
 
-class CodeBuilder(object):
+class CodeBuilder:
     """Build source code conveniently."""
 
-    def __init__(self, indent=0):
-        self.code = []
+    def __init__(self, indent: int = 0) -> None:
+        self.code: list[str | CodeBuilder] = []
         self.indent_level = indent
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "".join(str(c) for c in self.code)
 
-    def add_line(self, line):
+    def add_line(self, line: str) -> None:
         """Add a line of source to the code.
 
         Indentation and newline will be added for you, don't provide them.
@@ -43,35 +47,35 @@ class CodeBuilder(object):
         """
         self.code.extend([" " * self.indent_level, line, "\n"])
 
-    def add_section(self):
+    def add_section(self) -> CodeBuilder:
         """Add a section, a sub-CodeBuilder."""
         section = CodeBuilder(self.indent_level)
         self.code.append(section)
         return section
 
-    INDENT_STEP = 4      # PEP8 says so!
+    INDENT_STEP = 4  # PEP8 says so!
 
-    def indent(self):
+    def indent(self) -> None:
         """Increase the current indent for following lines."""
         self.indent_level += self.INDENT_STEP
 
-    def dedent(self):
+    def dedent(self) -> None:
         """Decrease the current indent for following lines."""
         self.indent_level -= self.INDENT_STEP
 
-    def get_globals(self):
+    def get_globals(self) -> dict[str, Any]:
         """Execute the code, and return a dict of globals it defines."""
         # A check that the caller really finished all the blocks they started.
         assert self.indent_level == 0
         # Get the Python source as a single string.
         python_source = str(self)
         # Execute the source, defining globals, and return them.
-        global_namespace = {}
+        global_namespace: dict[str, Any] = {}
         exec(python_source, global_namespace)
         return global_namespace
 
 
-class Templite(object):
+class Templite:
     """A simple template renderer, for a nano-subset of Django syntax.
 
     Supported constructs are extended variable access::
@@ -86,6 +90,10 @@ class Templite(object):
 
         {% if var %}...{% endif %}
 
+    if-else::
+
+        {% if var %}...{% else %}...{% endif %}
+
     Comments are within curly-hash markers::
 
         {# This will be ignored #}
@@ -94,7 +102,7 @@ class Templite(object):
     and joined.  Be careful, this could join words together!
 
     Any of these constructs can have a hyphen at the end (`-}}`, `-%}`, `-#}`),
-    which will collapse the whitespace following the tag.
+    which will collapse the white space following the tag.
 
     Construct a Templite with the template text, then use `render` against a
     dictionary context to create a finished string::
@@ -105,15 +113,16 @@ class Templite(object):
                 <p>You are interested in {{topic}}.</p>
             {% endif %}
             ''',
-            {'upper': str.upper},
+            {"upper": str.upper},
         )
         text = templite.render({
-            'name': "Ned",
-            'topics': ['Python', 'Geometry', 'Juggling'],
+            "name": "Ned",
+            "topics": ["Python", "Geometry", "Juggling"],
         })
 
     """
-    def __init__(self, text, *contexts):
+
+    def __init__(self, text: str, *contexts: dict[str, Any]) -> None:
         """Construct a Templite with the given `text`.
 
         `contexts` are dictionaries of values to use for future renderings.
@@ -124,8 +133,8 @@ class Templite(object):
         for context in contexts:
             self.context.update(context)
 
-        self.all_vars = set()
-        self.loop_vars = set()
+        self.all_vars: set[str] = set()
+        self.loop_vars: set[str] = set()
 
         # We construct a function in source form, then compile it and hold onto
         # it, and execute it to render the template.
@@ -137,14 +146,11 @@ class Templite(object):
         code.add_line("result = []")
         code.add_line("append_result = result.append")
         code.add_line("extend_result = result.extend")
-        if env.PY2:
-            code.add_line("to_str = unicode")
-        else:
-            code.add_line("to_str = str")
+        code.add_line("to_str = str")
 
-        buffered = []
+        buffered: list[str] = []
 
-        def flush_output():
+        def flush_output() -> None:
             """Force `buffered` to the code builder."""
             if len(buffered) == 1:
                 code.add_line("append_result(%s)" % buffered[0])
@@ -160,49 +166,54 @@ class Templite(object):
         squash = in_joined = False
 
         for token in tokens:
-            if token.startswith('{'):
+            if token.startswith("{"):
                 start, end = 2, -2
-                squash = (token[-3] == '-')
+                squash = (token[-3] == "-")  # fmt: skip
                 if squash:
                     end = -3
 
-                if token.startswith('{#'):
+                if token.startswith("{#"):
                     # Comment: ignore it and move on.
                     continue
-                elif token.startswith('{{'):
+                elif token.startswith("{{"):
                     # An expression to evaluate.
                     expr = self._expr_code(token[start:end].strip())
                     buffered.append("to_str(%s)" % expr)
                 else:
-                    # token.startswith('{%')
+                    # token.startswith("{%")
                     # Action tag: split into words and parse further.
                     flush_output()
 
                     words = token[start:end].strip().split()
-                    if words[0] == 'if':
+                    if words[0] == "if":
                         # An if statement: evaluate the expression to determine if.
                         if len(words) != 2:
                             self._syntax_error("Don't understand if", token)
-                        ops_stack.append('if')
+                        ops_stack.append("if")
                         code.add_line("if %s:" % self._expr_code(words[1]))
                         code.indent()
-                    elif words[0] == 'for':
+                    elif words[0] == "else":
+                        if len(words) != 1:
+                            self._syntax_error("Don't understand else", token)
+                        if not ops_stack or ops_stack[-1] != "if":
+                            self._syntax_error("Mismatched else", token)
+                        code.dedent()
+                        code.add_line("else:")
+                        code.indent()
+                    elif words[0] == "for":
                         # A loop: iterate over expression result.
-                        if len(words) != 4 or words[2] != 'in':
+                        if len(words) != 4 or words[2] != "in":
                             self._syntax_error("Don't understand for", token)
-                        ops_stack.append('for')
+                        ops_stack.append("for")
                         self._variable(words[1], self.loop_vars)
                         code.add_line(
-                            "for c_%s in %s:" % (
-                                words[1],
-                                self._expr_code(words[3])
-                            )
+                            f"for c_{words[1]} in {self._expr_code(words[3])}:",
                         )
                         code.indent()
-                    elif words[0] == 'joined':
-                        ops_stack.append('joined')
+                    elif words[0] == "joined":
+                        ops_stack.append("joined")
                         in_joined = True
-                    elif words[0].startswith('end'):
+                    elif words[0].startswith("end"):
                         # Endsomething.  Pop the ops stack.
                         if len(words) != 1:
                             self._syntax_error("Don't understand end", token)
@@ -212,7 +223,7 @@ class Templite(object):
                         start_what = ops_stack.pop()
                         if start_what != end_what:
                             self._syntax_error("Mismatched end tag", end_what)
-                        if end_what == 'joined':
+                        if end_what == "joined":
                             in_joined = False
                         else:
                             code.dedent()
@@ -233,35 +244,41 @@ class Templite(object):
         flush_output()
 
         for var_name in self.all_vars - self.loop_vars:
-            vars_code.add_line("c_%s = context[%r]" % (var_name, var_name))
+            vars_code.add_line(f"c_{var_name} = context[{var_name!r}]")
 
-        code.add_line('return "".join(result)')
+        code.add_line("return ''.join(result)")
         code.dedent()
-        self._render_function = code.get_globals()['render_function']
+        self._render_function = cast(
+            Callable[
+                [dict[str, Any], Callable[..., Any]],
+                str,
+            ],
+            code.get_globals()["render_function"],
+        )
 
-    def _expr_code(self, expr):
+    def _expr_code(self, expr: str) -> str:
         """Generate a Python expression for `expr`."""
         if "|" in expr:
             pipes = expr.split("|")
             code = self._expr_code(pipes[0])
             for func in pipes[1:]:
                 self._variable(func, self.all_vars)
-                code = "c_%s(%s)" % (func, code)
+                code = f"c_{func}({code})"
         elif "." in expr:
             dots = expr.split(".")
             code = self._expr_code(dots[0])
             args = ", ".join(repr(d) for d in dots[1:])
-            code = "do_dots(%s, %s)" % (code, args)
+            code = f"do_dots({code}, {args})"
         else:
             self._variable(expr, self.all_vars)
             code = "c_%s" % expr
         return code
 
-    def _syntax_error(self, msg, thing):
+    def _syntax_error(self, msg: str, thing: Any) -> NoReturn:
         """Raise a syntax error using `msg`, and showing `thing`."""
-        raise TempliteSyntaxError("%s: %r" % (msg, thing))
+        raise TempliteSyntaxError(f"{msg}: {thing!r}")
 
-    def _variable(self, name, vars_set):
+    def _variable(self, name: str, vars_set: set[str]) -> None:
         """Track that `name` is used as a variable.
 
         Adds the name to `vars_set`, a set of variable names.
@@ -273,7 +290,7 @@ class Templite(object):
             self._syntax_error("Not a valid name", name)
         vars_set.add(name)
 
-    def render(self, context=None):
+    def render(self, context: dict[str, Any] | None = None) -> str:
         """Render this template by applying it to `context`.
 
         `context` is a dictionary of values to use in this rendering.
@@ -285,7 +302,7 @@ class Templite(object):
             render_context.update(context)
         return self._render_function(render_context, self._do_dots)
 
-    def _do_dots(self, value, *dots):
+    def _do_dots(self, value: Any, *dots: str) -> Any:
         """Evaluate dotted expressions at run-time."""
         for dot in dots:
             try:
@@ -293,10 +310,10 @@ class Templite(object):
             except AttributeError:
                 try:
                     value = value[dot]
-                except (TypeError, KeyError):
+                except (TypeError, KeyError) as exc:
                     raise TempliteValueError(
-                        "Couldn't evaluate %r.%s" % (value, dot)
-                    )
+                        f"Couldn't evaluate {value!r}.{dot}",
+                    ) from exc
             if callable(value):
                 value = value()
         return value

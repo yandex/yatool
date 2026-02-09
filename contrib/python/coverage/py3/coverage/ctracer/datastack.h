@@ -1,5 +1,5 @@
 /* Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0 */
-/* For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt */
+/* For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt */
 
 #ifndef _COVERAGE_DATASTACK_H
 #define _COVERAGE_DATASTACK_H
@@ -12,7 +12,7 @@
  * possible.
  */
 typedef struct DataStackEntry {
-    /* The current file_data dictionary. Owned. */
+    /* The current file_data set. Owned. */
     PyObject * file_data;
 
     /* The disposition object for this frame. A borrowed instance of CFileDisposition. */

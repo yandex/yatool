@@ -1,29 +1,41 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
 """Config file for coverage.py"""
 
+from __future__ import annotations
+
+import base64
 import collections
+import configparser
 import copy
+import json
 import os
 import os.path
 import re
 import sys
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any, Final
 
-from coverage import env
-from coverage.backward import configparser, iitems, string_class
-from coverage.misc import contract, CoverageException, isolate_module
-from coverage.misc import substitute_variables
-
+from coverage.exceptions import ConfigError
+from coverage.misc import human_sorted_items, isolate_module, substitute_variables
 from coverage.tomlconfig import TomlConfigParser, TomlDecodeError
+from coverage.types import (
+    TConfigSectionIn,
+    TConfigSectionOut,
+    TConfigurable,
+    TConfigValueIn,
+    TConfigValueOut,
+    TPluginConfig,
+)
 
 os = isolate_module(os)
 
 
-class HandyConfigParser(configparser.RawConfigParser):
+class HandyConfigParser(configparser.ConfigParser):
     """Our specialization of ConfigParser."""
 
-    def __init__(self, our_file):
+    def __init__(self, our_file: bool) -> None:
         """Create the HandyConfigParser.
 
         `our_file` is True if this config file is specifically for coverage,
@@ -31,52 +43,54 @@ class HandyConfigParser(configparser.RawConfigParser):
         for possible settings.
         """
 
-        configparser.RawConfigParser.__init__(self)
+        super().__init__(interpolation=None)
         self.section_prefixes = ["coverage:"]
         if our_file:
             self.section_prefixes.append("")
 
-    def read(self, filenames, encoding=None):
+    def read(  # type: ignore[override]
+        self,
+        filenames: Iterable[str],
+        encoding_unused: str | None = None,
+    ) -> list[str]:
         """Read a file name as UTF-8 configuration data."""
-        kwargs = {}
-        if env.PYVERSION >= (3, 2):
-            kwargs['encoding'] = encoding or "utf-8"
-        return configparser.RawConfigParser.read(self, filenames, **kwargs)
+        return super().read(filenames, encoding="utf-8")
 
-    def has_option(self, section, option):
+    def real_section(self, section: str) -> str | None:
+        """Get the actual name of a section."""
         for section_prefix in self.section_prefixes:
             real_section = section_prefix + section
-            has = configparser.RawConfigParser.has_option(self, real_section, option)
-            if has:
-                return has
-        return False
-
-    def has_section(self, section):
-        for section_prefix in self.section_prefixes:
-            real_section = section_prefix + section
-            has = configparser.RawConfigParser.has_section(self, real_section)
+            has = super().has_section(real_section)
             if has:
                 return real_section
+        return None
+
+    def has_option(self, section: str, option: str) -> bool:  # type: ignore[override]
+        real_section = self.real_section(section)
+        if real_section is not None:
+            return super().has_option(real_section, option)
         return False
 
-    def options(self, section):
-        for section_prefix in self.section_prefixes:
-            real_section = section_prefix + section
-            if configparser.RawConfigParser.has_section(self, real_section):
-                return configparser.RawConfigParser.options(self, real_section)
-        raise configparser.NoSectionError(section)
+    def has_section(self, section: str) -> bool:  # type: ignore[override]
+        return bool(self.real_section(section))
 
-    def get_section(self, section):
+    def options(self, section: str) -> list[str]:  # type: ignore[override]
+        real_section = self.real_section(section)
+        if real_section is not None:
+            return super().options(real_section)
+        raise ConfigError(f"No section: {section!r}")
+
+    def get_section(self, section: str) -> TConfigSectionOut:
         """Get the contents of a section, as a dictionary."""
-        d = {}
+        d: dict[str, TConfigValueOut] = {}
         for opt in self.options(section):
             d[opt] = self.get(section, opt)
         return d
 
-    def get(self, section, option, *args, **kwargs):
+    def get(self, section: str, option: str, *args: Any, **kwargs: Any) -> str:  # type: ignore
         """Get a value, replacing environment variables also.
 
-        The arguments are the same as `RawConfigParser.get`, but in the found
+        The arguments are the same as `ConfigParser.get`, but in the found
         value, ``$WORD`` or ``${WORD}`` are replaced by the value of the
         environment variable ``WORD``.
 
@@ -85,95 +99,95 @@ class HandyConfigParser(configparser.RawConfigParser):
         """
         for section_prefix in self.section_prefixes:
             real_section = section_prefix + section
-            if configparser.RawConfigParser.has_option(self, real_section, option):
+            if super().has_option(real_section, option):
                 break
         else:
-            raise configparser.NoOptionError(option, section)
+            raise ConfigError(f"No option {option!r} in section: {section!r}")
 
-        v = configparser.RawConfigParser.get(self, real_section, option, *args, **kwargs)
+        v: str = super().get(real_section, option, *args, **kwargs)
         v = substitute_variables(v, os.environ)
         return v
 
-    def getlist(self, section, option):
+    def getfile(self, section: str, option: str) -> str:
+        """Fix up a file path setting."""
+        path = self.get(section, option)
+        return process_file_value(path)
+
+    def getlist(self, section: str, option: str) -> list[str]:
         """Read a list of strings.
 
         The value of `section` and `option` is treated as a comma- and newline-
-        separated list of strings.  Each value is stripped of whitespace.
+        separated list of strings.  Each value is stripped of white space.
 
         Returns the list of strings.
 
         """
         value_list = self.get(section, option)
         values = []
-        for value_line in value_list.split('\n'):
-            for value in value_line.split(','):
+        for value_line in value_list.split("\n"):
+            for value in value_line.split(","):
                 value = value.strip()
                 if value:
                     values.append(value)
         return values
 
-    def getregexlist(self, section, option):
+    def getregexlist(self, section: str, option: str) -> list[str]:
         """Read a list of full-line regexes.
 
         The value of `section` and `option` is treated as a newline-separated
-        list of regexes.  Each value is stripped of whitespace.
+        list of regexes.  Each value is stripped of white space.
 
         Returns the list of strings.
 
         """
         line_list = self.get(section, option)
-        value_list = []
-        for value in line_list.splitlines():
-            value = value.strip()
-            try:
-                re.compile(value)
-            except re.error as e:
-                raise CoverageException(
-                    "Invalid [%s].%s value %r: %s" % (section, option, value, e)
-                )
-            if value:
-                value_list.append(value)
-        return value_list
+        return process_regexlist(section, option, line_list.splitlines())
+
+
+TConfigParser = HandyConfigParser | TomlConfigParser
 
 
 # The default line exclusion regexes.
 DEFAULT_EXCLUDE = [
-    r'#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover|COVER)',
+    r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(cover|COVER)",
+    r"^\s*(((async )?def .*?)?\)(\s*->.*?)?:\s*)?\.\.\.\s*(#|$)",
+    r"if (typing\.)?TYPE_CHECKING:",
 ]
 
 # The default partial branch regexes, to be modified by the user.
 DEFAULT_PARTIAL = [
-    r'#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(branch|BRANCH)',
+    r"#\s*(pragma|PRAGMA)[:\s]?\s*(no|NO)\s*(branch|BRANCH)",
 ]
 
 # The default partial branch regexes, based on Python semantics.
 # These are any Python branching constructs that can't actually execute all
 # their branches.
 DEFAULT_PARTIAL_ALWAYS = [
-    'while (True|1|False|0):',
-    'if (True|1|False|0):',
+    "while (True|1|False|0):",
+    "if (True|1|False|0):",
 ]
 
 
-class CoverageConfig(object):
+class CoverageConfig(TConfigurable, TPluginConfig):
     """Coverage.py configuration.
 
     The attributes of this class are the various settings that control the
     operation of coverage.py.
 
     """
+
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the configuration attributes to their defaults."""
         # Metadata about the config.
         # We tried to read these config files.
-        self.attempted_config_files = []
+        self.config_files_attempted: list[str] = []
         # We did read these config files, but maybe didn't find any content for us.
-        self.config_files_read = []
+        self.config_files_read: list[str] = []
         # The file that gave us our configuration.
-        self.config_file = None
-        self._config_contents = None
+        self.config_file: str | None = None
+        self._config_contents: bytes | None = None
 
         # Defaults for [run] and [report]
         self._include = None
@@ -181,45 +195,53 @@ class CoverageConfig(object):
 
         # Defaults for [run]
         self.branch = False
-        self.command_line = None
-        self.concurrency = None
-        self.context = None
+        self.command_line: str | None = None
+        self.concurrency: list[str] = []
+        self.context: str | None = None
+        self.core: str | None = None
         self.cover_pylib = False
         self.data_file = ".coverage"
-        self.debug = []
-        self.disable_warnings = []
-        self.dynamic_context = None
-        self.note = None
+        self.debug: list[str] = []
+        self.debug_file: str | None = None
+        self.disable_warnings: list[str] = []
+        self.dynamic_context: str | None = None
         self.parallel = False
-        self.plugins = []
+        self.patch: list[str] = []
+        self.plugins: list[str] = []
         self.relative_files = False
-        self.run_include = None
-        self.run_omit = None
-        self.source = None
-        self.source_pkgs = []
+        self.run_include: list[str] = []
+        self.run_omit: list[str] = []
+        self.sigterm = False
+        self.source: list[str] | None = None
+        self.source_pkgs: list[str] = []
+        self.source_dirs: list[str] = []
         self.timid = False
-        self._crash = None
+        self._crash: str | None = None
 
         # Defaults for [report]
         self.exclude_list = DEFAULT_EXCLUDE[:]
+        self.exclude_also: list[str] = []
         self.fail_under = 0.0
+        self.format: str | None = None
         self.ignore_errors = False
-        self.report_include = None
-        self.report_omit = None
+        self.include_namespace_packages = False
+        self.report_include: list[str] | None = None
+        self.report_omit: list[str] | None = None
         self.partial_always_list = DEFAULT_PARTIAL_ALWAYS[:]
         self.partial_list = DEFAULT_PARTIAL[:]
+        self.partial_also: list[str] = []
         self.precision = 0
-        self.report_contexts = None
+        self.report_contexts: list[str] | None = None
         self.show_missing = False
         self.skip_covered = False
         self.skip_empty = False
-        self.sort = None
+        self.sort: str | None = None
 
         # Defaults for [html]
-        self.extra_css = None
+        self.extra_css: str | None = None
         self.html_dir = "htmlcov"
-        self.html_skip_covered = None
-        self.html_skip_empty = None
+        self.html_skip_covered: bool | None = None
+        self.html_skip_empty: bool | None = None
         self.html_title = "Coverage report"
         self.show_contexts = False
 
@@ -232,24 +254,44 @@ class CoverageConfig(object):
         self.json_pretty_print = False
         self.json_show_contexts = False
 
+        # Defaults for [lcov]
+        self.lcov_output = "coverage.lcov"
+        self.lcov_line_checksums = False
+
         # Defaults for [paths]
-        self.paths = collections.OrderedDict()
+        self.paths: dict[str, list[str]] = {}
 
         # Options for plugins
-        self.plugin_options = {}
+        self.plugin_options: dict[str, TConfigSectionOut] = {}
         self.suppress_plugin_errors = True
 
-    MUST_BE_LIST = [
-        "debug", "concurrency", "plugins",
-        "report_omit", "report_include",
-        "run_omit", "run_include",
-    ]
+    MUST_BE_LIST = {
+        "debug",
+        "concurrency",
+        "plugins",
+        "report_omit",
+        "report_include",
+        "run_omit",
+        "run_include",
+        "patch",
+    }
 
-    def from_args(self, **kwargs):
+    # File paths to make absolute during serialization.
+    # The pairs are (config_key, must_exist).
+    SERIALIZE_ABSPATH = {
+        ("data_file", False),
+        ("debug_file", False),
+        # `source` can be directories or modules, so don't abspath it if it
+        # doesn't exist.
+        ("source", True),
+        ("source_dirs", False),
+    }
+
+    def from_args(self, **kwargs: TConfigValueIn) -> None:
         """Read config values from `kwargs`."""
-        for k, v in iitems(kwargs):
+        for k, v in kwargs.items():
             if v is not None:
-                if k in self.MUST_BE_LIST and isinstance(v, string_class):
+                if k in self.MUST_BE_LIST and isinstance(v, str):
                     v = [v]
                 setattr(self, k, v)
 
@@ -258,8 +300,7 @@ class CoverageConfig(object):
         cp, self._config_contents = _load_config_from_resource(resource_name)
         return self._parse_config(cp, resource_name, True)
 
-    @contract(filename=str)
-    def from_file(self, filename, our_file):
+    def from_file(self, filename: str, warn: Callable[[str], None], our_file: bool) -> bool:
         """Read configuration from a .rc file.
 
         `filename` is a file name to read.
@@ -273,17 +314,18 @@ class CoverageConfig(object):
 
         """
         _, ext = os.path.splitext(filename)
-        if ext == '.toml':
+        cp: TConfigParser
+        if ext == ".toml":
             cp = TomlConfigParser(our_file)
         else:
             cp = HandyConfigParser(our_file)
 
-        self.attempted_config_files.append(filename)
+        self.config_files_attempted.append(os.path.abspath(filename))
 
         try:
             files_read = cp.read(filename)
         except (configparser.Error, TomlDecodeError) as err:
-            raise CoverageException("Couldn't read config file %s: %s" % (filename, err))
+            raise ConfigError(f"Couldn't read config file {filename}: {err}") from err
         if not files_read:
             return False
 
@@ -299,7 +341,7 @@ class CoverageConfig(object):
                 if was_set:
                     any_set = True
         except ValueError as err:
-            raise CoverageException("Couldn't read config file %s: %s" % (filename, err))
+            raise ConfigError(f"Couldn't read config file {filename}: {err}") from err
 
         # Check that there are no unrecognized options.
         all_options = collections.defaultdict(set)
@@ -307,20 +349,22 @@ class CoverageConfig(object):
             section, option = option_spec[1].split(":")
             all_options[section].add(option)
 
-        for section, options in iitems(all_options):
-            real_section = cp.has_section(section)
+        for section, options in all_options.items():
+            real_section = cp.real_section(section)
             if real_section:
                 for unknown in set(cp.options(section)) - options:
-                    raise CoverageException(
-                        "Unrecognized option '[%s] %s=' in config file %s" % (
-                            real_section, unknown, filename
-                        )
+                    warn(
+                        "Unrecognized option '[{}] {}=' in config file {}".format(
+                            real_section,
+                            unknown,
+                            filename,
+                        ),
                     )
 
         # [paths] is special
-        if cp.has_section('paths'):
-            for option in cp.options('paths'):
-                self.paths[option] = cp.getlist('paths', option)
+        if cp.has_section("paths"):
+            for option in cp.options("paths"):
+                self.paths[option] = cp.getlist("paths", option)
                 any_set = True
 
         # plugins can have options
@@ -345,9 +389,20 @@ class CoverageConfig(object):
 
         return used
 
-    def copy(self):
+    def copy(self) -> CoverageConfig:
         """Return a copy of the configuration."""
         return copy.deepcopy(self)
+
+    CONCURRENCY_CHOICES: Final[set[str]] = {
+        "thread",
+        "gevent",
+        "greenlet",
+        "eventlet",
+        "multiprocessing",
+    }
+
+    # Mutually exclusive concurrency settings.
+    LIGHT_THREADS = {"greenlet", "eventlet", "gevent"}
 
     CONFIG_FILE_OPTIONS = [
         # These are *args for _set_attr_from_config_option:
@@ -357,63 +412,81 @@ class CoverageConfig(object):
         #   where is the section:name to read from the configuration file.
         #   type_ is the optional type to apply, by using .getTYPE to read the
         #       configuration value from the file.
-
+        #
         # [run]
-        ('branch', 'run:branch', 'boolean'),
-        ('command_line', 'run:command_line'),
-        ('concurrency', 'run:concurrency', 'list'),
-        ('context', 'run:context'),
-        ('cover_pylib', 'run:cover_pylib', 'boolean'),
-        ('data_file', 'run:data_file'),
-        ('debug', 'run:debug', 'list'),
-        ('disable_warnings', 'run:disable_warnings', 'list'),
-        ('dynamic_context', 'run:dynamic_context'),
-        ('note', 'run:note'),
-        ('parallel', 'run:parallel', 'boolean'),
-        ('plugins', 'run:plugins', 'list'),
-        ('relative_files', 'run:relative_files', 'boolean'),
-        ('run_include', 'run:include', 'list'),
-        ('run_omit', 'run:omit', 'list'),
-        ('source', 'run:source', 'list'),
-        ('source_pkgs', 'run:source_pkgs', 'list'),
-        ('timid', 'run:timid', 'boolean'),
-        ('_crash', 'run:_crash'),
-        ('suppress_plugin_errors', 'run:suppress_plugin_errors', 'boolean'),
-
+        ("branch", "run:branch", "boolean"),
+        ("command_line", "run:command_line"),
+        ("concurrency", "run:concurrency", "list"),
+        ("context", "run:context"),
+        ("core", "run:core"),
+        ("cover_pylib", "run:cover_pylib", "boolean"),
+        ("data_file", "run:data_file", "file"),
+        ("debug", "run:debug", "list"),
+        ("debug_file", "run:debug_file", "file"),
+        ("disable_warnings", "run:disable_warnings", "list"),
+        ("dynamic_context", "run:dynamic_context"),
+        ("parallel", "run:parallel", "boolean"),
+        ("patch", "run:patch", "list"),
+        ("plugins", "run:plugins", "list"),
+        ("relative_files", "run:relative_files", "boolean"),
+        ("run_include", "run:include", "list"),
+        ("run_omit", "run:omit", "list"),
+        ("sigterm", "run:sigterm", "boolean"),
+        ("source", "run:source", "list"),
+        ("source_pkgs", "run:source_pkgs", "list"),
+        ("source_dirs", "run:source_dirs", "list"),
+        ("timid", "run:timid", "boolean"),
+        ("_crash", "run:_crash"),
+        ("suppress_plugin_errors", "run:suppress_plugin_errors", "boolean"),
+        #
         # [report]
-        ('exclude_list', 'report:exclude_lines', 'regexlist'),
-        ('fail_under', 'report:fail_under', 'float'),
-        ('ignore_errors', 'report:ignore_errors', 'boolean'),
-        ('partial_always_list', 'report:partial_branches_always', 'regexlist'),
-        ('partial_list', 'report:partial_branches', 'regexlist'),
-        ('precision', 'report:precision', 'int'),
-        ('report_contexts', 'report:contexts', 'list'),
-        ('report_include', 'report:include', 'list'),
-        ('report_omit', 'report:omit', 'list'),
-        ('show_missing', 'report:show_missing', 'boolean'),
-        ('skip_covered', 'report:skip_covered', 'boolean'),
-        ('skip_empty', 'report:skip_empty', 'boolean'),
-        ('sort', 'report:sort'),
-
+        ("exclude_list", "report:exclude_lines", "regexlist"),
+        ("exclude_also", "report:exclude_also", "regexlist"),
+        ("fail_under", "report:fail_under", "float"),
+        ("format", "report:format"),
+        ("ignore_errors", "report:ignore_errors", "boolean"),
+        ("include_namespace_packages", "report:include_namespace_packages", "boolean"),
+        ("partial_always_list", "report:partial_branches_always", "regexlist"),
+        ("partial_list", "report:partial_branches", "regexlist"),
+        ("partial_also", "report:partial_also", "regexlist"),
+        ("precision", "report:precision", "int"),
+        ("report_contexts", "report:contexts", "list"),
+        ("report_include", "report:include", "list"),
+        ("report_omit", "report:omit", "list"),
+        ("show_missing", "report:show_missing", "boolean"),
+        ("skip_covered", "report:skip_covered", "boolean"),
+        ("skip_empty", "report:skip_empty", "boolean"),
+        ("sort", "report:sort"),
+        #
         # [html]
-        ('extra_css', 'html:extra_css'),
-        ('html_dir', 'html:directory'),
-        ('html_skip_covered', 'html:skip_covered', 'boolean'),
-        ('html_skip_empty', 'html:skip_empty', 'boolean'),
-        ('html_title', 'html:title'),
-        ('show_contexts', 'html:show_contexts', 'boolean'),
-
+        ("extra_css", "html:extra_css"),
+        ("html_dir", "html:directory", "file"),
+        ("html_skip_covered", "html:skip_covered", "boolean"),
+        ("html_skip_empty", "html:skip_empty", "boolean"),
+        ("html_title", "html:title"),
+        ("show_contexts", "html:show_contexts", "boolean"),
+        #
         # [xml]
-        ('xml_output', 'xml:output'),
-        ('xml_package_depth', 'xml:package_depth', 'int'),
-
+        ("xml_output", "xml:output", "file"),
+        ("xml_package_depth", "xml:package_depth", "int"),
+        #
         # [json]
-        ('json_output', 'json:output'),
-        ('json_pretty_print', 'json:pretty_print', 'boolean'),
-        ('json_show_contexts', 'json:show_contexts', 'boolean'),
+        ("json_output", "json:output", "file"),
+        ("json_pretty_print", "json:pretty_print", "boolean"),
+        ("json_show_contexts", "json:show_contexts", "boolean"),
+        #
+        # [lcov]
+        ("lcov_output", "lcov:output", "file"),
+        ("lcov_line_checksums", "lcov:line_checksums", "boolean"),
     ]
 
-    def _set_attr_from_config_option(self, cp, attr, where, type_=''):
+    def _set_attr_from_config_option(
+        self,
+        cp: TConfigParser,
+        attr: str,
+        where: str,
+        type_: str = "",
+    ) -> bool:
         """Set an attribute on self if it exists in the ConfigParser.
 
         Returns True if the attribute was set.
@@ -421,16 +494,16 @@ class CoverageConfig(object):
         """
         section, option = where.split(":")
         if cp.has_option(section, option):
-            method = getattr(cp, 'get' + type_)
+            method = getattr(cp, f"get{type_}")
             setattr(self, attr, method(section, option))
             return True
         return False
 
-    def get_plugin_options(self, plugin):
+    def get_plugin_options(self, plugin: str) -> TConfigSectionOut:
         """Get a dictionary of options for the plugin named `plugin`."""
         return self.plugin_options.get(plugin, {})
 
-    def set_option(self, option_name, value):
+    def set_option(self, option_name: str, value: TConfigValueIn | TConfigSectionIn) -> None:
         """Set an option in the configuration.
 
         `option_name` is a colon-separated string indicating the section and
@@ -442,7 +515,13 @@ class CoverageConfig(object):
         """
         # Special-cased options.
         if option_name == "paths":
-            self.paths = value
+            # This is ugly, but type-checks and ensures the values are close
+            # to right.
+            self.paths = {}
+            assert isinstance(value, Mapping)
+            for k, v in value.items():
+                assert isinstance(v, Iterable)
+                self.paths[k] = list(v)
             return
 
         # Check all the hard-coded options.
@@ -455,13 +534,13 @@ class CoverageConfig(object):
         # See if it's a plugin option.
         plugin_name, _, key = option_name.partition(":")
         if key and plugin_name in self.plugins:
-            self.plugin_options.setdefault(plugin_name, {})[key] = value
+            self.plugin_options.setdefault(plugin_name, {})[key] = value  # type: ignore[index]
             return
 
         # If we get here, we didn't find the option.
-        raise CoverageException("No such option: %r" % option_name)
+        raise ConfigError(f"No such option: {option_name!r}")
 
-    def get_option(self, option_name):
+    def get_option(self, option_name: str) -> TConfigValueOut | None:
         """Get an option from the configuration.
 
         `option_name` is a colon-separated string indicating the section and
@@ -479,7 +558,7 @@ class CoverageConfig(object):
         for option_spec in self.CONFIG_FILE_OPTIONS:
             attr, where = option_spec[:2]
             if where == option_name:
-                return getattr(self, attr)
+                return getattr(self, attr)  # type: ignore[no-any-return]
 
         # See if it's a plugin option.
         plugin_name, _, key = option_name.partition(":")
@@ -487,24 +566,87 @@ class CoverageConfig(object):
             return self.plugin_options.get(plugin_name, {}).get(key)
 
         # If we get here, we didn't find the option.
-        raise CoverageException("No such option: %r" % option_name)
+        raise ConfigError(f"No such option: {option_name!r}")
 
-    def post_process_file(self, path):
-        """Make final adjustments to a file path to make it usable."""
-        return os.path.expanduser(path)
-
-    def post_process(self):
+    def post_process(self) -> None:
         """Make final adjustments to settings to make them usable."""
-        self.data_file = self.post_process_file(self.data_file)
-        self.html_dir = self.post_process_file(self.html_dir)
-        self.xml_output = self.post_process_file(self.xml_output)
-        self.paths = collections.OrderedDict(
-            (k, [self.post_process_file(f) for f in v])
-            for k, v in self.paths.items()
-        )
+        self.paths = {k: [process_file_value(f) for f in v] for k, v in self.paths.items()}
+
+        self.exclude_list += self.exclude_also
+        self.partial_list += self.partial_also
+
+        if "subprocess" in self.patch:
+            self.parallel = True
+
+        # We can handle a few concurrency options here, but only one at a time.
+        concurrencies = set(self.concurrency)
+        unknown = concurrencies - self.CONCURRENCY_CHOICES
+        if unknown:
+            show = ", ".join(sorted(unknown))
+            raise ConfigError(f"Unknown concurrency choices: {show}")
+        light_threads = concurrencies & self.LIGHT_THREADS
+        if len(light_threads) > 1:
+            show = ", ".join(sorted(light_threads))
+            raise ConfigError(f"Conflicting concurrency settings: {show}")
+
+    def debug_info(self) -> list[tuple[str, Any]]:
+        """Make a list of (name, value) pairs for writing debug info."""
+        return human_sorted_items((k, v) for k, v in self.__dict__.items() if not k.startswith("_"))
+
+    def serialize(self) -> str:
+        """Convert to a string that can be ingested with `deserialize`.
+
+        File paths used by `coverage run` are made absolute to ensure the
+        deserialized config will refer to the same files.
+        """
+        data = {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        for k, must_exist in self.SERIALIZE_ABSPATH:
+            abs_fn = abs_path_if_exists if must_exist else os.path.abspath
+            v = data[k]
+            if isinstance(v, list):
+                v = list(map(abs_fn, v))
+            elif isinstance(v, str):
+                v = abs_fn(v)
+            data[k] = v
+        return base64.b64encode(json.dumps(data).encode()).decode()
+
+    @classmethod
+    def deserialize(cls, config_str: str) -> CoverageConfig:
+        """Take a string from `serialize`, and make a CoverageConfig."""
+        data = json.loads(base64.b64decode(config_str.encode()).decode())
+        config = cls()
+        config.__dict__.update(data)
+        return config
 
 
-def config_files_to_try(config_file):
+def process_file_value(path: str) -> str:
+    """Make adjustments to a file path to make it usable."""
+    return os.path.expanduser(path)
+
+
+def abs_path_if_exists(path: str) -> str:
+    """os.path.abspath, but only if the path exists."""
+    if os.path.exists(path):
+        return os.path.abspath(path)
+    else:
+        return path
+
+
+def process_regexlist(name: str, option: str, values: list[str]) -> list[str]:
+    """Check the values in a regex list and keep the non-blank ones."""
+    value_list = []
+    for value in values:
+        value = value.strip()
+        try:
+            re.compile(value)
+        except re.error as e:
+            raise ConfigError(f"Invalid [{name}].{option} value {value!r}: {e}") from e
+        if value:
+            value_list.append(value)
+    return value_list
+
+
+def config_files_to_try(config_file: bool | str) -> list[tuple[str, bool, bool]]:
     """What config files should we try to read?
 
     Returns a list of tuples:
@@ -515,17 +657,20 @@ def config_files_to_try(config_file):
     # True, so make it so.
     if config_file == ".coveragerc":
         config_file = True
-    specified_file = (config_file is not True)
+    specified_file = config_file is not True
     if not specified_file:
         # No file was specified. Check COVERAGE_RCFILE.
-        config_file = os.environ.get('COVERAGE_RCFILE')
-        if config_file:
+        rcfile = os.getenv("COVERAGE_RCFILE")
+        if rcfile:
+            config_file = rcfile
             specified_file = True
     if not specified_file:
         # Still no file specified. Default to .coveragerc
         config_file = ".coveragerc"
+    assert isinstance(config_file, str)
     files_to_try = [
         (config_file, True, specified_file),
+        (".coveragerc.toml", True, False),
         ("setup.cfg", False, False),
         ("tox.ini", False, False),
         ("pyproject.toml", False, False),
@@ -533,12 +678,17 @@ def config_files_to_try(config_file):
     return files_to_try
 
 
-def read_coverage_config(config_file, **kwargs):
+def read_coverage_config(
+    config_file: bool | str,
+    warn: Callable[[str], None],
+    **kwargs: TConfigValueIn,
+) -> CoverageConfig:
     """Read the coverage.py configuration.
 
     Arguments:
         config_file: a boolean or string, see the `Coverage` class for the
             tricky details.
+        warn: a function to issue warnings.
         all others: keyword arguments from the `Coverage` class, used for
             setting values in the configuration.
 
@@ -563,23 +713,35 @@ def read_coverage_config(config_file, **kwargs):
         for fname, our_file, specified_file in files_to_try:
             if getattr(sys, 'is_standalone_binary', False) and fname == "/coverage_plugins/coveragerc.txt":
                 continue
-            config_read = config.from_file(fname, our_file=our_file)
+            config_read = config.from_file(fname, warn, our_file=our_file)
             if config_read:
                 break
             if specified_file:
-                raise CoverageException("Couldn't read '%s' as a config file" % fname)
+                raise ConfigError(f"Couldn't read {fname!r} as a config file")
 
-    # $set_env.py: COVERAGE_DEBUG - Options for --debug.
     # 3) from environment variables:
-    env_data_file = os.environ.get('COVERAGE_FILE')
+    env_data_file = os.getenv("COVERAGE_FILE")
     if env_data_file:
         config.data_file = env_data_file
-    debugs = os.environ.get('COVERAGE_DEBUG')
+
+    # $set_env.py: COVERAGE_DEBUG - Debug options: https://coverage.rtfd.io/cmd.html#debug
+    debugs = os.getenv("COVERAGE_DEBUG")
     if debugs:
         config.debug.extend(d.strip() for d in debugs.split(","))
 
+    # Read the COVERAGE_CORE environment variable for backward compatibility,
+    # and because we use it in the test suite to pick a specific core.
+    env_core = os.getenv("COVERAGE_CORE")
+    if env_core:
+        config.core = env_core
+
     # 4) from constructor arguments:
     config.from_args(**kwargs)
+
+    # 5) for our benchmark, force settings using a secret environment variable:
+    force_file = os.getenv("COVERAGE_FORCE_CONFIG")
+    if force_file:
+        config.from_file(force_file, warn, our_file=True)
 
     # Once all the config has been collected, there's a little post-processing
     # to do.

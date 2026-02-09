@@ -2,7 +2,7 @@
 
 PY3_LIBRARY()
 
-VERSION(5.5)
+VERSION(7.13.3)
 
 LICENSE(Apache-2.0)
 
@@ -39,38 +39,46 @@ PY_SRCS(
     coverage/__init__.py
     coverage/__main__.py
     coverage/annotate.py
-    coverage/backward.py
     coverage/bytecode.py
     coverage/cmdline.py
     coverage/collector.py
     coverage/config.py
     coverage/context.py
     coverage/control.py
+    coverage/core.py
     coverage/data.py
     coverage/debug.py
     coverage/disposition.py
     coverage/env.py
+    coverage/exceptions.py
     coverage/execfile.py
     coverage/files.py
-    coverage/fullcoverage/encodings.py
     coverage/html.py
     coverage/inorout.py
     coverage/jsonreport.py
+    coverage/lcovreport.py
     coverage/misc.py
     coverage/multiproc.py
     coverage/numbits.py
     coverage/parser.py
+    coverage/patch.py
     coverage/phystokens.py
     coverage/plugin.py
     coverage/plugin_support.py
+    coverage/pth_file.py
     coverage/python.py
     coverage/pytracer.py
+    coverage/regions.py
     coverage/report.py
+    coverage/report_core.py
     coverage/results.py
     coverage/sqldata.py
-    coverage/summary.py
+    coverage/sqlitedb.py
+    coverage/sysmon.py
     coverage/templite.py
     coverage/tomlconfig.py
+    coverage/tracer.pyi
+    coverage/types.py
     coverage/version.py
     coverage/xmlreport.py
 )
@@ -83,16 +91,11 @@ RESOURCE_FILES(
     coverage/htmlfiles/coverage_html.js
     coverage/htmlfiles/favicon_32.png
     coverage/htmlfiles/index.html
-    coverage/htmlfiles/jquery.ba-throttle-debounce.min.js
-    coverage/htmlfiles/jquery.hotkeys.js
-    coverage/htmlfiles/jquery.isonscreen.js
-    coverage/htmlfiles/jquery.min.js
-    coverage/htmlfiles/jquery.tablesorter.min.js
     coverage/htmlfiles/keybd_closed.png
-    coverage/htmlfiles/keybd_open.png
     coverage/htmlfiles/pyfile.html
     coverage/htmlfiles/style.css
     coverage/htmlfiles/style.scss
+    coverage/py.typed
 )
 
 END()

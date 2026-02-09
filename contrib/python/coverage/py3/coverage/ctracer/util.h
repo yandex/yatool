@@ -1,10 +1,11 @@
 /* Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0 */
-/* For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt */
+/* For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt */
 
 #ifndef _COVERAGE_UTIL_H
 #define _COVERAGE_UTIL_H
 
 #include <Python.h>
+#include <stdatomic.h>
 
 /* Compile-time debugging helpers */
 #undef WHAT_LOG         /* Define to log the WHAT params in the trace function. */
@@ -16,25 +17,25 @@
 // 3.11 moved f_lasti into an internal structure. This is totally the wrong way
 // to make this work, but it's all I've got until https://bugs.python.org/issue40421
 // is resolved.
+#if PY_VERSION_HEX < 0x030D0000
 #include <internal/pycore_frame.h>
+#endif
+
 #if PY_VERSION_HEX >= 0x030B00A7
 #define MyFrame_GetLasti(f)     (PyFrame_GetLasti(f))
 #else
 #define MyFrame_GetLasti(f)     ((f)->f_frame->f_lasti * 2)
 #endif
-#elif PY_VERSION_HEX >= 0x030A00A7
+#else
 // The f_lasti field changed meaning in 3.10.0a7. It had been bytes, but
 // now is instructions, so we need to adjust it to use it as a byte index.
 #define MyFrame_GetLasti(f)     ((f)->f_lasti * 2)
-#else
-#define MyFrame_GetLasti(f)     ((f)->f_lasti)
 #endif
 
-// Access f_code should be done through a helper starting in 3.9.
-#if PY_VERSION_HEX >= 0x03090000
-#define MyFrame_GetCode(f)      (PyFrame_GetCode(f))
+#if PY_VERSION_HEX >= 0x030D0000
+#define MyFrame_SetTrace(f, obj)    (PyObject_SetAttrString((PyObject*)(f), "f_trace", (PyObject*)(obj)))
 #else
-#define MyFrame_GetCode(f)      ((f)->f_code)
+#define MyFrame_SetTrace(f, obj)    {Py_INCREF(obj); Py_XSETREF((f)->f_trace, (PyObject*)(obj));}
 #endif
 
 #if PY_VERSION_HEX >= 0x030B00B1
@@ -48,45 +49,11 @@
 #define MyCode_FreeCode(code)
 #endif
 
-/* Py 2.x and 3.x compatibility */
-
-#if PY_MAJOR_VERSION >= 3
-
-#define MyText_Type                     PyUnicode_Type
-#define MyText_AS_BYTES(o)              PyUnicode_AsASCIIString(o)
-#define MyBytes_GET_SIZE(o)             PyBytes_GET_SIZE(o)
-#define MyBytes_AS_STRING(o)            PyBytes_AS_STRING(o)
-#define MyText_AsString(o)              PyUnicode_AsUTF8(o)
-#define MyText_FromFormat               PyUnicode_FromFormat
-#define MyInt_FromInt(i)                PyLong_FromLong((long)i)
-#define MyInt_AsInt(o)                  (int)PyLong_AsLong(o)
-#define MyText_InternFromString(s)      PyUnicode_InternFromString(s)
-
-#define MyType_HEAD_INIT                PyVarObject_HEAD_INIT(NULL, 0)
-
-#else
-
-#define MyText_Type                     PyString_Type
-#define MyText_AS_BYTES(o)              (Py_INCREF(o), o)
-#define MyBytes_GET_SIZE(o)             PyString_GET_SIZE(o)
-#define MyBytes_AS_STRING(o)            PyString_AS_STRING(o)
-#define MyText_AsString(o)              PyString_AsString(o)
-#define MyText_FromFormat               PyUnicode_FromFormat
-#define MyInt_FromInt(i)                PyInt_FromLong((long)i)
-#define MyInt_AsInt(o)                  (int)PyInt_AsLong(o)
-#define MyText_InternFromString(s)      PyString_InternFromString(s)
-
-#define MyType_HEAD_INIT                PyObject_HEAD_INIT(NULL)  0,
-
-#endif /* Py3k */
-
-// Undocumented, and not in all 2.7.x, so our own copy of it.
-#define My_XSETREF(op, op2)                     \
-    do {                                        \
-        PyObject *_py_tmp = (PyObject *)(op);   \
-        (op) = (op2);                           \
-        Py_XDECREF(_py_tmp);                    \
-    } while (0)
+// Where does frame.f_lasti point when yielding from a generator?
+// It used to point at the YIELD, in 3.13 it points at the RESUME,
+// then it went back to the YIELD.
+// https://github.com/python/cpython/issues/113728
+#define ENV_LASTI_IS_YIELD ((PY_VERSION_HEX & 0xFFFF0000) != 0x030D0000)
 
 /* The values returned to indicate ok or error. */
 #define RET_OK      0
@@ -96,6 +63,11 @@
 typedef int BOOL;
 #define FALSE   0
 #define TRUE    1
+
+#if SIZEOF_LONG_LONG < 8
+#error long long too small!
+#endif
+typedef unsigned long long uint64;
 
 /* Only for extreme machete-mode debugging! */
 #define CRASH       { printf("*** CRASH! ***\n"); *((int*)1) = 1; }

@@ -1,51 +1,82 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
-"""Core control stuff for coverage.py."""
+"""Central control stuff for coverage.py."""
+
+from __future__ import annotations
 
 import atexit
 import collections
 import contextlib
+import datetime
+import functools
 import os
 import os.path
-import platform
+import signal
 import sys
+import threading
 import time
+import warnings
 import json
+from collections.abc import Callable, Iterable, Iterator
+from types import FrameType
+from typing import IO, Any, cast
 
 from coverage import env
 from coverage.annotate import AnnotateReporter
-from coverage.backward import string_class, iitems
-from coverage.collector import Collector, CTracer
-from coverage.config import read_coverage_config
-from coverage.context import should_start_context_test_function, combine_context_switchers
+from coverage.collector import Collector
+from coverage.config import CoverageConfig, read_coverage_config
+from coverage.context import combine_context_switchers, should_start_context_test_function
+from coverage.core import CTRACER_FILE, Core
 from coverage.data import CoverageData, combine_parallel_data
-from coverage.debug import DebugControl, short_stack, write_formatted_info
+from coverage.debug import (
+    DebugControl,
+    NoDebugging,
+    relevant_environment_display,
+    short_stack,
+    write_formatted_info,
+)
 from coverage.disposition import disposition_debug_msg
+from coverage.exceptions import ConfigError, CoverageException, CoverageWarning, PluginError
 from coverage.files import PathAliases, abs_file, canonical_filename, relative_filename, set_relative_directory
 from coverage.html import HtmlReporter
 from coverage.inorout import InOrOut
 from coverage.jsonreport import JsonReporter
-from coverage.misc import CoverageException, bool_or_none, join_regex
-from coverage.misc import DefaultValue, ensure_dir_for_file, isolate_module
+from coverage.lcovreport import LcovReporter
+from coverage.misc import (
+    DefaultValue,
+    bool_or_none,
+    ensure_dir_for_file,
+    isolate_module,
+    join_regex,
+)
+from coverage.multiproc import patch_multiprocessing
+from coverage.patch import apply_patches
 from coverage.plugin import FileReporter
-from coverage.plugin_support import Plugins
+from coverage.plugin_support import Plugins, TCoverageInit
 from coverage.python import PythonFileReporter
-from coverage.report import render_report
-from coverage.results import Analysis, Numbers
-from coverage.summary import SummaryReporter
+from coverage.report import SummaryReporter
+from coverage.report_core import render_report
+from coverage.results import Analysis, analysis_from_file_reporter
+from coverage.types import (
+    FilePath,
+    TConfigSectionIn,
+    TConfigurable,
+    TConfigValueIn,
+    TConfigValueOut,
+    TFileDisposition,
+    TLineNo,
+    TMorf,
+    TMorfs,
+)
+from coverage.version import __url__
 from coverage.xmlreport import XmlReporter
-
-try:
-    from coverage.multiproc import patch_multiprocessing
-except ImportError:                                         # pragma: only jython
-    # Jython has no multiprocessing module.
-    patch_multiprocessing = None
 
 os = isolate_module(os)
 
+
 @contextlib.contextmanager
-def override_config(cov, **kwargs):
+def override_config(cov: Coverage, **kwargs: TConfigValueIn) -> Iterator[None]:
     """Temporarily tweak the configuration of `cov`.
 
     The arguments are applied to `cov.config` with the `from_args` method.
@@ -60,9 +91,12 @@ def override_config(cov, **kwargs):
         cov.config = original_config
 
 
-_DEFAULT_DATAFILE = DefaultValue("MISSING")
+DEFAULT_DATAFILE = DefaultValue("MISSING")
+_DEFAULT_DATAFILE = DEFAULT_DATAFILE  # Just in case, for backwards compatibility
+CONFIG_DATA_PREFIX = ":data:"
 
-class Coverage(object):
+
+class Coverage(TConfigurable):
     """Programmatic access to coverage.py.
 
     To use::
@@ -73,19 +107,28 @@ class Coverage(object):
         cov.start()
         #.. call your code ..
         cov.stop()
-        cov.html_report(directory='covhtml')
+        cov.html_report(directory="covhtml")
+
+    A context manager is available to do the same thing::
+
+        cov = Coverage()
+        with cov.collect():
+            #.. call your code ..
+        cov.html_report(directory="covhtml")
 
     Note: in keeping with Python custom, names starting with underscore are
     not part of the public API. They might stop working at any point.  Please
     limit yourself to documented methods to avoid problems.
 
+    Methods can raise any of the exceptions described in :ref:`api_exceptions`.
+
     """
 
     # The stack of started Coverage instances.
-    _instances = []
+    _instances: list[Coverage] = []
 
     @classmethod
-    def current(cls):
+    def current(cls) -> Coverage | None:
         """Get the latest started `Coverage` instance, if any.
 
         Returns: a `Coverage` instance, or None.
@@ -98,12 +141,27 @@ class Coverage(object):
         else:
             return None
 
-    def __init__(
-        self, data_file=_DEFAULT_DATAFILE, data_suffix=None, cover_pylib=None,
-        auto_data=False, timid=None, branch=None, config_file=True,
-        source=None, source_pkgs=None, omit=None, include=None, debug=None,
-        concurrency=None, check_preimported=False, context=None,
-    ):  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        data_file: FilePath | DefaultValue | None = DEFAULT_DATAFILE,
+        data_suffix: str | bool | None = None,
+        cover_pylib: bool | None = None,
+        auto_data: bool = False,
+        timid: bool | None = None,
+        branch: bool | None = None,
+        config_file: FilePath | bool = True,
+        source: Iterable[str] | None = None,
+        source_pkgs: Iterable[str] | None = None,
+        source_dirs: Iterable[str] | None = None,
+        omit: str | Iterable[str] | None = None,
+        include: str | Iterable[str] | None = None,
+        debug: Iterable[str] | None = None,
+        concurrency: str | Iterable[str] | None = None,
+        check_preimported: bool = False,
+        context: str | None = None,
+        messages: bool = False,
+        plugins: Iterable[Callable[..., None]] | None = None,
+    ) -> None:
         """
         Many of these arguments duplicate and override values that can be
         provided in a configuration file.  Parameters that are missing here
@@ -152,6 +210,10 @@ class Coverage(object):
         `source`, but can be used to name packages where the name can also be
         interpreted as a file path.
 
+        `source_dirs` is a list of file paths. It works the same as
+        `source`, but raises an error if the path doesn't exist, rather
+        than being treated as a package name.
+
         `include` and `omit` are lists of file name patterns. Files that match
         `include` will be measured, files that match `omit` will not.  Each
         will also accept a single string argument.
@@ -173,6 +235,14 @@ class Coverage(object):
         `context` is a string to use as the :ref:`static context
         <static_contexts>` label for collected data.
 
+        If `messages` is true, some messages will be printed to stdout
+        indicating what is happening.
+
+        If `plugins` are passed, they are an iterable of function objects
+        accepting a `reg` object to register plugins, as described in
+        :ref:`api_plugin`.  When they are provided, they will override the
+        plugins found in the coverage configuration file.
+
         .. versionadded:: 4.0
             The `concurrency` parameter.
 
@@ -185,25 +255,29 @@ class Coverage(object):
         .. versionadded:: 5.3
             The `source_pkgs` parameter.
 
+        .. versionadded:: 6.0
+            The `messages` parameter.
+
+        .. versionadded:: 7.7
+            The `plugins` parameter.
+
+        .. versionadded:: 7.8
+            The `source_dirs` parameter.
         """
+        # Start self.config as a usable default configuration. It will soon be
+        # replaced with the real configuration.
+        self.config = CoverageConfig()
+
         # data_file=None means no disk file at all. data_file missing means
         # use the value from the config file.
         self._no_disk = data_file is None
-        if data_file is _DEFAULT_DATAFILE:
+        if isinstance(data_file, DefaultValue):
             data_file = None
-
-        # Build our configuration from a number of sources.
-        self.config = read_coverage_config(
-            config_file=config_file,
-            data_file=data_file, cover_pylib=cover_pylib, timid=timid,
-            branch=branch, parallel=bool_or_none(data_suffix),
-            source=source, source_pkgs=source_pkgs, run_omit=omit, run_include=include, debug=debug,
-            report_omit=omit, report_include=include,
-            concurrency=concurrency, context=context,
-            )
+        if data_file is not None:
+            data_file = os.fspath(data_file)
 
         # This is injectable by tests.
-        self._debug_file = None
+        self._debug_file: IO[str] | None = None
 
         self._auto_load = self._auto_save = auto_data
         self._data_suffix_specified = data_suffix
@@ -212,19 +286,28 @@ class Coverage(object):
         self._warn_no_data = True
         self._warn_unimported_source = True
         self._warn_preimported_source = check_preimported
-        self._no_warn_slugs = None
+        self._no_warn_slugs: set[str] = set()
+        self._messages = messages
 
         # A record of all the warnings that have been issued.
-        self._warnings = []
+        self._warnings: list[str] = []
 
-        # Other instance attributes, set later.
-        self._data = self._collector = None
-        self._plugins = None
-        self._inorout = None
+        # Other instance attributes, set with placebos or placeholders.
+        # More useful objects will be created later.
+        self._debug: DebugControl = NoDebugging()
+        self._inorout: InOrOut | None = None
+        self._plugins: Plugins = Plugins()
+        self._plugin_override = cast(Iterable[TCoverageInit] | None, plugins)
+        self._data: CoverageData | None = None
+        self._data_to_close: list[CoverageData] = []
+        self._core: Core | None = None
+        self._collector: Collector | None = None
+        self._metacov = False
+
+        self._file_mapper: Callable[[str], str] = abs_file
         self._data_suffix = self._run_suffix = None
-        self._exclude_re = None
-        self._debug = None
-        self._file_mapper = None
+        self._exclude_re: dict[str, str] = {}
+        self._old_sigterm: Callable[[int, FrameType | None], Any] | None = None
 
         # State machine variables:
         # Have we initialized everything?
@@ -235,7 +318,33 @@ class Coverage(object):
         # Should we write the debug output?
         self._should_write_debug = True
 
-        # If we have sub-process measurement happening automatically, then we
+        # Build our configuration from a number of sources.
+        if isinstance(config_file, str) and config_file.startswith(CONFIG_DATA_PREFIX):
+            self.config = CoverageConfig.deserialize(config_file[len(CONFIG_DATA_PREFIX) :])
+        else:
+            if not isinstance(config_file, bool):
+                config_file = os.fspath(config_file)
+            self.config = read_coverage_config(
+                config_file=config_file,
+                warn=self._warn,
+                data_file=data_file,
+                cover_pylib=cover_pylib,
+                timid=timid,
+                branch=branch,
+                parallel=bool_or_none(data_suffix),
+                source=source,
+                source_pkgs=source_pkgs,
+                source_dirs=source_dirs,
+                run_omit=omit,
+                run_include=include,
+                debug=debug,
+                report_omit=omit,
+                report_include=include,
+                concurrency=concurrency,
+                context=context,
+            )
+
+        # If we have subprocess measurement happening automatically, then we
         # want any explicit creation of a Coverage object to mean, this process
         # is already coverage-aware, so don't auto-measure it.  By now, the
         # auto-creation of a Coverage object has already happened.  But we can
@@ -251,7 +360,18 @@ class Coverage(object):
             concurrency=concurrency
         ))
 
-    def _init(self):
+    def __repr__(self) -> str:
+        core_name = self._core.tracer_class.__name__ if self._core is not None else "-none-"
+        data_file = repr(self._data._filename) if self._data is not None else "-none-"
+        return (
+            "<Coverage"
+            + f" @0x{id(self):x}"
+            + f" core={core_name}"
+            + f" data_file={data_file}"
+            + ">"
+        )
+
+    def _init(self) -> None:
         """Set all the initial state.
 
         This is called by the public methods to initialize state. This lets us
@@ -264,10 +384,10 @@ class Coverage(object):
 
         self._inited = True
 
-        # Create and configure the debugging controller. COVERAGE_DEBUG_FILE
-        # is an environment variable, the name of a file to append debug logs
-        # to.
-        self._debug = DebugControl(self.config.debug, self._debug_file)
+        # Create and configure the debugging controller.
+        self._debug = DebugControl(self.config.debug, self._debug_file, self.config.debug_file)
+        if self._debug.should("process"):
+            self._debug.write("Coverage._init")
 
         if "multiprocessing" in (self.config.concurrency or ()):
             # Multi-processing uses parallel for the subprocesses, so also use
@@ -278,14 +398,17 @@ class Coverage(object):
         self._exclude_re = {}
 
         set_relative_directory()
-
         if getattr(sys, 'is_standalone_binary', False):
             self._file_mapper = canonical_filename
-        else:
-            self._file_mapper = relative_filename if self.config.relative_files else abs_file
+        elif self.config.relative_files:
+            self._file_mapper = relative_filename
 
         # Load plugins
-        self._plugins = Plugins.load_plugins(self.config.plugins, self.config, self._debug)
+        self._plugins = Plugins(self._debug)
+        if self._plugin_override:
+            self._plugins.load_from_callables(self._plugin_override)
+        else:
+            self._plugins.load_from_config(self.config.plugins, self.config)
 
         # Run configuring plugins.
         for plugin in self._plugins.configurers:
@@ -295,66 +418,73 @@ class Coverage(object):
             # this is a bit childish. :)
             plugin.configure([self, self.config][int(time.time()) % 2])
 
-    def _post_init(self):
+    def _post_init(self) -> None:
         """Stuff to do after everything is initialized."""
         if self._should_write_debug:
             self._should_write_debug = False
             self._write_startup_debug()
 
-        # '[run] _crash' will raise an exception if the value is close by in
+        # "[run] _crash" will raise an exception if the value is close by in
         # the call stack, for testing error handling.
-        if self.config._crash and self.config._crash in short_stack(limit=4):
-            raise Exception("Crashing because called by {}".format(self.config._crash))
+        if self.config._crash and self.config._crash in short_stack():
+            raise RuntimeError(f"Crashing because called by {self.config._crash}")
 
-    def _write_startup_debug(self):
+    def _write_startup_debug(self) -> None:
         """Write out debug info at startup if needed."""
         wrote_any = False
         with self._debug.without_callers():
-            if self._debug.should('config'):
-                config_info = sorted(self.config.__dict__.items())
-                config_info = [(k, v) for k, v in config_info if not k.startswith('_')]
-                write_formatted_info(self._debug, "config", config_info)
+            if self._debug.should("config"):
+                write_formatted_info(self._debug.write, "config", self.config.debug_info())
                 wrote_any = True
 
-            if self._debug.should('sys'):
-                write_formatted_info(self._debug, "sys", self.sys_info())
+            if self._debug.should("sys"):
+                write_formatted_info(self._debug.write, "sys", self.sys_info())
                 for plugin in self._plugins:
                     header = "sys: " + plugin._coverage_plugin_name
-                    info = plugin.sys_info()
-                    write_formatted_info(self._debug, header, info)
+                    write_formatted_info(self._debug.write, header, plugin.sys_info())
+                wrote_any = True
+
+            if self._debug.should("pybehave"):
+                write_formatted_info(self._debug.write, "pybehave", env.debug_info())
+                wrote_any = True
+
+            if self._debug.should("sqlite"):
+                write_formatted_info(self._debug.write, "sqlite", CoverageData.sys_info())
                 wrote_any = True
 
         if wrote_any:
-            write_formatted_info(self._debug, "end", ())
+            write_formatted_info(self._debug.write, "end", ())
 
-    def _should_trace(self, filename, frame):
+    def _should_trace(self, filename: str, frame: FrameType) -> TFileDisposition:
         """Decide whether to trace execution in `filename`.
 
         Calls `_should_trace_internal`, and returns the FileDisposition.
 
         """
+        assert self._inorout is not None
         disp = self._inorout.should_trace(filename, frame)
-        if self._debug.should('trace'):
+        if self._debug.should("trace"):
             self._debug.write(disposition_debug_msg(disp))
         return disp
 
-    def _check_include_omit_etc(self, filename, frame):
+    def _check_include_omit_etc(self, filename: str, frame: FrameType) -> bool:
         """Check a file name against the include/omit/etc, rules, verbosely.
 
         Returns a boolean: True if the file should be traced, False if not.
 
         """
+        assert self._inorout is not None
         reason = self._inorout.check_include_omit_etc(filename, frame)
-        if self._debug.should('trace'):
+        if self._debug.should("trace"):
             if not reason:
-                msg = "Including %r" % (filename,)
+                msg = f"Including {filename!r}"
             else:
-                msg = "Not including %r: %s" % (filename, reason)
+                msg = f"Not including {filename!r}: {reason}"
             self._debug.write(msg)
 
         return not reason
 
-    def _warn(self, msg, slug=None, once=False):
+    def _warn(self, msg: str, slug: str | None = None, once: bool = False) -> None:
         """Use `msg` as a warning.
 
         For warning suppression, use `slug` as the shorthand.
@@ -363,8 +493,8 @@ class Coverage(object):
         slug.)
 
         """
-        if self._no_warn_slugs is None:
-            self._no_warn_slugs = list(self.config.disable_warnings)
+        if not self._no_warn_slugs:
+            self._no_warn_slugs = set(self.config.disable_warnings)
 
         if slug in self._no_warn_slugs:
             # Don't issue the warning
@@ -372,15 +502,21 @@ class Coverage(object):
 
         self._warnings.append(msg)
         if slug:
-            msg = "%s (%s)" % (msg, slug)
-        if self._debug.should('pid'):
-            msg = "[%d] %s" % (os.getpid(), msg)
-        sys.stderr.write("Coverage.py warning: %s\n" % msg)
+            msg = f"{msg} ({slug}); see {__url__}/messages.html#warning-{slug}"
+        if self._debug.should("pid"):
+            msg = f"[{os.getpid()}] {msg}"
+        warnings.warn(msg, category=CoverageWarning, stacklevel=2)
 
         if once:
-            self._no_warn_slugs.append(slug)
+            assert slug is not None
+            self._no_warn_slugs.add(slug)
 
-    def get_option(self, option_name):
+    def _message(self, msg: str) -> None:
+        """Write a message to the user, if configured to do so."""
+        if self._messages:
+            print(msg)
+
+    def get_option(self, option_name: str) -> TConfigValueOut | None:
         """Get an option from the configuration.
 
         `option_name` is a colon-separated string indicating the section and
@@ -391,14 +527,14 @@ class Coverage(object):
         selected.
 
         As a special case, an `option_name` of ``"paths"`` will return an
-        OrderedDict with the entire ``[paths]`` section value.
+        dictionary with the entire ``[paths]`` section value.
 
         .. versionadded:: 4.0
 
         """
         return self.config.get_option(option_name)
 
-    def set_option(self, option_name, value):
+    def set_option(self, option_name: str, value: TConfigValueIn | TConfigSectionIn) -> None:
         """Set an option in the configuration.
 
         `option_name` is a colon-separated string indicating the section and
@@ -409,44 +545,47 @@ class Coverage(object):
         appropriate Python value.  For example, use True for booleans, not the
         string ``"True"``.
 
-        As an example, calling::
+        As an example, calling:
+
+        .. code-block:: python
 
             cov.set_option("run:branch", True)
 
-        has the same effect as this configuration file::
+        has the same effect as this configuration file:
+
+        .. code-block:: ini
 
             [run]
             branch = True
 
         As a special case, an `option_name` of ``"paths"`` will replace the
-        entire ``[paths]`` section.  The value should be an OrderedDict.
+        entire ``[paths]`` section.  The value should be a dictionary.
 
         .. versionadded:: 4.0
 
         """
         self.config.set_option(option_name, value)
 
-    def load(self):
+    def load(self) -> None:
         """Load previously-collected coverage data from the data file."""
         self._init()
-        if self._collector:
+        if self._collector is not None:
             self._collector.reset()
         should_skip = self.config.parallel and not os.path.exists(self.config.data_file)
         if not should_skip:
             self._init_data(suffix=None)
         self._post_init()
         if not should_skip:
+            assert self._data is not None
             self._data.read()
 
-    def _init_for_start(self):
+    def _init_for_start(self) -> None:
         """Initialization for start()"""
         # Construct the collector.
-        concurrency = self.config.concurrency or ()
+        concurrency: list[str] = self.config.concurrency
         if "multiprocessing" in concurrency:
-            if not patch_multiprocessing:
-                raise CoverageException(                    # pragma: only jython
-                    "multiprocessing is not supported on this Python"
-                )
+            if self.config.config_file is None:
+                raise ConfigError("multiprocessing requires a configuration file")
             patch_multiprocessing(rcfile=self.config.config_file, coverage_args=self._dumped_args)
 
         dycon = self.config.dynamic_context
@@ -455,9 +594,7 @@ class Coverage(object):
         elif dycon == "test_function":
             context_switchers = [should_start_context_test_function]
         else:
-            raise CoverageException(
-                "Don't understand dynamic_context setting: {!r}".format(dycon)
-            )
+            raise ConfigError(f"Don't understand dynamic_context setting: {dycon!r}")
 
         context_switchers.extend(
             plugin.dynamic_context for plugin in self._plugins.context_switchers
@@ -465,58 +602,82 @@ class Coverage(object):
 
         should_start_context = combine_context_switchers(context_switchers)
 
+        self._core = Core(
+            warn=self._warn,
+            debug=(self._debug if self._debug.should("core") else None),
+            config=self.config,
+            dynamic_contexts=(should_start_context is not None),
+            metacov=self._metacov,
+        )
         self._collector = Collector(
+            core=self._core,
             should_trace=self._should_trace,
             check_include=self._check_include_omit_etc,
             should_start_context=should_start_context,
             file_mapper=self._file_mapper,
-            timid=self.config.timid,
             branch=self.config.branch,
             warn=self._warn,
             concurrency=concurrency,
-            )
+        )
 
         suffix = self._data_suffix_specified
-        if suffix or self.config.parallel:
-            if not isinstance(suffix, string_class):
+        if suffix:
+            if not isinstance(suffix, str):
                 # if data_suffix=True, use .machinename.pid.random
                 suffix = True
+        elif self.config.parallel:
+            if suffix is None:
+                suffix = True
+            elif not isinstance(suffix, str):
+                suffix = bool(suffix)
         else:
             suffix = None
 
         self._init_data(suffix)
 
+        assert self._data is not None
         self._collector.use_data(self._data, self.config.context)
 
         # Early warning if we aren't going to be able to support plugins.
-        if self._plugins.file_tracers and not self._collector.supports_plugins:
+        if self._plugins.file_tracers and not self._core.supports_plugins:
             self._warn(
-                "Plugin file tracers (%s) aren't supported with %s" % (
+                "Plugin file tracers ({}) aren't supported with {}".format(
                     ", ".join(
-                        plugin._coverage_plugin_name
-                            for plugin in self._plugins.file_tracers
-                        ),
+                        plugin._coverage_plugin_name for plugin in self._plugins.file_tracers
+                    ),
                     self._collector.tracer_name(),
-                    )
-                )
+                ),
+            )
             for plugin in self._plugins.file_tracers:
                 plugin._coverage_enabled = False
 
         # Create the file classifying substructure.
         self._inorout = InOrOut(
+            config=self.config,
             warn=self._warn,
-            debug=(self._debug if self._debug.should('trace') else None),
+            debug=(self._debug if self._debug.should("trace") else None),
+            include_namespace_packages=self.config.include_namespace_packages,
         )
-        self._inorout.configure(self.config)
         self._inorout.plugins = self._plugins
-        self._inorout.disp_class = self._collector.file_disposition_class
+        self._inorout.disp_class = self._core.file_disposition_class
 
         # It's useful to write debug info after initing for start.
         self._should_write_debug = True
 
+        # Register our clean-up handlers.
         atexit.register(self._atexit)
+        if self.config.sigterm:
+            is_main = (threading.current_thread() == threading.main_thread())  # fmt: skip
+            if is_main and not env.WINDOWS:
+                # The Python docs seem to imply that SIGTERM works uniformly even
+                # on Windows, but that's not my experience, and this agrees:
+                # https://stackoverflow.com/questions/35772001/x/35792192#35792192
+                self._old_sigterm = signal.signal(  # type: ignore[assignment]
+                    signal.SIGTERM,
+                    self._on_sigterm,
+                )
 
-    def _init_data(self, suffix):
+    def _init_data(self, suffix: str | bool | None) -> None:
         """Create a data file if we don't have one yet."""
         if self._data is None:
             # Create the data file.  We do this at construction time so that the
@@ -530,16 +691,20 @@ class Coverage(object):
                 debug=self._debug,
                 no_disk=self._no_disk,
             )
+            self._data_to_close.append(self._data)
 
-    def start(self):
+    def start(self) -> None:
         """Start measuring code coverage.
 
-        Coverage measurement only occurs in functions called after
+        Coverage measurement is only collected in functions called after
         :meth:`start` is invoked.  Statements in the same scope as
         :meth:`start` won't be measured.
 
         Once you invoke :meth:`start`, you must also call :meth:`stop`
         eventually, or your process might not shut down cleanly.
+
+        The :meth:`collect` method is a context manager to handle both
+        starting and stopping collection.
 
         """
         self._init()
@@ -547,6 +712,9 @@ class Coverage(object):
             self._inited_for_start = True
             self._init_for_start()
         self._post_init()
+
+        assert self._collector is not None
+        assert self._inorout is not None
 
         # Issue warnings for possible problems.
         self._inorout.warn_conflicting_settings()
@@ -559,29 +727,55 @@ class Coverage(object):
         if self._auto_load:
             self.load()
 
+        apply_patches(self, self.config, self._debug)
+
         self._collector.start()
         self._started = True
         self._instances.append(self)
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop measuring code coverage."""
         if self._instances:
             if self._instances[-1] is self:
                 self._instances.pop()
         if self._started:
+            assert self._collector is not None
             self._collector.stop()
         self._started = False
 
-    def _atexit(self):
+    @contextlib.contextmanager
+    def collect(self) -> Iterator[None]:
+        """A context manager to start/stop coverage measurement collection.
+
+        .. versionadded:: 7.3
+
+        """
+        self.start()
+        try:
+            yield
+        finally:
+            self.stop()  # pragma: nested
+
+    def _atexit(self, event: str = "atexit") -> None:
         """Clean up on process shutdown."""
         if self._debug.should("process"):
-            self._debug.write("atexit: pid: {}, instance: {!r}".format(os.getpid(), self))
+            self._debug.write(f"{event}: pid: {os.getpid()}, instance: {self!r}")
         if self._started:
             self.stop()
-        if self._auto_save:
+        if self._auto_save or event == "sigterm":
             self.save()
+        for d in self._data_to_close:
+            d.close(force=True)
 
-    def erase(self):
+    def _on_sigterm(self, signum_unused: int, frame_unused: FrameType | None) -> None:
+        """A handler for signal.SIGTERM."""
+        self._atexit("sigterm")
+        # Statements after here won't be seen by metacov because we just wrote
+        # the data, and are about to kill the process.
+        signal.signal(signal.SIGTERM, self._old_sigterm)  # pragma: not covered
+        os.kill(os.getpid(), signal.SIGTERM)  # pragma: not covered
+
+    def erase(self) -> None:
         """Erase previously collected coverage data.
 
         This removes the in-memory data collected in this session as well as
@@ -590,14 +784,15 @@ class Coverage(object):
         """
         self._init()
         self._post_init()
-        if self._collector:
+        if self._collector is not None:
             self._collector.reset()
         self._init_data(suffix=None)
+        assert self._data is not None
         self._data.erase(parallel=self.config.parallel)
         self._data = None
         self._inited_for_start = False
 
-    def switch_context(self, new_context):
+    def switch_context(self, new_context: str) -> None:
         """Switch to a new dynamic context.
 
         `new_context` is a string to use as the :ref:`dynamic context
@@ -610,23 +805,22 @@ class Coverage(object):
         .. versionadded:: 5.0
 
         """
-        if not self._started:                           # pragma: part started
-            raise CoverageException(
-                "Cannot switch context, coverage is not started"
-                )
+        if not self._started:  # pragma: part started
+            raise CoverageException("Cannot switch context, coverage is not started")
 
+        assert self._collector is not None
         if self._collector.should_start_context:
             self._warn("Conflicting dynamic contexts", slug="dynamic-conflict", once=True)
 
         self._collector.switch_context(new_context)
 
-    def clear_exclude(self, which='exclude'):
+    def clear_exclude(self, which: str = "exclude") -> None:
         """Clear the exclude list."""
         self._init()
-        setattr(self.config, which + "_list", [])
+        setattr(self.config, f"{which}_list", [])
         self._exclude_regex_stale()
 
-    def exclude(self, regex, which='exclude'):
+    def exclude(self, regex: str, which: str = "exclude") -> None:
         """Exclude source lines from execution consideration.
 
         A number of lists of regular expressions are maintained.  Each list
@@ -642,37 +836,54 @@ class Coverage(object):
 
         """
         self._init()
-        excl_list = getattr(self.config, which + "_list")
+        excl_list = getattr(self.config, f"{which}_list")
         excl_list.append(regex)
         self._exclude_regex_stale()
 
-    def _exclude_regex_stale(self):
+    def _exclude_regex_stale(self) -> None:
         """Drop all the compiled exclusion regexes, a list was modified."""
         self._exclude_re.clear()
 
-    def _exclude_regex(self, which):
-        """Return a compiled regex for the given exclusion list."""
+    def _exclude_regex(self, which: str) -> str:
+        """Return a regex string for the given exclusion list."""
         if which not in self._exclude_re:
-            excl_list = getattr(self.config, which + "_list")
+            excl_list = getattr(self.config, f"{which}_list")
             self._exclude_re[which] = join_regex(excl_list)
         return self._exclude_re[which]
 
-    def get_exclude_list(self, which='exclude'):
-        """Return a list of excluded regex patterns.
+    def get_exclude_list(self, which: str = "exclude") -> list[str]:
+        """Return a list of excluded regex strings.
 
         `which` indicates which list is desired.  See :meth:`exclude` for the
         lists that are available, and their meaning.
 
         """
         self._init()
-        return getattr(self.config, which + "_list")
+        return cast(list[str], getattr(self.config, f"{which}_list"))
 
-    def save(self):
+    def save(self) -> None:
         """Save the collected coverage data to the data file."""
         data = self.get_data()
         data.write()
 
-    def combine(self, data_paths=None, strict=False, keep=False):
+    def _make_aliases(self) -> PathAliases:
+        """Create a PathAliases from our configuration."""
+        aliases = PathAliases(
+            debugfn=(self._debug.write if self._debug.should("pathmap") else None),
+            relative=self.config.relative_files,
+        )
+        for paths in self.config.paths.values():
+            result = paths[0]
+            for pattern in paths[1:]:
+                aliases.add(pattern, result)
+        return aliases
+
+    def combine(
+        self,
+        data_paths: Iterable[str] | None = None,
+        strict: bool = False,
+        keep: bool = False,
+    ) -> None:
         """Combine together a number of similarly-named coverage data files.
 
         All coverage data files whose name starts with `data_file` (from the
@@ -703,23 +914,17 @@ class Coverage(object):
         self._post_init()
         self.get_data()
 
-        aliases = None
-        if self.config.paths:
-            aliases = PathAliases()
-            for paths in self.config.paths.values():
-                result = paths[0]
-                for pattern in paths[1:]:
-                    aliases.add(pattern, result)
-
+        assert self._data is not None
         combine_parallel_data(
             self._data,
-            aliases=aliases,
+            aliases=self._make_aliases(),
             data_paths=data_paths,
             strict=strict,
             keep=keep,
+            message=self._message,
         )
 
-    def get_data(self):
+    def get_data(self) -> CoverageData:
         """Get the collected data.
 
         Also warn about various problems collecting data.
@@ -733,22 +938,27 @@ class Coverage(object):
         self._init_data(suffix=None)
         self._post_init()
 
-        for plugin in self._plugins:
-            if not plugin._coverage_enabled:
-                self._collector.plugin_was_disabled(plugin)
+        if self._collector is not None:
+            for plugin in self._plugins:
+                if not plugin._coverage_enabled:
+                    self._collector.plugin_was_disabled(plugin)
 
-        if self._collector and self._collector.flush_data():
-            self._post_save_work()
+            if self._collector.flush_data():
+                self._post_save_work()
 
+        assert self._data is not None
         return self._data
 
-    def _post_save_work(self):
+    def _post_save_work(self) -> None:
         """After saving data, look for warnings, post-work, etc.
 
         Warn about things that should have happened but didn't.
-        Look for unexecuted files.
+        Look for un-executed files.
 
         """
+        assert self._data is not None
+        assert self._inorout is not None
+
         # If there are still entries in the source_pkgs_unmatched list,
         # then we never encountered those packages.
         if self._warn_unimported_source:
@@ -759,25 +969,24 @@ class Coverage(object):
             self._warn("No data was collected.", slug="no-data-collected")
 
         # Touch all the files that could have executed, so that we can
-        # mark completely unexecuted files as 0% covered.
-        if self._data is not None:
-            file_paths = collections.defaultdict(list)
-            for file_path, plugin_name in self._inorout.find_possibly_unexecuted_files():
-                file_path = self._file_mapper(file_path)
-                file_paths[plugin_name].append(file_path)
-            for plugin_name, paths in file_paths.items():
-                self._data.touch_files(paths, plugin_name)
-
-        if self.config.note:
-            self._warn("The '[run] note' setting is no longer supported.")
+        # mark completely un-executed files as 0% covered.
+        file_paths = collections.defaultdict(list)
+        for file_path, plugin_name in self._inorout.find_possibly_unexecuted_files():
+            file_path = self._file_mapper(file_path)
+            file_paths[plugin_name].append(file_path)
+        for plugin_name, paths in file_paths.items():
+            self._data.touch_files(paths, plugin_name)
 
     # Backward compatibility with version 1.
-    def analysis(self, morf):
+    def analysis(self, morf: TMorf) -> tuple[str, list[TLineNo], list[TLineNo], str]:
         """Like `analysis2` but doesn't return excluded line numbers."""
         f, s, _, m, mf = self.analysis2(morf)
         return f, s, m, mf
 
-    def analysis2(self, morf):
+    def analysis2(
+        self,
+        morf: TMorf,
+    ) -> tuple[str, list[TLineNo], list[TLineNo], list[TLineNo], str]:
         """Analyze a module.
 
         `morf` is a module or a file name.  It will be analyzed to determine
@@ -801,31 +1010,41 @@ class Coverage(object):
             sorted(analysis.excluded),
             sorted(analysis.missing),
             analysis.missing_formatted(),
-            )
+        )
 
-    def _analyze(self, it):
-        """Analyze a single morf or code unit.
-
-        Returns an `Analysis` object.
-
-        """
-        # All reporting comes through here, so do reporting initialization.
+    @functools.lru_cache(maxsize=1)
+    def _analyze(self, morf: TMorf) -> Analysis:
+        """Analyze a module or file.  Private for now."""
         self._init()
-        Numbers.set_precision(self.config.precision)
         self._post_init()
 
         data = self.get_data()
-        if not isinstance(it, FileReporter):
-            it = self._get_file_reporter(it)
+        file_reporter = self._get_file_reporter(morf)
+        filename = self._file_mapper(file_reporter.filename)
+        return analysis_from_file_reporter(data, self.config.precision, file_reporter, filename)
 
-        return Analysis(data, it, self._file_mapper)
+    def branch_stats(self, morf: TMorf) -> dict[TLineNo, tuple[int, int]]:
+        """Get branch statistics about a module.
 
-    def _get_file_reporter(self, morf):
+        `morf` is a module or a file name.
+
+        Returns a dict mapping line numbers to a tuple:
+        (total_exits, taken_exits).
+
+        .. versionadded:: 7.7
+
+        """
+        analysis = self._analyze(morf)
+        return analysis.branch_stats()
+
+    @functools.lru_cache(maxsize=1)
+    def _get_file_reporter(self, morf: TMorf) -> FileReporter:
         """Get a FileReporter for a module or file name."""
+        assert self._data is not None
         plugin = None
-        file_reporter = "python"
+        file_reporter: str | FileReporter = "python"
 
-        if isinstance(morf, string_class):
+        if isinstance(morf, str):
             if getattr(sys, 'is_standalone_binary', False):
                 # Leave morf in canonical format - relative to the arcadia root
                 mapped_morf = morf
@@ -838,43 +1057,68 @@ class Coverage(object):
                 if plugin:
                     file_reporter = plugin.file_reporter(mapped_morf)
                     if file_reporter is None:
-                        raise CoverageException(
-                            "Plugin %r did not provide a file reporter for %r." % (
-                                plugin._coverage_plugin_name, morf
-                            )
+                        raise PluginError(
+                            "Plugin {!r} did not provide a file reporter for {!r}.".format(
+                                plugin._coverage_plugin_name,
+                                morf,
+                            ),
                         )
 
         if file_reporter == "python":
             file_reporter = PythonFileReporter(morf, self)
 
+        assert isinstance(file_reporter, FileReporter)
         return file_reporter
 
-    def _get_file_reporters(self, morfs=None):
-        """Get a list of FileReporters for a list of modules or file names.
+    def _get_file_reporters(
+        self,
+        morfs: TMorfs = None,
+    ) -> list[tuple[FileReporter, TMorf]]:
+        """Get FileReporters for a list of modules or file names.
 
         For each module or file name in `morfs`, find a FileReporter.  Return
-        the list of FileReporters.
+        a list pairing FileReporters with the morfs.
 
         If `morfs` is a single module or file name, this returns a list of one
         FileReporter.  If `morfs` is empty or None, then the list of all files
         measured is used to find the FileReporters.
 
         """
+        assert self._data is not None
         if not morfs:
             morfs = self._data.measured_files()
 
         # Be sure we have a collection.
         if not isinstance(morfs, (list, tuple, set)):
-            morfs = [morfs]
+            morfs = [morfs]  # type: ignore[list-item]
 
-        file_reporters = [self._get_file_reporter(morf) for morf in morfs]
-        return file_reporters
+        morfs = sorted(morfs, key=lambda m: m if isinstance(m, str) else m.__name__)
+        return [(self._get_file_reporter(morf), morf) for morf in morfs]
+
+    def _prepare_data_for_reporting(self) -> None:
+        """Re-map data before reporting, to get implicit "combine" behavior."""
+        if self.config.paths:
+            mapped_data = CoverageData(warn=self._warn, debug=self._debug, no_disk=True)
+            if self._data is not None:
+                mapped_data.update(self._data, map_path=self._make_aliases().map)
+            self._data = mapped_data
+            self._data_to_close.append(mapped_data)
 
     def report(
-        self, morfs=None, show_missing=None, ignore_errors=None,
-        file=None, omit=None, include=None, skip_covered=None,
-        contexts=None, skip_empty=None, precision=None, sort=None
-    ):
+        self,
+        morfs: TMorfs = None,
+        show_missing: bool | None = None,
+        ignore_errors: bool | None = None,
+        file: IO[str] | None = None,
+        omit: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        skip_covered: bool | None = None,
+        contexts: list[str] | None = None,
+        skip_empty: bool | None = None,
+        precision: int | None = None,
+        sort: str | None = None,
+        output_format: str | None = None,
+    ) -> float:
         """Write a textual summary report to `file`.
 
         Each module in `morfs` is listed, with counts of statements, executed
@@ -887,6 +1131,9 @@ class Coverage(object):
 
         `file` is a file-like object, suitable for writing.
 
+        `output_format` determines the format, either "text" (the default),
+        "markdown", or "total".
+
         `include` is a list of file name patterns.  Files that match will be
         included in the report. Files matching `omit` will not be included in
         the report.
@@ -896,7 +1143,7 @@ class Coverage(object):
         If `skip_empty` is true, don't report on empty files (those that have
         no statements).
 
-        `contexts` is a list of regular expressions.  Only data from
+        `contexts` is a list of regular expression strings.  Only data from
         :ref:`dynamic contexts <dynamic_contexts>` that match one of those
         expressions (using :func:`re.search <python:re.search>`) will be
         included in the report.
@@ -918,21 +1165,36 @@ class Coverage(object):
         .. versionadded:: 5.2
             The `precision` parameter.
 
+        .. versionadded:: 7.0
+            The `format` parameter.
+
         """
+        self._prepare_data_for_reporting()
         with override_config(
             self,
-            ignore_errors=ignore_errors, report_omit=omit, report_include=include,
-            show_missing=show_missing, skip_covered=skip_covered,
-            report_contexts=contexts, skip_empty=skip_empty, precision=precision,
-            sort=sort
+            ignore_errors=ignore_errors,
+            report_omit=omit,
+            report_include=include,
+            show_missing=show_missing,
+            skip_covered=skip_covered,
+            report_contexts=contexts,
+            skip_empty=skip_empty,
+            precision=precision,
+            sort=sort,
+            format=output_format,
         ):
             reporter = SummaryReporter(self)
             return reporter.report(morfs, outfile=file)
 
     def annotate(
-        self, morfs=None, directory=None, ignore_errors=None,
-        omit=None, include=None, contexts=None,
-    ):
+        self,
+        morfs: TMorfs = None,
+        directory: str | None = None,
+        ignore_errors: bool | None = None,
+        omit: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        contexts: list[str] | None = None,
+    ) -> None:
         """Annotate a list of modules.
 
         Each module in `morfs` is annotated.  The source is written to a new
@@ -943,19 +1205,32 @@ class Coverage(object):
         See :meth:`report` for other arguments.
 
         """
-        with override_config(self,
-            ignore_errors=ignore_errors, report_omit=omit,
-            report_include=include, report_contexts=contexts,
+        self._prepare_data_for_reporting()
+        with override_config(
+            self,
+            ignore_errors=ignore_errors,
+            report_omit=omit,
+            report_include=include,
+            report_contexts=contexts,
         ):
             reporter = AnnotateReporter(self)
             reporter.report(morfs, directory=directory)
 
     def html_report(
-        self, morfs=None, directory=None, ignore_errors=None,
-        omit=None, include=None, extra_css=None, title=None,
-        skip_covered=None, show_contexts=None, contexts=None,
-        skip_empty=None, precision=None,
-    ):
+        self,
+        morfs: TMorfs = None,
+        directory: str | None = None,
+        ignore_errors: bool | None = None,
+        omit: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        extra_css: str | None = None,
+        title: str | None = None,
+        skip_covered: bool | None = None,
+        show_contexts: bool | None = None,
+        contexts: list[str] | None = None,
+        skip_empty: bool | None = None,
+        precision: int | None = None,
+    ) -> float:
         """Generate an HTML report.
 
         The HTML is written to `directory`.  The file "index.html" is the
@@ -973,25 +1248,41 @@ class Coverage(object):
         Returns a float, the total percentage covered.
 
         .. note::
+
             The HTML report files are generated incrementally based on the
             source files and coverage results. If you modify the report files,
             the changes will not be considered.  You should be careful about
             changing the files in the report folder.
 
         """
-        with override_config(self,
-            ignore_errors=ignore_errors, report_omit=omit, report_include=include,
-            html_dir=directory, extra_css=extra_css, html_title=title,
-            html_skip_covered=skip_covered, show_contexts=show_contexts, report_contexts=contexts,
-            html_skip_empty=skip_empty, precision=precision,
+        self._prepare_data_for_reporting()
+        with override_config(
+            self,
+            ignore_errors=ignore_errors,
+            report_omit=omit,
+            report_include=include,
+            html_dir=directory,
+            extra_css=extra_css,
+            html_title=title,
+            html_skip_covered=skip_covered,
+            show_contexts=show_contexts,
+            report_contexts=contexts,
+            html_skip_empty=skip_empty,
+            precision=precision,
         ):
             reporter = HtmlReporter(self)
             return reporter.report(morfs)
 
     def xml_report(
-        self, morfs=None, outfile=None, ignore_errors=None,
-        omit=None, include=None, contexts=None, skip_empty=None,
-    ):
+        self,
+        morfs: TMorfs = None,
+        outfile: str | None = None,
+        ignore_errors: bool | None = None,
+        omit: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        contexts: list[str] | None = None,
+        skip_empty: bool | None = None,
+    ) -> float:
         """Generate an XML report of coverage results.
 
         The report is compatible with Cobertura reports.
@@ -1004,21 +1295,35 @@ class Coverage(object):
         Returns a float, the total percentage covered.
 
         """
-        with override_config(self,
-            ignore_errors=ignore_errors, report_omit=omit, report_include=include,
-            xml_output=outfile, report_contexts=contexts, skip_empty=skip_empty,
+        self._prepare_data_for_reporting()
+        with override_config(
+            self,
+            ignore_errors=ignore_errors,
+            report_omit=omit,
+            report_include=include,
+            xml_output=outfile,
+            report_contexts=contexts,
+            skip_empty=skip_empty,
         ):
-            return render_report(self.config.xml_output, XmlReporter(self), morfs)
+            return render_report(self.config.xml_output, XmlReporter(self), morfs, self._message)
 
     def json_report(
-        self, morfs=None, outfile=None, ignore_errors=None,
-        omit=None, include=None, contexts=None, pretty_print=None,
-        show_contexts=None
-    ):
+        self,
+        morfs: TMorfs = None,
+        outfile: str | None = None,
+        ignore_errors: bool | None = None,
+        omit: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        contexts: list[str] | None = None,
+        pretty_print: bool | None = None,
+        show_contexts: bool | None = None,
+    ) -> float:
         """Generate a JSON report of coverage results.
 
         Each module in `morfs` is included in the report.  `outfile` is the
         path to write the file to, "-" will write to stdout.
+
+        `pretty_print` is a boolean, whether to pretty-print the JSON output or not.
 
         See :meth:`report` for other arguments.
 
@@ -1027,22 +1332,60 @@ class Coverage(object):
         .. versionadded:: 5.0
 
         """
-        with override_config(self,
-            ignore_errors=ignore_errors, report_omit=omit, report_include=include,
-            json_output=outfile, report_contexts=contexts, json_pretty_print=pretty_print,
-            json_show_contexts=show_contexts
+        self._prepare_data_for_reporting()
+        with override_config(
+            self,
+            ignore_errors=ignore_errors,
+            report_omit=omit,
+            report_include=include,
+            json_output=outfile,
+            report_contexts=contexts,
+            json_pretty_print=pretty_print,
+            json_show_contexts=show_contexts,
         ):
-            return render_report(self.config.json_output, JsonReporter(self), morfs)
+            return render_report(self.config.json_output, JsonReporter(self), morfs, self._message)
 
-    def sys_info(self):
+    def lcov_report(
+        self,
+        morfs: TMorfs = None,
+        outfile: str | None = None,
+        ignore_errors: bool | None = None,
+        omit: str | list[str] | None = None,
+        include: str | list[str] | None = None,
+        contexts: list[str] | None = None,
+    ) -> float:
+        """Generate an LCOV report of coverage results.
+
+        Each module in `morfs` is included in the report. `outfile` is the
+        path to write the file to, "-" will write to stdout.
+
+        See :meth:`report` for other arguments.
+
+        .. versionadded:: 6.3
+        """
+        self._prepare_data_for_reporting()
+        with override_config(
+            self,
+            ignore_errors=ignore_errors,
+            report_omit=omit,
+            report_include=include,
+            lcov_output=outfile,
+            report_contexts=contexts,
+        ):
+            return render_report(self.config.lcov_output, LcovReporter(self), morfs, self._message)
+
+    def sys_info(self) -> Iterable[tuple[str, Any]]:
         """Return a list of (key, value) pairs showing internal information."""
 
+        import glob
+        import platform
+        import site
         import coverage as covmod
 
         self._init()
         self._post_init()
 
-        def plugin_info(plugins):
+        def plugin_info(plugins: list[Any]) -> list[str]:
             """Make an entry for the sys_info from a list of plug-ins."""
             entries = []
             for plugin in plugins:
@@ -1052,100 +1395,117 @@ class Coverage(object):
                 entries.append(entry)
             return entries
 
+        pth_files = []
+        for spdir in site.getsitepackages():
+            pth_files.extend(glob.glob(f"{spdir}/*cov*.pth"))
+
         info = [
-            ('version', covmod.__version__),
-            ('coverage', covmod.__file__),
-            ('tracer', self._collector.tracer_name() if self._collector else "-none-"),
-            ('CTracer', 'available' if CTracer else "unavailable"),
-            ('plugins.file_tracers', plugin_info(self._plugins.file_tracers)),
-            ('plugins.configurers', plugin_info(self._plugins.configurers)),
-            ('plugins.context_switchers', plugin_info(self._plugins.context_switchers)),
-            ('configs_attempted', self.config.attempted_config_files),
-            ('configs_read', self.config.config_files_read),
-            ('config_file', self.config.config_file),
-            ('config_contents',
-                repr(self.config._config_contents)
-                if self.config._config_contents
-                else '-none-'
+            ("coverage_version", covmod.__version__),
+            ("coverage_module", covmod.__file__),
+            ("core", self._collector.tracer_name() if self._collector is not None else "-none-"),
+            ("CTracer", f"available from {CTRACER_FILE}" if CTRACER_FILE else "unavailable"),
+            ("plugins.file_tracers", plugin_info(self._plugins.file_tracers)),
+            ("plugins.configurers", plugin_info(self._plugins.configurers)),
+            ("plugins.context_switchers", plugin_info(self._plugins.context_switchers)),
+            ("configs_attempted", self.config.config_files_attempted),
+            ("configs_read", self.config.config_files_read),
+            ("config_file", self.config.config_file),
+            (
+                "config_contents",
+                repr(self.config._config_contents) if self.config._config_contents else "-none-",
             ),
-            ('data_file', self._data.data_filename() if self._data is not None else "-none-"),
-            ('python', sys.version.replace('\n', '')),
-            ('platform', platform.platform()),
-            ('implementation', platform.python_implementation()),
-            ('executable', sys.executable),
-            ('def_encoding', sys.getdefaultencoding()),
-            ('fs_encoding', sys.getfilesystemencoding()),
-            ('pid', os.getpid()),
-            ('cwd', os.getcwd()),
-            ('path', sys.path),
-            ('environment', sorted(
-                ("%s = %s" % (k, v))
-                for k, v in iitems(os.environ)
-                if any(slug in k for slug in ("COV", "PY"))
-            )),
-            ('command_line', " ".join(getattr(sys, 'argv', ['-none-']))),
-            ]
+            ("data_file", self._data.data_filename() if self._data is not None else "-none-"),
+            ("python", sys.version.replace("\n", "")),
+            ("platform", platform.platform()),
+            ("implementation", platform.python_implementation()),
+            ("build", repr(platform.python_build())),
+            ("gil_enabled", getattr(sys, "_is_gil_enabled", lambda: True)()),
+            ("executable", sys.executable),
+            ("pth_files", pth_files),
+            ("def_encoding", sys.getdefaultencoding()),
+            ("fs_encoding", sys.getfilesystemencoding()),
+            ("pid", os.getpid()),
+            ("cwd", os.getcwd()),
+            ("path", sys.path),
+            ("environment", [f"{k} = {v}" for k, v in relevant_environment_display(os.environ)]),
+            ("command_line", " ".join(getattr(sys, "argv", ["-none-"]))),
+            ("time", f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S}"),
+        ]
 
-        if self._inorout:
+        if self._inorout is not None:
             info.extend(self._inorout.sys_info())
-
-        info.extend(CoverageData.sys_info())
 
         return info
 
 
 # Mega debugging...
 # $set_env.py: COVERAGE_DEBUG_CALLS - Lots and lots of output about calls to Coverage.
-if int(os.environ.get("COVERAGE_DEBUG_CALLS", 0)):              # pragma: debugging
+if int(os.getenv("COVERAGE_DEBUG_CALLS", 0)):  # pragma: debugging
     from coverage.debug import decorate_methods, show_calls
 
-    Coverage = decorate_methods(show_calls(show_args=True), butnot=['get_data'])(Coverage)
+    Coverage = decorate_methods(  # type: ignore[misc]
+        show_calls(show_args=True),
+        butnot=["get_data"],
+    )(Coverage)
 
 
-def process_startup():
+def process_startup(
+    *,
+    force: bool = False,
+    slug: str = "default",  # pylint: disable=unused-argument
+) -> Coverage | None:
     """Call this at Python start-up to perhaps measure coverage.
 
-    If the environment variable COVERAGE_PROCESS_START is defined, coverage
-    measurement is started.  The value of the variable is the config file
-    to use.
+    Coverage is started if one of these environment variables is defined:
 
-    There are two ways to configure your Python installation to invoke this
-    function when Python starts:
+    - COVERAGE_PROCESS_START: the config file to use.
+    - COVERAGE_PROCESS_CONFIG: the config data to use, a string produced by
+      CoverageConfig.serialize, prefixed by ":data:".
 
-    #. Create or append to sitecustomize.py to add these lines::
+    If one of these is defined, it's used to get the coverage configuration,
+    and coverage is started.
 
-        import coverage
-        coverage.process_startup()
-
-    #. Create a .pth file in your Python installation containing::
-
-        import coverage; coverage.process_startup()
+    For details, see https://coverage.readthedocs.io/en/latest/subprocess.html.
 
     Returns the :class:`Coverage` instance that was started, or None if it was
     not started by this call.
 
     """
-    cps = os.environ.get("COVERAGE_PROCESS_START")
-    if not cps:
+    # This function can be called more than once in a process, for a few
+    # reasons.
+    #
+    # 1) We install a .pth file in multiple places reported by the site module,
+    #    so this function can be called more than once even in simple
+    #    situations.
+    #
+    # 2) In some virtualenv configurations the same directory is visible twice
+    #    in sys.path.  This means that the .pth file will be found twice and
+    #    executed twice, executing this function twice.
+    #    https://github.com/coveragepy/coveragepy/issues/340 has more details.
+    #
+    # We set a global flag (an attribute on this function) to indicate that
+    # coverage.py has already been started, so we can avoid starting it twice.
+
+    if not force and hasattr(process_startup, "coverage"):
+        # We've annotated this function before, so we must have already
+        # auto-started coverage.py in this process.  Nothing to do.
+        return None
+
+    # Now check for the environment variables that request coverage. If they
+    # aren't set, do nothing.
+
+    config_data = os.getenv("COVERAGE_PROCESS_CONFIG")
+    cps = os.getenv("COVERAGE_PROCESS_START")
+    if config_data is not None:
+        config_file = CONFIG_DATA_PREFIX + config_data
+    elif cps is not None:
+        config_file = cps
+    else:
         # No request for coverage, nothing to do.
         return None
 
-    # This function can be called more than once in a process. This happens
-    # because some virtualenv configurations make the same directory visible
-    # twice in sys.path.  This means that the .pth file will be found twice,
-    # and executed twice, executing this function twice.  We set a global
-    # flag (an attribute on this function) to indicate that coverage.py has
-    # already been started, so we can avoid doing it twice.
-    #
-    # https://github.com/nedbat/coveragepy/issues/340 has more details.
-
-    if hasattr(process_startup, "coverage"):
-        # We've annotated this function before, so we must have already
-        # started coverage.py in this process.  Nothing to do.
-        return None
-
-    cov = Coverage(config_file=cps)
-    process_startup.coverage = cov
+    cov = Coverage(config_file=config_file)
+    process_startup.coverage = cov  # type: ignore[attr-defined]
     cov._warn_no_data = False
     cov._warn_unimported_source = False
     cov._warn_preimported_source = False
@@ -1155,7 +1515,14 @@ def process_startup():
     return cov
 
 
-def _prevent_sub_process_measurement():
+def _after_fork_in_child() -> None:
+    """Used by patch=fork in the child process to restart coverage."""
+    if cov := Coverage.current():
+        cov.stop()
+    process_startup(force=True, slug="fork")
+
+
+def _prevent_sub_process_measurement() -> None:
     """Stop any subprocess auto-measurement from writing data."""
     auto_created_coverage = getattr(process_startup, "coverage", None)
     if auto_created_coverage is not None:

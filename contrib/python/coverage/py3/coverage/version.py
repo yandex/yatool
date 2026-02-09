@@ -1,33 +1,35 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
 """The version and URL for coverage.py"""
 # This file is exec'ed in setup.py, don't import anything!
 
-# Same semantics as sys.version_info.
-version_info = (5, 5, 0, "final", 0)
+from __future__ import annotations
+
+# version_info: same semantics as sys.version_info.
+# _dev: the .devN suffix if any.
+version_info = (7, 13, 3, "final", 0)
+_dev = 0
 
 
-def _make_version(major, minor, micro, releaselevel, serial):
+def _make_version(
+    major: int,
+    minor: int,
+    micro: int,
+    releaselevel: str = "final",
+    serial: int = 0,
+    dev: int = 0,
+) -> str:
     """Create a readable version string from version_info tuple components."""
-    assert releaselevel in ['alpha', 'beta', 'candidate', 'final']
-    version = "%d.%d" % (major, minor)
-    if micro:
-        version += ".%d" % (micro,)
-    if releaselevel != 'final':
-        short = {'alpha': 'a', 'beta': 'b', 'candidate': 'rc'}[releaselevel]
-        version += "%s%d" % (short, serial)
+    assert releaselevel in ["alpha", "beta", "candidate", "final"]
+    version = f"{major}.{minor}.{micro}"
+    if releaselevel != "final":
+        short = {"alpha": "a", "beta": "b", "candidate": "rc"}[releaselevel]
+        version += f"{short}{serial}"
+    if dev != 0:
+        version += f".dev{dev}"
     return version
 
 
-def _make_url(major, minor, micro, releaselevel, serial):
-    """Make the URL people should start at for this version of coverage.py."""
-    url = "https://coverage.readthedocs.io"
-    if releaselevel != 'final':
-        # For pre-releases, use a version-specific URL.
-        url += "/en/coverage-" + _make_version(major, minor, micro, releaselevel, serial)
-    return url
-
-
-__version__ = _make_version(*version_info)
-__url__ = _make_url(*version_info)
+__version__ = _make_version(*version_info, _dev)
+__url__ = f"https://coverage.readthedocs.io/en/{__version__}"

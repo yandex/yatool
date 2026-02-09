@@ -1,5 +1,5 @@
 /* Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0 */
-/* For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt */
+/* For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt */
 
 #ifndef _COVERAGE_STATS_H
 #define _COVERAGE_STATS_H
@@ -17,10 +17,8 @@ typedef struct Stats {
 #if COLLECT_STATS
     unsigned int lines;
     unsigned int returns;
-    unsigned int exceptions;
     unsigned int others;
     unsigned int files;
-    unsigned int missed_returns;
     unsigned int stack_reallocs;
     unsigned int errors;
     unsigned int pycalls;

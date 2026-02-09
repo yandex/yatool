@@ -1,21 +1,26 @@
 # Licensed under the Apache License: http://www.apache.org/licenses/LICENSE-2.0
-# For details: https://github.com/nedbat/coveragepy/blob/master/NOTICE.txt
+# For details: https://github.com/coveragepy/coveragepy/blob/main/NOTICE.txt
 
 """Better tokenizing for coverage.py."""
 
-import codecs
+from __future__ import annotations
+
+import ast
+import io
 import keyword
 import re
 import sys
 import token
 import tokenize
+from collections.abc import Iterable
 
 from coverage import env
-from coverage.backward import iternext, unicode_class
-from coverage.misc import contract
+from coverage.types import TLineNo, TSourceTokenLines
+
+TokenInfos = Iterable[tokenize.TokenInfo]
 
 
-def phys_tokens(toks):
+def _phys_tokens(toks: TokenInfos) -> TokenInfos:
     """Return all physical tokens, even line continuations.
 
     tokenize.generate_tokens() doesn't return a token for the backslash that
@@ -25,9 +30,9 @@ def phys_tokens(toks):
     Returns the same values as generate_tokens()
 
     """
-    last_line = None
+    last_line: str | None = None
     last_lineno = -1
-    last_ttext = None
+    last_ttext: str = ""
     for ttype, ttext, (slineno, scol), (elineno, ecol), ltext in toks:
         if last_lineno != elineno:
             if last_line and last_line.endswith("\\\n"):
@@ -50,28 +55,57 @@ def phys_tokens(toks):
                 if last_ttext.endswith("\\"):
                     inject_backslash = False
                 elif ttype == token.STRING:
-                    if "\n" in ttext and ttext.split('\n', 1)[0][-1] == '\\':
+                    if (  # pylint: disable=simplifiable-if-statement
+                        last_line.endswith("\\\n")
+                        and last_line.rstrip(" \\\n").endswith(last_ttext)
+                    ):
+                        # Deal with special cases like such code::
+                        #
+                        #   a = ["aaa",\ # there may be zero or more blanks between "," and "\".
+                        #        "bbb \
+                        #        ccc"]
+                        #
+                        inject_backslash = True
+                    else:
                         # It's a multi-line string and the first line ends with
                         # a backslash, so we don't need to inject another.
                         inject_backslash = False
+                elif env.PYBEHAVIOR.fstring_syntax and ttype == token.FSTRING_MIDDLE:
+                    inject_backslash = False
                 if inject_backslash:
                     # Figure out what column the backslash is in.
                     ccol = len(last_line.split("\n")[-2]) - 1
                     # Yield the token, with a fake token type.
-                    yield (
-                        99999, "\\\n",
-                        (slineno, ccol), (slineno, ccol+2),
-                        last_line
-                        )
+                    yield tokenize.TokenInfo(
+                        99999,
+                        "\\\n",
+                        (slineno, ccol),
+                        (slineno, ccol + 2),
+                        last_line,
+                    )
             last_line = ltext
         if ttype not in (tokenize.NEWLINE, tokenize.NL):
             last_ttext = ttext
-        yield ttype, ttext, (slineno, scol), (elineno, ecol), ltext
+        yield tokenize.TokenInfo(ttype, ttext, (slineno, scol), (elineno, ecol), ltext)
         last_lineno = elineno
 
 
-@contract(source='unicode')
-def source_token_lines(source):
+def find_soft_key_lines(source: str) -> set[TLineNo]:
+    """Helper for finding lines with soft keywords, like match/case lines."""
+    soft_key_lines: set[TLineNo] = set()
+
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Match):
+            soft_key_lines.add(node.lineno)
+            for case in node.cases:
+                soft_key_lines.add(case.pattern.lineno)
+        elif sys.version_info >= (3, 12) and isinstance(node, ast.TypeAlias):
+            soft_key_lines.add(node.lineno)
+
+    return soft_key_lines
+
+
+def source_token_lines(source: str) -> TSourceTokenLines:
     """Generate a series of lines, one for each line in `source`.
 
     Each line is a list of pairs, each pair is a token::
@@ -82,37 +116,54 @@ def source_token_lines(source):
 
     If you concatenate all the token texts, and then join them with newlines,
     you should have your original `source` back, with two differences:
-    trailing whitespace is not preserved, and a final line with no newline
+    trailing white space is not preserved, and a final line with no newline
     is indistinguishable from a final line with a newline.
 
     """
 
     ws_tokens = {token.INDENT, token.DEDENT, token.NEWLINE, tokenize.NL}
-    line = []
+    line: list[tuple[str, str]] = []
     col = 0
 
-    source = source.expandtabs(8).replace('\r\n', '\n')
+    source = source.expandtabs(8).replace("\r\n", "\n")
     tokgen = generate_tokens(source)
 
-    for ttype, ttext, (_, scol), (_, ecol), _ in phys_tokens(tokgen):
+    soft_key_lines = find_soft_key_lines(source)
+
+    for ttype, ttext, (sline, scol), (_, ecol), _ in _phys_tokens(tokgen):
         mark_start = True
-        for part in re.split('(\n)', ttext):
-            if part == '\n':
+        for part in re.split("(\n)", ttext):
+            if part == "\n":
                 yield line
                 line = []
                 col = 0
                 mark_end = False
-            elif part == '':
+            elif part == "":
                 mark_end = False
             elif ttype in ws_tokens:
                 mark_end = False
             else:
+                if env.PYBEHAVIOR.fstring_syntax and ttype == token.FSTRING_MIDDLE:
+                    part = part.replace("{", "{{").replace("}", "}}")
+                    ecol = scol + len(part)
                 if mark_start and scol > col:
-                    line.append(("ws", u" " * (scol - col)))
+                    line.append(("ws", " " * (scol - col)))
                     mark_start = False
-                tok_class = tokenize.tok_name.get(ttype, 'xx').lower()[:3]
-                if ttype == token.NAME and keyword.iskeyword(ttext):
-                    tok_class = "key"
+                tok_class = tokenize.tok_name.get(ttype, "xx").lower()[:3]
+                if ttype == token.NAME:
+                    if keyword.iskeyword(ttext):
+                        # Hard keywords are always keywords.
+                        tok_class = "key"
+                    elif keyword.issoftkeyword(ttext):
+                        # Soft keywords appear at the start of their line.
+                        if len(line) == 0:
+                            is_start_of_line = True
+                        elif (len(line) == 1) and line[0][0] == "ws":
+                            is_start_of_line = True
+                        else:
+                            is_start_of_line = False
+                        if is_start_of_line and sline in soft_key_lines:
+                            tok_class = "key"
                 line.append((tok_class, part))
                 mark_end = True
             scol = 0
@@ -123,133 +174,18 @@ def source_token_lines(source):
         yield line
 
 
-class CachedTokenizer(object):
-    """A one-element cache around tokenize.generate_tokens.
+def generate_tokens(text: str) -> TokenInfos:
+    """A helper around `tokenize.generate_tokens`.
 
-    When reporting, coverage.py tokenizes files twice, once to find the
-    structure of the file, and once to syntax-color it.  Tokenizing is
-    expensive, and easily cached.
-
-    This is a one-element cache so that our twice-in-a-row tokenizing doesn't
-    actually tokenize twice.
+    Originally this was used to cache the results, but it didn't seem to make
+    reporting go faster, and caused issues with using too much memory.
 
     """
-    def __init__(self):
-        self.last_text = None
-        self.last_tokens = None
-
-    @contract(text='unicode')
-    def generate_tokens(self, text):
-        """A stand-in for `tokenize.generate_tokens`."""
-        if text != self.last_text:
-            self.last_text = text
-            readline = iternext(text.splitlines(True))
-            self.last_tokens = list(tokenize.generate_tokens(readline))
-        return self.last_tokens
-
-# Create our generate_tokens cache as a callable replacement function.
-generate_tokens = CachedTokenizer().generate_tokens
+    readline = io.StringIO(text).readline
+    return tokenize.generate_tokens(readline)
 
 
-COOKIE_RE = re.compile(r"^[ \t]*#.*coding[:=][ \t]*([-\w.]+)", flags=re.MULTILINE)
-
-@contract(source='bytes')
-def _source_encoding_py2(source):
-    """Determine the encoding for `source`, according to PEP 263.
-
-    `source` is a byte string, the text of the program.
-
-    Returns a string, the name of the encoding.
-
-    """
-    assert isinstance(source, bytes)
-
-    # Do this so the detect_encode code we copied will work.
-    readline = iternext(source.splitlines(True))
-
-    # This is mostly code adapted from Py3.2's tokenize module.
-
-    def _get_normal_name(orig_enc):
-        """Imitates get_normal_name in tokenizer.c."""
-        # Only care about the first 12 characters.
-        enc = orig_enc[:12].lower().replace("_", "-")
-        if re.match(r"^utf-8($|-)", enc):
-            return "utf-8"
-        if re.match(r"^(latin-1|iso-8859-1|iso-latin-1)($|-)", enc):
-            return "iso-8859-1"
-        return orig_enc
-
-    # From detect_encode():
-    # It detects the encoding from the presence of a UTF-8 BOM or an encoding
-    # cookie as specified in PEP-0263.  If both a BOM and a cookie are present,
-    # but disagree, a SyntaxError will be raised.  If the encoding cookie is an
-    # invalid charset, raise a SyntaxError.  Note that if a UTF-8 BOM is found,
-    # 'utf-8-sig' is returned.
-
-    # If no encoding is specified, then the default will be returned.
-    default = 'ascii'
-
-    bom_found = False
-    encoding = None
-
-    def read_or_stop():
-        """Get the next source line, or ''."""
-        try:
-            return readline()
-        except StopIteration:
-            return ''
-
-    def find_cookie(line):
-        """Find an encoding cookie in `line`."""
-        try:
-            line_string = line.decode('ascii')
-        except UnicodeDecodeError:
-            return None
-
-        matches = COOKIE_RE.findall(line_string)
-        if not matches:
-            return None
-        encoding = _get_normal_name(matches[0])
-        try:
-            codec = codecs.lookup(encoding)
-        except LookupError:
-            # This behavior mimics the Python interpreter
-            raise SyntaxError("unknown encoding: " + encoding)
-
-        if bom_found:
-            # codecs in 2.3 were raw tuples of functions, assume the best.
-            codec_name = getattr(codec, 'name', encoding)
-            if codec_name != 'utf-8':
-                # This behavior mimics the Python interpreter
-                raise SyntaxError('encoding problem: utf-8')
-            encoding += '-sig'
-        return encoding
-
-    first = read_or_stop()
-    if first.startswith(codecs.BOM_UTF8):
-        bom_found = True
-        first = first[3:]
-        default = 'utf-8-sig'
-    if not first:
-        return default
-
-    encoding = find_cookie(first)
-    if encoding:
-        return encoding
-
-    second = read_or_stop()
-    if not second:
-        return default
-
-    encoding = find_cookie(second)
-    if encoding:
-        return encoding
-
-    return default
-
-
-@contract(source='bytes')
-def _source_encoding_py3(source):
+def source_encoding(source: bytes) -> str:
     """Determine the encoding for `source`, according to PEP 263.
 
     `source` is a byte string: the text of the program.
@@ -257,41 +193,5 @@ def _source_encoding_py3(source):
     Returns a string, the name of the encoding.
 
     """
-    readline = iternext(source.splitlines(True))
+    readline = iter(source.splitlines(True)).__next__
     return tokenize.detect_encoding(readline)[0]
-
-
-if env.PY3:
-    source_encoding = _source_encoding_py3
-else:
-    source_encoding = _source_encoding_py2
-
-
-@contract(source='unicode')
-def compile_unicode(source, filename, mode):
-    """Just like the `compile` builtin, but works on any Unicode string.
-
-    Python 2's compile() builtin has a stupid restriction: if the source string
-    is Unicode, then it may not have a encoding declaration in it.  Why not?
-    Who knows!  It also decodes to utf8, and then tries to interpret those utf8
-    bytes according to the encoding declaration.  Why? Who knows!
-
-    This function neuters the coding declaration, and compiles it.
-
-    """
-    source = neuter_encoding_declaration(source)
-    if env.PY2 and isinstance(filename, unicode_class):
-        filename = filename.encode(sys.getfilesystemencoding(), "replace")
-    code = compile(source, filename, mode)
-    return code
-
-
-@contract(source='unicode', returns='unicode')
-def neuter_encoding_declaration(source):
-    """Return `source`, with any encoding declaration neutered."""
-    if COOKIE_RE.search(source):
-        source_lines = source.splitlines(True)
-        for lineno in range(min(2, len(source_lines))):
-            source_lines[lineno] = COOKIE_RE.sub("# (deleted declaration)", source_lines[lineno])
-        source = "".join(source_lines)
-    return source
