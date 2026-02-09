@@ -208,7 +208,17 @@ def get_test_classes(project_path, binary, test_filter, tracefile, list_timeout,
             )
 
             result = exts.fs.read_text(filename).strip().split("\n")
-            test_names = [_f for _f in result if _f]
+            test_names = []
+            for line in filter(None, result):
+                try:
+                    test_obj = json.loads(line)
+                    if 'nodeid' in test_obj:
+                        test_names.append(test_obj['nodeid'])
+                    else:
+                        # Fallback to old behavior if nodeid is absent
+                        test_names.append(line)
+                except (json.JSONDecodeError, ValueError):
+                    test_names.append(line)
             logger.debug("Found tests: '%s'", "' '".join(test_names))
     except process.TimeoutError as e:
         comment = "[[bad]]Cannot obtain list of ut tests in the allotted time ('ut --list-verbose' worked longer than [[imp]]{}s[[bad]])".format(
@@ -603,7 +613,7 @@ def execute_ut(
                     cmd,
                     stdout=stdout,
                     stderr=subprocess.PIPE,
-                    **({'text': True, 'encoding': 'utf-8', 'errors': 'ignore'} if six.PY3 else {})
+                    **({'text': True, 'encoding': 'utf-8', 'errors': 'ignore'} if six.PY3 else {}),
                 )
 
                 def reader(proc, buffer):
@@ -845,6 +855,7 @@ def launch_tests(
         if res.last_test_name:
             entry_name = res.last_test_name
             logger.debug("Trying to recover dump core file for '%s' test", entry_name)
+            logger.debug("Available logs keys: %s", res.logs.keys())
         else:
             entry_name = "chunk"
             logger.debug("Trying to recover dump core file")
@@ -852,6 +863,7 @@ def launch_tests(
         filename = "{}.{}".format(
             os.path.basename(binary), entry_name.replace("::", ".").replace('/', '.').replace('\\', '.')
         )
+
         backtrace = shared.postprocess_coredump(
             binary, os.getcwd(), res.pid, res.logs[entry_name], gdb_path, collect_cores, filename, logsdir
         )
@@ -1047,7 +1059,16 @@ def main():
 
     if args.test_list_path and os.path.exists(args.test_list_path):
         with open(args.test_list_path, 'r') as afile:
-            test_names = json.load(afile)[args.modulo_index]
+            raw_test_data = json.load(afile)[args.modulo_index]
+            test_names = []
+            for item in raw_test_data:
+                if isinstance(item, dict):
+                    if nodeid := item.get('nodeid'):
+                        test_names.append(nodeid)
+                    else:
+                        logger.warning('Failed to find nodeid in given testinfo dict %s, this may cause issues', item)
+                else:
+                    test_names.append(item)
     else:
         try:
             test_classes = get_test_classes(

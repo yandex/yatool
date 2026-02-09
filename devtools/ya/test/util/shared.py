@@ -567,10 +567,29 @@ def timeit(func):
 def get_testcases_info(cmd_result):
     result = []
     if cmd_result.exit_code == 0:
-        for x in cmd_result.std_out.split():
-            if const.TEST_SUBTEST_SEPARATOR in x:
-                testname, testcase = x.split(const.TEST_SUBTEST_SEPARATOR)
+        for line in cmd_result.std_out.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                test_obj = json.loads(line)
+                if 'nodeid' in test_obj:
+                    nodeid = test_obj['nodeid']
+                    if const.TEST_SUBTEST_SEPARATOR in nodeid:
+                        testname, testcase = nodeid.split(const.TEST_SUBTEST_SEPARATOR, 1)
+                        result.append((testname, testcase))
+                    else:
+                        result.append((nodeid, ""))
+                    continue
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+            # Fallback to old format, "suite::test" string
+            if const.TEST_SUBTEST_SEPARATOR in line:
+                testname, testcase = line.split(const.TEST_SUBTEST_SEPARATOR, 1)
                 result.append((testname, testcase))
+
         return result
     raise Exception(cmd_result.std_err)
 
