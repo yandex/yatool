@@ -91,7 +91,6 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetValueHook(
                     "files_visibility",
                     values=("targets", "targets-and-deps", "all"),
-                    default_value=lambda _: "targets-and-deps",
                 ),
                 group=cls.GROUP,
             ),
