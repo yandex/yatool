@@ -239,8 +239,8 @@ namespace {
         return CollectArgNamesIf(signature, [] (const auto& arg) { return IsSpecialization(arg.Type); });
     }
 
-    TCmdProperty::TKeywords CollectKeywords(const TArgs& arguments) {
-        TCmdProperty::TKeywords keywords;
+    TSignature::TKeywords CollectKeywords(const TArgs& arguments) {
+        TSignature::TKeywords keywords;
         for (const auto& arg : arguments) {
             TStringBuf kwPresent, kwMissing;
             switch (arg.Type) {
@@ -680,7 +680,7 @@ namespace {
                 CollectPlainArgNames(specArgs.empty() ? arguments : macroIter->second),
                 CollectKeywords(arguments)
             });
-            if (!blockData.CmdProps->ArgNames().empty()) {
+            if (!blockData.CmdProps->Signature().ArgNames().empty()) {
                 block.SetArgs(blockData.CmdProps->ConvertCmdArgs());
             }
 

@@ -5,7 +5,7 @@
 #include <expected>
 #include <string>
 
-class TCmdProperty;
+class TSignature;
 
 enum class EMapMacroVarsErrClass {
     UserSyntaxError,
@@ -20,5 +20,5 @@ struct TMapMacroVarsErr {
 
 using TMapMacroVarsResult = std::expected<void, TMapMacroVarsErr>;
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty* prop, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals);
-TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty& macroProps, TArrayRef<const TStringBuf> args, TVars& locals);
+TMapMacroVarsResult AddMacroArgsToLocals(const TSignature* sign, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals);
+TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals);

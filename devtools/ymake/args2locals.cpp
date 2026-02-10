@@ -1,11 +1,12 @@
 #include "args2locals.h"
 
-#include <devtools/ymake/cmd_properties.h>
-#include <devtools/ymake/args_converter.h>
-
-#include <devtools/ymake/options/static_options.h>
+#include "vars.h"
 
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/lang/call_signature.h>
+#include <devtools/ymake/options/static_options.h>
+
+#include <util/generic/array_ref.h>
 
 #include <fmt/format.h>
 
@@ -134,11 +135,11 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
     return {};
 }
 
-TStringBuf GetVararg(const TCmdProperty& props) noexcept {
-    if (props.GetNumUsrArgs() == 0 || !props.ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX))
+TStringBuf GetVararg(const TSignature& sign) noexcept {
+    if (sign.GetNumUsrArgs() == 0 || !sign.ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX))
         return {};
 
-    TStringBuf res{props.ArgNames().back()};
+    TStringBuf res{sign.ArgNames().back()};
     res.remove_suffix(3);
     return res;
 }
@@ -171,7 +172,7 @@ void VarAppend(TYVar& var, std::span<const TString> vals) {
 
 class TKWArgs {
 public:
-    static std::pair<std::span<const TStringBuf>, TKWArgs> Find(const TCmdProperty &props, std::span<const TStringBuf> args) {
+    static std::pair<std::span<const TStringBuf>, TKWArgs> Find(const TSignature &props, std::span<const TStringBuf> args) {
         TKWArgs tail{props, args};
         const auto nonKw = tail.TakeUntilKeyword();
         return {nonKw, tail};
@@ -189,18 +190,18 @@ public:
     }
 
     TStringBuf KeywordName(const TKeyword& kw) const {
-        return Props_->GetKeyword(kw.Pos);
+        return Sign_->GetKeyword(kw.Pos);
     }
 
 private:
-    TKWArgs(const TCmdProperty& props, std::span<const TStringBuf> args)
+    TKWArgs(const TSignature& sign, std::span<const TStringBuf> args)
         : RemainingArgs_{args}
-        , Props_{&props}
+        , Sign_{&sign}
     {}
 
     std::span<const TStringBuf> TakeUntilKeyword() {
         for (size_t i = 0; i < RemainingArgs_.size(); ++i) {
-            if (NextKW_ = Props_->GetKeywordData(RemainingArgs_[i])) {
+            if (NextKW_ = Sign_->GetKeywordData(RemainingArgs_[i])) {
                 const auto res = RemainingArgs_.subspan(0, i);
                 RemainingArgs_ = RemainingArgs_.subspan(i + 1);
                 return res;
@@ -213,7 +214,7 @@ private:
 private:
     std::span<const TStringBuf> RemainingArgs_;
     const TKeyword* NextKW_ = nullptr;
-    const TCmdProperty* Props_ = nullptr;
+    const TSignature* Sign_ = nullptr;
 };
 
 TMapMacroVarsResult ConsumePositionals(
@@ -243,8 +244,8 @@ TMapMacroVarsResult ConsumePositionals(
     return {};
 }
 
-void SetDefaultsForMissingKw(const TCmdProperty& props, TVars& locals) {
-    for (const auto& [key, kw]: props.GetKeywords()) {
+void SetDefaultsForMissingKw(const TSignature& sign, TVars& locals) {
+    for (const auto& [key, kw]: sign.GetKeywords()) {
         if (!locals.Contains(key)) {
             if (!kw.OnKwMissing.empty())
                 VarAppend(locals[key], kw.OnKwMissing);
@@ -262,15 +263,15 @@ void TMapMacroVarsErr::Report(TStringBuf macroName, TStringBuf argsStr) const {
     YConfErr(Syntax) << what << Endl;
 }
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty& props, TArrayRef<const TStringBuf> args, TVars& locals) {
+TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals) {
     TMapMacroVarsResult res;
 
-    const TStringBuf vararg = GetVararg(props);
-    auto positionalScalars = std::span{props.ArgNames()}.subspan(props.GetKeyArgsNum());
+    const TStringBuf vararg = GetVararg(sign);
+    auto positionalScalars = std::span{sign.ArgNames()}.subspan(sign.GetKeyArgsNum());
     if (!vararg.empty())
         positionalScalars = positionalScalars.subspan(0, positionalScalars.size() - 1);
 
-    auto [frontPosArgs, kwArgs] = TKWArgs::Find(props, args);
+    auto [frontPosArgs, kwArgs] = TKWArgs::Find(sign, args);
     res = ConsumePositionals(frontPosArgs, positionalScalars, vararg, locals);
     if (!res)
         return res;
@@ -336,16 +337,16 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty& props, TArrayRef<co
         });
     }
 
-    SetDefaultsForMissingKw(props, locals);
+    SetDefaultsForMissingKw(sign, locals);
     if (!vararg.empty() && !locals.contains(vararg))
         locals[vararg] = {};
 
     return res;
 }
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TCmdProperty* prop, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals) {
-    if (prop && prop->IsNonPositional()) {
-        return AddMacroArgsToLocals(*prop, args, locals);
+TMapMacroVarsResult AddMacroArgsToLocals(const TSignature* sign, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals) {
+    if (sign && sign->IsNonPositional()) {
+        return AddMacroArgsToLocals(*sign, args, locals);
     }
     return MapMacroVars(args, argNames, locals);
 }

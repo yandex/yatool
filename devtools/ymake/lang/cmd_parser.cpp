@@ -162,7 +162,7 @@ namespace {
         std::any doVisitTermC(CmdParser::TermCContext *ctx) {
             static const auto ifBlockData = [&]() {
                 // cf. TConfBuilder::EnterMacro
-                auto keywords = TCmdProperty::TKeywords();
+                auto keywords = TSignature::TKeywords();
                 keywords.AddKeyword("THEN", 0, -1, "");
                 keywords.AddKeyword("ELSE", 0, -1, "");
                 auto blockData = TBlockData{};
@@ -185,7 +185,7 @@ namespace {
             auto text = ctx->TEXT_VAR()->getText();
             auto macroName = Unvariable(text);
             if (macroName == "IF") {
-                auto args = CollectArgs(macroName, ifBlockData, std::move(rawArgs));
+                auto args = CollectArgs(macroName, ifBlockData.CmdProps->Signature(), std::move(rawArgs));
                 auto& cond = FindCallArg(args, "COND");
                 auto& then = FindCallArg(args, "THEN");
                 auto& notThen = FindCallArg(args, "ELSE");
@@ -205,7 +205,7 @@ namespace {
                 auto blockDataIt = Conf->BlockData.find(macroName);
                 if (blockDataIt == Conf->BlockData.end()) [[unlikely]]
                     throw TError() << "Macro " << macroName << " not found";
-                GetCurrentArgument().emplace_back(CollectArgs(macroName, blockDataIt->second, std::move(rawArgs)));
+                GetCurrentArgument().emplace_back(CollectArgs(macroName, blockDataIt->second.CmdProps->Signature(), std::move(rawArgs)));
             }
             return result;
         }
@@ -229,7 +229,7 @@ namespace {
             return call.Arguments[it - call.ArgumentNames.begin()];
         }
 
-        TSyntax::TCall CollectArgs(TStringBuf macroName, const TBlockData& blockData, TSyntax::TCommand rawArgs) {
+        TSyntax::TCall CollectArgs(TStringBuf macroName, const TSignature& signature, TSyntax::TCommand rawArgs) {
             // see the "functions/arg-passing" test for the sorts of patterns this logic is supposed to handle
 
             //
@@ -240,13 +240,12 @@ namespace {
             //
             // the resulting collection follows the ordering in ArgNames
             //
-
-            auto args = TVector<TSyntax>(blockData.CmdProps->ArgNames().size());
+            auto args = TVector<TSyntax>(signature.ArgNames().size());
             const TKeyword* kwDesc = nullptr;
 
-            auto kwArgCnt = blockData.CmdProps->GetKeyArgsNum();
-            auto posArgCnt = blockData.CmdProps->ArgNames().size() - blockData.CmdProps->GetKeyArgsNum();
-            auto hasVarArg = posArgCnt != 0 && blockData.CmdProps->ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX);
+            auto kwArgCnt = signature.GetKeyArgsNum();
+            auto posArgCnt = signature.ArgNames().size() - signature.GetKeyArgsNum();
+            auto hasVarArg = posArgCnt != 0 && signature.ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX);
 
             for (size_t i = 0; i != posArgCnt; ++i)
                 args[kwArgCnt + i].Script.emplace_back();
@@ -281,7 +280,7 @@ namespace {
 
                 if (rawArg->size() == 1)
                     if (auto kw = std::get_if<TSyntax::TIdOrString>(&rawArg->front())) {
-                        if (auto *keywordData = blockData.CmdProps->GetKeywordData(kw->Value)) {
+                        if (auto *keywordData = signature.GetKeywordData(kw->Value)) {
                             kwDesc = keywordData;
                             maybeStartNamedArg();
                             continue;
@@ -316,7 +315,7 @@ namespace {
                     << " called with too few positional arguments"
                     << " (" << posArgCnt << (hasVarArg ? " or more" : "") << " expected)";
 
-            for (const auto& [name, kw] : blockData.CmdProps->GetKeywords()) {
+            for (const auto& [name, kw] : signature.GetKeywords()) {
                 auto namedArg = &args[kw.Pos];
                 if (!namedArg->Script.empty()) {
                     Y_ASSERT(namedArg->Script.size() == 1);
@@ -330,8 +329,8 @@ namespace {
             }
 
             auto argNames = std::vector<TStringBuf>();
-            argNames.reserve(blockData.CmdProps->ArgNames().size());
-            for (auto& name : blockData.CmdProps->ArgNames()) {
+            argNames.reserve(signature.ArgNames().size());
+            for (auto& name : signature.ArgNames()) {
                 argNames.push_back(name);
                 if (argNames.back().EndsWith(NStaticConf::ARRAY_SUFFIX))
                     argNames.back().Chop(strlen(NStaticConf::ARRAY_SUFFIX));

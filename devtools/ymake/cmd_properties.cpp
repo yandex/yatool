@@ -1,46 +1,20 @@
 #include "cmd_properties.h"
-#include "builtin_macro_consts.h"
 #include "macro_processor.h"
 
-#include <devtools/ymake/options/static_options.h>
-
-#include <util/generic/hide_ptr.h>
 #include <util/string/split.h>
 
-#include <ranges>
 using namespace std::literals;
 
-TCmdProperty::TCmdProperty(const TVector<TString>& cmd, TKeywords&& kw)
-    : Keywords_{std::move(kw).Take()}
-    , NumUsrArgs_{cmd.size()}
-{
-    std::ranges::sort(Keywords_, std::less<>{}, &std::pair<TString, TKeyword>::first);
-    size_t cnt = 0;
-    for (auto& [key, kw]: Keywords_) {
-        kw.Pos = cnt++;
-        ArgNames_.push_back(key + NStaticConf::ARRAY_SUFFIX);
-    }
-
-    for (const auto& name: cmd)
-        ArgNames_.push_back(name);
-}
+TCmdProperty::TCmdProperty(const TVector<TString>& cmd, TSignature::TKeywords&& kw)
+    : Signature_{cmd, std::move(kw)}
+{}
 
 TString TCmdProperty::ConvertCmdArgs() const {
-    TString res = JoinStrings(ArgNames_, ", ");
+    TString res = JoinStrings(Signature_.ArgNames(), ", ");
     // TODO: compatibility hack to be carefully removed
-    if (!Keywords_.empty() && Keywords_.size() == ArgNames_.size())
+    if (!Signature_.GetKeywords().empty() && Signature_.GetKeywords().size() == Signature_.ArgNames().size())
         res += ", ";
     return res;
-}
-
-void TCmdProperty::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
-    Collected_.emplace_back(keyword, TKeyword{keyword, from, to, deepReplaceTo, onKwPresent, onKwMissing});
-}
-
-size_t TCmdProperty::Key2ArrayIndex(TStringBuf arg) const {
-    const auto [first, last] = std::ranges::equal_range(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
-    AssertEx(first != last, "Arg was defined as keyword and must be in map.");
-    return first->second.Pos;
 }
 
 bool TCmdProperty::AddMacroCall(const TStringBuf& name, const TStringBuf& argList) {

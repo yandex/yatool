@@ -1,7 +1,7 @@
 #pragma once
 
-#include "cmd_properties.h"
+#include <devtools/ymake/lang/call_signature.h>
 
 struct IMemoryPool;
 
-size_t ConvertArgsToPositionalArrays(const TCmdProperty& cmdProp, TVector<TStringBuf>& args, IMemoryPool& sspool);
+size_t ConvertArgsToPositionalArrays(const TSignature& cmdProp, TVector<TStringBuf>& args, IMemoryPool& sspool);

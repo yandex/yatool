@@ -38,6 +38,7 @@ RUN_ANTLR4_CPP_SPLIT(
 
 SRCS(
     cmd_parser.cpp
+    call_signature.cpp
     config_conditions.cpp
     confreader.cpp
     confreader_cache.cpp

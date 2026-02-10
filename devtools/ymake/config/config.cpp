@@ -837,7 +837,7 @@ void TYmakeConfig::VerifyModuleConfs() {
                 YErr() << mod->Epilogue << " macro set in [[alt1]]." << NProperties::EPILOGUE << "[[rst]] property of module " << mod->Name << " does not exist." << Endl;
             } else if (it->second.ModuleConf) {
                 YErr() << "The value " << mod->Epilogue << " set in [[alt1]]." << NProperties::EPILOGUE << "[[rst]] property of module " << mod->Name << " should define a macro name." << Endl;
-            } else if (it->second.CmdProps && !it->second.CmdProps->ArgNames().empty()) {
+            } else if (it->second.CmdProps && !it->second.CmdProps->Signature().ArgNames().empty()) {
                 YErr() << "Macro set in [[alt1]]." << NProperties::EPILOGUE << "[[rst]] property of module " << mod->Name << " should be a macro without arguments." << Endl;
             }
         }

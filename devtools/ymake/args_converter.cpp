@@ -9,6 +9,7 @@
 #include <util/generic/strbuf.h>
 #include <util/generic/vector.h>
 #include <util/string/ascii.h>
+#include <util/string/vector.h>
 
 namespace {
 
@@ -67,9 +68,9 @@ bool IsValidSymbolAfter(char sym) {
     return IsValidSymbol(sym);
 }
 
-TTypedArgs FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& args, IMemoryPool& sspool) {
-    TTypedArgs typedArgs(cmdProp.GetKeyArgsNum());
-    typedArgs.resize(cmdProp.GetKeyArgsNum() + 1); //last is for Args... without keywords
+TTypedArgs FillTypedArgs(const TSignature& sign, const TVector<TStringBuf>& args, IMemoryPool& sspool) {
+    TTypedArgs typedArgs(sign.GetKeyArgsNum());
+    typedArgs.resize(sign.GetKeyArgsNum() + 1); //last is for Args... without keywords
 
     TVector<TScriptArg> scriptArgs;
     TVector<std::pair<size_t, size_t>> origArgsPos;
@@ -78,12 +79,12 @@ TTypedArgs FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>&
     bool needDeepReplace = false;
     bool inArgArray = false; //array is one argument
     for (size_t i = 0; i < args.size(); ++i) {
-        if (const TKeyword* kw = cmdProp.GetKeywordData(args[i])) { //if it is a keyword, designate argLimit and array to put
+        if (const TKeyword* kw = sign.GetKeywordData(args[i])) { //if it is a keyword, designate argLimit and array to put
             bool useKeyItself = kw->To == 0 && kw->From == 0;
 
             argLimit = useKeyItself ? -1 : kw->To;
             needDeepReplace = kw->DeepReplaceTo.size();
-            argId = cmdProp.Key2ArrayIndex(args[i]);
+            argId = sign.Key2ArrayIndex(args[i]);
             TTypedArgArray& outArg = typedArgs[argId];
 
             if (!outArg.GotKeyword && !kw->OnKwPresent.empty()) { // add only once
@@ -104,7 +105,7 @@ TTypedArgs FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>&
                 scriptArgs.push_back(TScriptArg(args[i], argId));
             }
             if (argId == typedArgs.OrigArgId) {
-                if (cmdProp.HasUsrArgs()) {
+                if (sign.HasUsrArgs()) {
                     auto& origTypedArgs = typedArgs[typedArgs.OrigArgId].Args;
                     origTypedArgs.push_back(args[i]);
                     origArgsPos.emplace_back(i, origTypedArgs.size() - 1);
@@ -137,7 +138,7 @@ TTypedArgs FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>&
                     bool allowReplaceBefore = !inpos || IsValidSymbolBefore(arg[inpos - 1]);
                     bool allowReplaceAfter = (inpos + scriptArg.size() == arg.size() || IsValidSymbolAfter(arg[inpos + scriptArg.size()]));
                     if (allowReplaceBefore && allowReplaceAfter && NPath::MustDeepReplace(scriptArg)) {
-                        TString mod = cmdProp.GetDeepReplaceTo(sarg.Argtype);
+                        TString mod = sign.GetDeepReplaceTo(sarg.Argtype);
                         TString v = TString{arg.Head(inpos)} + "${" + mod + "\"" + scriptArg + "\"}" + TString{arg.Tail(inpos + scriptArg.size())};
                         YDIAG(V) << "Replacement: " << arg << "->" << v << Endl;
                         typedArgs[typedArgs.OrigArgId].Args[pos->second] = sspool.Append(v);
@@ -154,7 +155,7 @@ TTypedArgs FillTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>&
     return typedArgs;
 }
 
-size_t ConvertTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& args, const TTypedArgs& typedArgs, TVector<TStringBuf>& res) {
+size_t ConvertTypedArgs(const TSignature& sign, const TVector<TStringBuf>& args, const TTypedArgs& typedArgs, TVector<TStringBuf>& res) {
     size_t firstOrig = 0;
     for (size_t cnt = 0; cnt < typedArgs.size(); cnt++) {
         const TTypedArgArray& outArg = typedArgs[cnt];
@@ -167,16 +168,16 @@ size_t ConvertTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& 
             res.push_back(outArg.Args[j]);
         }
         if (cnt != typedArgs.OrigArgId) {
-            const TKeyword& kw = cmdProp.GetKeywordData(cnt);
+            const TKeyword& kw = sign.GetKeywordData(cnt);
             if (outArg.GotKeyword && outArg.NumNativeArgs() < kw.From)
-                YWarn() << "Received only " << outArg.NumNativeArgs() << " args with keyword " << cmdProp.GetKeyword(cnt) << "; must be greater than " << kw.From << ". Args: "<< JoinVectorIntoString(args, " ") << Endl;
+                YWarn() << "Received only " << outArg.NumNativeArgs() << " args with keyword " << sign.GetKeyword(cnt) << "; must be greater than " << kw.From << ". Args: "<< JoinVectorIntoString(args, " ") << Endl;
             if (!outArg.GotKeyword && !kw.OnKwMissing.empty())
                 res.insert(res.end(), kw.OnKwMissing.begin(), kw.OnKwMissing.end());
             res.push_back(NStaticConf::ARRAY_END);
         }
     }
 
-    if (cmdProp.HasUsrArgs() && typedArgs.CntUserArgs < cmdProp.GetNumUsrArgs()) {
+    if (sign.HasUsrArgs() && typedArgs.CntUserArgs < sign.GetNumUsrArgs()) {
         res.push_back(NStaticConf::ARRAY_START);
         res.push_back(NStaticConf::ARRAY_END);
     }
@@ -185,10 +186,10 @@ size_t ConvertTypedArgs(const TCmdProperty& cmdProp, const TVector<TStringBuf>& 
 
 }
 
-size_t ConvertArgsToPositionalArrays(const TCmdProperty& cmdProp, TVector<TStringBuf>& args, IMemoryPool& sspool) {
-    const auto typedArgs = FillTypedArgs(cmdProp, args, sspool);
+size_t ConvertArgsToPositionalArrays(const TSignature& sign, TVector<TStringBuf>& args, IMemoryPool& sspool) {
+    const auto typedArgs = FillTypedArgs(sign, args, sspool);
     TVector<TStringBuf> res;
-    size_t firstOrig = ConvertTypedArgs(cmdProp, args, typedArgs, res);
+    size_t firstOrig = ConvertTypedArgs(sign, args, typedArgs, res);
 
     args.swap(res);
     return firstOrig;

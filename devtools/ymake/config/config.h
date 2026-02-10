@@ -285,7 +285,7 @@ inline bool IsFileExtRule(const TBlockData* blockData) {
 }
 
 inline bool HasNamedArgs(const TBlockData* blockData) {
-    return blockData && blockData->CmdProps && blockData->CmdProps->IsNonPositional();
+    return blockData && blockData->CmdProps && blockData->CmdProps->Signature().IsNonPositional();
 }
 
 struct TImportedFileDescription {

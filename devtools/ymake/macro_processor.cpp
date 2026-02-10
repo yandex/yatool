@@ -281,7 +281,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         throw yexception() << "Expected argument list in () brackets, got [" << prepArgs << "] in [" << s << "]";
     }
     AddMacroArgsToLocals(
-        convertNamedArgs && blockData && blockData->CmdProps ? blockData->CmdProps.get() : nullptr,
+        convertNamedArgs && blockData && blockData->CmdProps ? &(blockData->CmdProps->Signature()) : nullptr,
         argNames,
         tempArgs,
         ownVars
@@ -305,7 +305,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
         // whereas the preevaluator currently cannot (see TBD/`Eval1` in `TRefReducer::Evaluate(NPolexpr::EVarId)`)
 
         auto hasDeepReplacement = false;
-        for (const auto& [name, kw] : blockData->CmdProps->GetKeywords()) {
+        for (const auto& [name, kw] : blockData->CmdProps->Signature().GetKeywords()) {
             if (kw.DeepReplaceTo.size() != 0) {
                 ownVars[name].NoInline = false;
                 hasDeepReplacement = true;
