@@ -49,6 +49,9 @@ namespace NYMake::NResourcePacker {
                    "--rescompiler"sv, Unit_.Get("_TOOL_RESCOMPILER"),
                    "--output_obj"sv, "${output:__OUT}"sv,
                    "--target"sv, targetPlatform);
+            append_if(Unit_.Enabled("ARCH_TYPE_32"), cmdArgs, "--arch_32_bits"sv);
+            auto threshold = Unit_.Get("YMAKE_OBJCOPY_LARGE_RESOURCE_THR");
+            append_if(threshold.size() > 0, cmdArgs, "--large_resource_thr"sv, threshold);
             append_if(Objects_.paths.size() > 0, cmdArgs, "--inputs"sv, "${input:__PATHS}"sv, "--keys"sv, "$__KEYS"sv);
             append_if(Objects_.kvs.size() > 0, cmdArgs, "--kvs"sv, Objects_.kvs);
             append(cmdArgs,
