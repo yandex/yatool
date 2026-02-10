@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument('--source-root')
     parser.add_argument('--mcdc-coverage', action='store_true')
     parser.add_argument('--branch-coverage', action='store_true')
+    parser.add_argument('--include-generated', action='store_true')
     parser.add_argument('--log-path')
     parser.add_argument(
         "--log-level",
@@ -76,7 +77,7 @@ def merge_mcdc_records(r1, r2):
 
 
 @shared.timeit
-def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches=False):
+def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches=False, include_generated=False):
     if covtype == 'files':
         filename = covdata['filename']
     elif covtype == 'functions':
@@ -84,7 +85,7 @@ def saturate_coverage(covtype, covdata, source_root, cache, mcdc=False, branches
     else:
         raise Exception('Unknown coverage type: {}'.format(covtype))
 
-    if lib_coverage.util.should_skip(filename, source_root):
+    if lib_coverage.util.should_skip(filename, source_root, include_generated):
         return None
 
     relfilename = lib_coverage.util.normalize_path(filename, source_root)
@@ -162,11 +163,6 @@ def merge_covdata(profdata_tool, bin_name, filenames):
 @shared.timeit
 def load_block(data):
     return json.loads(data)
-
-
-@shared.timeit
-def is_generated_code(filename, source_root):
-    return lib_coverage.util.should_skip(filename, source_root)
 
 
 def gen_empty_output(filename):
@@ -254,13 +250,13 @@ def main():
     if args.mcdc_coverage:
         cmd.append('--show-mcdc-summary')
 
-    cmd += lib_coverage.util.get_default_llvm_export_args()
+    cmd += lib_coverage.util.get_default_llvm_export_args(args.include_generated)
 
     def process_block(covtype, filename, data):
         # XXX temporary hack till https://st.yandex-team.ru/DEVTOOLS-3757 is done
         # We need to skip such blocks to avoid useless job and memory exhaustion parsing data
         if len(data) > limit_of_suspicion:
-            if is_generated_code(filename, args.source_root):
+            if lib_coverage.util.should_skip(filename, args.source_root, args.include_generated):
                 return
 
         saturate_coverage(
@@ -270,6 +266,7 @@ def main():
             coverage,
             mcdc=args.mcdc_coverage,
             branches=args.branch_coverage,
+            include_generated=args.include_generated,
         )
 
     lib_coverage.export.export_llvm_coverage(cmd, process_block, cancel_func=is_shutdown_requested)

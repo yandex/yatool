@@ -242,6 +242,9 @@ def inject_clang_coverage_resolve_node(
     if opts.use_distbuild or opts.coverage_verbose_resolve:
         cmd += ["--log-level", "DEBUG"]
 
+    if opts.coverage_include_all:
+        cmd += ["--include-generated"]
+
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
@@ -320,6 +323,9 @@ def inject_create_clang_coverage_report_node(graph, suites, coverage_tar_name, o
             "--exclude-regexp",
             opts.coverage_exclude_regexp,
         ]
+
+    if opts.coverage_include_all:
+        cmd += ["--include-generated"]
 
     test_uids = set()
     inputs = set()

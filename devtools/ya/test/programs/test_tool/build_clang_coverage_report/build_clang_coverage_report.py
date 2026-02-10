@@ -42,6 +42,7 @@ def parse_args():
     )
     parser.add_argument("--prefix-filter")
     parser.add_argument("--exclude-regexp")
+    parser.add_argument("--include-generated", action="store_true")
     parser.add_argument("--test-mode", action="store_true")
 
     parser.add_argument("--mcdc-coverage", action="store_true")
@@ -62,6 +63,7 @@ def get_file_stats(
     exclude_regexp=None,
     mcdc=False,
     branches=False,
+    include_generated=False,
 ):
     cmd = [
         llvm_cov_bin,
@@ -71,7 +73,7 @@ def get_file_stats(
         "-instr-profile",
         indexed_profile,
         "-summary-only",
-    ] + lib_coverage.util.get_default_llvm_export_args()
+    ] + lib_coverage.util.get_default_llvm_export_args(include_generated)
 
     for binary in binaries:
         cmd += ["-object", binary]
@@ -97,7 +99,7 @@ def get_file_stats(
     file_filter = coverage_utils_library.make_filter(prefix_filter, exclude_regexp)
 
     def process_block(covtype, filename, data):
-        if covtype != "files" or lib_coverage.util.should_skip(filename, source_root):
+        if covtype != "files" or lib_coverage.util.should_skip(filename, source_root, include_generated):
             return
 
         relname = filename[len(source_root) :].strip("/")
@@ -181,6 +183,7 @@ def main():
         args.exclude_regexp,
         args.mcdc_coverage,
         args.branch_coverage,
+        args.include_generated,
     )
 
     cmd = [
@@ -190,7 +193,7 @@ def main():
         "html",
         "-instr-profile",
         indexed_profile,
-    ] + lib_coverage.util.get_default_llvm_export_args()
+    ] + lib_coverage.util.get_default_llvm_export_args(args.include_generated)
 
     for binary in binaries:
         cmd += ["-object", binary]

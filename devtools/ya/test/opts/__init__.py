@@ -1261,6 +1261,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.coverage_direct_upload_yt = True
         self.coverage_exclude_regexp = None
         self.coverage_failed_upload_uids_file = None
+        self.coverage_include_all = False
         self.coverage_prefix_filter = None
         self.coverage_report_path = None
         self.coverage_succeed_upload_uids_file = None
@@ -1305,6 +1306,19 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetValueHook('coverage_exclude_regexp'),
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,
+            ),
+            TestArgConsumer(
+                ['--coverage-include-all'],
+                help='Do not apply filters for coverage (disables --ignore-filename-regex in llvm-cov export and skipping of generated code)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('coverage_include_all', True),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_coverage_include_all',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'coverage_include_all', devtools.ya.core.yarg.return_true_if_enabled
+                ),
             ),
             TestArgConsumer(
                 ['--coverage-report-path'],

@@ -62,7 +62,10 @@ def get_default_export_skip_pattern():
     return "({})".format(pattern)
 
 
-def get_default_llvm_export_args():
+def get_default_llvm_export_args(include_generated=False):
+    if include_generated:
+        return []
+
     return [
         '--ignore-filename-regex',
         get_default_export_skip_pattern(),
@@ -84,7 +87,10 @@ def guess_llvm_coverage_filename(covtype, data):
 
 
 @exts.func.memoize()
-def should_skip(filename, source_root):
+def should_skip(filename, source_root, include_generated=False):
+    if include_generated:
+        return False
+
     relpath = normalize_path(filename, source_root)
     if not relpath:
         logger.debug('Skipping source code from external resource: %s', filename)
