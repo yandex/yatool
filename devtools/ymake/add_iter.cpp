@@ -1006,9 +1006,6 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
                         modData.CmdInfo->AddCfgVars(propValues->Data(), *Add);
                     }
                 }
-                //if (LeftType == EMNT_BuildCommand && !Add->Module->Incomplete()) {
-                // pass props early
-                //}
             }
             break;
         case EMNT_Directory:
