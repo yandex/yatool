@@ -337,7 +337,7 @@ class PyTestBinSuite(PyTestSuite):
 
         if not for_listing and self.get_parallel_tests_within_node_workers():
             if self.get_parallel_tests_within_node_workers() > 1:
-                self.logger.debug("Enable parralel test in node")
+                logger.debug("Enable parralel test in node")
                 test_tool = devtools.ya.test.util.tools.get_test_tool_cmd(
                     opts, 'run_pytest', self.global_resources, wrapper=True, run_on_target_platform=True
                 )
