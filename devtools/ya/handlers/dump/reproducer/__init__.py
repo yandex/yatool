@@ -2,6 +2,7 @@ import copy
 import json
 import pathlib
 import platform
+import re
 import subprocess
 import tempfile
 import typing as tp
@@ -113,7 +114,12 @@ class Reproducer:
         users_arc_root = self._mine_arc_root(args)
 
         args['reproducer_arc_root'] = users_arc_root
-        args['reproducer_cache_dir'] = self.debug_item.debug_bundle_data.get("cache_dir")
+        args['reproducer_cache_dir'] = self.debug_item.debug_bundle_data.get('cache_dir')
+        args['ymake_binary'] = self.debug_item.debug_bundle_data.get('ymake_run_0', {}).get('run', {}).get('binary')
+        for key in self.get_ymake_run_keys():
+            args[f'custom_conf_{key}'] = (
+                self.debug_item.debug_bundle_data.get(f'ymake_run_{key}', {}).get('kwargs', {}).get('custom_conf')
+            )
 
         if 'abs_targets' in args:
             args['build_targets'] = copy.deepcopy(args['abs_targets'])
@@ -188,9 +194,21 @@ class Reproducer:
 
         return sorted(list(result))
 
-    def fill_makefile(self, patch_path, configure_generated, package_targets: list[str]) -> pathlib.Path:
+    def get_ymake_run_keys(self) -> set[str]:
+        pattern = re.compile(r"^ymake_run_(\d+)$")
 
+        result: set[str] = set()
+
+        for key in self.debug_item.debug_bundle_data.keys():
+            match = pattern.match(key)
+            if match:
+                result.add(match.group(1))
+
+        return result
+
+    def fill_makefile(self, patch_path: str, configure_generated: bool, package_targets: list[str]) -> pathlib.Path:
         trunk_commit = self._mine_trunk_arc_revision()
+        ymake_calls = self.get_ymake_run_keys()
 
         data = {
             'command': str(self.debug_item),
@@ -199,6 +217,8 @@ class Reproducer:
             'configure': configure_generated,
             'repro_sources_path': str(self.temp_dir.relative_to(self.temp_dir.parts[0])),
             'package_targets': package_targets,
+            'has_ymake_calls': bool(ymake_calls),
+            'ymake_calls': [item[0] for item in ymake_calls or []],
         }
 
         makefile = self.temp_dir / "Makefile"

@@ -1,9 +1,8 @@
 import datetime
 import itertools
-
 import logging
-
 import os
+import typing
 
 import exts.hashing
 import exts.fs
@@ -37,9 +36,27 @@ try:
 except ImportError:
     dump_upload = None
 
-from yalibrary.debug_store.processor import DumpProcessor
+from yalibrary.debug_store.processor import DumpItem, DumpProcessor
 
 import devtools.ya.app
+
+
+DEFAULT_TMP_YA_PATH = '.ya/'
+DEFAULT_ARC_ROOT_PATH = '/arcadia/'
+
+PARAMS_KEYS_TO_EXCLUDE_SAVING = [
+    'yt_dir',
+    'arc_root',
+    'bld_dir',
+    'bld_root',
+    'custom_build_directory',
+    'docker_config_path',
+]  # TODO: лучше не исключать то что мы знаем, а включать. Так мы не сломаемся от добавления нового
+
+
+class FilePathInfo(typing.NamedTuple):
+    filename: str
+    directory: Path
 
 
 class DumpDebugProcessingOptions(Options):
@@ -93,6 +110,38 @@ class DumpDebugProcessingOptions(Options):
             )
 
 
+def get_ymake_args(json_data: dict[str, str], key_nums: set[str]) -> set[str]:
+    all_args: set[str] = set()
+    for key in key_nums:
+        try:
+            run_block = json_data[f"ymake_run_{key}"].get("run", {})
+            if (args_list := run_block.get("args")) and isinstance(args_list, list):
+                all_args.update(args_list)
+        except AttributeError:
+            continue
+
+    return all_args
+
+
+def extract_pathes(args: set[str], start_dir: str, arc_root: str) -> list[FilePathInfo]:
+    results: list[FilePathInfo] = []
+    for arg in args:
+        if not isinstance(arg, str):
+            continue
+        parts = arg.split(',')
+        for part in parts:
+            clean_part = part.strip()
+            if '/' not in clean_part or clean_part.startswith('-') or clean_part.startswith('http'):
+                continue
+
+            if start_dir in clean_part and arc_root not in clean_part:
+                directory, filename = os.path.split(clean_part)
+                if filename:
+                    results.append(FilePathInfo(filename, Path(directory)))
+
+    return results
+
+
 def do_dump_debug(params):
     import app_ctx
 
@@ -118,7 +167,7 @@ def do_dump_debug(params):
         return
 
     try:
-        item = proc[params.dump_debug_choose]
+        item: DumpItem = proc[params.dump_debug_choose]
     except IndexError:
         app_ctx.display.emit_message("[[bad]]Wrong bundle number[[rst]]")
         return -1
@@ -170,11 +219,40 @@ def do_dump_debug(params):
         if additional_path and Path(additional_path).exists():
             additional_paths.append((additional_item, Path(additional_path)))
 
+    # Store files and dirs from params
+    move_paths = []
+    # TODO: В теории, внутри value может быть list[str] с путями, но потребности обрабатывать такое у нас сейчас нет
+    filtered_params = item.debug_bundle_data['params'].copy()
+    for key in PARAMS_KEYS_TO_EXCLUDE_SAVING:
+        filtered_params.pop(key, None)
+
+    pathes: list[FilePathInfo] = extract_pathes(
+        filtered_params,
+        start_dir='/',
+        arc_root=getattr(app_ctx.params, 'arc_root', DEFAULT_ARC_ROOT_PATH),
+    )
+
+    for additional_path in pathes:
+        full_source_path = additional_path.directory / additional_path.filename
+        if additional_path and full_source_path.exists():
+            additional_paths.append((additional_path.filename, full_source_path))
+
     try:
         repro_manager = reproducer.Reproducer(item)
         fully_restored_repo, path, makefile_path = repro_manager.prepare_reproducer()
         additional_paths.append(("reproducer", path))
-        move_paths = [(makefile_path, Path("/Makefile"))]
+        move_paths.append((makefile_path, Path("/Makefile")))
+
+        ymake_call_nums = repro_manager.get_ymake_run_keys()
+        args = get_ymake_args(item.debug_bundle_data, key_nums=ymake_call_nums)
+        all_pathes = extract_pathes(
+            args=args,
+            start_dir=getattr(app_ctx.params, 'dump_debug', {}).get('cache_dir', DEFAULT_TMP_YA_PATH),
+            arc_root=getattr(app_ctx.params, 'arc_root', DEFAULT_ARC_ROOT_PATH),
+        )
+        if all_pathes:
+            additional_paths.extend(all_pathes)
+
     except Exception as exc:
         logging.debug("Failed to gather reproducer due to exception", exc_info=exc)
         path = None

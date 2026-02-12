@@ -197,6 +197,8 @@ class BaseDumpItem:
                 shutil.move(rel_src, rel_dst)
                 if str(rel_src) in processed_files:
                     processed_files[str(rel_dst)] = processed_files.pop(str(rel_src))
+            except FileNotFoundError:
+                self.logger.warning("File not found: %s, parts %s", rel_src, src.parts[0])
             except Exception:
                 self.logger.exception("Failed to move file from %s to %s", rel_src, rel_dst)
 
