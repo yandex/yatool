@@ -5,7 +5,6 @@
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/message.h>
 
-#include <library/cpp/deprecated/atomic_bool/bool.h>
 #include <library/cpp/string_utils/base64/base64.h>
 
 #include <util/generic/map.h>
@@ -14,6 +13,8 @@
 #include <util/string/hex.h>
 #include <util/system/guard.h>
 #include <util/system/mutex.h>
+
+#include <atomic>
 
 namespace NProtoBuf {
     class TEventFactory {
@@ -129,7 +130,7 @@ namespace NProtoBuf {
     private:
         TMap<size_t, TFactoryItem> FactoryItems_;
         TDeque<TRegistrationFunc> EventRegistrators_;
-        NAtomic::TBool DelayedRegistrationDone_ = false;
+        std::atomic<bool> DelayedRegistrationDone_ = false;
         TMutex MutexEventRegistrators_;
     };
 
