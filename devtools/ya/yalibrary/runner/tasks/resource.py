@@ -121,7 +121,9 @@ class PrepareResource(object):
             self._ctx.fast_fail()
             raise
         except Exception as e:
-            logging.exception('Unable to fetch resource %s', self._uri_description)
+            if getattr(e, 'mute', False) is not True:
+                logging.exception('Unable to fetch resource %s', self._pattern)
+
             self._exit_code = (
                 devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
                 if devtools.ya.core.error.is_temporary_error(e)
