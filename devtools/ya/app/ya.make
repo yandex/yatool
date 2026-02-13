@@ -35,6 +35,7 @@ PEERDIR(
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/find_root
     devtools/ya/yalibrary/formatter
+    devtools/ya/yalibrary/host_health
     devtools/ya/yalibrary/loggers
     devtools/ya/yalibrary/loggers/display_log
     devtools/ya/yalibrary/loggers/file_log

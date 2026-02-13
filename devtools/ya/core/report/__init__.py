@@ -48,6 +48,7 @@ class ReportTypes(object):
     BUILD_ERRORS_COUNT = 'build_errors_count'
     RECIPES_USAGE = 'recipes_usage'
     FINISH = 'finish'
+    HOST_HEALTH = 'host_health'
 
 
 @func.lazy

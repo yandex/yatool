@@ -165,6 +165,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('profile', configure_profiler_support(ctx)),
             ('mlockall', configure_mlock_info()),
             ('event_queue', configure_event_queue()),
+            ('host_health', configure_host_health()),
         ]
 
         if getattr(parameters, 'require_changelist_store', True):
@@ -184,6 +185,10 @@ def execute(action, respawn=RespawnType.MANDATORY):
             report_params(ctx)
             action_name = getattr(action, "__name__", "module")
             modules_initialization_full_stage.finish()
+
+            prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix()
+            if len(prefix) > 1 and prefix[1] in ("make", "test", "package"):
+                ctx.host_health.start_watcher(prefix, ctx.params)
 
             with stager.scope("invoke-{}".format(action_name)):
                 return action(ctx.params)
@@ -693,6 +698,14 @@ def configure_mlock_info():
 def configure_event_queue():
     queue = event_handling.EventQueue()
     yield queue
+
+
+def configure_host_health():
+    from devtools.ya.yalibrary.host_health import HostHealth
+
+    host_health = HostHealth()
+    yield host_health
+    host_health.stop_watcher()
 
 
 def check_and_respawn_if_possible():
