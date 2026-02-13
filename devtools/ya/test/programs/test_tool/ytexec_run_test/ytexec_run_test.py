@@ -158,6 +158,8 @@ class YtexecConfig(object):
             cluster="",
             pool="",
             title="",
+            description=None,
+            annotations=None,
             cypress_root="",
             output_ttl=OUTPUT_TTL,
             blob_ttl=OUTPUT_TTL,
@@ -176,6 +178,8 @@ class YtexecConfig(object):
             self.cluster = cluster
             self.pool = pool
             self.title = title
+            self.description = description or dict()
+            self.annotations = annotations or dict()
             self.cypress_root = cypress_root
             self.output_ttl = output_ttl
             self.blob_ttl = blob_ttl
@@ -370,6 +374,30 @@ def validate_operaion_fields(operation_fields):
         operation_fields.blob_ttl = DEVTOOLS_OUTPUT_TTL
 
 
+def generate_operation_description(args):
+    # type: (argparse.Namespace) -> str, dict, dict
+
+    # title
+    title = args.description
+
+    # create annotations
+    annotations = {}
+    # From run_test args:
+    for p in ["target_platform_descriptor", "project_path", "test_size", "test_type"]:
+        if hasattr(args, p):
+            annotations[p] = getattr(args, p)
+
+    # create description
+    description = {
+        "Test suite uid": os.environ.get("TEST_NODE_SUITE_UID", "-"),
+        **annotations,
+    }
+    if hasattr(args, "command") and args.command:
+        description["command"] = ' '.join(args.command)
+
+    return title, description, annotations
+
+
 def generate_config_sections(args):
     exec_logs_dir = args.output_dir
     exts.fs.ensure_dir(exec_logs_dir)
@@ -418,9 +446,14 @@ def generate_config_sections(args):
         )
     else:
         timeout = DEFAULT_TIMEOUT
+
+    title, description, annotations = generate_operation_description(args)
+
     operation_fields = YtexecConfig.Operation(
         pool=DEFAULT_POOL,
-        title=args.description,
+        title=title,
+        description=description,
+        annotations=annotations,
         blob_ttl=BLOB_TTL,
         cluster="hahn",
         coordinate_upload=True,
