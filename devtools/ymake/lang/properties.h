@@ -23,8 +23,12 @@ static inline IOutputStream& operator<<(IOutputStream& o Y_LIFETIME_BOUND, const
 
 #define PROPERTY(name, description) constexpr TProperty name{#name, description, __LOCATION__};
 
-PROPERTY(ADDINCL, "")
-PROPERTY(ALIASES, "")
+PROPERTY(ADDINCL, "@usage: .ADDINCL=[GLOBAL|LOCAL|ONE_LEVEL] [FOR lang] dir1 [dir2] ...\n\n"
+""
+"Adds include directories for the module, optionally scoped by language and propagation policy.")
+PROPERTY(ALIASES, "@usage: .ALIASES=FROM1=TO1 [FROM2=TO2] ...\n\n"
+""
+"Defines macro name aliases for the module. When a macro FROM is used, it is redirected to macro TO before processing.")
 PROPERTY(ALLOWED, "@usage: .ALLOWED=MACRO1 [MACRO2] ...\n\n"
 ""
 "Restricts macros list allowed within the module.")
@@ -39,26 +43,48 @@ PROPERTY(ARGS_PARSER, "Choose argument parser for macro opening curent module de
 " * `Raw` - Do not perform any parsing or validation. Stores all arguments in a variable `MODULE_ARGS_RAW` which can be analyzed by macros invoked in the module body.\n")
 PROPERTY(CMD, "Macro or module build command")
 PROPERTY(DEFAULT_NAME_GENERATOR, "Name of embedded output filename generator, one of: UseDirNameOrSetGoPackage, TwoDirNames, ThreeDirNames, FullPath")
-PROPERTY(EPILOGUE, "")
+PROPERTY(EPILOGUE, "Name of a macro to invoke after the module body is fully parsed.")
 PROPERTY(EXTS, "@usage: `.EXTS=.o .obj` specify a list of extensions which are automatically captured as module AUTO_INPUT for all `output`s generated in the current module without the `noauto` modifier.")
-PROPERTY(FINAL_TARGET, "")
-PROPERTY(GEN_FROM_FILE, "")
-PROPERTY(GLOBAL, "")
-PROPERTY(GLOBAL_CMD, "")
-PROPERTY(GLOBAL_EXTS, "")
+PROPERTY(FINAL_TARGET, "@usage: .FINAL_TARGET=yes|no\n\n"
+""
+"Marks the module as a final build target.")
+PROPERTY(GEN_FROM_FILE, "@usage: .GEN_FROM_FILE=yes\n\n"
+""
+"Mark command as embedding configuration variables into files. Adds configuration variables in form of key=value to the end of .CMD.")
+PROPERTY(GLOBAL, "@usage: .GLOBAL=VAR1 [VAR2] ...\n\n"
+""
+"Makes listed variables global. For each listed name a corresponding NAME_GLOBAL variable is created to collect values across dependent modules.")
+PROPERTY(GLOBAL_CMD, "Build command for global sources (e.g. SRCS(GLOBAL ...)). Must be accompanied by .GLOBAL_EXTS.")
+PROPERTY(GLOBAL_EXTS, "@usage: .GLOBAL_EXTS=.ext1 .ext2\n\n"
+""
+"Specify extensions which are treated as global inputs and processed by .GLOBAL_CMD.")
 PROPERTY(GLOBAL_SEM, "Global semantics (instead of global commands) for export to other build systems in --sem-graph mode")
-PROPERTY(IGNORED, "")
-PROPERTY(INCLUDE_TAG, "")
-PROPERTY(NODE_TYPE, "")
-PROPERTY(NO_EXPAND, "")
-PROPERTY(PEERDIR, "")
-PROPERTY(PEERDIR_POLICY, "")
-PROPERTY(PEERDIRSELF, "")
+PROPERTY(IGNORED, "@usage: .IGNORED=MACRO1 [MACRO2] ...\n\n"
+""
+"Lists macros that are silently ignored within the module (neither processed nor causing an error).")
+PROPERTY(INCLUDE_TAG, "@usage: .INCLUDE_TAG=yes|no\n\n"
+""
+"Controls whether a multimodule sub-module tag is included in the default set of active tags.")
+PROPERTY(NODE_TYPE, "@usage: .NODE_TYPE=Library|Program|Bundle\n\n"
+""
+"Required. Sets the module node type in the build graph.")
+PROPERTY(NO_EXPAND, "@usage: .NO_EXPAND=yes\n\n"
+""
+"Prevents expansion of the macro command variables during command evaluation.")
+PROPERTY(PEERDIR, "Adds implicit PEERDIR dependencies to the module when the macro is invoked.")
+PROPERTY(PEERDIR_POLICY, "@usage: .PEERDIR_POLICY=as_include|as_build_from\n\n"
+""
+"Controls how PEERDIRs to the module work. as_build_from makes dependants to just use results produced by the module; as_include makes dependants to include the module as a whole (with transitive info, for example).")
+PROPERTY(PEERDIRSELF, "@usage: .PEERDIRSELF=TAG1 [TAG2] ...\n\n"
+""
+"Declares intra-multimodule dependencies: lists sub-module tags that the current sub-module depends on within the same multimodule.")
 PROPERTY(PROXY, "")
 PROPERTY(VERSION_PROXY, "@usage: `.VERSION_PROXY=yes` mark module as empty intermediate proxy for library with multiple versions.\n\n"
 ""
 "Such module is always replaced by exact version of the library in dependency management phase of build configuration. It can only be used with dependency management aware modules.")
-PROPERTY(RESTRICTED, "")
+PROPERTY(RESTRICTED, "@usage: .RESTRICTED=MACRO1 [MACRO2] ...\n\n"
+""
+"Restricts listed macros from being used within the module. Complementary to .ALLOWED and .IGNORED properties.")
 PROPERTY(SEM, "Semantics (instead of commands) for export to other build systems in --sem-graph mode")
 PROPERTY(SYMLINK_POLICY, "")
 PROPERTY(USE_PEERS_LATE_OUTS, "@usage `.USE_PEERS_LATE_OUTS=yes` enables propagation of dependencies `late_out`s from direct and transitive peers. Gathered late outs can be used by module command through late variable `PEERS_LATE_OUTS`.")
