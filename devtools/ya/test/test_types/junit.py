@@ -71,6 +71,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         self.classpath_file = os.path.splitext(self.tests_jar)[0] + '.test.cpf'
 
         self.experimental_fork = self.meta.experimental_fork
+        self.test_partition = self.meta.test_partition
 
     def init_from_opts(self, opts):
         self.jdk_resource = base.resolve_jdk(
@@ -393,6 +394,9 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         )
         if self.experimental_fork == 'yes':
             cmd.append('--experimental-fork')
+
+        if self.test_partition:
+            cmd.append(['--test-partition', self.test_partition])
 
         if build_root:
             cmd.extend(['--build-root', build_root])

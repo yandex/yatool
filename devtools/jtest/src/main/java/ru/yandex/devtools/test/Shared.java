@@ -78,6 +78,9 @@ public class Shared {
         @Parameter(names = {"-s", "--fork-subtests"})
         public boolean forkSubtests;
 
+        @Parameter(names = {"-p", "--test-partition"})
+        public boolean testPartition;
+
         @Parameter(names = {"--experimental-fork"})
         public boolean experimentalFork;
 
