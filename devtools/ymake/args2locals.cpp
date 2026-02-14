@@ -135,15 +135,6 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
     return {};
 }
 
-TStringBuf GetVararg(const TSignature& sign) noexcept {
-    if (sign.GetNumUsrArgs() == 0 || !sign.ArgNames().back().EndsWith(NStaticConf::ARRAY_SUFFIX))
-        return {};
-
-    TStringBuf res{sign.ArgNames().back()};
-    res.remove_suffix(3);
-    return res;
-}
-
 template<std::convertible_to<TStringBuf> TStr>
 TStringBuf TakeArg(std::span<const TStr>& args) noexcept {
     if (args.empty())
@@ -266,7 +257,7 @@ void TMapMacroVarsErr::Report(TStringBuf macroName, TStringBuf argsStr) const {
 TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals) {
     TMapMacroVarsResult res;
 
-    const TStringBuf vararg = GetVararg(sign);
+    const TStringBuf vararg = sign.GetVarargName();
     auto positionalScalars = std::span{sign.ArgNames()}.subspan(sign.GetKeyArgsNum());
     if (!vararg.empty())
         positionalScalars = positionalScalars.subspan(0, positionalScalars.size() - 1);

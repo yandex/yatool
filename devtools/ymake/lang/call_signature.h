@@ -109,6 +109,11 @@ public:
     }
     size_t Key2ArrayIndex(TStringBuf arg) const;
 
+    // @return Variable positional argument name (i.e. for `Rest...` argument form signature returns `Rest`). Returns empty string
+    //         for signature without variable positional argument.
+    TStringBuf GetVarargName() const noexcept;
+    bool HasVararg() const noexcept;
+
     bool HasUsrArgs() const noexcept {
         return NumUsrArgs_ != 0;
     }

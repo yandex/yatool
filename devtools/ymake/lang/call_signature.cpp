@@ -20,6 +20,19 @@ TSignature::TSignature(const TVector<TString>& cmd, TSignature::TKeywords&& kw)
         ArgNames_.push_back(name);
 }
 
+TStringBuf TSignature::GetVarargName() const noexcept {
+    if (!HasVararg())
+        return {};
+
+    TStringBuf res{ArgNames_.back()};
+    res.remove_suffix(3); // NStaticConf::ARRAY_SUFFIX.size() but ARRAY_SUFFIX is `const char*` :(
+    return res;
+}
+
+bool TSignature::HasVararg() const noexcept {
+    return NumUsrArgs_ != 0 && ArgNames_.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
+}
+
 size_t TSignature::Key2ArrayIndex(TStringBuf arg) const {
     const auto [first, last] = std::ranges::equal_range(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
     AssertEx(first != last, "Arg was defined as keyword and must be in map.");
