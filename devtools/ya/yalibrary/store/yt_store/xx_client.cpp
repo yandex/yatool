@@ -1,13 +1,11 @@
 #include "xx_client.hpp"
-#include "table_defs.h"
 #include "mem_sem.h"
+#include "table_defs.h"
+#include "tar.h"
 
 #define XX_CLIENT_INT_H_
 #include "xx_client_int.h"
 #undef XX_CLIENT_INT_H_
-
-#include <contrib/libs/libarchive/libarchive/archive.h>
-#include <contrib/libs/libarchive/libarchive/archive_entry.h>
 
 #include <yt/cpp/mapreduce/client/client.h>
 #include <yt/cpp/mapreduce/common/retry_lib.h>
@@ -171,128 +169,6 @@ namespace NYa {
 
     IYtClusterConnectorPtr YtClusterConnectorPtr{};
 
-    // TODO: Move to devtools/lib?
-    namespace NStreamingTar {
-        struct IInput {
-            virtual size_t Read(const void** buffer) = 0;
-            virtual ~IInput() = default;
-        };
-
-        class TUntarError : public yexception {
-        };
-
-        namespace {
-            // TODO (YA-2800) Remove 'maybe_unused' later
-            constexpr TStringBuf MSG_CREATE = "Failed to create tar";
-            constexpr TStringBuf MSG_OPEN = "Failed to open tar";
-            constexpr TStringBuf MSG_EXTRACT = "Failed to extract tar";
-            constexpr TStringBuf MSG_READ = "Failed to read file";
-            constexpr TStringBuf MSG_WRITE = "Failed to write tar";
-
-            static inline la_ssize_t InputCallback(struct archive*, void* client_data, const void** buffer) {
-                return reinterpret_cast<IInput*>(client_data)->Read(buffer);
-            }
-
-            static inline la_ssize_t OutputCallback(struct archive*, void* client_data, const void *buffer, size_t length) {
-                reinterpret_cast<IOutputStream*>(client_data)->Write(buffer, length);
-                return length;
-            }
-
-            static inline void Check(int code, struct archive *a, TStringBuf msg) {
-                if (code != ARCHIVE_OK) {
-                    ythrow TUntarError() << msg << ": " << archive_error_string(a);
-                }
-            }
-        }
-
-        static inline void Tar(IOutputStream& dest, const TFsPath& rootDir, const TVector<TFsPath>& files) {
-            struct archive* a = archive_write_new();
-            archive_write_add_filter_none(a);
-            archive_write_set_format_gnutar(a);
-            archive_write_set_bytes_in_last_block(a, 1);
-            Y_DEFER {
-                archive_write_free(a);
-            };
-            Check(archive_write_open2(a, &dest, nullptr, OutputCallback, nullptr, nullptr), a, MSG_CREATE);
-            struct archive_entry* entry = nullptr;
-            for(const auto &path: files) {
-                struct archive *disk = archive_read_disk_new();
-                Y_DEFER {
-                    archive_read_free(disk);
-                };
-                Check(archive_read_disk_open(disk, path.c_str()), disk, MSG_READ);
-
-                entry = archive_entry_new();
-                Y_DEFER {
-                    archive_entry_free(entry);
-                };
-                Check(archive_read_next_header2(disk, entry), disk, "Failed to read file");
-
-                archive_entry_set_pathname(entry, TFsPath(archive_entry_pathname(entry)).RelativeTo(rootDir).c_str());
-                archive_entry_set_mtime(entry, 0, 0);
-                archive_entry_set_uid(entry, 0);
-                archive_entry_set_gid(entry, 0);
-
-                Check(archive_write_header(a, entry), a, MSG_WRITE);
-                if (!archive_entry_hardlink(entry) && !archive_entry_symlink(entry)) {
-                    auto fileInput = TBlob::FromFile(path);
-                    if (fileInput.size()) {
-                        auto data = fileInput.data();
-                        auto size = fileInput.size();
-                        while (size) {
-                            auto written = archive_write_data(a, data, size);
-                            if (written < 0) {
-                                ythrow yexception() << MSG_WRITE << ": " << path << " " << written << archive_error_string(a);
-                            }
-                            size -= written;
-                            data += written;
-                        }
-                    }
-                }
-            }
-        }
-
-        static inline void Untar(IInput& source, const TFsPath& destPath) {
-            struct archive* reader = archive_read_new();
-            struct archive* writer = archive_write_disk_new();
-            struct archive_entry* entry = nullptr;
-            const void* buf;
-            archive_read_support_filter_all(reader);
-            archive_read_support_format_all(reader);
-            archive_write_disk_set_options(writer, ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM);
-            Y_DEFER {
-                archive_read_free(reader);
-                archive_write_free(writer);
-            };
-            Check(archive_read_open(reader, &source, nullptr, InputCallback, nullptr), reader, MSG_OPEN);
-            while (archive_read_next_header(reader, &entry) == ARCHIVE_OK) {
-                archive_entry_set_pathname(entry, (destPath / archive_entry_pathname(entry)).c_str());
-
-                if (const char* src = archive_entry_hardlink(entry); src) {
-                    archive_entry_set_hardlink(entry, (destPath / src).c_str());
-                }
-
-                Check(archive_write_header(writer, entry), writer, MSG_EXTRACT);
-
-                la_int64_t offset;
-                size_t size;
-                int r;
-                while ((r = archive_read_data_block(reader, &buf, &size, &offset)) == ARCHIVE_OK) {
-                    Check(archive_write_data_block(writer, buf, size, offset), writer, MSG_EXTRACT);
-                }
-                if (r != ARCHIVE_EOF) {
-                    ythrow TUntarError() << "Failed to read archive: " << archive_error_string(reader);
-                }
-
-                Check(archive_write_finish_entry(writer), writer, MSG_EXTRACT);
-            }
-            // Ensure we readed all from source
-            // Possibly will never happen IRL but useful for testing
-            const void* x;
-            Y_ENSURE(source.Read(&x) == 0);
-        }
-    }
-
     namespace {
         using TYtTimestamp = ui64;
         using TKnownHashesSet = THashSet<TString>;
@@ -311,7 +187,7 @@ namespace NYa {
             return childNode.IsOfType<T>() ? childNode.As<T>() : T{};
         }
 
-        class TChunkFetcher: public IWalkInput, public NStreamingTar::IInput {
+        class TChunkFetcher: public IWalkInput, public NTar::IUntarInput {
         public:
             using TFetchDataFunc = std::function<NYT::TNode::TListType(const TVector<ui64>&)>;
             TChunkFetcher(TFetchDataFunc fetchDataFunc, ui64 chunksCount, ui64 dataSize)
@@ -397,7 +273,7 @@ namespace NYa {
             }
         };
 
-        class TChunkDecoder : public NStreamingTar::IInput {
+        class TChunkDecoder : public NTar::IUntarInput {
         public:
             TChunkDecoder(IInputStream& source)
                 : Decoder_{&source}
@@ -817,13 +693,13 @@ namespace NYa {
                     };
 
                     TChunkFetcher chunkFetcher{fetchDataFunc, chunksCount, dataSize};
-                    NStreamingTar::IInput* input{&chunkFetcher};
+                    NTar::IUntarInput* input{&chunkFetcher};
                     std::unique_ptr<TChunkDecoder> decoder{};
                     if (codec) {
                         decoder = std::make_unique<TChunkDecoder>(chunkFetcher);
                         input = decoder.get();
                     }
-                    NStreamingTar::Untar(*input, intoDir);
+                    NTar::Untar(*input, intoDir);
 
                     auto realHash = ToString(chunkFetcher.GetHash());
                     if (realHash != hash) {
@@ -2585,7 +2461,7 @@ namespace NYa {
                 encoder = std::make_unique<NUCompress::TCodedOutput>(&out, NBlockCodecs::Codec(codec));
                 dest = encoder.get();
             }
-            NStreamingTar::Tar(*dest, rootDir, files);
+            NTar::Tar(*dest, rootDir, files);
         }
 
         void WriteMeta(

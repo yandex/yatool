@@ -2,6 +2,7 @@ PY3_LIBRARY()
 
 SRCS(
     mem_sem.cpp
+    tar.cpp
     xx_client.cpp
 )
 
