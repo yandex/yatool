@@ -11,7 +11,7 @@ import exts.fs
 import exts.archive
 import devtools.ya.test.system.process as process
 
-from yatest.common.network import PortManager
+from library.python.port_manager import PortManager
 from yatest.common.process import InvalidExecutionStateError
 
 logger = logging.getLogger(__name__)
