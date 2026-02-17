@@ -804,6 +804,8 @@ def release_all_data():
 
 
 class ACCache(object):
+    support_content_uids = True
+
     def __init__(self, store_path):
         self._fs_size = 0
         self._size = 0

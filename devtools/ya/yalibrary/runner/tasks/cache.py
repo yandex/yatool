@@ -185,7 +185,7 @@ class PutInCacheTask(object):
                 fi.digest = digests.get(output)
                 file_list.add(fi)
             self._cache.put(self._node.uid, self._build_root.path, file_list, codec)
-            if self._node.content_uid is not None:
+            if self._node.content_uid is not None and getattr(self._cache, 'support_content_uids', False):
                 self._cache.put(self._node.content_uid, self._build_root.path, file_list, codec)
             if hasattr(self._cache, 'put_dependencies'):
                 self._cache.put_dependencies(self._node.uid, self._node.deps)

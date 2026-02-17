@@ -607,7 +607,9 @@ class RunNodeTask(object):
                 if all_deps_have_outputs_uid:
                     self._node.content_uid = acdigest.combine_hashes(uids_hashes)
                     start_time = time.time()
-                    if self._cache.try_restore(self._node.content_uid, self._build_root.path):
+                    if getattr(self._cache, 'support_content_uids', False) and self._cache.try_restore(
+                        self._node.content_uid, self._build_root.path
+                    ):
                         cached_by_content_uid = True
                     elif self._dist_cache and self._dist_cache.has(self._node.content_uid):
                         cached_by_content_uid = self._dist_cache.try_restore(

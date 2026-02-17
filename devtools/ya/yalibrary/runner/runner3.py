@@ -112,7 +112,7 @@ class TaskContext(object):
         self.state = app_ctx.state.sub(__name__)
         self.resources: dict[str, dict] = {}
         self.legacy_sandbox_fetcher = app_ctx.legacy_sandbox_fetcher
-        self.content_uids: bool = self.opts.force_content_uids
+        self.content_uids: bool = self.opts.content_uids
         logger.debug("content UIDs %s in runner", "*enabled*" if self.content_uids else "*disabled*")
 
         self._res: "ResultArtifacts" = collections.defaultdict(list)

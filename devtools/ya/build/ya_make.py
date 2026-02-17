@@ -324,23 +324,6 @@ def make_lock(opts, garbage_dir, write_lock=False, non_blocking=False):
     return exts.filelock.FileLock(lock_file)
 
 
-def _setup_content_uids(opts, enable):
-    if getattr(opts, 'force_content_uids', False):
-        logger.debug('content UIDs forced')
-        return
-
-    if not getattr(opts, 'request_content_uids', False):
-        logger.debug('content UIDs disabled by request')
-        return
-
-    if not enable:
-        logger.debug('content UIDs disabled: incompatible with cache version')
-        return
-
-    logger.debug('content UIDs enabled by request')
-    opts.force_content_uids = True
-
-
 class CacheFactory:
     def __init__(self, opts):
         self._opts = opts
@@ -353,7 +336,6 @@ class CacheFactory:
 
     def get_local_cache_instance(self, garbage_dir):
         if exts.windows.on_win():
-            _setup_content_uids(self._opts, False)
             return uid_store.UidStore(os.path.join(garbage_dir, 'cache', CACHE_GENERATION))
 
         if getattr(self._opts, 'build_cache', False):
@@ -361,14 +343,11 @@ class CacheFactory:
 
             # garbage_dir is configured in yalibrary.toolscache
             if buildcache_enabled(self._opts):
-                _setup_content_uids(self._opts, True)
                 return ACCache(os.path.join(garbage_dir, 'cache', '7'))
 
-        _setup_content_uids(self._opts, False)
         if getattr(self._opts, 'new_store', False) and getattr(self._opts, 'new_runner', False):
             from yalibrary.store import new_store
 
-            # FIXME: This suspected to have some race condition in current content_uids implementation (see YA-701)
             store = new_store.NewStore(os.path.join(garbage_dir, 'cache', '6'))
             return store
 
@@ -508,7 +487,7 @@ def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
             self_uids,
             uids,
             refresh_on_read=opts.yt_store_refresh_on_read,
-            content_uids=opts.force_content_uids,
+            content_uids=opts.content_uids,
         )
     logger.debug("Dist cache prepared")
     return cache

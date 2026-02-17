@@ -1322,8 +1322,7 @@ class YaMakeOptions(Options):
 
 class ContentUidsOptions(Options):
     def __init__(self):
-        self.request_content_uids = False
-        self.force_content_uids = False
+        self.content_uids = True
         self.validate_build_root_content = False
 
     @staticmethod
@@ -1332,34 +1331,29 @@ class ContentUidsOptions(Options):
             ArgConsumer(
                 ['--content-uids'],
                 help='Enable additional cache based on content-only dynamic uids [default]',
-                hook=SetConstValueHook('request_content_uids', True),
+                hook=SetConstValueHook('content_uids', True),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=False,
             ),
             ArgConsumer(
                 ['--no-content-uids'],
                 help='Disable additional cache based on content-only dynamic uids',
-                hook=SetConstValueHook('request_content_uids', False),
+                hook=SetConstValueHook('content_uids', False),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
             ArgConsumer(
                 ['--force-content-uids'],
-                help='Force additional cache based on content-only dynamic uids with older caches',
-                hook=SetConstValueHook('force_content_uids', True),
+                help='Deprecated, do nothing',
+                hook=NoValueDummyHook(),
                 group=DEVELOPERS_OPT_GROUP,
                 visible=False,
             ),
-            ConfigConsumer('content_uids', hook=SetValueHook('request_content_uids')),
+            ConfigConsumer('content_uids'),
             EnvConsumer(
                 'YA_USE_CONTENT_UIDS',
                 help='Enable additional cache based on content-only dynamic uids (depends on cache version)',
-                hook=SetValueHook('request_content_uids', return_true_if_enabled),
-            ),
-            EnvConsumer(
-                'YA_FORCE_CONTENT_UIDS',
-                help='Force additional cache based on content-only dynamic uids',
-                hook=SetValueHook('force_content_uids', return_true_if_enabled),
+                hook=SetValueHook('content_uids', return_true_if_enabled),
             ),
             ArgConsumer(
                 ['--validate-build-root-content'],
@@ -1373,9 +1367,7 @@ class ContentUidsOptions(Options):
         ]
 
     def postprocess(self):
-        if self.force_content_uids:
-            self.request_content_uids = True
-        if not self.request_content_uids:
+        if not self.content_uids:
             self.validate_build_root_content = False
 
 
