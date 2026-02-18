@@ -57,6 +57,8 @@ import devtools.ya.build.ymake2 as ymake2
 import devtools.ya.build.graph_description as graph_descr
 from devtools.ya.build.ymake2.consts import YmakeEvents
 import devtools.ya.build.genconf as bg
+from devtools.ya.build.build_graph_cache import layout as bg_cache_layout
+from devtools.ya.build.build_graph_cache import target_tc as bg_cache_target_tc
 from devtools.ya.build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
 from devtools.ya.test.test_types.common import SemanticLinterSuite
@@ -1467,14 +1469,17 @@ class _GraphMaker:
         else:
             flags = self._opts.flags.copy()
 
-        cache_dir = bg_cache.configure_build_graph_cache_dir(self._opts)
-        if cache_dir:
-            if node_checks.is_tools_tc(target_tc):
-                cache_dir = self._build_graph_cache_dirname(target_tc, cache_dir, 'TOOLS')
-            elif is_global_tools:
-                cache_dir = self._build_graph_cache_dirname(target_tc, cache_dir, 'GTOOLS')
-            else:
-                cache_dir = self._build_graph_cache_dirname(target_tc, cache_dir)
+        platform_name_override = None
+        if node_checks.is_tools_tc(target_tc):
+            platform_name_override = "TOOLS"
+        elif is_global_tools:
+            platform_name_override = "GTOOLS"
+
+        cache_dir = bg_cache_target_tc.compute_cache_base_dir(
+            self._opts,
+            target_tc,
+            platform_name_override=platform_name_override,
+        )
 
         self._print_status("Configuring dependencies for platform {}".format(self._make_debug_id(debug_id, None)))
 
@@ -1642,43 +1647,6 @@ class _GraphMaker:
         return _TargetGraphsResult(pic, no_pic, target_tc)
 
     @staticmethod
-    def _build_graph_cache_dirname(target_tc_orig, cache_dir_root, platform_name=None):
-        target_tc = copy.deepcopy(target_tc_orig)
-        flags = target_tc.get('flags', {})
-        for i in ['RECURSE_PARTITIONS_COUNT', 'RECURSE_PARTITION_INDEX']:
-            if i in flags:
-                del flags[i]
-
-        target_tc.pop('targets', None)
-        target_tc.pop('executable_path', None)
-        target_tc.pop('tool_var', None)
-
-        json_str = json.dumps(target_tc, sort_keys=True)
-        base_name = ""
-        if platform_name:
-            base_name += platform_name
-        elif 'platform_name' in target_tc:
-            base_name += target_tc['platform_name']
-
-        base_name += "-" + hashing.md5_value(json_str)
-        cache_dir = os.path.join(cache_dir_root, base_name)
-        logger.debug(
-            "Creating ymake directory for target_tc: {}".format(json.dumps(target_tc, sort_keys=True, indent=2))
-        )
-        if not os.path.exists(cache_dir):
-            exts.fs.ensure_dir(cache_dir)
-            logger.debug("Created ymake directory")
-
-        target_json = os.path.join(cache_dir, "target.json")
-        if not os.path.exists(target_json):
-            logger.debug("Wrote target.json into ymake directory")
-            with open(target_json, 'w') as f:
-                json.dump(target_tc, f, sort_keys=True, indent=2)
-
-        logger.debug("Done with ymake directory")
-        return cache_dir
-
-    @staticmethod
     def _non_pic_only(target_tc):
         # Windows builds are always relocatable, but not PIC
         return target_tc['platform']['target']['os'] == "WIN"
@@ -1686,7 +1654,7 @@ class _GraphMaker:
     @staticmethod
     def _pic_only(flags, target_tc):
         # Honor -DPIC and --target-platlform-flag=PIC as force_pic
-        return strtobool(flags.get('PIC', 'no')) or strtobool(target_tc.get('flags', {}).get('PIC', 'no'))
+        return bg_cache_layout.is_pic_only(flags, target_tc)
 
     def _build_pic(
         self,
@@ -2197,10 +2165,10 @@ def _build_graph_and_tests(
     if target_platforms:
         target_platforms = [x.copy() for x in target_platforms]
         for platform in target_platforms:
-            platform_name = platform['platform_name']
-            if platform_name == "host_platform":
-                platform_name = bg.host_platform_name()
-            platform['platform_name'] = bg.mine_platform_name(platform_name)
+            platform['platform_name'] = bg_cache_target_tc.normalize_target_platform_name(
+                platform.get('platform_name'),
+                host or bg.host_platform_name(),
+            )
 
     if opts.use_distbuild:
         if not host:
@@ -2267,23 +2235,7 @@ def _build_graph_and_tests(
     if host_tc['flags'].get('SANDBOXING') == 'yes':
         host_tc['flags']['FAKEID'] = host_tc['flags'].get('FAKEID', '') + sandboxing_salt
 
-    def resolve_target(target):
-        target = copy.deepcopy(target)
-        target.update(
-            bg.gen_cross_tc(
-                host,
-                target['platform_name'],
-                target.get('c_compiler', opts.c_compiler),
-                target.get('cxx_compiler', opts.cxx_compiler),
-                (
-                    target.get('flags', {}).get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'
-                    or opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'
-                ),
-            )
-        )
-        return target
-
-    target_tcs = [resolve_target(p) for p in target_platforms]
+    target_tcs = [bg_cache_target_tc.resolve_target_tc(host, p, opts) for p in target_platforms]
     test_target_platforms = [tpc for tpc in target_tcs if _should_run_tests(opts, tpc)]
 
     logger.debug('flags: %s', json.dumps(opts.flags, indent=4, sort_keys=True))

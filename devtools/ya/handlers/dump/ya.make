@@ -10,6 +10,7 @@ PEERDIR(
     contrib/python/toml
     devtools/ya/app
     devtools/ya/build
+    devtools/ya/build/build_graph_cache
     devtools/ya/build/build_facade
     devtools/ya/build/build_opts
     devtools/ya/build/genconf
@@ -37,6 +38,7 @@ PEERDIR(
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/handlers/dump/arcadia_specific
+        devtools/ya/yalibrary/build_graph_cache
     )
 ENDIF()
 

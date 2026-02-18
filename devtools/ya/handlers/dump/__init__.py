@@ -49,6 +49,7 @@ from devtools.ya.core.yarg import (
 )
 from yalibrary.vcs import vcsversion
 from devtools.ya.core.imprint import imprint
+import devtools.ya.build.build_opts as build_opts_module
 from devtools.ya.build.build_opts import (
     YMakeDebugOptions,
     YMakeBinOptions,
@@ -80,10 +81,27 @@ from devtools.ya.test.dartfile import decode_recipe_cmdline
 
 from devtools.ya.build.ya_make import DisplayMessageSubscriber, YmakeEvlogSubscriber
 
+from devtools.ya.build.build_graph_cache.dump_integration import compute_dump_ymake_build_root_and_conf_dir
+
 import devtools.ya.app
 import app_config
 
 logger = logging.getLogger(__name__)
+
+
+class DumpBuildGraphCacheShimOptions(Options):
+    """
+    Provide attributes required by BuildGraphCacheConfigOptions.postprocess2().
+
+    `ya dump` does not run the full `ya make` pipeline, so some build-related options are not
+    present by default, but build-graph-cache options still validate against them.
+    """
+
+    def __init__(self):
+        self.build_threads = 0
+        self.distbuild_patch = None
+        self.revision_for_check = None
+        self.arc_url_as_working_copy_in_distbuild = None
 
 
 class DumpYaHandler(CompositeHandler):
@@ -274,7 +292,9 @@ class DumpYaHandler(CompositeHandler):
                 DataOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
-            ],
+                DumpBuildGraphCacheShimOptions(),
+            ]
+            + build_opts_module.build_graph_cache_config_opts(),
         )
         self['loops'] = OptsHandler(
             action=devtools.ya.app.execute(action=do_loops),
@@ -1096,7 +1116,17 @@ def do_files(params):
         options.append('skip-make-files')
     if params.mark_make_files:
         options.append('mark-make-files')
-    _do_dump(gen_filelist, params, options)
+    patch_path = getattr(params, "build_graph_cache_cl", None)
+    build_root, custom_conf_dir = compute_dump_ymake_build_root_and_conf_dir(params)
+
+    _do_dump(
+        gen_filelist,
+        params,
+        options,
+        build_root=build_root,
+        custom_conf_dir=custom_conf_dir,
+        patch_path=patch_path,
+    )
 
 
 def do_loops(params):

@@ -20,6 +20,7 @@ PEERDIR(
     devtools/libs/parse_number/python
     devtools/libs/yaplatform/python
     devtools/ya/build/build_facade
+    devtools/ya/build/build_graph_cache
     devtools/ya/build/build_opts
     devtools/ya/build/build_plan
     devtools/ya/build/build_result
@@ -95,6 +96,7 @@ END()
 
 RECURSE(
     build_facade
+    build_graph_cache
     build_opts
     build_plan
     build_result

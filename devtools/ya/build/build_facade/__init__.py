@@ -39,6 +39,7 @@ def _gen(
     classpaths=None,
     dump_file=None,
     custom_conf_dir=None,
+    patch_path=None,
 ):
     generation_conf = gen_conf(
         build_root=custom_build_directory,
@@ -69,6 +70,7 @@ def _gen(
         managed_dep_tree=managed_dep_tree,
         classpaths=classpaths,
         dump_file=dump_file,
+        patch_path=patch_path,
         disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
     )
     return (res, evlog_dump) if evlog else res
@@ -508,6 +510,8 @@ def gen_filelist(
     ymake_bin=None,
     host_platform=None,
     target_platforms=None,
+    custom_conf_dir=None,
+    patch_path=None,
 ):
     return _gen(
         custom_build_directory=build_root,
@@ -518,6 +522,8 @@ def gen_filelist(
         ymake_bin=ymake_bin,
         host_platform=host_platform,
         target_platforms=target_platforms,
+        custom_conf_dir=custom_conf_dir,
+        patch_path=patch_path,
     )
 
 
