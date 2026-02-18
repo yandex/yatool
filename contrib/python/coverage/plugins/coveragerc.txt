@@ -26,4 +26,5 @@ pylib_paths =
     # don't trace python sources
     contrib/tools/python
     contrib/tools/python3
+    contrib/tools/python3_prev
     contrib/libs/protobuf
