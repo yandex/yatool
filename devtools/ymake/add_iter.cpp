@@ -845,11 +845,9 @@ inline void InduceDeps(TAddDepContext& ctx, const IPropertiesWrapper& iprops) {
 
     const TIndDepsRule& rule = *ctx.DepsRule;
     for (const auto& [type, action] : rule.Actions) {
-        if (Diag()->IPRP) {
-            YDIAG(IPRP) << "Inducing (" << action << ") " <<  type.GetName(ctx.Graph) <<
-                " deps to " << to.NodeType << " " <<
-                ctx.Graph.ToString(ctx.Graph.GetNodeById(to.NodeType, to.ElemId)) << ":" << Endl;
-        }
+        YDIAG(IPRP) << "Inducing (" << action << ") " <<  type.GetName(ctx.Graph) <<
+            " deps to " << to.NodeType << " " <<
+            ctx.Graph.ToString(ctx.Graph.GetNodeById(to.NodeType, to.ElemId)) << ":" << Endl;
 
         const auto* values = iprops.FindValues(type);
         if (!values) {
