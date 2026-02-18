@@ -1,4 +1,7 @@
+# cython: c_string_type=str, c_string_encoding=utf8
+
 from cpython.object cimport PyObject
+from cpython.unicode cimport PyUnicode_DecodeUTF8
 from cython.operator cimport dereference as deref
 from cython.operator cimport preincrement as preinc
 from libcpp cimport bool
@@ -57,21 +60,22 @@ LOG_PRIORITY_TO_LEVEL = {
 
 
 cdef extern void YaYtStoreLoggingHook(ELogPriority priority, const char *msg, size_t size) with gil:
-    logger.log(LOG_PRIORITY_TO_LEVEL[priority], msg[:size].decode(errors='replace'))
+    # Note: msg is not a null-terminated string
+    logger.log(LOG_PRIORITY_TO_LEVEL[priority], PyUnicode_DecodeUTF8(msg, size, 'replace'))
 
 
 cdef extern void YaYtStoreDisableHook(void* owner, const TString& errorType, const TString& errorMessage) with gil:
-    (<YtStoreImpl>owner)._on_disable_callback(errorType.decode(), errorMessage.decode())
+    (<YtStoreImpl>owner)._on_disable_callback(errorType, errorMessage)
 
 
 cdef extern void YaYtStoreStartStage(void* owner, const TString& name) with gil:
     if (<YtStoreImpl>owner)._stager:
-        (<YtStoreImpl>owner)._stager.start(name.decode())
+        (<YtStoreImpl>owner)._stager.start(name)
 
 
 cdef extern void YaYtStoreFinishStage(void* owner, const TString& name) with gil:
     if (<YtStoreImpl>owner)._stager:
-        (<YtStoreImpl>owner)._stager.finish(name.decode())
+        (<YtStoreImpl>owner)._stager.finish(name)
 
 
 class YtStoreError(Exception):
@@ -314,8 +318,8 @@ cdef class YtStoreImpl:
         self._stager = stager
         self._exiting = False
 
-        cdef TString c_proxy = proxy.encode()
-        cdef TString c_data_dir = data_dir.encode()
+        cdef TString c_proxy = proxy
+        cdef TString c_data_dir = data_dir
         cdef TYtStoreOptions options
         options.ConnectOptions = YtStoreImpl._get_connect_options(token, proxy_role)
         options.Owner = <void*> self
@@ -330,9 +334,9 @@ cdef class YtStoreImpl:
             options.Ttl = TDuration.Hours(ttl_hours)
         if name_re_ttls:
             for name_re, ttl in name_re_ttls.items():
-                options.NameReTtls.push_back(TNameReTtl(name_re.encode(), TDuration.Hours(ttl)))
+                options.NameReTtls.push_back(TNameReTtl(name_re, TDuration.Hours(ttl)))
         if operation_pool:
-            options.OperationPool = operation_pool.encode()
+            options.OperationPool = operation_pool
         if retry_time_limit:
             options.RetryTimeLimit = YtStoreImpl._as_duration(retry_time_limit)
         if init_timeout:
@@ -350,7 +354,7 @@ cdef class YtStoreImpl:
             else:
                 raise ValueError(f"Unknown crit_level value: {crit_level}")
         if gsid:
-            options.GSID = gsid.encode()
+            options.GSID = gsid
         with nogil:
             self._store_ptr = new TYtStore(
                 c_proxy,
@@ -405,9 +409,9 @@ cdef class YtStoreImpl:
     ) -> None:
         cdef TYtStore.TPrepareOptionsPtr options = new TYtStore.TPrepareOptions()
         for u in self_uids:
-            options.Get().SelfUids.push_back(u.encode())
+            options.Get().SelfUids.push_back(u)
         for u in uids:
-            options.Get().Uids.push_back(u.encode())
+            options.Get().Uids.push_back(u)
         options.Get().RefreshOnRead = refresh_on_read
         # XXX TODO YA-2886
         # options.Get().ContentUidsEnabled = content_uids
@@ -415,15 +419,15 @@ cdef class YtStoreImpl:
             self._store_ptr.Prepare(options)
 
     def _do_has(self, uid: str) -> bool:
-        cdef TString c_uid = uid.encode()
+        cdef TString c_uid = uid
         cdef bool c_result
         with nogil:
             c_result = self._store_ptr.Has(c_uid)
         return c_result
 
     def _do_try_restore(self, uid: str, into_dir: str, *args, **kwargs) -> bool:
-        cdef TString c_uid = uid.encode()
-        cdef TString c_into_dir = into_dir.encode()
+        cdef TString c_uid = uid
+        cdef TString c_into_dir = into_dir
         cdef bool c_result
         with nogil:
             c_result = self._store_ptr.TryRestore(c_uid, c_into_dir)
@@ -440,15 +444,15 @@ cdef class YtStoreImpl:
         forced_size: int | None = None
     ) -> bool:
         cdef TYtStore.TPutOptions options
-        options.SelfUid = self_uid.encode()
-        options.Uid = uid.encode()
-        options.RootDir = TFsPath(<TString>(root_dir.encode()))
+        options.SelfUid = self_uid
+        options.Uid = uid
+        options.RootDir = TFsPath(<TString>(root_dir))
         for f in files:
-            options.Files.push_back(TFsPath(<TString>(f.encode())))
+            options.Files.push_back(TFsPath(<TString>(f)))
         if codec:
-            options.Codec = codec.encode()
+            options.Codec = codec
         if cuid:
-            options.Cuid = cuid.encode()
+            options.Cuid = cuid
         if forced_size:
             options.ForcedSize = forced_size
         cdef bool c_result
@@ -463,13 +467,13 @@ cdef class YtStoreImpl:
 
         timers_it = c_metrics.Timers.begin()
         while timers_it != c_metrics.Timers.end():
-            metrics.timers[deref(timers_it).first.decode()] = deref(timers_it).second.SecondsFloat()
+            metrics.timers[deref(timers_it).first] = deref(timers_it).second.SecondsFloat()
             preinc(timers_it)
 
         cdef TVector[pair[TInstant, TInstant]].iterator int_it
         time_int_it = c_metrics.TimerIntervals.begin()
         while time_int_it != c_metrics.TimerIntervals.end():
-            intervals = metrics.time_intervals[deref(time_int_it).first.decode()] = []
+            intervals = metrics.time_intervals[deref(time_int_it).first] = []
             int_it = deref(time_int_it).second.begin()
             while int_it != deref(time_int_it).second.end():
                 intervals.append((deref(int_it).first.SecondsFloat(), deref(int_it).second.SecondsFloat()))
@@ -478,17 +482,17 @@ cdef class YtStoreImpl:
 
         counters_it = c_metrics.Counters.begin()
         while counters_it != c_metrics.Counters.end():
-            metrics.counters[deref(counters_it).first.decode()] = deref(counters_it).second
+            metrics.counters[deref(counters_it).first] = deref(counters_it).second
             preinc(counters_it)
 
         failures_it = c_metrics.Failures.begin()
         while failures_it != c_metrics.Failures.end():
-            metrics.failures[deref(failures_it).first.decode()] = deref(failures_it).second
+            metrics.failures[deref(failures_it).first] = deref(failures_it).second
             preinc(failures_it)
 
         data_size_it = c_metrics.DataSize.begin()
         while data_size_it != c_metrics.DataSize.end():
-            metrics.data_size[deref(data_size_it).first.decode()] = deref(data_size_it).second
+            metrics.data_size[deref(data_size_it).first] = deref(data_size_it).second
             preinc(data_size_it)
 
         metrics.requested = c_metrics.Requested
@@ -527,14 +531,14 @@ cdef class YtStoreImpl:
             self._store_ptr.DataGc(options)
 
     def put_stat(self, key: str, value: bytes):
-        cdef TString c_key = key.encode()
+        cdef TString c_key = key
         cdef TString c_value = value
         with nogil:
             self._store_ptr.PutStat(c_key, c_value)
 
     @staticmethod
     def validate_regexp(re_str: str) -> None:
-        TYtStore.ValidateRegexp(re_str.encode())
+        TYtStore.ValidateRegexp(re_str)
 
     @staticmethod
     def create_tables(
@@ -551,8 +555,8 @@ cdef class YtStoreImpl:
         metadata_tablet_count: int | None = None,
         data_tablet_count: int | None = None,
     ):
-        cdef TString c_proxy = proxy.encode()
-        cdef TString c_data_dir = data_dir.encode()
+        cdef TString c_proxy = proxy
+        cdef TString c_data_dir = data_dir
         cdef TYtStore.TCreateTablesOptions options
         cdef ui64 c_metadata_tablet_count
         cdef ui64 c_data_tablet_count
@@ -582,8 +586,8 @@ cdef class YtStoreImpl:
         token: str | None,
         proxy_role: str | None,
     ):
-        cdef TString c_proxy = proxy.encode()
-        cdef TString c_data_dir = data_dir.encode()
+        cdef TString c_proxy = proxy
+        cdef TString c_data_dir = data_dir
         cdef TYtStore.TModifyTablesStateOptions options
         options.ConnectOptions = YtStoreImpl._get_connect_options(token, proxy_role)
         options.Action = action
@@ -608,10 +612,10 @@ cdef class YtStoreImpl:
         replica_sync_mode: bool | NoneType = None,
         enable: bool | NoneType = None,
     ):
-        cdef TString c_proxy = proxy.encode()
-        cdef TString c_data_dir = data_dir.encode()
-        cdef TString c_replica_proxy = replica_proxy.encode()
-        cdef TString c_replica_data_dir = replica_data_dir.encode()
+        cdef TString c_proxy = proxy
+        cdef TString c_data_dir = data_dir
+        cdef TString c_replica_proxy = replica_proxy
+        cdef TString c_replica_data_dir = replica_data_dir
         cdef bool c_replica_sync_mode
         cdef bool c_enable
         cdef TYtStore.TModifyReplicaOptions options
@@ -636,10 +640,10 @@ cdef class YtStoreImpl:
         token: str | None = None,
         proxy_role: str | None = None,
     ):
-        cdef TString c_proxy = proxy.encode()
-        cdef TString c_data_dir = data_dir.encode()
-        cdef TString c_replica_proxy = replica_proxy.encode()
-        cdef TString c_replica_data_dir = replica_data_dir.encode()
+        cdef TString c_proxy = proxy
+        cdef TString c_data_dir = data_dir
+        cdef TString c_replica_proxy = replica_proxy
+        cdef TString c_replica_data_dir = replica_data_dir
         cdef TYtStore.TModifyReplicaOptions options
         options.ConnectOptions = YtStoreImpl._get_connect_options(token, proxy_role)
         options.Action = TYtStore.TModifyReplicaOptions.EAction.REMOVE
@@ -688,7 +692,7 @@ cdef class YtStoreImpl:
     cdef TYtConnectOptions _get_connect_options(token: str | None, proxy_role: str | None) noexcept:
         cdef TYtConnectOptions options
         if token:
-            options.Token = token.encode()
+            options.Token = token
         if proxy_role:
-            options.ProxyRole = proxy_role.encode()
+            options.ProxyRole = proxy_role
         return options
