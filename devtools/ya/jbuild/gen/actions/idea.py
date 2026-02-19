@@ -140,7 +140,7 @@ def forced_lib(path, ctx):
 
 
 def is_test(plain):
-    return mp2.is_jtest_for(plain) or mp2.is_jtest(plain) or mp2.is_junit5(plain)
+    return mp2.is_jtest_for(plain) or mp2.is_jtest(plain) or mp2.is_junit5(plain) or mp2.is_junit6(plain)
 
 
 def idea_results(ctx, nodes):
@@ -1280,7 +1280,7 @@ def process_path(path, ctx, results_root, project_root, relativize_cache, dry_ru
         Root(
             s[0],
             p,
-            mp2.is_jtest(target.plain) or mp2.is_jtest_for(target.plain) or mp2.is_junit5(target.plain),
+            is_test(target.plain),
             False,
             g,
             (s[1] or op.basename(s[0] or '') == 'resources') if s is not None else False,
@@ -1382,7 +1382,7 @@ def merge_jvm_args(left, *other):
                 left.append(arg)
 
 
-def collapse_ut(by_path, is_jtest, is_jtest_for, jtest_for_wat, is_junit5):
+def collapse_ut(by_path, is_jtest, is_jtest_for, jtest_for_wat, is_junit5, is_junit6):
     redirect = {}
 
     def is_java_module(p):
@@ -1391,11 +1391,12 @@ def collapse_ut(by_path, is_jtest, is_jtest_for, jtest_for_wat, is_junit5):
             and not is_jtest(p)
             and not is_jtest_for(p)
             and not is_junit5(p)
+            and not is_junit6(p)
             and isinstance(by_path[p], Module)
         )
 
     for p in six.iterkeys(by_path):
-        if is_jtest(p) or is_junit5(p):
+        if is_jtest(p) or is_junit5(p) or is_junit6(p):
             d = op.dirname(p)
 
             while fix_windows(d) != fix_windows(os.path.dirname(d)):
@@ -1649,6 +1650,9 @@ def up_funcs(ctx, results_root, project_root, dry_run):
             ),
             is_junit5=lambda path: (
                 mp2.is_junit5(ctx.by_path[path].plain) if ctx.by_path[path].is_idea_target() else False
+            ),
+            is_junit6=lambda path: (
+                mp2.is_junit6(ctx.by_path[path].plain) if ctx.by_path[path].is_idea_target() else False
             ),
         )
 

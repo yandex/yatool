@@ -91,6 +91,10 @@ def is_junit5(plain):
     return consts.JUNIT5 in plain
 
 
+def is_junit6(plain):
+    return consts.JUNIT6 in plain
+
+
 def is_jtest_for(plain):
     return consts.JAVA_TEST_FOR in plain
 
@@ -102,6 +106,7 @@ def is_java(plain):
         or is_jtest(plain)
         or is_jtest_for(plain)
         or is_junit5(plain)
+        or is_junit6(plain)
     )
 
 
