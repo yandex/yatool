@@ -122,7 +122,7 @@ class PrepareResource(object):
             raise
         except Exception as e:
             if getattr(e, 'mute', False) is not True:
-                logging.exception('Unable to fetch resource %s', self._pattern)
+                logging.exception('Unable to fetch resource %s', self._uri_description)
 
             self._exit_code = (
                 devtools.ya.core.error.ExitCodes.INFRASTRUCTURE_ERROR
