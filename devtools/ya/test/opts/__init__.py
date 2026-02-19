@@ -1283,6 +1283,8 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.upload_coverage_report = False
         self.upload_coverage_yt_path = ""
         self.upload_coverage_yt_proxy = "hahn"
+        self.upload_coverage_root_ttl = 7  # days
+        self.upload_coverage_tables_ttl = 2  # days
 
     def consumer(self):
         return [
@@ -1427,6 +1429,20 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 ['--upload-coverage-proxy'],
                 help='Specifies YT proxy to upload coverage',
                 hook=devtools.ya.core.yarg.SetValueHook('upload_coverage_yt_proxy'),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            TestArgConsumer(
+                ['--upload-coverage-root-ttl'],
+                help='Specify how many days the coverage directory will be alive (default: 7)',
+                hook=devtools.ya.core.yarg.SetValueHook('upload_coverage_root_ttl', transform=int),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            TestArgConsumer(
+                ['--upload-coverage-tables-ttl'],
+                help='Specify how many days the coverage tables will be alive (default: 2)',
+                hook=devtools.ya.core.yarg.SetValueHook('upload_coverage_tables_ttl', transform=int),
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.EXPERT,
             ),

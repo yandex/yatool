@@ -57,6 +57,10 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
         "create_root",
         "--yt-root-path",
         yt_table_root,
+        "--root-ttl",
+        str(opts.upload_coverage_root_ttl),
+        "--tables-ttl",
+        str(opts.upload_coverage_tables_ttl),
         "--tables",
     ] + tables
 
