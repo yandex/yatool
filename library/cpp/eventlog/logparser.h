@@ -196,7 +196,7 @@ private:
 
 class TContainsEventFrameFilter: public IFrameFilter {
 public:
-    TContainsEventFrameFilter(const TString& args, const IEventFactory* fac);
+    TContainsEventFrameFilter(TStringBuf unparsedMatchGroups, const IEventFactory* fac);
 
     bool FrameAllowed(const TFrame& frame) const override;
 

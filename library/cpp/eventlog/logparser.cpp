@@ -251,7 +251,7 @@ TMaybe<TFrame> FindNextFrame(IInputStream* in, IEventFactory* eventFactory) {
     }
 }
 
-TContainsEventFrameFilter::TContainsEventFrameFilter(const TString& unparsedMatchGroups, const IEventFactory* eventFactory) {
+TContainsEventFrameFilter::TContainsEventFrameFilter(TStringBuf unparsedMatchGroups, const IEventFactory* eventFactory) {
     TVector<TStringBuf> tokens;
 
     SplitWithEscaping(tokens, unparsedMatchGroups, "/");
