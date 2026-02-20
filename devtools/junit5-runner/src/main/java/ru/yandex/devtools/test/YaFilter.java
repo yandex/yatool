@@ -28,7 +28,7 @@ public class YaFilter implements PostDiscoveryFilter {
                 String fullName = testName.getFullName(test);
                 FileNameMatcher matcher = new FileNameMatcher(pattern, null);
                 matcher.append(fullName);
-                if (matcher.isMatch() || pattern.startsWith(fullName)) {
+                if (matcher.isMatch() || fullName.startsWith(pattern)) {
                     return FilterResult.included("passed by " + pattern + " filter");
                 }
 
@@ -40,7 +40,7 @@ public class YaFilter implements PostDiscoveryFilter {
                         fullName = testName.getFullName(parent);
                         matcher.append(fullName);
 
-                        if (matcher.isMatch() || pattern.startsWith(fullName)) {
+                        if (matcher.isMatch() || fullName.startsWith(pattern)) {
                             return FilterResult.included("passed by " + pattern + " filter and parent");
                         }
                     }
