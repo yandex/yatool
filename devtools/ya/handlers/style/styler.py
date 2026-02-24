@@ -49,6 +49,7 @@ class StylerKind(StrEnum):
     JSON = auto()
     YAML = auto()
     EOL = auto()
+    EOF = auto()
 
     @property
     def default_enabled(self) -> bool:
@@ -743,6 +744,31 @@ class EOLFmt:
 
     def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         return self._run_format(path, content)
+
+
+@_register
+class EOFFmt:
+    kind: tp.ClassVar = StylerKind.EOF
+    name: tp.ClassVar = 'eoffmt'
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (
+        '.cpp',
+        '.h',
+        '.hpp',
+        '.json',
+        '.ini',
+        '.md',
+        '.py',
+        '.sql',
+        '.txt',
+        '.xml',
+        '.yaml',
+        '.yml',
+    )
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ('Dockerfile', 'Makefile')
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
+        return StylerOutput(content + "\n" if content and not content.endswith("\n") else content)
 
 
 _TAXI_NAME_TO_STYLER_MAP = {
