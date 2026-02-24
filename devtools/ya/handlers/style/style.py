@@ -32,14 +32,23 @@ class StyleOptions(tp.NamedTuple):
     full_output: bool = False
 
 
-def _setup_logging(quiet: bool = False) -> None:
+def _setup_logging(
+    *,
+    quiet: bool = False,
+    verbose: bool = False,
+) -> None:
     console_log = logging.StreamHandler()
 
     while logging.root.hasHandlers():
         logging.root.handlers[0].close()
         logging.root.removeHandler(logging.root.handlers[0])
 
-    console_log.setLevel(logging.ERROR if quiet else logging.INFO)
+    log_level = logging.INFO
+    if quiet:
+        log_level = logging.ERROR
+    elif verbose:
+        log_level = logging.DEBUG
+    console_log.setLevel(log_level)
     console_log.setFormatter(coloredlogs.ColoredFormatter('%(levelname).1s | %(message)s'))
     logging.root.addHandler(console_log)
 
@@ -129,7 +138,10 @@ def _collect_target_stylers(
 
 
 def run_style(args) -> int:
-    _setup_logging(args.quiet)
+    _setup_logging(
+        quiet=args.quiet,
+        verbose=args.verbose,
+    )
 
     mine_opts = trgt.MineOptions(
         targets=tuple(Path(t) for t in args.targets),

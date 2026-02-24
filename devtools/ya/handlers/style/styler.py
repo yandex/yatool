@@ -147,13 +147,13 @@ def select_suitable_stylers(
 
     matches = _SUFFIX_MAPPING.get(target.path.suffix, set()) | _NAME_MAPPING.get(target.path.name, set())
     if not matches:
-        logger.warning('skip %s (sufficient styler not found)', target.path)
+        logger.debug('skip %s (sufficient styler not found)', target.path)
         return set()
 
     if file_types:
         stylers = {m for m in matches if m.kind in file_types}
         if not stylers:
-            logger.warning('skip %s (filtered by file type)', target.path)
+            logger.debug('skip %s (filtered by file type)', target.path)
             return set()
     else:
         stylers = set()
@@ -169,7 +169,7 @@ def select_suitable_stylers(
                 stylers.add(m)
         if not stylers:
             options = ' or '.join(f'--{m.kind}' for m in matches)
-            logger.warning('skip %s (require explicit %s or --all)', target.path, options)
+            logger.debug('skip %s (require explicit %s or --all)', target.path, options)
             return set()
 
     if target.passed_directly:
@@ -181,7 +181,7 @@ def select_suitable_stylers(
         for pattern in styler.ignore:
             if target.path.match(pattern):
                 # TODO: Python3.13 Use pathlib.PurePath.full_match
-                logger.warning('skip %s (filtered by ignore rules)', target.path)
+                logger.debug('skip %s (filtered by ignore rules)', target.path)
                 break
         else:
             filtered.add(styler)

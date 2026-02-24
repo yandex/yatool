@@ -146,6 +146,11 @@ class FilterOptions(devtools.ya.core.yarg.Options):
 class ReportOptions(devtools.ya.core.yarg.Options):
     def __init__(self):
         self.quiet = False
+        self.verbose = False
+
+    def postprocess(self):
+        if self.quiet and self.verbose:
+            raise devtools.ya.core.yarg.ArgsValidatingException("Don't use --quiet and --verbose options together")
 
     @staticmethod
     def consumer():
@@ -154,6 +159,12 @@ class ReportOptions(devtools.ya.core.yarg.Options):
                 ['-q', '--quiet'],
                 help="Skip warning messages",
                 hook=devtools.ya.core.yarg.SetConstValueHook('quiet', True),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['-v', '--verbose'],
+                help="Show debug messages",
+                hook=devtools.ya.core.yarg.SetConstValueHook('verbose', True),
                 group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
