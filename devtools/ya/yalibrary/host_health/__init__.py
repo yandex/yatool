@@ -137,7 +137,7 @@ class CpuUsage:
         while not stopped():
             v = psutil.cpu_times_percent(interval=self._INTERVAL)
             with self._lock:
-                self._value = CpuUsage.Usage(v.user + v.nice, v.system)
+                self._value = CpuUsage.Usage(v.user + getattr(v, "nice", 0), v.system)
 
 
 class StoppableThread:
