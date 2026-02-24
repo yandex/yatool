@@ -842,12 +842,14 @@ namespace NYa {
             } catch (const TYtStoreFatalError&) {
                 throw;
             } catch (...) {
-                ReadOnly_.store(true, std::memory_order::relaxed);
                 if (CritLevel_ == ECritLevel::PUT) {
                     Disable(true);
                 }
                 Metrics_.CountFailures("put");
                 DEBUG_LOG << logPrefix << "to YT failed: " << CurrentExceptionMessage();
+                if (!ReadOnly_.exchange(true, std::memory_order::relaxed)) {
+                    DEBUG_LOG << "Switched to read only mode";
+                }
             }
             return false;
         }
