@@ -109,7 +109,9 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
 
 
 @functools.cache
-def get_ufetcher(should_tar_output: bool = True) -> universal_fetcher.UniversalFetcher:
+def get_ufetcher(
+    should_tar_output: bool = True, docker_config_path: str | None = None
+) -> universal_fetcher.UniversalFetcher:
     # 2.3 + 5 + 12 + 27 + 64 + 148 + 340 + 360
     default_retry_policy = universal_fetcher.RetryPolicy(
         max_retry_count=9,
@@ -130,7 +132,6 @@ def get_ufetcher(should_tar_output: bool = True) -> universal_fetcher.UniversalF
 
     configs = []
 
-    docker_config_path = _get_docker_config()
     if docker_config_path:
         docker_config = universal_fetcher.DockerConfig(
             universal_fetcher.DockerParams(

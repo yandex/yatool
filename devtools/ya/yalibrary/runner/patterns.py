@@ -41,6 +41,9 @@ class Patterns(object):
             else:
                 raise
 
+    def __contains__(self, key):
+        return key in self._map
+
     def get(self, key, default=None):
         try:
             return self[key]

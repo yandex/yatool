@@ -38,7 +38,15 @@ class PrepareResource(object):
     worker_pool_type = WorkerPoolType.SERVICE
 
     def __init__(
-        self, uri_description, ctx, resource_root, legacy_sandbox_fetcher, fetch_resource_if_need, execution_log, cache
+        self,
+        uri_description,
+        ctx,
+        resource_root,
+        legacy_sandbox_fetcher,
+        fetch_resource_if_need,
+        execution_log,
+        cache,
+        patterns,
     ):
         self._uri_description = dict(uri_description)
         self._ctx = ctx
@@ -51,6 +59,7 @@ class PrepareResource(object):
         self._resource_root = resource_root
         self._execution_log = execution_log
         self._cache = cache
+        self._patterns = patterns
 
         self._parsed_uri = None
         self._resource_display = None
@@ -168,6 +177,7 @@ class PrepareResource(object):
                 install_params=(fetcher_common.FIXED_NAME, False),
                 keep_directory_packed=True,
                 force_universal_fetcher=self._shloud_use_universal_fetcher,
+                docker_config_path=self._patterns.get('DOCKER_CONFIG_PATH'),
             )
             where = os.path.abspath(res.where)
 

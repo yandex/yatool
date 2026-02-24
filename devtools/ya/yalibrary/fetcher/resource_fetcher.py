@@ -73,6 +73,7 @@ def fetch_resource_if_need(
     keep_directory_packed=False,
     strip_prefix=None,
     force_universal_fetcher=True,
+    docker_config_path=None,
 ):
     global FALLBACK_MSG_LOGGED
 
@@ -103,7 +104,7 @@ def fetch_resource_if_need(
     )
 
     downloader = _get_downloader(
-        fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher
+        fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher, docker_config_path
     )
 
     def do_deploy(download_to, resource_info):
@@ -146,7 +147,9 @@ def select_resource(item, platform=None):
         raise Exception('Incorrect resource format')
 
 
-def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher):
+def _get_downloader(
+    fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher, docker_config_path=None
+):
     resource_info = {
         'file_name': parsed_uri.resource_id[:20],
         'id': parsed_uri.resource_id,
@@ -162,7 +165,7 @@ def _get_downloader(fetcher, parsed_uri, progress_callback, state, keep_director
         what_to_download = parsed_uri.resource_url or parsed_uri.resource_uri
 
         return ufetcher.UFetcherDownloader(
-            ufetcher.get_ufetcher(),
+            ufetcher.get_ufetcher(docker_config_path=docker_config_path),
             what_to_download,
             progress_callback,
             keep_directory_packed,

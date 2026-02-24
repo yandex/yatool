@@ -1,6 +1,5 @@
 import collections
 import contextlib
-import exts.yjson as json
 import fnmatch
 import logging
 import os
@@ -8,6 +7,7 @@ import re
 import time
 import types
 import weakref
+import base64
 
 import typing as tp
 from collections.abc import Callable
@@ -15,10 +15,7 @@ from collections.abc import Callable
 import devtools.ya.core.config
 import devtools.ya.core.error
 import devtools.ya.core.report
-import exts.archive
-import exts.os2
-import exts.process
-import exts.shlex2
+import exts.yjson as json
 import exts.timer
 import exts.windows
 import devtools.ya.test.const
@@ -197,6 +194,7 @@ class TaskContext(object):
             fetch_resource_if_need,
             self._execution_log,
             self._ctx.cache,
+            self.patterns,
         )
 
     def prepare_node(self, node: "Node") -> "PrepareNodeTask":
@@ -566,11 +564,26 @@ class TaskContext(object):
         elif (self.opts.oauth_token or self.opts.sandbox_oauth_token) and self.opts.store_oauth_token:
             token = self.opts.oauth_token or self.opts.sandbox_oauth_token
             patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(
-                self._exit_stack.enter_context(self._token_context(token))
+                self._exit_stack.enter_context(self._token_context(token, '.ya_token'))
             )
+
+        is_ya_token_present = self.opts.oauth_token_path or (self.opts.oauth_token and self.opts.store_oauth_token)
+        if self.opts.docker_config_path:
+            patterns['DOCKER_CONFIG_PATH'] = exts.windows.win_path_fix(self.opts.docker_config_path)
+        elif is_ya_token_present and 'YA_TOKEN_PATH' in patterns:
+            payload = self._get_docker_auth_json_payload(self._read_token_from_file(patterns['YA_TOKEN_PATH']))
+            patterns['DOCKER_CONFIG_PATH'] = exts.windows.win_path_fix(
+                self._exit_stack.enter_context(self._token_context(payload, '.docker_auth.json'))
+            )
+
         if self.opts.frepkage_root:
             patterns['FREPKAGE_ROOT'] = exts.windows.win_path_fix(self.opts.frepkage_root)
         self.patterns = patterns
+
+    @staticmethod
+    def _read_token_from_file(src_file: str):
+        with open(src_file, 'r') as f:
+            return f.read().strip()
 
     def _init_nodes(self):
         self.results: frozenset[GraphNodeUid] = frozenset(self._ctx.graph['result'])
@@ -653,10 +666,10 @@ class TaskContext(object):
             self.save_links_regex = re.compile("|".join(fnmatch.translate(e) for e in save_links_for))
 
     @contextlib.contextmanager
-    def _token_context(self, token: str):
-        token_file = os.path.join(self._transient_resource_dir, '.ya_token')
+    def _token_context(self, payload: str, filename: str):
+        token_file = os.path.join(self._transient_resource_dir, filename)
         with open(token_file, 'w') as f:
-            f.write(token)
+            f.write(payload)
         try:
             yield token_file
         finally:
@@ -665,6 +678,12 @@ class TaskContext(object):
             except OSError:
                 # May have removed during build root cleanup
                 pass
+
+    def _get_docker_auth_json_payload(self, token: str) -> str:
+        to_be_encoded = f"{self._app_ctx.username}:{token}"
+        encoded = base64.b64encode(to_be_encoded.encode("utf-8"))
+
+        return json.dumps({"auths": {"registry.yandex.net": {"auth": encoded.decode()}}})
 
     def _release_symres_lock(self):
         if lock := self.clean_symres_task.get_shared_lock():
