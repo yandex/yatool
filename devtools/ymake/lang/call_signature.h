@@ -4,6 +4,8 @@
 #include <util/generic/vector.h>
 #include <util/ysaveload.h>
 
+#include <span>
+
 struct TKeyword {
     size_t From;
     size_t To;
@@ -113,6 +115,8 @@ public:
     //         for signature without variable positional argument.
     TStringBuf GetVarargName() const noexcept;
     bool HasVararg() const noexcept;
+
+    std::span<const TString> ScalarPositionalArgs() const noexcept;
 
     bool HasUsrArgs() const noexcept {
         return NumUsrArgs_ != 0;

@@ -33,6 +33,13 @@ bool TSignature::HasVararg() const noexcept {
     return NumUsrArgs_ != 0 && ArgNames_.back().EndsWith(NStaticConf::ARRAY_SUFFIX);
 }
 
+std::span<const TString> TSignature::ScalarPositionalArgs() const noexcept {
+    auto res = std::span{ArgNames_}.subspan(GetKeyArgsNum());
+    if (HasVararg())
+        res = res.subspan(0, res.size() - 1);
+    return res;
+}
+
 size_t TSignature::Key2ArrayIndex(TStringBuf arg) const {
     const auto [first, last] = std::ranges::equal_range(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
     AssertEx(first != last, "Arg was defined as keyword and must be in map.");

@@ -258,9 +258,7 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
     TMapMacroVarsResult res;
 
     const TStringBuf vararg = sign.GetVarargName();
-    auto positionalScalars = std::span{sign.ArgNames()}.subspan(sign.GetKeyArgsNum());
-    if (!vararg.empty())
-        positionalScalars = positionalScalars.subspan(0, positionalScalars.size() - 1);
+    auto positionalScalars = sign.ScalarPositionalArgs();
 
     auto [frontPosArgs, kwArgs] = TKWArgs::Find(sign, args);
     res = ConsumePositionals(frontPosArgs, positionalScalars, vararg, locals);
