@@ -1,4 +1,3 @@
-import os
 import logging
 import re
 from pathlib import Path
@@ -161,19 +160,9 @@ class _JavaSemGraph(SemGraph):
                 if not isinstance(node, SemNode):
                     continue  # interest only nodes
                 for semantic in node.semantics:
-                    if (
-                        len(semantic.sems) == 2
-                        and semantic.sems[0] == "runs-classpath"
-                        and semantic.sems[1].startswith('@')
-                        and semantic.sems[1].endswith('.cplst')
-                    ):
-                        cplst = semantic.sems[1][len('@') : -len('.cplst')]
-                        if not cplst:  # Ignore java runners without classpath
-                            continue
-                        # target is directory of cplst
-                        run_java_program_rel_targets.append(
-                            os.path.relpath(Path(cplst).parent, self.config.export_root)
-                        )
+                    rjp_tool_rel_path = self._get_run_java_program_tool_rel_path(semantic)
+                    if rjp_tool_rel_path:
+                        run_java_program_rel_targets.append(rjp_tool_rel_path)
             return run_java_program_rel_targets
         except Exception as e:
             raise YaIdeGradleException(f'Fail extract additional RUN_JAVA_PROGRAM targets from sem-graph: {e}') from e
@@ -184,6 +173,7 @@ class _JavaSemGraph(SemGraph):
         self._patch_annotation_processors()
         self._patch_jdk()
         self._patch_exclude_targets()
+        self._patch_run_java_programs()
         if self._graph_patched:
             self._update_graph()
 
@@ -569,3 +559,45 @@ class _JavaSemGraph(SemGraph):
             if not has_ignored:
                 node.semantics.append(Semantic({Semantic.SEM: [self._IGNORED_SEM]}))
                 self._graph_patched = True
+
+    def _patch_run_java_programs(self) -> None:
+        self._before_any_patch()
+        rjp_start_dirs = []
+        for node in self._graph_data:
+            if not isinstance(node, SemNode) or not node.has_semantics():
+                continue
+            for semantic in node.semantics:
+                rjp_tool_rel_path = self._get_run_java_program_tool_rel_path(semantic)
+                if rjp_tool_rel_path:
+                    if self.config.in_rel_targets(rjp_tool_rel_path) and not self.config.in_rel_exclude_targets(
+                        rjp_tool_rel_path
+                    ):
+                        semantic.sems[1] = str(
+                            rjp_tool_rel_path
+                        )  # Put relative path without @ and .cplst - must be applied as project() in Gradle
+                        self._graph_patched = True
+                        # Add directory of RUN_JAVA_PROGRAM codegen as start directory
+                        rjp_start_dirs.append(f'$S/{rjp_tool_rel_path}')
+        if rjp_start_dirs:
+            # For export RUN_JAVA_PROGRAM codegen tool to Gradle it must be start directory
+            # else it may absent in recurses, and will not export, but patch above wait it as project in Gradle
+            for node in self._graph_data:
+                if not isinstance(node, SemNode) or node.type != 'Directory':
+                    continue
+                if node.name in rjp_start_dirs:
+                    node.tag = 'StartDir'
+                    self._graph_patched = True
+
+    def _get_run_java_program_tool_rel_path(self, semantic: Semantic) -> Path:
+        if (
+            len(semantic.sems) != 2
+            or semantic.sems[0] != "runs-classpath"
+            or semantic.sems[1] == '@.cplst'
+            or not semantic.sems[1].startswith('@')
+            or not semantic.sems[1].endswith('.cplst')
+        ):
+            return ""
+        rjp_tool_path = Path(semantic.sems[1][len('@') : -len('.cplst')]).parent
+        if not rjp_tool_path.is_relative_to(self.config.export_root):
+            return rjp_tool_path
+        return rjp_tool_path.relative_to(self.config.export_root)

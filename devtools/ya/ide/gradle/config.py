@@ -191,6 +191,12 @@ class _JavaSemConfig(SemConfig):
                 return True
         return False
 
+    def in_rel_exclude_targets(self, rel_target: Path) -> bool:
+        for exclude_rel_target in self.rel_exclude_targets:
+            if rel_target.is_relative_to(Path(exclude_rel_target)):
+                return True
+        return False
+
     def is_rel_parent_of_targets(self, rel_target: Path) -> bool:
         for conf_rel_target in self.params.rel_targets:
             if Path(conf_rel_target).is_relative_to(rel_target):
