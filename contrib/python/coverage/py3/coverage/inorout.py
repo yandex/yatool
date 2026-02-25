@@ -171,17 +171,16 @@ class DirectoryDetail:
 
 def _analyze_directory(d: str) -> DirectoryDetail:
     """Analyze the directory `d` for existence and venv status."""
-    detail = DirectoryDetail(exists=True, venv=None)
-    while True:
-        if not os.path.exists(d):
-            detail.exists = False
-            break
-        d = os.path.dirname(d)
-        if d == os.path.dirname(d):
-            break
-        if "pyvenv.cfg" in os.listdir(d):
-            detail.venv = d
-            break
+    detail = DirectoryDetail(exists=os.path.exists(d), venv=None)
+    if detail.exists:
+        while True:
+            d = os.path.dirname(d)
+            if d == os.path.dirname(d):
+                break
+            pyvenv = os.path.join(d, "pyvenv.cfg")
+            if os.path.exists(pyvenv):
+                detail.venv = d
+                break
     return detail
 
 
@@ -189,11 +188,11 @@ def _dir_detail(d: str) -> str:
     """Get a string describing the directory `d` for debugging."""
     detail = _analyze_directory(d)
     if not detail.exists:
-        describe = "no such dir"
+        describe = "does not exist"
     elif detail.venv is not None:
         describe = f"venv at {detail.venv}"
     else:
-        describe = "not venv"
+        describe = "not a venv"
     return f"{d!r} ({describe})"
 
 
