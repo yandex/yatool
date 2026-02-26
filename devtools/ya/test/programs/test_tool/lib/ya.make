@@ -47,6 +47,7 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/list_result_node
     devtools/ya/test/programs/test_tool/list_tests
     devtools/ya/test/programs/test_tool/merge_coverage_inplace
+    devtools/ya/test/programs/test_tool/merge_go_coverage
     devtools/ya/test/programs/test_tool/merge_python_coverage
     devtools/ya/test/programs/test_tool/resolve_clang_coverage
     devtools/ya/test/programs/test_tool/resolve_go_coverage
