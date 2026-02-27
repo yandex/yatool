@@ -14,6 +14,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/pyjavaproperties
     devtools/ya/build
     devtools/ya/build/build_opts
     devtools/ya/build/sem_graph
@@ -24,7 +25,6 @@ PEERDIR(
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/sjson
     devtools/ya/yalibrary/tools
-    contrib/python/pyjavaproperties
 )
 
 IF(NOT YA_OPENSOURCE)
