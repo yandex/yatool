@@ -24,6 +24,11 @@ PEERDIR(
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/sjson
     devtools/ya/yalibrary/tools
+    contrib/python/pyjavaproperties
 )
+
+IF(NOT YA_OPENSOURCE)
+    PEERDIR(devtools/ya/yalibrary/oauth)
+ENDIF()
 
 END()

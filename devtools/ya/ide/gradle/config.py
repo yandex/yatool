@@ -4,11 +4,19 @@ import re
 import shutil
 from pathlib import Path
 from configparser import ConfigParser
+from pyjavaproperties import Properties
 
 from devtools.ya.core import config as core_config
 from devtools.ya.build.sem_graph import SemLang, SemConfig, SemException
+from devtools.ya.core.config import get_user
 from yalibrary import platform_matcher
 from exts import hashing
+
+try:
+    from yalibrary import oauth
+except ImportError:
+    # oauth module not exist in Open Source mode
+    oauth = None
 
 from devtools.ya.ide.gradle.common import YaIdeGradleException
 
@@ -18,11 +26,15 @@ class _JavaSemConfig(SemConfig):
 
     GRADLE_PROPS = 'gradle.properties'  # Gradle properties filename auto detected by Gradle
     GRADLE_PROPS_FILE: Path = Path.home() / '.gradle' / GRADLE_PROPS  # User Gradle properties file
+    BUCKET_USERNAME = 'bucketUsername'
+    BUCKET_PASSWORD = 'bucketPassword'
+    GRADLE_WRAPPER_USER = 'systemProp.gradle.wrapperUser'
+    GRADLE_WRAPPER_PASSWORD = 'systemProp.gradle.wrapperPassword'
     GRADLE_REQUIRED_PROPS: tuple[str] = (
-        'bucketUsername',
-        'bucketPassword',
-        'systemProp.gradle.wrapperUser',
-        'systemProp.gradle.wrapperPassword',
+        BUCKET_USERNAME,
+        BUCKET_PASSWORD,
+        GRADLE_WRAPPER_USER,
+        GRADLE_WRAPPER_PASSWORD,
     )
     GRADLE_BUILD_DIR = "gradle.build"
     CONFIG_SIGN = "config.sign"
@@ -39,7 +51,7 @@ class _JavaSemConfig(SemConfig):
         super().__init__(SemLang.JAVA(), params)
         self.logger = logging.getLogger(type(self).__name__)
         if not self.params.remove:
-            self._check_gradle_props()
+            self._setup_gradle_props()
         self.ya_gradle_config_files: list[str] = []
         self.ya_gradle_config: ConfigParser = None
         self.yexport_toml_checked = False
@@ -55,17 +67,54 @@ class _JavaSemConfig(SemConfig):
         # For use settings_root as hash base for export root must fill it after prepare targets
         self.settings_root: Path = self._get_settings_root()
 
-    def _check_gradle_props(self) -> None:
-        """Check exists all required gradle properties"""
+    def _setup_gradle_props(self) -> None:
+        """Setup all required gradle properties"""
+        if oauth is None:
+            # Do not setup gradle properties in Open Source mode
+            return
+
         errors = []
-        if not _JavaSemConfig.GRADLE_PROPS_FILE.is_file():
-            errors.append(f'File {_JavaSemConfig.GRADLE_PROPS_FILE} does not exist')
-        else:
+        if _JavaSemConfig.GRADLE_PROPS_FILE.exists() and _JavaSemConfig.GRADLE_PROPS_FILE.is_dir():
+            raise YaIdeGradleException(
+                f'Now Gradle properties file {_JavaSemConfig.GRADLE_PROPS_FILE} is invalid: is directory'
+            )
+
+        if not _JavaSemConfig.GRADLE_PROPS_FILE.exists():
+            logging.info(f'Gradle properties file {_JavaSemConfig.GRADLE_PROPS_FILE} not found')
+            logging.info('Try setup automatically')
+            with _JavaSemConfig.GRADLE_PROPS_FILE.open('w') as f:
+                f.write('')  # create empty file
+
+        gradle_props = Properties()
+        with _JavaSemConfig.GRADLE_PROPS_FILE.open() as f:
+            gradle_props.load(f)
+
+        user = get_user()
+        updated_fields = []
+        if gradle_props.get(_JavaSemConfig.BUCKET_USERNAME) is None:
+            updated_fields.append(f'{_JavaSemConfig.BUCKET_USERNAME}={user}')
+
+        if gradle_props.get(_JavaSemConfig.BUCKET_PASSWORD) is None:
+            try:
+                oauth_token = oauth.resolve_token({}, required=True, query_passwd=True, ignore_existing_token=True)
+                updated_fields.append(f'{_JavaSemConfig.BUCKET_PASSWORD}={oauth_token}')
+            except Exception as e:
+                errors.append(f'Could not get OAuth bucket token: {e}')
+
+        if gradle_props.get(_JavaSemConfig.GRADLE_WRAPPER_USER) is None:
+            updated_fields.append(f'{_JavaSemConfig.GRADLE_WRAPPER_USER}={user}')
+
+        if gradle_props.get(_JavaSemConfig.GRADLE_WRAPPER_PASSWORD) is None:
+            updated_fields.append(f'{_JavaSemConfig.GRADLE_WRAPPER_PASSWORD}={user}')
+
+        if updated_fields and not errors:
+            logging.info(f'Update gradle properties file {_JavaSemConfig.GRADLE_PROPS_FILE}')
             with _JavaSemConfig.GRADLE_PROPS_FILE.open() as f:
-                props = f.read()
-            for prop in _JavaSemConfig.GRADLE_REQUIRED_PROPS:
-                if prop not in props:
-                    errors.append(f'Required property {prop} is not defined in {_JavaSemConfig.GRADLE_PROPS_FILE} file')
+                original = f.read()
+            with _JavaSemConfig.GRADLE_PROPS_FILE.open(mode='w') as f:
+                updated_properties = '\n'.join([original, *updated_fields]).lstrip('\n')
+                f.write(updated_properties)
+
         if errors:
             raise YaIdeGradleException(
                 '\n'.join(
@@ -75,7 +124,7 @@ class _JavaSemConfig(SemConfig):
                         'and authentication for Gradle https://docs.yandex-team.ru/bucket/gradle#autentifikaciya',
                         'Token can be taken from here https://oauth.yandex-team.ru/authorize?response_type=token&client_id=bf8b6a8a109242daaf62bce9d6609b3b',
                         '',
-                        f'Now Gradle properties file {_JavaSemConfig.GRADLE_PROPS_FILE} is invalid:',
+                        'Automatic setup failed',
                         *errors,
                     ]
                 )
