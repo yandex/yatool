@@ -86,16 +86,17 @@ class TermView(object):
         return s[: lim - 3] + '...'
 
     def _fmt_status(self, task_status, pre, post):
+        # Always trim to _max_len so the status line never wraps. Otherwise \r (carriage return)
+        # only moves to the start of the current visual line, leaving previous wrapped parts
+        # on screen and causing duplicated-looking output.
         if isinstance(task_status, str):
             return pack.pack_status(
-                pre + [1, pack.Truncatable(task_status)] + post, _calc_len, self._max_len, trim=self._ninja
+                pre + [1, pack.Truncatable(task_status)] + post, _calc_len, self._max_len, trim=True
             )[0]
 
         ans = None
         for v in task_status:
-            ans, ans_len = pack.pack_status(
-                pre + [1, pack.Truncatable(v)] + post, _calc_len, self._max_len, trim=self._ninja
-            )
+            ans, ans_len = pack.pack_status(pre + [1, pack.Truncatable(v)] + post, _calc_len, self._max_len, trim=True)
             break
         return ans
 
