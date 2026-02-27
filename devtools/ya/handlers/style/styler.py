@@ -767,6 +767,9 @@ class EOFFmt:
     match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ('Dockerfile', 'Makefile')
     ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
 
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        pass
+
     def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
         return StylerOutput(content + "\n" if content and not content.endswith("\n") else content)
 
