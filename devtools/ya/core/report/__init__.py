@@ -49,6 +49,7 @@ class ReportTypes(object):
     RECIPES_USAGE = 'recipes_usage'
     FINISH = 'finish'
     HOST_HEALTH = 'host_health'
+    PACKAGE_STATS = 'package_stats'
 
 
 @func.lazy

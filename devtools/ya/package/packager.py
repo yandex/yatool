@@ -47,6 +47,7 @@ import package.tarball
 import package.vcs
 import package.wheel
 from package.package_tree import load_package, get_tree_info
+from devtools.ya.core.report import telemetry, ReportTypes
 from devtools.ya.package import const
 from yalibrary import find_root
 from yalibrary.tools import tool, UnsupportedToolchain, UnsupportedPlatform, ToolNotFoundException, ToolResolveException
@@ -819,19 +820,18 @@ def create_package(package_context, output_root, builds):
                         'Package content is stored in [[imp]]{}'.format(os.path.abspath(package_path))
                     )
                 else:
-                    stage_started("create_tarball_package")
-                    package_path = package.tarball.create_tarball_package(
-                        result_dir,
-                        content_dir,
-                        package_context.resolve_filename(extra={"package_ext": "tar"}),
-                        compress=params.compress_archive,
-                        codec=params.codec,
-                        threads=params.build_threads,
-                        compression_filter=params.compression_filter,
-                        compression_level=params.compression_level,
-                        stable_archive=params.stable_archive,
-                    )
-                    stage_finished("create_tarball_package")
+                    with stager.scope("create_tarball_package"):
+                        package_path = package.tarball.create_tarball_package(
+                            result_dir,
+                            content_dir,
+                            package_context.resolve_filename(extra={"package_ext": "tar"}),
+                            compress=params.compress_archive,
+                            codec=params.codec,
+                            threads=params.build_threads,
+                            compression_filter=params.compression_filter,
+                            compression_level=params.compression_level,
+                            stable_archive=params.stable_archive,
+                        )
 
                 if create_dbg:
                     package_filename = package_context.resolve_filename(
@@ -1077,6 +1077,11 @@ def create_package(package_context, output_root, builds):
                 exts.fs.copytree3(temp_work_dir, result_temp, symlinks=True)
                 package.display.emit_message('Result temp directory: [[imp]]{}'.format(result_temp))
 
+        stat = stage_tracer.get_stat("ya-package")
+        telemetry.report(
+            ReportTypes.PACKAGE_STATS,
+            stat,
+        )
         return package_name, package_version, package_path, debug_package_path
 
 
