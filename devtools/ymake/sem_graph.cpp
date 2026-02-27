@@ -17,7 +17,7 @@
 #include <util/generic/overloaded.h>
 
 template<>
-struct NFlatJsonGraph::TNodePropertyTriat<TSingleCmd> {
+struct NFlatJsonGraph::TNodePropertyTrait<TSingleCmd> {
     static void Serialize(NJsonWriter::TBuf& to, TSingleCmd value) {
         to.BeginObject();
         to.WriteKey("sem");

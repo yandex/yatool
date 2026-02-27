@@ -7,11 +7,11 @@
 namespace NFlatJsonGraph {
 
     template<typename>
-    struct TNodePropertyTriat;
+    struct TNodePropertyTrait;
 
     template<typename TProp>
     concept NodeProperty = requires(NJsonWriter::TBuf& to, const TProp& prop) {
-        { TNodePropertyTriat<std::remove_cvref_t<TProp>>::Serialize(to, prop) };
+        { TNodePropertyTrait<std::remove_cvref_t<TProp>>::Serialize(to, prop) };
     };
 
     template<typename TRange>
@@ -22,31 +22,31 @@ namespace NFlatJsonGraph {
             { *rng.begin() } -> NodeProperty;
         };
 
-    // Provided NodePropety implementations
+    // Provided NodeProperty implementations
     template<>
-    struct TNodePropertyTriat<TStringBuf> {
+    struct TNodePropertyTrait<TStringBuf> {
         static void Serialize(NJsonWriter::TBuf& to, TStringBuf value) {
             to.WriteString(value);
         }
     };
     template<>
-    struct TNodePropertyTriat<TString>: TNodePropertyTriat<TStringBuf> {};
+    struct TNodePropertyTrait<TString>: TNodePropertyTrait<TStringBuf> {};
     template<size_t N>
-    struct TNodePropertyTriat<char[N]>: TNodePropertyTriat<TStringBuf> {};
+    struct TNodePropertyTrait<char[N]>: TNodePropertyTrait<TStringBuf> {};
 
     template<>
-    struct TNodePropertyTriat<ui32> {
+    struct TNodePropertyTrait<ui32> {
         static void Serialize(NJsonWriter::TBuf& to, ui32 value) {
             to.WriteLongLong(value);
         }
     };
 
     template<NodePropertiesRange TRange>
-    struct TNodePropertyTriat<TRange> {
+    struct TNodePropertyTrait<TRange> {
         static void Serialize(NJsonWriter::TBuf& to, const TRange& value) {
             to.BeginList();
             for (const auto& item: value) {
-                TNodePropertyTriat<std::remove_cvref_t<decltype(item)>>::Serialize(to, item);
+                TNodePropertyTrait<std::remove_cvref_t<decltype(item)>>::Serialize(to, item);
             }
             to.EndList();
         }
@@ -59,7 +59,7 @@ namespace NFlatJsonGraph {
         template<NodeProperty TProp>
         TNodeWriter& AddProp(TStringBuf name, const TProp& val) {
             JsonWriter.WriteKey(name);
-            TNodePropertyTriat<TProp>::Serialize(JsonWriter, val);
+            TNodePropertyTrait<TProp>::Serialize(JsonWriter, val);
             return *this;
         }
 
