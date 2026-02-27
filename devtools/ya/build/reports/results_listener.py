@@ -292,5 +292,5 @@ class FailedNodeListener:
         self._writer = evlog.get_writer(self.NAMESPACE)
 
     def __call__(self, res=None, build_stage=None):
-        if res and res.get('status', 0) != 0 and 'exit_code' in res:
-            self._writer(self.EVENT, uid=res['uid'], exit_code=res['exit_code'])
+        if res and res.get('status', 0) != 0:
+            self._writer(self.EVENT, uid=res['uid'], exit_code=res['status'])
