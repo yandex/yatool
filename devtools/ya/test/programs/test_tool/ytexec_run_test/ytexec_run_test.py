@@ -596,9 +596,14 @@ def dump_test_info(params, metrics=None, error=None, status=const.Status.FAIL):
     if metrics:
         chunk.metrics.update(metrics)
 
+    op_url = extract_operation_url(params.output_dir)
     for t in chunk.tests:
         t.logs.update({'operation_logs': logs_dir})
+        if op_url:
+            t.logs.update({'operation_url': op_url})
     chunk.logs.update({'operation_logs': logs_dir})
+    if op_url:
+        chunk.logs.update({'operation_url': op_url})
     chunk.logs.update({'download_script': os.path.join(logs_dir, "download.sh")})
 
     def fix_log_path(path):
