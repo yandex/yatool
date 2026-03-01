@@ -449,7 +449,7 @@ FASTCALL_ATTR JSOBJ FASTCALL_MSVC decode_string ( struct DecoderState *ds)
       escStart = (wchar_t *)ds->dec->realloc(ds->escStart, newSize * sizeof(wchar_t));
       if (!escStart)
       {
-        ds->dec->free(ds->escStart);
+        // Don't free ds->escStart here; it gets handled in JSON_DecodeObject.
         return SetError(ds, -1, "Could not reserve memory block");
       }
       ds->escStart = escStart;
