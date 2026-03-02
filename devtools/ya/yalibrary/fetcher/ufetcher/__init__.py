@@ -110,7 +110,7 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
 
 @functools.cache
 def get_ufetcher(
-    should_tar_output: bool = True, docker_config_path: str | None = None
+    should_tar_output: bool = True, docker_config_path: str | None = None, skopeo_binary: str | None = None
 ) -> universal_fetcher.UniversalFetcher:
     # 2.3 + 5 + 12 + 27 + 64 + 148 + 340 + 360
     default_retry_policy = universal_fetcher.RetryPolicy(
@@ -132,10 +132,11 @@ def get_ufetcher(
 
     configs = []
 
-    if docker_config_path:
+    if docker_config_path and skopeo_binary:
         docker_config = universal_fetcher.DockerConfig(
             universal_fetcher.DockerParams(
                 auth_json_file=docker_config_path,
+                skopeo_binary=skopeo_binary,
             ),
             default_retry_policy,
         )

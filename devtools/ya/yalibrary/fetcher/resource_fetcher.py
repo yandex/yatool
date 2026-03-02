@@ -3,10 +3,11 @@ import logging
 import os
 import sys
 import collections
+import shutil
 
 import six
 
-from exts import uniq_id, http_client
+from exts import uniq_id, http_client, func
 from exts.hashing import md5_value
 from yalibrary import guards
 from yalibrary import platform_matcher
@@ -25,6 +26,10 @@ class MissingResourceError(Exception):
     mute = True
 
 
+class SkopeoBinaryIsMissing(Exception):
+    mute = True
+
+
 FetchResponse = collections.namedtuple("FetchResponse", ("install_stat", "where"))
 
 CAN_USE_UNIVERSAL_FETCHER = sys.version_info[0] >= 3
@@ -32,6 +37,27 @@ FALLBACK_MSG_LOGGED = False
 
 
 logger = logging.getLogger(__name__)
+
+
+@func.memoize()
+def _get_skopeo_binary():
+    try:
+        import yalibrary.tools as tools
+
+        try:
+            return tools.tool('skopeo')
+        except:  # noqa
+            pass
+    except ImportError:
+        pass
+
+    which_skopeo = shutil.which('skopeo')
+    if which_skopeo:
+        return which_skopeo
+
+    raise SkopeoBinaryIsMissing(
+        "Couldn't find `skopeo` binary. At first we tried to get it from our toolchain and it did not work. We advise you to globally download one by yourself."
+    )
 
 
 def fetch_base64_resource(root_dir, resource_uri):
@@ -103,8 +129,19 @@ def fetch_resource_if_need(
         % (parsed_uri.resource_id, parsed_uri.resource_uri, result_dir, post_process)
     )
 
+    skopeo_binary = None
+    if parsed_uri.resource_type == "docker":
+        skopeo_binary = _get_skopeo_binary()
+
     downloader = _get_downloader(
-        fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher, docker_config_path
+        fetcher,
+        parsed_uri,
+        progress_callback,
+        state,
+        keep_directory_packed,
+        use_universal_fetcher,
+        docker_config_path,
+        skopeo_binary,
     )
 
     def do_deploy(download_to, resource_info):
@@ -148,7 +185,14 @@ def select_resource(item, platform=None):
 
 
 def _get_downloader(
-    fetcher, parsed_uri, progress_callback, state, keep_directory_packed, use_universal_fetcher, docker_config_path=None
+    fetcher,
+    parsed_uri,
+    progress_callback,
+    state,
+    keep_directory_packed,
+    use_universal_fetcher,
+    docker_config_path=None,
+    skopeo_binary=None,
 ):
     resource_info = {
         'file_name': parsed_uri.resource_id[:20],
@@ -165,7 +209,7 @@ def _get_downloader(
         what_to_download = parsed_uri.resource_url or parsed_uri.resource_uri
 
         return ufetcher.UFetcherDownloader(
-            ufetcher.get_ufetcher(docker_config_path=docker_config_path),
+            ufetcher.get_ufetcher(docker_config_path=docker_config_path, skopeo_binary=skopeo_binary),
             what_to_download,
             progress_callback,
             keep_directory_packed,
