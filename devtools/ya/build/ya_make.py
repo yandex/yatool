@@ -411,6 +411,7 @@ class CacheFactory:
             crit_level=self._opts.yt_store_crit,
             gsid=devtools.ya.core.gsid.flat_session_id(),
             stager=stager,
+            allow_tar=('.tar' in self._opts.add_result),
         )
 
     def _can_use_bazel_remote_cache(self):
@@ -986,7 +987,7 @@ class Context:
             results = set(self.graph['result'])
             self.tests = [x for x in self.tests if x.uid in results]
         # XXX see YA-1354
-        elif (opts.yt_replace_result or opts.dist_cache_evict_cached) and not opts.add_result:
+        elif opts.yt_replace_result or opts.dist_cache_evict_cached:
             new_results, cached_results = replace_yt_results(self.graph, opts, self.dist_cache)
             self.graph['result'] = new_results
             logger.debug("Strip graph due yt_replace_result mode")

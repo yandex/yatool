@@ -311,12 +311,14 @@ cdef class YtStoreImpl:
         crit_level: str | None,
         gsid: str | None,
         stager: stage_tracer.StageTracer.GroupStageTracer | None,
+        allow_tar: bool,
     ):
         self._proxy = proxy
         self._data_dir = data_dir
         self._is_heater = crit_level == "put"
         self._stager = stager
         self._exiting = False
+        self._allow_tar = allow_tar
 
         cdef TString c_proxy = proxy
         cdef TString c_data_dir = data_dir
@@ -397,7 +399,7 @@ cdef class YtStoreImpl:
             for p in 'library/cpp/svnversion', 'library/cpp/build_info':
                 if o.startswith('$(BUILD_ROOT)/' + p):
                     return False
-        if all(o.endswith('.tar') for o in outputs):
+        if not self._allow_tar and all(o.endswith('.tar') for o in outputs):
             return False
         return True
 
