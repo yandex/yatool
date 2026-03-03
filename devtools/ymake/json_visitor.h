@@ -69,7 +69,6 @@ private:
     const TCommands& Commands;
     const TCmdConf& CmdConf;
 
-    const bool MainOutputAsExtra;
     const bool JsonDepsFromMainOutputEnabled_ = false;
 
     ui64 NumModuleNodesForRendering = 0;

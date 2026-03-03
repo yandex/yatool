@@ -429,12 +429,11 @@ public:
         const TUpdEntryStats &parentState,
         EMakeNodeType prntNodeType,
         EMakeNodeType chldNodeType,
-        EDepType edgeType,
-        bool mainOutputAsExtra
+        EDepType edgeType
     )
     {
         ReceiveFromChildIntents_ = CalcIntentsToReceiveFromChild(
-            parentState, prntNodeType, chldNodeType, edgeType, mainOutputAsExtra
+            parentState, prntNodeType, chldNodeType, edgeType
         );
         BINARY_LOG(IPRP, NIter::TSetupReceiveFromChildIntents, DebugGraph, DebugNode, chldNodeType, edgeType, ReceiveFromChildIntents_);
     }
@@ -495,8 +494,7 @@ private:
         const TUpdEntryStats& parentState,
         EMakeNodeType prntNodeType,
         EMakeNodeType chldNodeType,
-        EDepType edgeType,
-        bool mainOutputAsExtra
+        EDepType edgeType
     );
 };
 
@@ -678,7 +676,7 @@ struct TDGIterAddable: public TUpdIterStBase {
         return graph.ToString(Node);
     }
 
-    inline void SetupPropsPassing(TDGIterAddable* parentIterState, bool mainOutputAsExtra);
+    inline void SetupPropsPassing(TDGIterAddable* parentIterState);
 
     void UseProps(TYMake& ymake, const TPropertiesState& props, TUsingRules restrictedProps);
     /// trick DGIter into processing additional nodes as current node's children
@@ -725,7 +723,6 @@ public:
     ui32 LastElem = 0;
     EMakeNodeType LastType;
     TModule* ParentModule = nullptr;
-    bool MainOutputAsExtra = false;
 
     bool Enter(TState& state);
     void Leave(TState& state);
@@ -885,7 +882,6 @@ struct TUpdReiter: public TDepthDGIter<TUpdReIterSt> {
     bool UnflushedFilled = false;
     EMakeNodeType LastType;
     ui32 LastElem = 0;
-    bool MainOutputAsExtra = false;
 
     TUpdReiter(TUpdIter& parentIter);
 

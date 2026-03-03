@@ -462,7 +462,6 @@ void TBuildConfiguration::FillMiscValues() {
         }
     };
 
-    updateFlag(MainOutputAsExtra_, "MAIN_OUTPUT_AS_EXTRA", true);
     updateFlag(DedicatedModuleNode_, "YMAKE_DEDICATED_MODULE_NODE", true);
     updateFlag(CheckForIncorrectLoops_, "YMAKE_CHECK_FOR_INCORRECT_LOOPS", true);
 

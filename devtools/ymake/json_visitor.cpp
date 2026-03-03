@@ -35,12 +35,8 @@
 #include <utility>
 
 namespace {
-    bool IsWrongEdge(bool mainOutputAsExtra, TDepGraph::TConstEdgeRef edgeRef) {
-        if (mainOutputAsExtra) {
-            return *edgeRef != EDT_Include;
-        } else {
-            return !IsIn({EDT_Include, EDT_OutTogether, EDT_OutTogetherBack}, *edgeRef);
-        }
+    bool IsWrongEdge(TDepGraph::TConstEdgeRef edgeRef) {
+        return *edgeRef != EDT_Include;
     }
 
     void DumpLoop(const TDepGraph& graph, const TGraphLoop& loop, IOutputStream& out) {
@@ -58,13 +54,13 @@ namespace {
         }
     }
 
-    bool IsCorrectLoop(const TDepGraph& graph, bool mainOutputAsExtra, const TGraphLoop& loop) {
+    bool IsCorrectLoop(const TDepGraph& graph, const TGraphLoop& loop) {
         THashSet<TNodeId> loopNodeIds{loop.begin(), loop.end()};
         for (TNodeId nodeId : loop) {
             auto nodeRef = graph[nodeId];
             for (auto edgeRef : nodeRef.Edges()) {
                 if (IsIn(loopNodeIds, edgeRef.To().Id())) {
-                    if (IsWrongEdge(mainOutputAsExtra, edgeRef)) {
+                    if (IsWrongEdge(edgeRef)) {
                         return false;
                     }
                 }
@@ -74,12 +70,12 @@ namespace {
         return true;
     }
 
-    void CheckLoops(const TDepGraph& graph, bool mainOutputAsExtra, const TGraphLoops& loops) {
+    void CheckLoops(const TDepGraph& graph, const TGraphLoops& loops) {
         bool first = true;
         size_t count = 0;
 
         for (const TGraphLoop& loop : loops) {
-            if (!IsCorrectLoop(graph, mainOutputAsExtra, loop)) {
+            if (!IsCorrectLoop(graph, loop)) {
                 if (first) {
                     TStringStream out;
                     DumpLoop(graph, loop, out);
@@ -269,7 +265,6 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     : TUidsData(restoreContext, startDirs)
     , Commands(commands)
     , CmdConf(cmdConf)
-    , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
     , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
     , GlobalVarsCollector(restoreContext)
     , Edge(restoreContext.Graph.GetInvalidEdge())
@@ -288,7 +283,7 @@ TJSONVisitor::TJSONVisitor(const TRestoreContext& restoreContext, TCommands& com
     }
 
     if (restoreContext.Conf.CheckForIncorrectLoops()) {
-        CheckLoops(restoreContext.Graph, MainOutputAsExtra, Loops);
+        CheckLoops(restoreContext.Graph, Loops);
     }
 }
 
@@ -296,7 +291,6 @@ TJSONVisitor::TJSONVisitor(TUidsData&& uidsData, const TRestoreContext& restoreC
     : TUidsData(std::move(uidsData))
     , Commands(commands)
     , CmdConf(cmdConf)
-    , MainOutputAsExtra(restoreContext.Conf.MainOutputAsExtra())
     , JsonDepsFromMainOutputEnabled_(restoreContext.Conf.JsonDepsFromMainOutputEnabled())
     , GlobalVarsCollector(restoreContext)
     , Edge(restoreContext.Graph.GetInvalidEdge())
@@ -315,7 +309,7 @@ TJSONVisitor::TJSONVisitor(TUidsData&& uidsData, const TRestoreContext& restoreC
     }
 
     if (restoreContext.Conf.CheckForIncorrectLoops()) {
-        CheckLoops(restoreContext.Graph, MainOutputAsExtra, Loops);
+        CheckLoops(restoreContext.Graph, Loops);
     }
 }
 
@@ -338,10 +332,8 @@ bool TJSONVisitor::AcceptDep(TState& state) {
     if (*dep == EDT_OutTogetherBack) {
         if (!currDone) {
             bool addOutputName = true;
-            if (MainOutputAsExtra) {
-                if (IsMainOutput(graph, currNode.Id(), dep.To().Id())) {
-                    addOutputName = false;
-                }
+            if (IsMainOutput(graph, currNode.Id(), dep.To().Id())) {
+                addOutputName = false;
             }
 
             if (addOutputName) {
@@ -947,10 +939,8 @@ void TJSONVisitor::FinishCurrent(TState& state) {
     for (auto dep : CurrNode.Edges()) {
         if (*dep == EDT_OutTogetherBack) {
             bool addOutputName = true;
-            if (MainOutputAsExtra) {
-                if (IsMainOutput(Graph, CurrNode.Id(), dep.To().Id())) {
-                    addOutputName = false;
-                }
+            if (IsMainOutput(Graph, CurrNode.Id(), dep.To().Id())) {
+                addOutputName = false;
             }
 
             if (addOutputName)
@@ -1022,10 +1012,8 @@ void TJSONVisitor::FinishCurrent(TState& state) {
         // TODO: This is a workaround, and should be removed when "inputs" sections
         // no more contain spurious dependency main outputs.
         bool addOutputName = true;
-        if (MainOutputAsExtra) {
-            if (IsMainOutput(Graph, CurrNode.Id(), CurrData->OutTogetherDependency)) {
-                addOutputName = false;
-            }
+        if (IsMainOutput(Graph, CurrNode.Id(), CurrData->OutTogetherDependency)) {
+            addOutputName = false;
         }
 
         if (addOutputName) {

@@ -168,10 +168,6 @@ public:
         UseGrandBypass = true;
     }
 
-    bool MainOutputAsExtra() const noexcept {
-        return MainOutputAsExtra_;
-    }
-
     bool DedicatedModuleNode() const noexcept {
         return DedicatedModuleNode_;
     }
@@ -269,7 +265,6 @@ private:
     bool CheckDependsInDart = false;
     bool ReportMissingAddincls = true;
     bool JsonDepsFromMainOutputEnabled_ = false;
-    bool MainOutputAsExtra_ = true;
     bool DedicatedModuleNode_ = false;
     bool CheckForIncorrectLoops_ = false;
     bool UseGraphChangesPredictor = false;

@@ -1077,7 +1077,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     };
 
     const bool hasExtraOuts = GetOutput().size() > startCountOuts;
-    const bool mainOutAsExtra = hasExtraOuts && Conf->MainOutputAsExtra() && !IsModuleType(mainOutType);
+    const bool mainOutAsExtra = hasExtraOuts && !IsModuleType(mainOutType);
 
     const bool addModuleNode = Conf->DedicatedModuleNode() && IsModuleType(mainOutType);
     EMakeNodeType moduleType = EMNT_Last;

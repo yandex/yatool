@@ -885,14 +885,11 @@ TIntents TPropertiesIterState::CalcIntentsToReceiveFromChild(
     const TUpdEntryStats& parentState,
     EMakeNodeType prntNodeType,
     EMakeNodeType chldNodeType,
-    EDepType edgeType,
-    bool mainOutputAsExtra
+    EDepType edgeType
 )
 {
-    if (mainOutputAsExtra) {
-        if (prntNodeType == EMNT_NonParsedFile && edgeType == EDT_OutTogetherBack) {
-            return TIntents::None();
-        }
+    if (prntNodeType == EMNT_NonParsedFile && edgeType == EDT_OutTogetherBack) {
+        return TIntents::None();
     }
     if (edgeType == EDT_Property) {
         if (prntNodeType == EMNT_File) {
@@ -974,7 +971,7 @@ inline void UseDiagProps(const TPropsNodeList& props, TFileView moduleName, TDep
         TRACE(P, NEvent::TInvalidPeerdir(TString{dir}));
     }
 }
-inline void TDGIterAddable::SetupPropsPassing(TDGIterAddable* parentIterState, bool mainOutputAsExtra) {
+inline void TDGIterAddable::SetupPropsPassing(TDGIterAddable* parentIterState) {
     if (!parentIterState)
         return;
 
@@ -982,7 +979,7 @@ inline void TDGIterAddable::SetupPropsPassing(TDGIterAddable* parentIterState, b
     const TDepTreeNode& parentNode = parentIterState->Node;
     EDepType edge = parentIterState->Dep.DepType;
 
-    parentIterState->SetupReceiveFromChildIntents(parentState, parentNode.NodeType, Node.NodeType, edge, mainOutputAsExtra);
+    parentIterState->SetupReceiveFromChildIntents(parentState, parentNode.NodeType, Node.NodeType, edge);
 
     ResetFetchIntents(parentState.HasChanges, parentState.Props, *parentIterState);
 }
@@ -1054,9 +1051,7 @@ TUpdIter::TUpdIter(TYMake& yMake)
     , YMake(yMake)
     , NeverCachePropId(GetNeverCachePropElem(yMake.Graph))
     , Nodes(yMake.Graph)
-{
-    MainOutputAsExtra = yMake.Conf.MainOutputAsExtra();
-}
+{}
 
 void TUpdIter::RestorePropsToUse() {
     for (const auto& node : Graph.Nodes()) {
@@ -1269,7 +1264,7 @@ inline bool TUpdIter::Enter(TState& state) {
         // а если бы получал правильные значения, то это приводило бы к большому количеству ненужных повторных
         // разборов makefile-ов. Нужно сначала эту ситуацию исследовать, убрать или корректно изменить
         // зависимость StartEdit от FetchIntents и после этого перенести вызов SetupPropsPassing в более правильное место.
-        st.SetupPropsPassing(prev, MainOutputAsExtra);
+        st.SetupPropsPassing(prev);
         propsPassingSetupDone = true;
 
         if (!isModule && IsModuleType(st.Node.NodeType)) {
@@ -1325,7 +1320,7 @@ inline bool TUpdIter::Enter(TState& state) {
     }
 
     if (!propsPassingSetupDone) {
-        st.SetupPropsPassing(prev, MainOutputAsExtra);
+        st.SetupPropsPassing(prev);
         propsPassingSetupDone = true;
     }
 
@@ -1670,11 +1665,9 @@ inline void TUpdIter::Left(TState& state) {
         // Делаем Rescan только для тех свойств, которые понадобятся в текущем узле.
         // Если родительским узлам понадобятся другие свойства, они сами сделают Rescan.
         missingProps = chldProps.GetNotReadyIntents() & currProps.GetRequiredIntents() & GetNonRuntimeIntents();
-        if (MainOutputAsExtra) {
-            missingProps = missingProps & st_.IntentsToReceiveFromChild();
-        }
+        missingProps = missingProps & st_.IntentsToReceiveFromChild();
 
-        if (!missingProps.Empty() || !MainOutputAsExtra) {
+        if (!missingProps.Empty()) {
             YDIAG(IPRP) << "      Rescan " << Endl;
             Rescan(st_);
             // TODO/FIXME: this may report "<invalid node>" when dealing with not-yet-flushed nodes (use extra outputs in module commands to reproduce)
@@ -1999,7 +1992,7 @@ inline TUpdReiter::EDepVerdict TUpdReiter::AcceptDep(TState& state) {
     }
 
     if (dep.DepType == EDT_OutTogetherBack) {
-        if (MainOutputAsExtra && dep.DepNode.NodeType == EMNT_NonParsedFile) {
+        if (dep.DepNode.NodeType == EMNT_NonParsedFile) {
             return EDepVerdict::No;
         }
 
@@ -2013,9 +2006,7 @@ inline TUpdReiter::TUpdReiter(TUpdIter& parentIter)
     : TDepthDGIter<TUpdReIterSt>(parentIter.Graph, TNodeId::Invalid)
     , ParentIter(parentIter)
     , CurEnt(nullptr)
-{
-    MainOutputAsExtra = ParentIter.MainOutputAsExtra;
-}
+{}
 
 inline bool TUpdReiter::Enter(TState& state) {
     TUpdReIterSt& st = state.back();
@@ -2033,7 +2024,7 @@ inline bool TUpdReiter::Enter(TState& state) {
             st.IsInducedDep = IntentByName(intentName, false) == EVI_InducedDeps;
         }
 
-        prev->SetupReceiveFromChildIntents(prev->Entry(), prev->Node.NodeType, st.Node.NodeType, prev->Dep.DepType, MainOutputAsExtra);
+        prev->SetupReceiveFromChildIntents(prev->Entry(), prev->Node.NodeType, st.Node.NodeType, prev->Dep.DepType);
     }
 
     YDIAG(IPUR) << "ReIter::Enter " << Graph.ToString(st.Node) << '\n';
