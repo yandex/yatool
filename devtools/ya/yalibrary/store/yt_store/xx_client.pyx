@@ -64,8 +64,8 @@ cdef extern void YaYtStoreLoggingHook(ELogPriority priority, const char *msg, si
     logger.log(LOG_PRIORITY_TO_LEVEL[priority], PyUnicode_DecodeUTF8(msg, size, 'replace'))
 
 
-cdef extern void YaYtStoreDisableHook(void* owner, const TString& errorType, const TString& errorMessage) with gil:
-    (<YtStoreImpl>owner)._on_disable_callback(errorType, errorMessage)
+cdef extern void YaYtStoreReportError(void* owner, const TString& errorType, const TString& errorMessage) with gil:
+    (<YtStoreImpl>owner)._report_yt_error(errorType, errorMessage)
 
 
 cdef extern void YaYtStoreStartStage(void* owner, const TString& name) with gil:
@@ -656,7 +656,7 @@ cdef class YtStoreImpl:
             raise ValueError(f"Too small duration: {seconds}")
         return TDuration.MicroSeconds(int(seconds * 1_000_000))
 
-    def _on_disable_callback(self, err_type, msg):
+    def _report_yt_error(self, err_type, msg):
         labels = {
             "error_type": err_type,
             "yt_proxy": self._proxy,

@@ -47,7 +47,7 @@ using namespace NYT;
 
 // see .pyx
 extern void YaYtStoreLoggingHook(ELogPriority priority, const char* msg, size_t size);
-extern void YaYtStoreDisableHook(void* callback, const TString& errorType, const TString& errorMessage);
+extern void YaYtStoreReportError(void* callback, const TString& errorType, const TString& errorMessage);
 extern void YaYtStoreStartStage(void* owner, const TString& name);
 extern void YaYtStoreFinishStage(void* owner, const TString& name);
 
@@ -607,7 +607,7 @@ namespace NYa {
     public:
         TImpl(const TString& proxy, const TString& dataDir, const TYtStoreOptions& options)
             : ConnectOptions_{options.ConnectOptions}
-            , Owner_{options.Owner}
+            , PyYtStoreObject_{options.Owner}
             , ReadOnly_{options.ReadOnly}
             , CheckSize_{options.CheckSize}
             , MaxCacheSize_{options.MaxCacheSize}
@@ -1534,27 +1534,6 @@ namespace NYa {
             TInstant DeadLine{};
         };
 
-        struct TLoadMetaTask : public TThrRefBase {
-            TLoadMetaTask(
-                TString proxy,
-                NYT::TYPath dataDir,
-                NYT::IClientPtr client,
-                TDuration lag
-            )
-                : Proxy{proxy}
-                , DataDir{dataDir}
-                , Client{client}
-                , Lag{lag}
-            {
-            }
-
-            TString Proxy;
-            NYT::TYPath DataDir;
-            NYT::IClientPtr Client;
-            TDuration Lag;
-        };
-        using TLoadMetaTaskPtr = TIntrusivePtr<TLoadMetaTask>;
-
         using TMetaData = THashMap<TString, NYT::TNode>;
 
         class TYtStoreReader : TNonCopyable, public std::enable_shared_from_this<TYtStoreReader> {
@@ -1567,8 +1546,9 @@ namespace NYa {
                 bool GetByCuid;
             };
 
-            TYtStoreReader(const TReplica& cluster, TYtErrorRetrierPtr retrierPtr)
-                : Cluster_{cluster}
+            TYtStoreReader(void* pyYtStoreObject, const TReplica& cluster, TYtErrorRetrierPtr retrierPtr)
+                : PyYtStoreObject_{pyYtStoreObject}
+                , Cluster_{cluster}
                 , RetrierPtr_{retrierPtr}
             {
             }
@@ -1810,12 +1790,17 @@ namespace NYa {
                     }
                     DEBUG_LOG << "Fetched (cuid) " << rows.size() << " metadata rows from " << ReaderName() << " in " << (TInstant::Now() - startTime);
                 } catch (...) {
-                    DEBUG_LOG << "Loading metadata (cuid) failed with an error: " << CurrentExceptionMessage();
-                    // TODO (YA-2886): Send notification to the monitoring
+                    TStringStream errMsg{};
+                    errMsg << "Loading metadata (cuid) from " << ReaderName() << " failed with an error: " << CurrentExceptionMessage();
+                    DEBUG_LOG << errMsg.Str();
+                    if (PyYtStoreObject_) {
+                        CallHook(YaYtStoreReportError, PyYtStoreObject_, "CuidLoadError", errMsg.Str());
+                    }
                 }
             }
 
         private:
+            void* PyYtStoreObject_;
             TReplica Cluster_;
             TYtErrorRetrierPtr RetrierPtr_;
             std::atomic_bool Disabled_{};
@@ -2018,8 +2003,8 @@ namespace NYa {
                     errType = "UNKNOWN";
                     errMessage = "Unknown exception (not an yexception descendant)";
                 }
-                if (Owner_) {
-                    CallHook(YaYtStoreDisableHook, Owner_, errType, errMessage);
+                if (PyYtStoreObject_) {
+                    CallHook(YaYtStoreReportError, PyYtStoreObject_, errType, errMessage);
                 }
                 // For any other CritLevel value, the exception is escalated and results in program termination, so the log message is redundant
                 if (CritLevel_ == ECritLevel::NONE) {
@@ -2260,14 +2245,14 @@ namespace NYa {
         }
 
         void StartStage(const TString& name) {
-            if (Owner_) {
-                CallHook(YaYtStoreStartStage, Owner_, name);
+            if (PyYtStoreObject_) {
+                CallHook(YaYtStoreStartStage, PyYtStoreObject_, name);
             }
         }
 
         void StopStage(const TString& name) {
-            if (Owner_) {
-                CallHook(YaYtStoreFinishStage, Owner_, name);
+            if (PyYtStoreObject_) {
+                CallHook(YaYtStoreFinishStage, PyYtStoreObject_, name);
             }
         }
 
@@ -2290,7 +2275,7 @@ namespace NYa {
                     bool syncReplicaOnly = !ReadOnly_ && CritLevel_ == ECritLevel::PUT && config->RequireSyncReplica;
                     for (TReplica& replica : config->Replicas) {
                         if (!syncReplicaOnly || replica.Sync) {
-                            prepareResultPtr->Readers.emplace_back(std::make_shared<TYtStoreReader>(replica, RetrierPtr_));
+                            prepareResultPtr->Readers.emplace_back(std::make_shared<TYtStoreReader>(PyYtStoreObject_, replica, RetrierPtr_));
                         }
                     }
                 } else {
@@ -2301,7 +2286,7 @@ namespace NYa {
                         .Sync = true,
                         .Lag = TDuration::Zero()
                     };
-                    prepareResultPtr->Readers.emplace_back(std::make_shared<TYtStoreReader>(cluster, RetrierPtr_));
+                    prepareResultPtr->Readers.emplace_back(std::make_shared<TYtStoreReader>(PyYtStoreObject_, cluster, RetrierPtr_));
                 }
                 Y_ENSURE(!prepareResultPtr->Readers.empty());
 
@@ -2708,7 +2693,7 @@ namespace NYa {
 
     private:
         TYtConnectOptions ConnectOptions_;
-        void* Owner_;
+        void* PyYtStoreObject_;
         std::atomic_bool ReadOnly_;
         bool CheckSize_;
         TMaxCacheSize MaxCacheSize_;
@@ -2717,9 +2702,8 @@ namespace NYa {
         TString OperationPool_;
         TDuration RetryTimeLimit_;
         TDuration PrepareTimeout_;
-        // TODO (YA-2800) remove maybe_unused later
-        [[maybe_unused]] bool ProbeBeforePut_;
-        [[maybe_unused]] size_t ProbeBeforePutMinSize_;
+        bool ProbeBeforePut_;
+        size_t ProbeBeforePutMinSize_;
         ECritLevel CritLevel_;
         TString GSID_;
 
