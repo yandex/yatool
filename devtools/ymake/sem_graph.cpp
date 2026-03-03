@@ -277,16 +277,12 @@ namespace {
         void Leave(TState& state) {
             const auto& topNode = state.TopNode();
             if (!ModulesStack.empty() && topNode.Id() == ModulesStack.top().ModNodeId) {
-                auto mod = RestoreContext.Modules.Get(topNode->ElemId);
                 auto transitiveOnlyPeersUnderDM = std::move(ModulesStack.top().TransitiveOnlyPeersUnderDM);
                 ModulesStack.pop();
                 if (!transitiveOnlyPeersUnderDM.empty()) {
                     for (const auto transitivePeerId: transitiveOnlyPeersUnderDM) {
                         auto peerNode = RestoreContext.Graph[transitivePeerId];
-                        auto peerMod = RestoreContext.Modules.Get(peerNode->ElemId);
-                        Y_ASSERT(peerMod);
-                        // Sem graph use ElemId as id of nodes, use TModule->GetId()
-                        auto node = JsonWriter.AddLink(mod->GetId(), mod->GetNodeType(), peerMod->GetId(), peerMod->GetNodeType(), EDepType::EDT_BuildFrom, NFlatJsonGraph::EIDFormat::Simple);
+                        auto node = JsonWriter.AddLink(topNode, EDepType::EDT_BuildFrom, peerNode);
                         AddExcludeProperty(node, topNode, peerNode, true); // generate Excludes attribute
                         AddIsClosureProperty(node); // IsClosure flag attribute
                     }

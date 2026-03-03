@@ -98,21 +98,23 @@ namespace NFlatJsonGraph {
 
     class TWriter {
     public:
-        explicit TWriter(IOutputStream& sink);
+        explicit TWriter(IOutputStream& sink, EIDFormat format = EIDFormat::Simple);
         ~TWriter();
 
         TNodeWriter AddNode(TConstDepNodeRef node);
-        TNodeWriter AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name, const EIDFormat format);
-
         TNodeWriter AddLink(TConstDepRef dep);
-        TNodeWriter AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const EIDFormat format, const ELogicalDepType logicalDepType = ELDT_FromDepType);
+        TNodeWriter AddLink(TConstDepNodeRef from, EDepType type, TConstDepNodeRef to);
+
+    protected:
+        TNodeWriter AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name);
+        TNodeWriter AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const ELogicalDepType logicalDepType = ELDT_FromDepType);
 
     private:
         void FinishNode(bool reopen);
-        TString CreateComplexId(EMakeNodeType type, ui32 id) const;
 
     private:
         NJsonWriter::TBuf JsonWriter;
+        EIDFormat Format;
         bool UnfinishedNode = false;
     };
 

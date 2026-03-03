@@ -307,20 +307,20 @@ public:
     }
 };
 
-class TFlatJsonFormat : public TFormatInterface, public NFlatJsonGraph::TWriter {
+class TFlatJsonFormat : public TFormatInterface, private NFlatJsonGraph::TWriter {
 public:
     static const bool NeedParentName = true;
     static const bool PrintChildren = false;
 
     TFlatJsonFormat(IOutputStream* stream)
-    : NFlatJsonGraph::TWriter(*stream) {}
+    : NFlatJsonGraph::TWriter(*stream, NFlatJsonGraph::EIDFormat::Complex) {}
 
     void EmitDep(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType  depType, bool /*isFirst*/, const ELogicalDepType logicalDepType = ELDT_FromDepType) override {
-        AddLink(fromId, fromType, toId, toType, depType, NFlatJsonGraph::EIDFormat::Complex, logicalDepType);
+        AddLink(fromId, fromType, toId, toType, depType, logicalDepType);
     }
 
     void EmitNode(const EMakeNodeType type, const ui32 id, const TStringBuf& /*parentName*/, const TStringBuf& name, const TStringBuf&) override {
-        AddNode(type, id, name, NFlatJsonGraph::EIDFormat::Complex);
+        AddNode(type, id, name);
     }
 };
 

@@ -2,10 +2,24 @@
 
 #include <fmt/format.h>
 
+namespace {
+
+TString CreateComplexId(EMakeNodeType type, ui32 id) {
+    ui32 targetId = TFileConf::GetTargetId(id);
+    TStringBuf nodeContext = "n";
+    if (UseFileId(type) && targetId != id) {
+        nodeContext = TFileConf::GetContextStr(id);
+    }
+    return fmt::format("{}:{}:{}", UseFileId(type) ? "f" : "c", nodeContext, targetId);
+}
+
+}
+
 namespace NFlatJsonGraph {
 
-    TWriter::TWriter(IOutputStream& sink)
+    TWriter::TWriter(IOutputStream& sink, EIDFormat format)
         : JsonWriter{NJsonWriter::HEM_RELAXED, &sink}
+        , Format{format}
     {
         JsonWriter.SetIndentSpaces(2);
         JsonWriter.BeginObject();
@@ -20,19 +34,18 @@ namespace NFlatJsonGraph {
     }
 
     TNodeWriter TWriter::AddNode(TConstDepNodeRef node) {
-        return AddNode(node->NodeType, node->ElemId, TDepGraph::Graph(node).ToTargetStringBuf(node), EIDFormat::Simple);
+        return AddNode(node->NodeType, node->ElemId, TDepGraph::Graph(node).ToTargetStringBuf(node));
     }
 
-    TNodeWriter TWriter::AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name, const EIDFormat format) {
+    TNodeWriter TWriter::AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name) {
         FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
         JsonWriter.WriteString("Node");
         JsonWriter.WriteKey("Id");
-        if (format == EIDFormat::Complex) {
-            JsonWriter.WriteString(CreateComplexId(type, id));
-        } else {
-            JsonWriter.WriteInt(id);
+        switch (Format) {
+            case EIDFormat::Simple: JsonWriter.WriteInt(id); break;
+            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(type, id)); break;
         }
         JsonWriter.WriteKey("Name");
         JsonWriter.WriteString(name);
@@ -43,25 +56,27 @@ namespace NFlatJsonGraph {
     }
 
     TNodeWriter TWriter::AddLink(TConstDepRef dep) {
-        return AddLink(dep.From()->ElemId, dep.From()->NodeType, dep.To()->ElemId, dep.To()->NodeType, dep.Value(), EIDFormat::Simple);
+        return AddLink(dep.From()->ElemId, dep.From()->NodeType, dep.To()->ElemId, dep.To()->NodeType, dep.Value());
     }
 
-    TNodeWriter TWriter::AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const EIDFormat format, const ELogicalDepType logicalDepType) {
+    TNodeWriter TWriter::AddLink(TConstDepNodeRef from, EDepType type, TConstDepNodeRef to) {
+        return AddLink(from->ElemId, from->NodeType, to->ElemId, to->NodeType, type);
+    }
+
+    TNodeWriter TWriter::AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const ELogicalDepType logicalDepType) {
         FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
         JsonWriter.WriteString("Dep");
         JsonWriter.WriteKey("FromId");
-        if (format == EIDFormat::Complex) {
-            JsonWriter.WriteString(CreateComplexId(fromType, fromId));
-        } else {
-            JsonWriter.WriteInt(fromId);
+        switch (Format) {
+            case EIDFormat::Simple: JsonWriter.WriteInt(fromId); break;
+            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(fromType, fromId)); break;
         }
         JsonWriter.WriteKey("ToId");
-        if (format == EIDFormat::Complex) {
-            JsonWriter.WriteString(CreateComplexId(toType, toId));
-        } else {
-            JsonWriter.WriteInt(toId);
+        switch (Format) {
+            case EIDFormat::Simple: JsonWriter.WriteInt(toId); break;
+            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(toType, toId)); break;
         }
         JsonWriter.WriteKey("DepType");
         if (logicalDepType == ELDT_FromDepType) {
@@ -76,15 +91,6 @@ namespace NFlatJsonGraph {
         if (std::exchange(UnfinishedNode, reopen)) {
             JsonWriter.EndObject();
         }
-    }
-
-    TString TWriter::CreateComplexId(EMakeNodeType type, ui32 id) const {
-        ui32 targetId = TFileConf::GetTargetId(id);
-        TStringBuf nodeContext = "n";
-        if (UseFileId(type) && targetId != id) {
-            nodeContext = TFileConf::GetContextStr(id);
-        }
-        return fmt::format("{}:{}:{}", UseFileId(type) ? "f" : "c", nodeContext, targetId);
     }
 
     // "Unit tests" for provided NodeProperty implementations
