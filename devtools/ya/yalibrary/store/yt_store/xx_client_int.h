@@ -31,7 +31,6 @@ namespace NYa {
         NYT::EAtomicity Atomicity;
         int Version{};
         TVector<TReplica> GoodReplicas;
-        TReplica PreparedReplica;
         friend bool operator== (const TYtStore::TInternalState&, const TYtStore::TInternalState&) = default;
     };
  }

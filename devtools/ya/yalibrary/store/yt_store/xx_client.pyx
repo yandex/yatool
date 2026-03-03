@@ -407,7 +407,7 @@ cdef class YtStoreImpl:
         self_uids: list[str],
         uids: list[str],
         refresh_on_read=False,
-        content_uids=False
+        content_uids=False,
     ) -> None:
         cdef TYtStore.TPrepareOptionsPtr options = new TYtStore.TPrepareOptions()
         for u in self_uids:
@@ -415,8 +415,7 @@ cdef class YtStoreImpl:
         for u in uids:
             options.Get().Uids.push_back(u)
         options.Get().RefreshOnRead = refresh_on_read
-        # XXX TODO YA-2886
-        # options.Get().ContentUidsEnabled = content_uids
+        options.Get().ContentUidsEnabled = content_uids
         with nogil:
             self._store_ptr.Prepare(options)
 
