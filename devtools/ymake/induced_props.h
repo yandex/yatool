@@ -77,8 +77,8 @@ struct TIndDepsRule {
         Use,
         Pass
     };
+    using TActions = TVector<std::pair<TPropertyType, EAction>>;
 
-    typedef TVector<std::pair<TPropertyType, EAction>> TActions;
     TActions Actions;
     bool PassInducedIncludesThroughFiles = false;
     bool PassNoInducedDeps = false;
@@ -91,6 +91,14 @@ struct TIndDepsRule {
     }
 
     void InsertUseActionsTo(THashSet<TPropertyType>& target) const;
+    void ApplyNodeFlags(TNodeData& node) const noexcept {
+        node.PassInducedIncludesThroughFiles = PassInducedIncludesThroughFiles;
+        node.PassNoInducedDeps = PassNoInducedDeps;
+    }
+    static void ResetNodeFlags(TNodeData& node) noexcept {
+        node.PassInducedIncludesThroughFiles = false;
+        node.PassNoInducedDeps = false;
+    }
 };
 
 class TIntents {

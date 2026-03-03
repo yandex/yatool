@@ -1213,8 +1213,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             if (setPassFlags) {
                 auto setFlags = [&](ui32 elemId) {
                     TNodeData& nodeData = Graph->GetFileNodeData(elemId);
-                    nodeData.PassNoInducedDeps = rule ? rule->PassNoInducedDeps : false;
-                    nodeData.PassInducedIncludesThroughFiles = rule ? rule->PassInducedIncludesThroughFiles : false;
+                    rule ? rule->ApplyNodeFlags(nodeData) : TIndDepsRule::ResetNodeFlags(nodeData);
                 };
 
                 setFlags(outNode.ElemId);

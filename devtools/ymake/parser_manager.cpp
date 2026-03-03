@@ -302,17 +302,12 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
     }
     ext = ExtPreprocess(ext, context.ModuleResolveContext.Graph.Names(), context.Stack);
 
-    TParserBase* parser = ParserByExt(ext);
-    if (parser) {
-        const TIndDepsRule* rule = parser->DepsTransferRules();
-        if (rule != nullptr) {
-            auto& nodeData = context.ModuleResolveContext.Graph.GetFileNodeData(incFile.GetTargetId());
-            nodeData.PassInducedIncludesThroughFiles = rule->PassInducedIncludesThroughFiles;
-            nodeData.PassNoInducedDeps = rule->PassNoInducedDeps;
-        }
+    if (TParserBase* parser = ParserByExt(ext)) {
+        if (const TIndDepsRule* rule = parser->DepsTransferRules())
+            rule->ApplyNodeFlags(context.ModuleResolveContext.Graph.GetFileNodeData(incFile.GetTargetId()));
+
         const auto start = Now();
-        auto wasParsed = parser->ParseIncludes(context.Node, wrapper, incFile);
-        if (wasParsed) {
+        if (parser->ParseIncludes(context.Node, wrapper, incFile)) {
             Stats.Inc(NStats::EIncParserManagerStats::ParseTime, (Now() - start).MicroSeconds());
             Stats.Inc(NStats::EIncParserManagerStats::ParsedFilesCount);
             Stats.Inc(NStats::EIncParserManagerStats::ParsedFilesSize, incFile.Size());
