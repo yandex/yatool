@@ -25,7 +25,8 @@ class _Populate(object):
         self.args = args
         self.env = env
         self.unknown_args_as_free = unknown_args_as_free
-        self.config_files = config_files
+        # Same config may be added by both global_config and user_config paths, duplicates causes ArgsBindingException
+        self.config_files = list(dict.fromkeys(config_files)) if config_files else config_files
         self.prefix = (prefix or [])[1:]  # skip ya
 
         self._aliases = []
