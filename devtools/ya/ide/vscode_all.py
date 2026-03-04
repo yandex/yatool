@@ -439,6 +439,8 @@ class VSCodeProject:
             python_excludes = vscode.workspace.gen_pyrights_excludes(self.params.arc_root, python_srcdirs)
             if self.params.ruff_formatter_enabled:
                 workspace["settings"]["ruff.exclude"] = python_excludes
+            else:
+                workspace["settings"]["ruff.configurationPreference"] = "editorOnly"
             pyright_config = vscode.workspace.gen_pyrightconfig(
                 self.params, python_srcdirs, extra_paths, python_excludes
             )
