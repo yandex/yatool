@@ -6,6 +6,7 @@ PEERDIR(
     build/config/tests/py_style
     build/config/tests/ruff
     build/config/tests/yaml_style
+    contrib/python/charset-normalizer
     contrib/python/coloredlogs
     contrib/python/marisa-trie
     contrib/python/PyYAML

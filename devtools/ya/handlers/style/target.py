@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import subprocess
@@ -6,6 +7,8 @@ import typing as tp
 
 from collections.abc import Generator, Callable, Iterable, Sequence
 from pathlib import Path, PurePath
+
+from charset_normalizer import from_bytes
 
 import devtools.ya.handlers.style.state_helper as state_helper
 import devtools.ya.handlers.style.styler as stlr
@@ -29,9 +32,24 @@ class MineOptions(tp.NamedTuple):
 
 class Target(tp.NamedTuple):
     path: Path | PurePath
-    reader: Callable[..., str]
+    reader: Callable[..., bytes]
     stdin: bool = False
     passed_directly: bool = False
+
+    def read_content(self) -> str:
+        raw = self.reader()
+        with contextlib.suppress(UnicodeDecodeError):
+            return raw.decode(encoding='utf-8')
+        result = from_bytes(raw).best()
+        if result and result.encoding:
+            with contextlib.suppress(UnicodeDecodeError, LookupError):
+                return raw.decode(encoding=result.encoding)
+        logger.warning(
+            'Failed to decode content of %s with utf-8 and %s. Using latin-1 as a fallback',
+            self.path,
+            result.encoding,
+        )
+        return raw.decode('latin-1')
 
 
 def _mine_filepath_targets(paths: Iterable[Path]) -> Generator[Target]:
@@ -39,7 +57,12 @@ def _mine_filepath_targets(paths: Iterable[Path]) -> Generator[Target]:
         if path.is_symlink():
             continue
         if path.is_file():
-            yield Target(path.resolve(), path.read_text, passed_directly=True)
+            resolved_path = path.resolve()
+            yield Target(
+                path=resolved_path,
+                reader=resolved_path.read_bytes,
+                passed_directly=True,
+            )
         elif path.is_dir():
             path = path.resolve()
             for dirpath, _, filenames in path.walk():
@@ -50,7 +73,7 @@ def _mine_filepath_targets(paths: Iterable[Path]) -> Generator[Target]:
                     filepath = dirpath / filename
                     if filepath.is_symlink():
                         continue
-                    yield Target(filepath, filepath.read_text)
+                    yield Target(filepath, filepath.read_bytes)
         else:
             logger.warning('skip %s (no such file or directory)', path)
 
@@ -97,13 +120,13 @@ def _mine_targets_smart(paths: Sequence[Path], only_staged: bool = False) -> Gen
                 if '->' in name:
                     name = name.rsplit('->', maxsplit=1)[-1].strip()
                 target_path = Path(relative, name).resolve(strict=True)
-                yield Target(target_path, target_path.read_text, passed_directly=path.is_file())
+                yield Target(target_path, target_path.read_bytes, passed_directly=path.is_file())
 
 
 def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
     # read stdin if not tty
     if not mine_opts.tty:
-        yield Target(PurePath(mine_opts.stdin_filename), sys.stdin.read, stdin=True)
+        yield Target(PurePath(mine_opts.stdin_filename), sys.stdin.buffer.read, stdin=True)
 
     # read cwd if target is not specified
     if not mine_opts.targets and mine_opts.tty:

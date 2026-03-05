@@ -80,7 +80,7 @@ def _style(style_opts: StyleOptions, stylers: list[stlr.Styler], target: trgt.Ta
     Execute `format` and store or display the result.
     Return 0 if no formatting happened, 1 otherwise
     """
-    orig_content = content = target.reader()
+    orig_content = content = target.read_content()
     target_path = target.path
 
     if target.stdin:
