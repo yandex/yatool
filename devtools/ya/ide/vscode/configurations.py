@@ -119,7 +119,7 @@ def gen_debug_configurations(run_modules, params, codegen_cpp_dir, tool_fetcher,
             conf_name = common.pretty_name(name)
 
         if module_lang == "PY3":
-            wrapper_dir = os.path.join(python_wrappers_dir, os.path.basename(module["path"]))
+            wrapper_dir = os.path.join(python_wrappers_dir, module["module_path"].replace("/", "-"))
 
             configuration = OrderedDict(
                 (
