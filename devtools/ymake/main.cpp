@@ -722,9 +722,7 @@ bool PostConfigureStage(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     bool hasBadLoops = yMake->DumpLoops();
     if (hasBadLoops) {
         NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::BadLoops), true);
-        if (!conf.IsYmakeSaveAllCachesWhenBadLoops()) {
-            conf.DoNotWriteAllCaches();
-        }
+        conf.DoNotWriteAllCaches();
     }
     return hasBadLoops;
 }
