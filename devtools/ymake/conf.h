@@ -204,6 +204,10 @@ public:
         return IsolatedProjectsHashChanged_;
     }
 
+    bool IsYmakeSaveAllCachesWhenBadLoops() const noexcept {
+        return YmakeSaveAllCachesWhenBadLoops_;
+    }
+
     bool ShouldUseOnlyYmakeCache() const noexcept {
         return UseOnlyYmakeCache_;
     }
@@ -267,6 +271,7 @@ private:
     bool UseGrandBypass = false;
     bool BlacklistHashChanged_ = true; // by default require apply blacklist for all modules
     bool IsolatedProjectsHashChanged_ = true; // by default require apply isolated projects for all modules
+    bool YmakeSaveAllCachesWhenBadLoops_ = false;
     bool LoadDartCaches_ = true;
     bool SaveDartCaches_ = true;
     bool LoadJsonCacheEarly_ = false;
