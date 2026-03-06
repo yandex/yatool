@@ -1572,12 +1572,22 @@ namespace NYa {
                     selfPtr->DoLoadMetaDataByUid(loadingColumns, version, options, promise);
                 });
                 if (config->Version >= 3 && options->ContentUidsEnabled) {
-                    threadPool.SafeAddFunc([selfPtr = shared_from_this(), loadingColumns, options] {
-                        selfPtr->DoLoadMetaDataBySelfUid(loadingColumns, options);
-                    });
+                    bool contentUidsFlag = false;
+                    try {
+                        contentUidsFlag = RetrierPtr_->Do([&] {
+                            return Cluster_.Client->Exists(NYT::JoinYPaths(Cluster_.DataDir, "content_uids"));
+                        });
+                    } catch (...) {
+                        DEBUG_LOG << "Cannot check content_uids flag: " << CurrentExceptionMessage();
+                    }
+                    if (contentUidsFlag) {
+                        threadPool.SafeAddFunc([selfPtr = shared_from_this(), loadingColumns, options] {
+                            selfPtr->DoLoadMetaDataBySelfUid(loadingColumns, options);
+                        });
+                    }
                 }
                 return promise.GetFuture();
-;            }
+            }
 
             TMetaData GetWholeMetaData() const {
                 Y_ENSURE(!Disabled_.load(std::memory_order::relaxed));

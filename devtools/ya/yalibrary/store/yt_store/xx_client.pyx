@@ -415,8 +415,7 @@ cdef class YtStoreImpl:
         for u in uids:
             options.Get().Uids.push_back(u)
         options.Get().RefreshOnRead = refresh_on_read
-        # XXX YA-2886, SPI-188601
-        # options.Get().ContentUidsEnabled = content_uids
+        options.Get().ContentUidsEnabled = content_uids
         with nogil:
             self._store_ptr.Prepare(options)
 
