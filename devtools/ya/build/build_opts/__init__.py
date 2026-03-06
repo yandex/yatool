@@ -3246,6 +3246,7 @@ class DistCacheOptions(DistCacheSetupOptions):
                 env_opts=dict(
                     hook=lambda n: SetValueHook(n, values=["get", "put"]),
                 ),
+                cfg_opts={},
             )
         )
 
