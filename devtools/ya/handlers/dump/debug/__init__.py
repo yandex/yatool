@@ -40,7 +40,6 @@ from yalibrary.debug_store.processor import DumpItem, DumpProcessor
 
 import devtools.ya.app
 
-
 DEFAULT_TMP_YA_PATH = '.ya/'
 DEFAULT_ARC_ROOT_PATH = '/arcadia/'
 

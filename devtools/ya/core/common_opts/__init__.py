@@ -51,7 +51,6 @@ import devtools.ya.core.config as cc
 import yalibrary.upload.consts
 from yalibrary.platform_matcher import is_darwin_rosetta
 
-
 logger = logging.getLogger(__name__)
 
 

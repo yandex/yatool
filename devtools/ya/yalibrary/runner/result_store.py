@@ -14,7 +14,6 @@ import yalibrary.runner.fs
 
 from exts import fs
 
-
 AUX_EXT = '.link'
 
 logger = logging.getLogger(__name__)

@@ -11,7 +11,6 @@ from devtools.ya.test.facility import TestCase
 from devtools.ya.test.system.process import execute
 from devtools.ya.test.test_types.common import PerformedTestSuite
 
-
 logger = logging.getLogger(__name__)
 
 report_name = 'stylelint.report.json'

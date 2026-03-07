@@ -8,7 +8,6 @@ from yalibrary import toolscache
 
 from .common import clean_dir
 
-
 _GUARD_FILE_NAME = "INSTALLED"
 _VERSION = 2
 _refetched_paths = set()

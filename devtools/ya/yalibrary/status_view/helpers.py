@@ -7,7 +7,6 @@ import devtools.ya.test.const
 import yalibrary.roman as roman
 import library.python.func as func
 
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_PRINT_COLOR = 'white'

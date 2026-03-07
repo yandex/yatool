@@ -1,7 +1,6 @@
 from devtools.ya.test.test_types import py_test
 import devtools.ya.test.util.shared as util_shared
 
-
 VALIDATE_RESOURCE_TEST_TYPE = "validate_resource"
 VALIDATE_DATA_SBR_TEST_TYPE = "validate_data_sbr"
 

@@ -2,7 +2,6 @@ import sys
 import re
 from xml.dom import minidom
 
-
 # Python 2.X and 3.X compatibility
 try:
     unichr(65)

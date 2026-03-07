@@ -3,7 +3,6 @@ import logging
 
 import library.python.retry as lpr
 
-
 logger = logging.getLogger(__name__)
 
 

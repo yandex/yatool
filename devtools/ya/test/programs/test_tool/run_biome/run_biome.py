@@ -14,7 +14,6 @@ import devtools.ya.test.system.process
 import devtools.ya.test.test_types.common
 import devtools.ya.test.util
 
-
 logger = logging.getLogger(__name__)
 
 

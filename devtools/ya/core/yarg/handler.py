@@ -22,7 +22,6 @@ from devtools.ya.core.yarg.help_level import HelpLevel
 
 from yalibrary.display import build_term_display
 
-
 # XXX hack to preserve "ya m" as "ya make" short form
 EXACT_MATCH_HANDLERS = [
     'maven-import',

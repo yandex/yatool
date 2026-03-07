@@ -7,7 +7,6 @@ from devtools.ya.test import common as test_common
 from devtools.ya.test.system import process
 from devtools.ya.test.test_types import common as common_types
 
-
 GO_TEST_TYPE = "go_test"
 GO_BENCH_TEST_TYPE = "go_bench"
 

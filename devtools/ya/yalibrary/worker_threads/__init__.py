@@ -7,7 +7,6 @@ import time
 import queue as Queue
 from exts import asyncthread
 
-
 logger = logging.getLogger(__name__)
 logger.setLevel('INFO')
 

@@ -11,7 +11,6 @@ import devtools.ya.core.yarg
 
 from . import ide_common
 
-
 MAKE_LIST_HEADER = '# fake CMakeLists.txt generated for CLion'
 MAKE_LIST = 'CMakeLists.txt'
 
@@ -114,16 +113,12 @@ def gen_idea_prj(
     # Write misc.xml
 
     with open(os.path.join(idea_dir, 'misc.xml'), 'w') as misc_out:
-        misc_out.write(
-            """<?xml version="1.0" encoding="UTF-8"?>
+        misc_out.write("""<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
 <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$">
 <contentRoot DIR="{}" />
 </component>
-  <component name="CidrRootsConfiguration">""".format(
-                content_root
-            )
-        )
+  <component name="CidrRootsConfiguration">""".format(content_root))
 
         misc_out.write("<sourceRoots>\n")
         misc_out.write(f'<file path="{content_root}" />\n')
@@ -141,30 +136,24 @@ def gen_idea_prj(
         misc_out.write('<file path="{}" />'.format(os.path.join(project_info.params.arc_root, 'contrib')))
         misc_out.write('</libraryRoots>')
 
-        misc_out.write(
-            """</component>
+        misc_out.write("""</component>
 <component name="ProjectRootManager" version="2" />
 <component name="SvnBranchConfigurationManager">
 <option name="mySupportsUserInfoFilter" value="true" />
 </component>
-</project>"""
-        )
+</project>""")
 
     # Write vcs.xml
 
     vcs_file = os.path.join(idea_dir, 'vcs.xml')
     if not os.path.exists(vcs_file):
         with open(vcs_file, 'w') as vcs_out:
-            vcs_out.write(
-                """<?xml version="1.0" encoding="UTF-8"?>
+            vcs_out.write("""<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="{root}" vcs="{vcs}" />
   </component>
-</project>""".format(
-                    root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)
-                )
-            )
+</project>""".format(root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)))
 
     # Write workspace.xml
 
@@ -223,14 +212,12 @@ def gen_idea_prj(
         with open(workspace_file) as f:
             root = eTree.fromstring(f.read())
     else:
-        root = eTree.fromstring(
-            '''<?xml version="1.0" encoding="UTF-8"?>
+        root = eTree.fromstring('''<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
     <component name="CMakeRunConfigurationManager" shouldGenerate="false">
         <generated />
     </component>
-</project>'''
-        )
+</project>''')
 
     def _warn_override(what, where_type, where, value, canon):
         if value != canon:
@@ -367,15 +354,13 @@ def gen_idea_prj(
             with open(deployment_file) as f:
                 root = eTree.fromstring(f.read())
         else:
-            root = eTree.fromstring(
-                '''<?xml version="1.0" encoding="UTF-8"?>
+            root = eTree.fromstring('''<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="PublishConfigData">
     <serverData>
     </serverData>
   </component>
-</project>'''
-            )
+</project>''')
 
         component = root.find('component[@name="PublishConfigData"]')
         if component is None:
@@ -424,14 +409,12 @@ def gen_idea_prj(
         external_dependencies_file = os.path.join(idea_dir, 'externalDependencies.xml')
         if not os.path.exists(external_dependencies_file):
             with open(external_dependencies_file, 'w') as vcs_out:
-                vcs_out.write(
-                    """<?xml version="1.0" encoding="UTF-8"?>
+                vcs_out.write("""<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ExternalDependencies">
     <plugin id="com.intellij.plugins.watcher" />
   </component>
-</project>"""
-                )
+</project>""")
 
         # write watcherTasks.xml
 
@@ -440,14 +423,12 @@ def gen_idea_prj(
             with open(watcher_tasks_file) as f:
                 root = eTree.fromstring(f.read())
         else:
-            root = eTree.fromstring(
-                '''<?xml version="1.0" encoding="UTF-8"?>
+            root = eTree.fromstring('''<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ProjectTasksOptions">
   </component>
 </project>
-'''
-            )
+''')
 
         component = root.find('component[@name="ProjectTasksOptions"]')
         if component is None:

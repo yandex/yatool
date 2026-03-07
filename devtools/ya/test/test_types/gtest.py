@@ -1,7 +1,6 @@
 import devtools.ya.test.const
 from devtools.ya.test.test_types import library_ut
 
-
 GTEST_TYPE = "gtest"
 
 

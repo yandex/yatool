@@ -55,7 +55,7 @@ def path_explode(p):
 
     components = []
     while True:
-        (next_p, tail) = os.path.split(p)
+        next_p, tail = os.path.split(p)
 
         if p == next_p:
             if p != '':  # If the path is relative, empty string should not be added

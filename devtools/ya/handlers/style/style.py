@@ -20,7 +20,6 @@ import devtools.ya.handlers.style.validate as vldt
 from library.python.testing.style import rules
 from library.python.fs import replace_file
 
-
 logger = logging.getLogger(__name__)
 display = yalibrary.display.build_term_display(sys.stdout, exts.os2.is_tty())
 

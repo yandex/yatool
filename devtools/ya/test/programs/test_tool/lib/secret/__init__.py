@@ -10,7 +10,6 @@ import threading
 import exts.uniq_id
 import library.python.windows
 
-
 logger = logging.getLogger(__name__)
 
 CMD_STOP = 'plsstopit'

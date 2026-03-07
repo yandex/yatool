@@ -3,7 +3,6 @@ import logging
 
 from .base_subscriber import SubscriberExcludedTopics
 
-
 logger = logging.getLogger(__name__)
 
 

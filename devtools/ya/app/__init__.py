@@ -35,7 +35,6 @@ from .modules import evlog
 from .modules import params
 from .modules import token_suppressions
 
-
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer(stage_tracer.StagerGroups.OVERALL_EXECUTION)
 modules_stager = stage_tracer.get_tracer(stage_tracer.StagerGroups.MODULE_LIFECYCLE)

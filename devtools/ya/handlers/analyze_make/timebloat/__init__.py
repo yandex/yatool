@@ -14,7 +14,6 @@ import tqdm
 
 import library.python.resource as resource
 
-
 CSS_TYPE_ENTRY = """
 .webtreemap-type-%(type)s {
   background: %(color)s;

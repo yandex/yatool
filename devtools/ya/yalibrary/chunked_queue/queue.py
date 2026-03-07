@@ -8,7 +8,6 @@ from exts import filelock
 
 from pytz import UTC
 
-
 __all__ = ['Queue']
 
 

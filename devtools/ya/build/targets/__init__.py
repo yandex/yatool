@@ -5,7 +5,6 @@ import yalibrary.find_root
 
 from devtools.ya.build import makelist
 
-
 logger = logging.getLogger(__name__)
 
 

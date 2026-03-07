@@ -13,7 +13,6 @@ import devtools.ya.core.config
 import devtools.ya.core.resource
 import devtools.ya.test.const as const
 
-
 logger = logging.getLogger(__name__)
 
 type ConfigPath = Path

@@ -36,7 +36,6 @@ from devtools.ya.build.ccgraph.cpp_string_wrapper import CppStringWrapper
 
 from devtools.ya.build.evlog.progress import PrintProgressSubscriber
 
-
 logger = logging.getLogger(__name__)
 
 

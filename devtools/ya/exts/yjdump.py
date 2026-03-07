@@ -6,7 +6,6 @@ import io  # noqa: F401
 from exts.decompress import udopen
 from devtools.ya.yalibrary import sjson
 
-
 FILE_PROTO = 'file://'
 
 

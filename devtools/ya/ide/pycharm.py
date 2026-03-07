@@ -14,7 +14,6 @@ import devtools.ya.core.yarg
 import devtools.ya.core.resource as resource
 import exts.fs
 
-
 JDK_TABLE_XML = 'jdk.table.xml'
 JDK_TABLE_XML_BKP = JDK_TABLE_XML + '.bkp'
 JDK_TABLE_XML_ORIG = JDK_TABLE_XML + '.orig'

@@ -10,7 +10,6 @@ from six import iteritems
 from exts import func
 from exts import fs
 
-
 logger = logging.getLogger(__name__)
 
 

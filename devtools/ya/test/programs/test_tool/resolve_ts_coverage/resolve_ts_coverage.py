@@ -9,7 +9,6 @@ import exts.archive as archive
 
 from devtools.ya.test.util import shared
 
-
 logger = logging.getLogger(__name__)
 
 

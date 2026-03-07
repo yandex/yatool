@@ -9,7 +9,6 @@ from exts import func
 from devtools.ya.test import common
 from devtools.ya.test import const
 
-
 logger = logging.getLogger(__name__)
 
 

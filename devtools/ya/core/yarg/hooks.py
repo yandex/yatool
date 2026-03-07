@@ -8,7 +8,6 @@ from devtools.ya.core.yarg.excs import TransformationException, ArgsValidatingEx
 from exts import yjson as json
 from exts import compatible23  # noqa
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -26,7 +26,6 @@ from build.plugins.lib.nots.package_manager.utils import (
 
 from .parse_json_report import parse_json_report
 
-
 logger = logging.getLogger(__name__)
 
 

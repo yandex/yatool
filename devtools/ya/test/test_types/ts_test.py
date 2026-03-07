@@ -8,7 +8,6 @@ import devtools.ya.test.const as test_const
 import devtools.ya.test.test_types.common as common_types
 import devtools.ya.test.util.tools as test_tools
 
-
 JEST_TEST_TYPE = "jest"
 HERMIONE_TEST_TYPE = "hermione"
 PLAYWRIGHT_TEST_TYPE = "playwright"

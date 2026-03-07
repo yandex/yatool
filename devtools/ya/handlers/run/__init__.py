@@ -14,7 +14,6 @@ import exts.tmp
 
 import devtools.ya.app
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -34,8 +33,7 @@ class RunYaHandler(yarg.OptsHandler):
                     "Build 'tools/uc' tool with musl and in debug mode and run it",
                 ),
             ],
-            extra_help=textwrap.dedent(
-                """\
+            extra_help=textwrap.dedent("""\
                 Two modes are available.
                 [[imp]]Simple mode[[rst]]:
                   ya run [YA RUN OPTIONS] [TARGET [ARGS]...]
@@ -43,8 +41,7 @@ class RunYaHandler(yarg.OptsHandler):
                 [[imp]]Extended mode.[[rst]]
                 In this mode you can use all 'ya make' options, but the delimiter '--' is needed to separate the target arguments from the 'ya make' ones:
                   ya run [YA MAKE OPTIONS AND YA RUN OPTIONS] [TARGET] -- [ARGS]...\
-                """
-            ),
+                """),
         )
 
     def handle(self, root_handler, args, prefix):

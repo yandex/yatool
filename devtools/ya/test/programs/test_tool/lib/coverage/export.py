@@ -13,7 +13,6 @@ import ujson as json
 import devtools.ya.test.programs.test_tool.lib.coverage.iter_cov_json.lib
 from library.python.reservoir_sampling import reservoir_sampling
 
-
 logger = logging.getLogger(__name__)
 
 

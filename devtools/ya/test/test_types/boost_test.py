@@ -8,7 +8,6 @@ import devtools.ya.test.common as test_common
 from devtools.ya.test.system import process
 from devtools.ya.test.test_types import common as common_types
 
-
 BOOST_TEST_TYPE = "boost_test"
 
 

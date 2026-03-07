@@ -11,7 +11,6 @@ from library.python import strings
 
 import typing as tp  # noqa
 
-
 MARKUP_PATTERN = r'\[\[([^\[\]]*?)\]\]'
 MARKUP_RE = re.compile(MARKUP_PATTERN)
 MARKUP_RE_BIN = re.compile(six.ensure_binary(MARKUP_PATTERN))

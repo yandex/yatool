@@ -168,7 +168,7 @@ def _task_details(task):
 
 
 def print_all_tasks(graph, filename, display):
-    (max_critical_time, critical_path) = graph.get_critical_path()
+    max_critical_time, critical_path = graph.get_critical_path()
 
     tasks = [task for task in graph.get_all_nodes() if task.get_time_elapsed() is not None]
     if tasks:
@@ -257,7 +257,7 @@ def profile_critical_path(critical_path):
 
 
 def print_critical_path(critical_data, graph, filename, display, ymake_stats=None):
-    (max_critical_time, critical_path) = critical_data
+    max_critical_time, critical_path = critical_data
     if len(critical_path) == 0:
         display.emit_message('Critical path is empty.')
         return []

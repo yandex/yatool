@@ -7,7 +7,6 @@ from devtools.ya.test import common as test_common
 import devtools.ya.test.system.process as process
 from devtools.ya.test.test_types import common as common_types
 
-
 GBENCHMARK_TEST_TYPE = "g_benchmark"
 YBENCHMARK_TEST_TYPE = "benchmark"
 

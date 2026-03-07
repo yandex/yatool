@@ -20,7 +20,6 @@ from build.plugins.lib.nots.package_manager.constants import (
 
 from .process_json_report import process_json_report
 
-
 logger = logging.getLogger("run_playwright")
 
 

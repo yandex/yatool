@@ -3,6 +3,7 @@
 """
 Accumulates output results from splitted tests
 """
+
 import os
 import sys
 import six

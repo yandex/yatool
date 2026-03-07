@@ -19,7 +19,6 @@ import package.fs_util
 
 import library.python.compress
 
-
 ATTRIBUTES = ['owner', 'group', 'mode']
 
 TEST_DATA_DIRECTORIES = ['data']
@@ -505,11 +504,9 @@ class ArcadiaSource(Source):
         source = os.path.join(self.arcadia_root, self.source_path())
         destination = os.path.join(self.result_dir, self.destination_path())
         if os.path.abspath(source) == os.path.abspath(self.arcadia_root):
-            logger.warning(
-                "['source']['path'] in your ARCADIA data equals to arcadia root. \
+            logger.warning("['source']['path'] in your ARCADIA data equals to arcadia root. \
 It will cause to scan full arcadia repo, so it will be very slow. \
-Please consider defining your data paths more explicitly"
-            )
+Please consider defining your data paths more explicitly")
         self.copy(source, destination)
 
     def _use_hardlinks(self):

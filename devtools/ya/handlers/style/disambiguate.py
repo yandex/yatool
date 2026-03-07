@@ -7,7 +7,6 @@ import devtools.ya.test.const as const
 from . import config as cfg
 from . import styler
 
-
 type ConfigCache = dict[cfg.Config, type[styler.Styler]]
 
 

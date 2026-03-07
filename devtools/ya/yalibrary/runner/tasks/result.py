@@ -12,7 +12,6 @@ import yalibrary.runner.fs
 
 from yalibrary.runner.tasks.enums import WorkerPoolType
 
-
 logger = logging.getLogger(__name__)
 
 

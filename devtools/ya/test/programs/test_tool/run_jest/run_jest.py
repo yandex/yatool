@@ -25,7 +25,6 @@ from build.plugins.lib.nots.package_manager.utils import (
     build_vs_store_path,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

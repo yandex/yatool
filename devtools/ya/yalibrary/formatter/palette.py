@@ -2,7 +2,6 @@
 
 from devtools.ya.test.const import Highlight, Colors
 
-
 DEFAULT_PALETTE = {
     Highlight.RESET: None,
     Highlight.PATH: Colors.YELLOW,

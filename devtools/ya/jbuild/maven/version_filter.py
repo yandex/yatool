@@ -1,6 +1,5 @@
 import re
 
-
 RANGE = r'(?P<left>\(|\[)(?P<content>.*?)(?P<right>\)|\])'
 
 

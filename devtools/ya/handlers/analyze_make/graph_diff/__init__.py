@@ -4,7 +4,6 @@ from pathlib import Path
 from . import compare
 from . import find_diff
 
-
 logger = logging.getLogger(__name__)
 
 

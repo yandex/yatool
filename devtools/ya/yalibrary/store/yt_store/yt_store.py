@@ -8,7 +8,6 @@ from yalibrary.store.dist_store import DistStore
 from . import xx_client
 from .xx_client import YtStoreError  # noqa
 
-
 YT_CACHE_NO_DATA_CODEC = "no_data"
 
 

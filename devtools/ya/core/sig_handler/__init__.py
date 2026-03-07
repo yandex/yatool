@@ -6,7 +6,6 @@ import termcolor
 
 import devtools.executor.proc_util.python.lib as proc_util
 
-
 if sys.stderr.isatty():
     STOP_STR = termcolor.colored('\r' + chr(27) + '[2KStop\n', color='red', attrs=['bold'])
 else:

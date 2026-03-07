@@ -3,7 +3,6 @@ import enum
 import getpass
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 

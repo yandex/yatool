@@ -25,7 +25,6 @@ from exts import fs
 import exts.windows
 import devtools.ya.test.filter as test_filter
 
-
 logger = logging.getLogger(__name__)
 
 MASTER_TEST_SUITE = "Master Test Suite"

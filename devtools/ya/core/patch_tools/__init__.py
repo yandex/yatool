@@ -83,7 +83,7 @@ def is_valid_unified_diff(diff):
 
 
 def parse_universal_spec(spec):
-    (trs, data) = spec.split(TRANSFORMATIONS_DATA_SEPARATOR, 1)
+    trs, data = spec.split(TRANSFORMATIONS_DATA_SEPARATOR, 1)
     trs = trs.split(TRANSFORMATIONS_SEPARATOR)
     return (trs, data)
 
@@ -93,7 +93,7 @@ def convert_patch_spec(spec):
     converts any known patch spec to universal spec
     """
     if is_universal_spec(spec):
-        (trs, data) = parse_universal_spec(spec)
+        trs, data = parse_universal_spec(spec)
 
         # hack to read files in-place
         if trs[0] == 'read_file':

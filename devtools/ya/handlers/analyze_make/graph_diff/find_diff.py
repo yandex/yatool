@@ -7,7 +7,6 @@ from pathlib import Path
 import devtools.ya.build.graph_description as gd
 import library.python.json as lpj  # type: ignore
 
-
 logger = logging.getLogger(__name__)
 
 

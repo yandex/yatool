@@ -6,7 +6,6 @@ from . import palette
 from . import formatter
 from exts import func
 
-
 CLEAR_TILL_END = '\033[K'
 
 

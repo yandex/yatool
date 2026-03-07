@@ -14,7 +14,6 @@ import exts.archive
 
 from exts import filelock, fs, func, hashing, asyncthread
 
-
 RESOURCE_INFO_JSON = "resource_info.json"
 # this file will hold the resource and later in the test run will be renamed to the actual resource file name
 RESOURCE_CONTENT_FILE_NAME = "resource"

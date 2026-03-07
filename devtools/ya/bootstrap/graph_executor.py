@@ -12,7 +12,6 @@ import subprocess
 from urllib.request import urlopen
 from urllib.request import Request
 
-
 SOURCE_ROOT = sys.argv[1]
 BUILD_ROOT = sys.argv[2]
 

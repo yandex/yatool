@@ -14,7 +14,6 @@ from devtools.ya.core.yarg.excs import ArgsBindingException
 from devtools.ya.core.yarg.options import Options  # noqa: F401
 from devtools.ya.core.yarg.options import _MergedOptions
 
-
 logger = logging.getLogger(__name__)
 
 

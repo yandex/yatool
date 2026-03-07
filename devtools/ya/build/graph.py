@@ -537,7 +537,7 @@ def filter_nodes_by_output(graph, flt, warn=False, host=None, any_match=False):
             if host != node.get('host_platform', False):
                 continue
         for out_name in node.get('outputs'):
-            (new_out_name, renamed) = _apply_out_names_map(mapping, out_name)
+            new_out_name, renamed = _apply_out_names_map(mapping, out_name)
             if new_out_name.endswith(flt):
                 has_match = True
             elif not any_match:
@@ -1139,7 +1139,7 @@ class _ToolTargetsQueue:
     def get(self):
         targets = set()
         while self._sources_ids:
-            (source_id, res, async_result) = self._interruptable_queue_get()
+            source_id, res, async_result = self._interruptable_queue_get()
             # Receives either res or async_result
             assert bool(res is None) != bool(async_result is None)
             if res is not None:
@@ -1174,7 +1174,7 @@ class _ToolEventsQueueServerMode(_ToolTargetsQueue):
         return self._queue.qsize() == 0 and len(self.__finals_received) == len(self._sources_ids)
 
     def get(self):
-        (source_id, res, async_result) = self._interruptable_queue_get()
+        source_id, res, async_result = self._interruptable_queue_get()
         assert bool(res is None) != bool(async_result is None)
         if res is not None:
             assert source_id in self._sources_ids, "Unknown source_id={}".format(source_id)

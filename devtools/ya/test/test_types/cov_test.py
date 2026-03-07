@@ -7,7 +7,6 @@ from devtools.ya.test import const, common as test_common
 from devtools.ya.test.system import process
 from devtools.ya.test.test_types import common as common_types
 
-
 COVERAGE_EXTRACTOR_TEST_TYPE = "coverage_extractor"
 
 

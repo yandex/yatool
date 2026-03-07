@@ -7,7 +7,6 @@ from enum import StrEnum
 
 from devtools.ya.core import report
 
-
 MEMORY_THRESHOLDS = [80, 85] + list(range(90, 101, 1))
 WATCH_INTERVAL = 0.05
 

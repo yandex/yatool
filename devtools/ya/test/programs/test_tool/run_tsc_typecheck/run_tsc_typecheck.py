@@ -12,7 +12,6 @@ from devtools.ya.test.test_types.common import PerformedTestSuite
 from devtools.ya.test.util.shared import setup_logging
 from .parse_output import parse_output
 
-
 logger = logging.getLogger(__name__)
 
 

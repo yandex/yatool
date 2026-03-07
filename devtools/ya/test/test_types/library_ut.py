@@ -9,7 +9,6 @@ from devtools.ya.test.system import process
 from devtools.ya.test.test_types import common as common_types
 from devtools.ya.test.util import tools, shared
 
-
 logger = logging.getLogger(__name__)
 
 UNITTEST_TYPE = "unittest"

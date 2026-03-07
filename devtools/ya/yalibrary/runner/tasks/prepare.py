@@ -10,7 +10,6 @@ from yalibrary.runner.tasks.enums import WorkerPoolType
 
 from .resource import PrepareResource
 
-
 logger = logging.getLogger(__name__)
 
 

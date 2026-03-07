@@ -14,7 +14,6 @@ import devtools.ya.ide.ide_common
 from .clion2016 import create_plugin_config, get_vcs
 from itertools import filterfalse
 
-
 CODEGEN_EXTS = [".go", ".gosrc"]
 SUPPRESS_CODEGEN_EXTS = [".cgo1.go", "_cgo_gotypes.go", "_cgo_import.go"]
 
@@ -221,22 +220,17 @@ def gen_idea_prj(project_info, app_ctx, targets, params):
 
     iml_name = project_info.title + '.iml'
     with open(os.path.join(idea_dir, 'modules.xml'), 'w') as modules_out:
-        modules_out.write(
-            """<?xml version="1.0" encoding="UTF-8"?>
+        modules_out.write("""<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/{iml}" filepath="$PROJECT_DIR$/.idea/{iml}" />
     </modules>
   </component>
-</project>""".format(
-                iml=iml_name
-            )
-        )
+</project>""".format(iml=iml_name))
 
     with open(os.path.join(idea_dir, iml_name), 'w') as go_iml:
-        go_iml.write(
-            """<?xml version="1.0" encoding="UTF-8"?>
+        go_iml.write("""<?xml version="1.0" encoding="UTF-8"?>
 <module type="WEB_MODULE" version="4">
   <component name="Go" enabled="true">
     <buildTags>
@@ -244,35 +238,26 @@ def gen_idea_prj(project_info, app_ctx, targets, params):
     </buildTags>
   </component>
   <component name="NewModuleRootManager">
-    <content url="file://{}">""".format(
-                project_info.params.arc_root
-            )
-        )
+    <content url="file://{}">""".format(project_info.params.arc_root))
 
         for x in excludes:
             go_iml.write(f'<excludeFolder url="file://{x}" />\n')
 
-        go_iml.write(
-            """
+        go_iml.write("""
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
-</module>"""
-        )
+</module>""")
 
     vcs_file = os.path.join(idea_dir, 'vcs.xml')
     if not os.path.exists(vcs_file):
         with open(vcs_file, 'w') as vcs_out:
-            vcs_out.write(
-                """<?xml version="1.0" encoding="UTF-8"?>
+            vcs_out.write("""<?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="{root}" vcs="{vcs}" />
   </component>
-</project>""".format(
-                    root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)
-                )
-            )
+</project>""".format(root=project_info.params.arc_root, vcs=get_vcs(project_info.params.arc_root)))
 
     workspace_file = os.path.join(idea_dir, 'workspace.xml')
     if os.path.exists(workspace_file):

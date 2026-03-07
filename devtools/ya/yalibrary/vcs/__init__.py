@@ -5,7 +5,6 @@ import sys
 
 import library.python.find_root
 
-
 logger = logging.getLogger(__name__)
 
 

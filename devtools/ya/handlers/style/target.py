@@ -13,7 +13,6 @@ from charset_normalizer import from_bytes
 import devtools.ya.handlers.style.state_helper as state_helper
 import devtools.ya.handlers.style.styler as stlr
 
-
 STDIN_FILENAME = 'source.cpp'
 
 logger = logging.getLogger(__name__)

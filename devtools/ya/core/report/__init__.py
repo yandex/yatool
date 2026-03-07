@@ -17,7 +17,6 @@ from devtools.ya.core import config
 from devtools.ya.core import gsid
 from devtools.ya.core import sec
 
-
 logger = logging.getLogger(__name__)
 SUPPRESSIONS = []  # type: list[str]
 

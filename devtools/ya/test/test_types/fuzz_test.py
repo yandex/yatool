@@ -10,7 +10,6 @@ from devtools.ya.test import common as test_common
 from devtools.ya.test.system import process
 from devtools.ya.test.test_types import common as common_types
 
-
 FUZZ_TEST_TYPE = "fuzz"
 
 

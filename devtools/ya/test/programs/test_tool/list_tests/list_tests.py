@@ -32,7 +32,6 @@ from yatest_lib import test_splitter
 
 from devtools.ya.test.dependency import sandbox_storage
 
-
 logger = logging.getLogger(__name__)
 
 

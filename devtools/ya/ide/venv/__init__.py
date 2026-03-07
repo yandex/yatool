@@ -12,7 +12,6 @@ import exts.path2
 
 from . import project
 
-
 PYTHON_BINARY = 'yapython'
 BUILD_OUTPUT = 'ya_build_output'
 SOURCE_ROOT_KEY = 'arcadia-source-root'

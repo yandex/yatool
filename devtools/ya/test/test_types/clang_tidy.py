@@ -5,7 +5,6 @@ import devtools.ya.test.util.tools
 from devtools.ya.test import common as test_common
 from devtools.ya.test.test_types import common as common_types
 
-
 CLANG_TIDY_TEST_TYPE = "clang_tidy"
 
 

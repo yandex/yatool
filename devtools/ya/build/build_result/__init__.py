@@ -10,7 +10,6 @@ import devtools.ya.build.node_checks as node_checks
 
 import typing as tp
 
-
 type Errors = dict[graph_description.GraphNodeUid, list[str]]
 type ErrorLinks = dict[graph_description.GraphNodeUid, list[str]]
 type NodeByUid = dict[graph_description.GraphNodeUid, graph_description.GraphNode]

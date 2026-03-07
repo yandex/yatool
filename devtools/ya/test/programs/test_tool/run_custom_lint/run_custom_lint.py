@@ -10,7 +10,6 @@ import devtools.ya.test.test_types.common
 from devtools.ya.test import facility
 from devtools.ya.test.system import process
 
-
 STATUSES = {
     "GOOD": devtools.ya.test.common.Status.GOOD,
     "FAIL": devtools.ya.test.common.Status.FAIL,

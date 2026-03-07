@@ -1,6 +1,5 @@
 import logging
 
-
 VERBOSE_LEVEL = logging.INFO
 
 

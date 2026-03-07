@@ -30,7 +30,6 @@ import devtools.ya.test.const
 import devtools.ya.test.util.tools
 import build.plugins.lib._metric_resolvers as mr
 
-
 ATTRS_TO_STATE_HASH = [
     '_modulo',
     'project_path',

@@ -17,7 +17,6 @@ from devtools.ya.core.yarg import Options, ArgConsumer, SetValueHook, ArgsValida
 
 import devtools.ya.app
 
-
 TARGET_CONFIG_NAME = 'buf.yaml'
 RESOURCE_CONFIG_NAME = 'buf.yaml'
 

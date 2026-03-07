@@ -26,7 +26,6 @@ import exts.process
 import yalibrary.display
 import yalibrary.platform_matcher
 
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_PROJECT_TITLE = 'arcadia'

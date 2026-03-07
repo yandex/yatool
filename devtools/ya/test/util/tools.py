@@ -12,7 +12,6 @@ from devtools.ya.test import const
 
 from yalibrary.loggers.file_log import TokenFilterFormatter
 
-
 logger = logging.getLogger(__name__)
 
 

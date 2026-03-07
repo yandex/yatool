@@ -2,7 +2,6 @@
 
 import future  # noqa: F401
 
-
 TEMPORARY_ERROR_MESSAGES = [
     'Connection reset by peer',
     'Connection timed out',

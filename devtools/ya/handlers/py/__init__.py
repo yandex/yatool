@@ -22,7 +22,6 @@ import yalibrary.makelists.mk_common
 
 import devtools.ya.app
 
-
 logger = logging.getLogger(__name__)
 
 

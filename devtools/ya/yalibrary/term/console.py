@@ -8,7 +8,6 @@ import six
 from exts import func
 from exts.os2 import is_tty
 
-
 ECMA_48_PATTERN = r"\x1b\[([\d;]*?)m"
 
 

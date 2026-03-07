@@ -18,7 +18,6 @@ import devtools.ya.build.graph_path
 from yalibrary.fetcher import resource_fetcher
 from yalibrary.toolscache import toolscache_version
 
-
 logger = logging.getLogger(__name__)
 
 SOURCE_EXTS = ('cpp', 'c', 'cc', 'cxx')

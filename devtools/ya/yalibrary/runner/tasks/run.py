@@ -29,7 +29,6 @@ if tp.TYPE_CHECKING:
 from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.runner.timeline_store import DetailedTimelineStore, DetailedStages
 
-
 logger = logging.getLogger(__name__)
 
 

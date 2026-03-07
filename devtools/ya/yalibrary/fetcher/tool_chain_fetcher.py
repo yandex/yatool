@@ -28,7 +28,6 @@ from .resource_fetcher import (
     fetch_resource_if_need,
 )
 
-
 logger = logging.getLogger(__name__)
 
 

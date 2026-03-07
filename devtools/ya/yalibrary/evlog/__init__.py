@@ -16,7 +16,6 @@ from exts import fs, os2, yjson, archive
 import typing as tp  # noqa
 import abc
 
-
 _LOG_FILE_NAME_FMT = '%H-%M-%S'
 _LOG_DIR_NAME_FMT = '%Y-%m-%d'
 DAYS_TO_SAVE = 10

@@ -13,7 +13,6 @@ from devtools.ya.core import profiler
 
 import typing as tp  # noqa
 
-
 logger = logging.getLogger(__name__)
 
 

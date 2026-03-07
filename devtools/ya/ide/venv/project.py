@@ -7,7 +7,6 @@ import exts.fs
 import yalibrary.makelists
 import yalibrary.makelists.macro_definitions
 
-
 PEER_PROJECT_TYPES = {
     'PROTO_LIBRARY',
     'PY23_LIBRARY',

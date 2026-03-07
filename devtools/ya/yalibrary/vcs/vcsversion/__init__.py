@@ -23,7 +23,6 @@ import yalibrary.find_root
 import yalibrary.tools
 import yalibrary.vcs
 
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_VCS_REVISION: int = -1

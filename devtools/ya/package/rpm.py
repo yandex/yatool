@@ -13,7 +13,6 @@ import package.fs_util
 import package.noconffiles
 import package.process
 
-
 SPEC_FILE = """
 Name:\t {name}
 Version:\t {version}

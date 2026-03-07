@@ -5,7 +5,6 @@ import traceback
 
 import devtools.ya.core.config
 
-
 logger = logging.getLogger(__name__)
 
 

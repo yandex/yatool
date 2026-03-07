@@ -3,6 +3,7 @@
 """
 Merges results from multiple runs of one test
 """
+
 import os
 import json
 import logging

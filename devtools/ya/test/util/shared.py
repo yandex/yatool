@@ -29,7 +29,6 @@ from yalibrary import term
 from yalibrary.loggers.file_log import TokenFilterFormatter
 from yalibrary.term import console
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -8,7 +8,6 @@ import typing as tp  # noqa
 
 from exts import func
 
-
 logger = logging.getLogger(__name__)
 
 
