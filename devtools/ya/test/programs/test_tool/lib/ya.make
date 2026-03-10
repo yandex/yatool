@@ -27,6 +27,7 @@ IF (NOT YA_OPENSOURCE)
         )
     ENDIF()
 ENDIF()
+
 PEERDIR(
     devtools/ya/test/programs/test_tool/build_clang_coverage_report
     devtools/ya/test/programs/test_tool/build_go_coverage_report
@@ -82,11 +83,13 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_stylelint
     devtools/ya/test/programs/test_tool/run_test
     devtools/ya/test/programs/test_tool/run_tsc_typecheck
+    devtools/ya/test/programs/test_tool/run_ts_check
     devtools/ya/test/programs/test_tool/run_vitest
     devtools/ya/test/programs/test_tool/run_ut
     devtools/ya/test/programs/test_tool/run_y_benchmark
     devtools/ya/test/programs/test_tool/unify_clang_coverage
 )
+
 IF (NOT ARCH_AARCH64 AND NOT ARCH_PPC64LE)
     PEERDIR(
         devtools/ya/test/programs/test_tool/ytexec_run_test

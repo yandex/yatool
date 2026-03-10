@@ -88,6 +88,8 @@ _META_MAP = [
     ('ts_test_data_dirs', None, (dict.get, ('TS-TEST-DATA-DIRS',))),
     ('ts_test_data_dirs_rename', None, (dict.get, ('TS-TEST-DATA-DIRS-RENAME',))),
     ('ts_test_for_path', None, (dict.get, ('TS-TEST-FOR-PATH',))),
+    ('ts_check_script_name', None, (dict.get, ('TS-CHECK-SCRIPT-NAME',))),
+    ('ts_check_type', None, (dict.get, ('TS-CHECK-TYPE',))),
     ('use_arcadia_python', None, (dict.get, ('USE_ARCADIA_PYTHON',))),
     ('use_ktlint_old', None, (dict.get, ('USE_KTLINT_OLD',))),
     ('yt_spec', (), (dict.get, ('YT-SPEC',))),
