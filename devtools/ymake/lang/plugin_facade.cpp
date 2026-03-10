@@ -39,7 +39,7 @@ void TMacroFacade::Clear() {
 class TParserAdapter: public TParserBase {
 private:
     TSimpleSharedPtr<TParser> Parser_;
-    TIndDepsRule Rule;
+    TIndDepsRule Rule_;
 
 public:
     TParserAdapter(TSimpleSharedPtr<TParser> parser)
@@ -48,26 +48,25 @@ public:
     }
 
     void RegisterIndDepsRule(TSymbols& symbols) override {
-        for (auto ci: Parser_->GetIndDepsRule()) {
+        for (const auto& [type, actionStr]: Parser_->GetIndDepsRule()) {
             TIndDepsRule::EAction action;
 
-            if (ci.second == "use") {
+            if (actionStr == "use") {
                 action = TIndDepsRule::EAction::Use;
 
-            } else if (ci.second == "pass") {
+            } else if (actionStr == "pass") {
                 action = TIndDepsRule::EAction::Pass;
 
             } else {
-                ythrow yexception() << "Expected (use|pass) action, got " << ci.second;
+                ythrow yexception() << "Expected (use|pass) action, got " << actionStr;
             }
 
-            Rule.Actions.push_back(std::make_pair(TPropertyType{symbols, EVI_InducedDeps, ci.first}, action));
+            Rule_.Actions.push_back(std::make_pair(TPropertyType{symbols, EVI_InducedDeps, type}, action));
         }
-        Rule.PassInducedIncludesThroughFiles = Parser_->GetPassInducedIncludes();
+        Rule_.PassInducedIncludesThroughFiles = Parser_->GetPassInducedIncludes();
     }
 
-    ~TParserAdapter() override {
-    }
+    ~TParserAdapter() noexcept override = default;
 
     bool ProcessOutputIncludes(TAddDepAdaptor&,
                                TModuleWrapper&,
@@ -109,7 +108,7 @@ public:
     }
 
     const TIndDepsRule* DepsTransferRules() const override {
-        return &Rule;
+        return &Rule_;
     }
 };
 
