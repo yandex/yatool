@@ -54,7 +54,7 @@ struct TDiagCtrl {
     };
     union {
         ui32 DbgMsg = 0;
-        struct { // 24 bits used
+        struct { // 23 bits used
             ui32 MkCmd : 1;
             ui32 NATR : 1;   // TNodeAddCtx trace
             ui32 V : 1;      // verbose messages
@@ -75,7 +75,6 @@ struct TDiagCtrl {
             ui32 IPRP : 1;   // intent/induced property propagation
             ui32 IPUR : 1;   // graph rescan for intent/induced
             ui32 PATH : 1;   // ResolveSourcePath/ResolveBuildPath
-            ui32 Sln : 1;    // for solution
             ui32 UIDs : 1;   // search for blinking UIDs
             ui32 Star : 1;   // related to star-like subgraphs (multiple outputs)
             ui32 Iter : 1;   // graph iteration
