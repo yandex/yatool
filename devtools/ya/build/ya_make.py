@@ -1595,7 +1595,7 @@ class YaMake:
         self._build_results_listener = pr.CompositeResultsListener([])
         test_results_path = self._get_results_root()
         test_node_listener = pr.TestNodeListener(self.ctx.tests, test_results_path, None)
-        if self.opts.dump_failed_node_info_to_evlog:
+        if self.opts.dump_failed_node_info_to_evlog and getattr(self.app_ctx, 'evlog', None) is not None:
             self._build_results_listener.add(pr.FailedNodeListener(self.app_ctx.evlog))
 
         if self.opts.json_line_report_file is None and self.opts.build_results_report_file is None:

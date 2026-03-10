@@ -443,7 +443,7 @@ class EventLogFileOptions(Options):
         self.evlog_file = None
         self.no_evlogs = False
         self.dump_platform_to_evlog = False
-        self.dump_failed_node_info_to_evlog = False
+        self.dump_failed_node_info_to_evlog = True
         self.evlog_dump_node_stat = False
         self.compress_evlog = True
 
@@ -488,7 +488,7 @@ class EventLogFileOptions(Options):
             ),
             EnvConsumer(
                 name='YA_EVLOG_DUMP_FAILED_NODE_INFO',
-                hook=SetConstValueHook('dump_failed_node_info_to_evlog', True),
+                hook=SetConstValueHook('dump_failed_node_info_to_evlog', return_true_if_enabled),
             ),
             ArgConsumer(
                 ['--evlog-node-stat'],
