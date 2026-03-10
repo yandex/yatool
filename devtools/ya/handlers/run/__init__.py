@@ -216,7 +216,6 @@ def _reduced_ya_make_options():
         build_opts.MDSUploadOptions,
         build_opts.OutputOptions,
         build_opts.SandboxUploadOptions,
-        build_opts.SonarOptions,
         build_opts.StreamReportOptions,
         build_opts.TestenvReportDirOptions,
         build_opts.YaMakeOptions,

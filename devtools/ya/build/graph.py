@@ -95,7 +95,6 @@ ALLOWED_EXTRA_RESOURCES = {
     'JSTYLERUNNER': 'jstyle_runner',
     'KYTHE': 'kythe',
     'KYTHETOPROTO': 'kythe_to_proto',
-    'SONAR_SCANNER': 'sonar_scanner',
     'UBERJAR': 'uber_jar',
     'UBERJAR_10': 'uber_jar10',
     'SCRIPTGEN': 'scriptgen',

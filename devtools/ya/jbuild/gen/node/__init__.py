@@ -61,9 +61,7 @@ class JNode(graph_node.Node):
     def to_serializable(self, ctx=None):
         self.target_properties = {}
 
-        sources_as_modules = ctx is not None and (
-            getattr(ctx.opts, 'coverage', False) or getattr(ctx.opts, 'sonar', False)
-        )
+        sources_as_modules = ctx is not None and getattr(ctx.opts, 'coverage', False)
 
         is_mod = False
 

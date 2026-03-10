@@ -1896,64 +1896,6 @@ class YWarnModeOptions(Options):
         self.warn_mode = [y for x in self.warn_mode for y in x.split(';')]
 
 
-class SonarOptions(Options):
-    def __init__(self):
-        self.sonar = False
-        self.sonar_project_filters = []
-        self.sonar_properties = {}
-        self.sonar_do_not_compile = False
-        self.sonar_default_project_filter = False
-        self.sonar_java_args = []
-
-    @staticmethod
-    def consumer():
-        return [
-            ArgConsumer(
-                ['--sonar'],
-                help='Analyze code with sonar.',
-                hook=SetConstValueHook('sonar', True),
-                group=JAVA_BUILD_OPT_GROUP,
-                visible=HelpLevel.BASIC,
-            ),
-            ArgConsumer(
-                ['--sonar-project-filter'],
-                help='Analyze only projects that match any filter',
-                hook=SetAppendHook('sonar_project_filters'),
-                group=JAVA_BUILD_OPT_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
-            ArgConsumer(
-                ['--sonar-default-project-filter'],
-                help='Set default --sonar-project-filter value( build targets )',
-                hook=SetConstValueHook('sonar_default_project_filter', True),
-                group=JAVA_BUILD_OPT_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
-            ArgConsumer(
-                ['--sonar-property', '-N'],
-                help='Property for sonar analyzer(name[=val], "yes" if val is omitted")',
-                hook=DictPutHook('sonar_properties', default_value='yes'),
-                group=JAVA_BUILD_OPT_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
-            ArgConsumer(
-                ['--sonar-do-not-compile'],
-                help='Do not compile java sources.'
-                'In this case "-Dsonar.java.binaries" property is not set up automatically.',
-                hook=SetConstValueHook('sonar_do_not_compile', True),
-                group=JAVA_BUILD_OPT_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
-            ArgConsumer(
-                ['--sonar-java-args'],
-                help='Java machine properties for sonar scanner run',
-                hook=SetAppendHook('sonar_java_args'),
-                group=JAVA_BUILD_OPT_GROUP,
-                visible=HelpLevel.EXPERT,
-            ),
-        ]
-
-
 class UniversalFetcherOptions(Options):
     def __init__(self):
         self.use_universal_fetcher_everywhere = False
@@ -3642,7 +3584,6 @@ def ya_make_options(  # compat
             AuthOptions(),
             SandboxUploadOptions(),  # must go after AuthOptions because it inherits from it
             MDSUploadOptions(),
-            SonarOptions(),
             OutputOptions(),
             ArcPrefetchOptions(),
             GenerateLegacyDirOptions(),
