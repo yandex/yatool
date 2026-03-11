@@ -103,7 +103,7 @@ def inject_unified_coverage_merger_node(graph, suite, resolved_filename, opts):
     work_dir = suite.work_dir()
     output_path = os.path.join(work_dir, resolved_filename)
     resolved_coverage_paths = [work_dir]
-    uid = uid_gen.get_uid(test_uid, "coverage_unified_merger")
+    uid = uid_gen.get_uid(test_uid + resolved_coverage_paths, "coverage_unified_merger")
     cmd = util_tools.get_test_tool_cmd(opts, "merge_coverage_inplace", suite.global_resources) + [
         "--output",
         output_path,
