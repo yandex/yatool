@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <util/generic/ptr.h>
 #include <util/generic/yexception.h>
 #include <util/generic/vector.h>
@@ -148,6 +150,9 @@ public:
 // be set accorting to the in->Counter(). Otherwise it will be zeroO
 TMaybe<TFrame> FindNextFrame(IInputStream* in, IEventFactory*);
 
+// Called when a truncated frame is skipped (premature end of stream). For logging and metrics.
+void OnTruncatedFrameSkipped(size_t skipAfter);
+
 using TFrameStream = TPacketInputStream<const TFrame&>;
 
 class IFrameFilter: public TSimpleRefCount<IFrameFilter> {
@@ -216,16 +221,20 @@ TString UnescapeCharacters(const TStringBuf& stringToUnescape, const TStringBuf&
 
 TString GetEventFieldAsString(const NProtoBuf::Message* message, const google::protobuf::FieldDescriptor* fieldDescriptor, const google::protobuf::Reflection* reflection);
 
+// Optional handler for truncated frame (premature end of stream). Plugins can set via TOptions.
+using TTruncatedFrameHandler = std::function<void(size_t skipAfter)>;
+
 class TFrameStreamer: public TFrameStream {
 public:
-    TFrameStreamer(IInputStream&, IEventFactory* fac, IFrameFilterRef ff = nullptr);
+    TFrameStreamer(IInputStream&, IEventFactory* fac, IFrameFilterRef ff = nullptr, TTruncatedFrameHandler truncatedHandler = nullptr);
     TFrameStreamer(
             const TString& fileName,
             ui64 startTime,
             ui64 endTime,
             ui64 maxRequestDuration,
             IEventFactory* fac,
-            IFrameFilterRef ff = nullptr);
+            IFrameFilterRef ff = nullptr,
+            TTruncatedFrameHandler truncatedHandler = nullptr);
     ~TFrameStreamer() override;
 
     bool Avail() const override;
@@ -242,8 +251,27 @@ private:
 
     void SkipToAllowedFrame() {
         if (Frame_) {
-            while (!AllowedFrame(*Frame_) && DoNext()) {
-                //do nothing
+            for (;;) {
+                try {
+                    if (AllowedFrame(*Frame_)) {
+                        break;
+                    }
+                } catch (const TFrameLoadError& err) {
+                    if (TruncatedFrameHandler_) {
+                        TruncatedFrameHandler_(err.SkipAfter);
+                    } else {
+                        OnTruncatedFrameSkipped(err.SkipAfter);
+                    }
+                    In_.Skip(err.SkipAfter);
+                    Frame_ = FindNextFrame(&In_, EventFactory_);
+                    if (!Frame_) {
+                        break;
+                    }
+                    continue;
+                }
+                if (!DoNext()) {
+                    break;
+                }
             }
         }
     }
@@ -258,6 +286,7 @@ private:
     TMaybe<TFrame> Frame_;
     IFrameFilterRef FrameFilter_;
     IEventFactory* EventFactory_;
+    TTruncatedFrameHandler TruncatedFrameHandler_;
 };
 
 class TFrameDecoder: TEventStream {

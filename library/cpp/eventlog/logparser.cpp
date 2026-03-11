@@ -199,9 +199,13 @@ void TFrame::ClearEventsCache() const {
 TString TFrame::GetCompressedFrame() const {
     const auto left = Limiter_->Left();
     TString payload = Limiter_->ReadAll();
-    Y_ENSURE(payload.size() == left, "Could not read frame payload: premature end of stream");
+    if (payload.size() != left) {
+        ythrow TFrameLoadError(Limiter_->Left()) << "Could not read frame payload: premature end of stream";
+    }
     const ui32 checksum = MurmurHash<ui32>(payload.data(), payload.size());
-    Y_ENSURE(checksum == Framehdr.PayloadChecksum, "Invalid frame checksum");
+    if (checksum != Framehdr.PayloadChecksum) {
+        ythrow TFrameLoadError(0) << "Invalid frame checksum: expected " << Framehdr.PayloadChecksum << ", got " << checksum;
+    }
 
     return payload;
 }
@@ -249,6 +253,13 @@ TMaybe<TFrame> FindNextFrame(IInputStream* in, IEventFactory* eventFactory) {
     } else {
         return Nothing();
     }
+}
+
+// Default handler when no custom TTruncatedFrameHandler is set via TOptions. In practice, plugins
+// (e.g. alice_error_booster_filter, alice_rtlog_filter in unified_agent) pass their own handler
+// for metrics/logging and status.
+void OnTruncatedFrameSkipped(size_t skipAfter) {
+    Cdbg << "eventlog: skipped truncated frame (premature end of stream), skipAfter=" << skipAfter << Endl;
 }
 
 TContainsEventFrameFilter::TContainsEventFrameFilter(TStringBuf unparsedMatchGroups, const IEventFactory* eventFactory) {
@@ -423,10 +434,11 @@ TString GetEventFieldAsString(const NProtoBuf::Message* message, const google::p
     return result;
 }
 
-TFrameStreamer::TFrameStreamer(IInputStream& s, IEventFactory* fac, IFrameFilterRef ff)
+TFrameStreamer::TFrameStreamer(IInputStream& s, IEventFactory* fac, IFrameFilterRef ff, TTruncatedFrameHandler truncatedHandler)
     : In_(&s)
     , FrameFilter_(ff)
     , EventFactory_(fac)
+    , TruncatedFrameHandler_(std::move(truncatedHandler))
 {
     Frame_ = FindNextFrame(&In_, EventFactory_);
 
@@ -439,7 +451,8 @@ TFrameStreamer::TFrameStreamer(
         ui64 endTime,
         ui64 maxRequestDuration,
         IEventFactory* fac,
-        IFrameFilterRef ff)
+        IFrameFilterRef ff,
+        TTruncatedFrameHandler truncatedHandler)
     : File_(TBlob::FromFile(fileName))
     , MemoryIn_(File_.Data(), File_.Size())
     , In_(&MemoryIn_)
@@ -448,6 +461,7 @@ TFrameStreamer::TFrameStreamer(
     , CutoffTime_(endTime + Min(maxRequestDuration, Max<ui64>() - endTime))
     , FrameFilter_(ff)
     , EventFactory_(fac)
+    , TruncatedFrameHandler_(std::move(truncatedHandler))
 {
     In_.Skip(FindFrames(File_.AsStringBuf(), startTime, endTime, maxRequestDuration));
     Frame_ = FindNextFrame(&In_, fac);

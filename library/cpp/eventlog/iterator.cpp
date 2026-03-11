@@ -41,12 +41,12 @@ namespace {
             if (o.FileName.size()) {
                 if (o.ForceStreamMode || o.TailFMode) {
                     FileInput.Reset(o.TailFMode ? (IInputStream*)new TGrowingFileInput(o.FileName) : (IInputStream*)new TUnbufferedFileInput(o.FileName));
-                    FrameStream.Reset(new TFrameStreamer(*FileInput, fac, o.FrameFilter));
+                    FrameStream.Reset(new TFrameStreamer(*FileInput, fac, o.FrameFilter, o.TruncatedFrameHandler));
                 } else {
-                    FrameStream.Reset(new TFrameStreamer(o.FileName, o.StartTime, o.EndTime, o.MaxRequestDuration, fac, o.FrameFilter));
+                    FrameStream.Reset(new TFrameStreamer(o.FileName, o.StartTime, o.EndTime, o.MaxRequestDuration, fac, o.FrameFilter, o.TruncatedFrameHandler));
                 }
             } else {
-                FrameStream.Reset(new TFrameStreamer(*o.Input, fac, o.FrameFilter));
+                FrameStream.Reset(new TFrameStreamer(*o.Input, fac, o.FrameFilter, o.TruncatedFrameHandler));
             }
 
             EvFilter = ConstructEventFilter(o.EnableEvents, o.EvList, fac);

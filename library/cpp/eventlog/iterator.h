@@ -37,6 +37,8 @@ namespace NEventLog {
         bool TailFMode = false;
         IInputStream* Input = &Cin;
         IFrameFilterRef FrameFilter;
+        /// Optional. When set, called on truncated frame (premature end of stream) instead of default log/counter.
+        TTruncatedFrameHandler TruncatedFrameHandler;
     };
 
     class IIterator: public TInputRangeAdaptor<IIterator> {
