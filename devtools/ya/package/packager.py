@@ -192,6 +192,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.vcs_file = params.vcs_file
     build_options.be_verbose = params.be_verbose
     build_options.custom_build_directory = params.custom_build_directory
+    build_options.content_uids = params.content_uids
     if app_config.in_house:
         build_options.use_distbuild = params.use_distbuild
         build_options.distbuild_patch = params.distbuild_patch
