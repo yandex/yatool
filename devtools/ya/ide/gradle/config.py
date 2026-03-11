@@ -82,6 +82,7 @@ class _JavaSemConfig(SemConfig):
         if not _JavaSemConfig.GRADLE_PROPS_FILE.exists():
             logging.info(f'Gradle properties file {_JavaSemConfig.GRADLE_PROPS_FILE} not found')
             logging.info('Try setup automatically')
+            _JavaSemConfig.GRADLE_PROPS_FILE.parent.mkdir(parents=True, exist_ok=True)
             with _JavaSemConfig.GRADLE_PROPS_FILE.open('w') as f:
                 f.write('')  # create empty file
 
