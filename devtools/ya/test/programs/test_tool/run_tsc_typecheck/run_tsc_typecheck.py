@@ -31,6 +31,7 @@ def get_env(args):
         ),
         # TODO: remove - no longer needed
         os.path.join(bindir_node_modules_path, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+        os.path.join(build_dir, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
     ]
 
     return {"NODE_PATH": os.pathsep.join(node_path), "NODE_OPTIONS": "--max-old-space-size=4096"}

@@ -51,6 +51,7 @@ def get_env(args):
         os.path.join(pm_utils.build_vs_store_path(args.build_root, args.project_path), pm_const.NODE_MODULES_DIRNAME),
         # TODO: remove - no longer needed
         os.path.join(bindir_node_modules_path, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+        os.path.join(build_dir, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
         bindir_node_modules_path,
     ]
     env = os.environ.copy()

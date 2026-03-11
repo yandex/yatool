@@ -43,6 +43,7 @@ def main():
         os.path.join(build_vs_store_path(args.build_root, args.source_folder_path), NODE_MODULES_DIRNAME),
         # TODO: remove - no longer needed
         os.path.join(bindir_node_modules_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
+        os.path.join(build_dir, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
         bindir_node_modules_path,
     ]
 

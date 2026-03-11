@@ -121,6 +121,7 @@ def run_tests(opts):
         [
             os.path.join(build_vs_store_path(opts.build_root, test_for_project_path), NODE_MODULES_DIRNAME),
             os.path.join(bindir_node_modules_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
+            os.path.join(opts.build_root, test_for_project_path, VIRTUAL_STORE_DIRNAME, NODE_MODULES_DIRNAME),
             bindir_node_modules_path,
         ]
     )

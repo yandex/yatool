@@ -32,6 +32,7 @@ def get_env(args: CliArgs, report_path: str):
         os.path.join(pm_utils.build_vs_store_path(args.build_root, args.target_path), pm_const.NODE_MODULES_DIRNAME),
         # TODO: remove - no longer needed
         os.path.join(bindir_node_modules_path, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
+        os.path.join(build_dir, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
     ]
 
     return {
