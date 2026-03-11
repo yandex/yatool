@@ -1572,19 +1572,9 @@ namespace NYa {
                     selfPtr->DoLoadMetaDataByUid(loadingColumns, version, options, promise);
                 });
                 if (config->Version >= 3 && options->ContentUidsEnabled) {
-                    bool contentUidsFlag = false;
-                    try {
-                        contentUidsFlag = RetrierPtr_->Do([&] {
-                            return Cluster_.Client->Exists(NYT::JoinYPaths(Cluster_.DataDir, "content_uids"));
-                        });
-                    } catch (...) {
-                        DEBUG_LOG << "Cannot check content_uids flag: " << CurrentExceptionMessage();
-                    }
-                    if (contentUidsFlag) {
-                        threadPool.SafeAddFunc([selfPtr = shared_from_this(), loadingColumns, options] {
-                            selfPtr->DoLoadMetaDataBySelfUid(loadingColumns, options);
-                        });
-                    }
+                    threadPool.SafeAddFunc([selfPtr = shared_from_this(), loadingColumns, options] {
+                        selfPtr->DoLoadMetaDataBySelfUid(loadingColumns, options);
+                    });
                 }
                 return promise.GetFuture();
             }
@@ -1768,6 +1758,19 @@ namespace NYa {
             }
 
             void DoLoadMetaDataBySelfUid(const TVector<TString>& loadingColumns, TPrepareOptionsPtr options) {
+                try {
+                    bool contentUidsFlag = RetrierPtr_->Do([&] {
+                        return Cluster_.Client->Exists(NYT::JoinYPaths(Cluster_.DataDir, "content_uids"));
+                    });
+                    if (!contentUidsFlag) {
+                        DEBUG_LOG << ReaderName() << ": no content_uid flag found";
+                        return;
+                    }
+                } catch (...) {
+                    DEBUG_LOG << ReaderName() << ": cannot check content_uids flag: " << CurrentExceptionMessage();
+                    return;
+                }
+
                 try {
                     auto startTime = TInstant::Now();
 
