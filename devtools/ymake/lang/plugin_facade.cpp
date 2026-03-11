@@ -50,15 +50,14 @@ public:
     void RegisterIndDepsRule(TSymbols& symbols) override {
         for (const auto& [type, actionStr]: Parser_->GetIndDepsRule()) {
             TIndDepsRule::EAction action;
-
-            if (actionStr == "use") {
-                action = TIndDepsRule::EAction::Use;
-
-            } else if (actionStr == "pass") {
-                action = TIndDepsRule::EAction::Pass;
-
-            } else {
-                ythrow yexception() << "Expected (use|pass) action, got " << actionStr;
+            if (!TryFromString(actionStr, action)) {
+                if (actionStr == "use") {
+                    action = TIndDepsRule::EAction::Use;
+                } else if (actionStr == "pass") {
+                    action = TIndDepsRule::EAction::Pass;
+                } else {
+                    ythrow yexception() << "Expected (Use|Pass) action, got " << actionStr;
+                }
             }
 
             Rule_.Actions.push_back(std::make_pair(TPropertyType{symbols, EVI_InducedDeps, type}, action));
