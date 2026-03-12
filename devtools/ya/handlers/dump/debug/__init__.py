@@ -53,9 +53,9 @@ PARAMS_KEYS_TO_EXCLUDE_SAVING = [
 ]  # TODO: лучше не исключать то что мы знаем, а включать. Так мы не сломаемся от добавления нового
 
 
-class FilePathInfo(typing.NamedTuple):
-    filename: str
-    directory: Path
+class PathInfo(typing.NamedTuple):
+    key: str
+    path: Path
 
 
 class DumpDebugProcessingOptions(Options):
@@ -122,8 +122,8 @@ def get_ymake_args(json_data: dict[str, str], key_nums: set[str]) -> set[str]:
     return all_args
 
 
-def extract_pathes(args: set[str], start_dir: str, arc_root: str) -> list[FilePathInfo]:
-    results: list[FilePathInfo] = []
+def extract_pathes(args: set[str], start_dir: str, arc_root: str) -> list[PathInfo]:
+    results: list[PathInfo] = []
     for arg in args:
         if not isinstance(arg, str):
             continue
@@ -134,9 +134,11 @@ def extract_pathes(args: set[str], start_dir: str, arc_root: str) -> list[FilePa
                 continue
 
             if start_dir in clean_part and arc_root not in clean_part:
-                directory, filename = os.path.split(clean_part)
-                if filename:
-                    results.append(FilePathInfo(filename, Path(directory)))
+                full_path = Path(clean_part)
+                if full_path.exists():
+                    key = full_path.name if full_path.name else clean_part
+                    path_info = PathInfo(key, full_path)
+                    results.append(path_info)
 
     return results
 
@@ -225,16 +227,15 @@ def do_dump_debug(params):
     for key in PARAMS_KEYS_TO_EXCLUDE_SAVING:
         filtered_params.pop(key, None)
 
-    pathes: list[FilePathInfo] = extract_pathes(
+    pathes: list[PathInfo] = extract_pathes(
         filtered_params,
         start_dir='/',
         arc_root=getattr(app_ctx.params, 'arc_root', DEFAULT_ARC_ROOT_PATH),
     )
 
-    for additional_path in pathes:
-        full_source_path = additional_path.directory / additional_path.filename
-        if additional_path and full_source_path.exists():
-            additional_paths.append((additional_path.filename, full_source_path))
+    for path_info in pathes:
+        if path_info.path.exists():
+            additional_paths.append((path_info.key, path_info.path))
 
     try:
         repro_manager = reproducer.Reproducer(item)
@@ -249,8 +250,9 @@ def do_dump_debug(params):
             start_dir=getattr(app_ctx.params, 'dump_debug', {}).get('cache_dir', DEFAULT_TMP_YA_PATH),
             arc_root=getattr(app_ctx.params, 'arc_root', DEFAULT_ARC_ROOT_PATH),
         )
-        if all_pathes:
-            additional_paths.extend(all_pathes)
+        for path_info in all_pathes:
+            if path_info.path.exists():
+                additional_paths.append((path_info.key, path_info.path))
 
     except Exception as exc:
         logging.debug("Failed to gather reproducer due to exception", exc_info=exc)
