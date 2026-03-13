@@ -122,9 +122,6 @@ namespace NYndex {
         { "GO_TEST_FOR",
             "@usage: GO_TEST_FOR(path/to/module)  #builtin\n\n"
             "Produces go test for specified module"},
-        { "TS_TEST_FOR",
-            "@usage: TS_TEST_FOR(path/to/module)  #builtin\n\n"
-            "Produces typescript test for specified module"},
         { NMacro::IF,
             "@usage IF(condition) .. ELSEIF(other_condition) .. ELSE() .. ENDIF()  #builtin\n\n"
                  "Apply macros if condition holds" },

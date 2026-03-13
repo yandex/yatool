@@ -488,8 +488,6 @@ bool TDirParser::ModuleStatement(const TStringBuf& name, TArrayRef<const TString
         return DeclStatement("PY_PACKAGE", args, vars, orig);
     } else if (orig.contains("GO_TEST_FOR_DIR")) {
         return DeclStatement("GO_TEST", args, vars, orig);
-    } else if (orig.contains("TS_TEST_FOR_DIR")) {
-        return DeclStatement("TS_TEST", args, vars, orig);
     } else if (name == "UNITTEST_FOR" || name == "JTEST_FOR") {
         if (args.size() < 1) {
             TString what = TString::Join("[[alt1]]", name, "[[rst]] without arguments is invalid.");
@@ -653,7 +651,7 @@ bool TDirParser::DirStatement(const TStringBuf& name, const TVector<TStringBuf>&
 }
 
 bool TDirParser::MiscStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (name == "DLL_FOR" || name == "PY_PROTOS_FOR" || name == "GO_TEST_FOR" || name == "TS_TEST_FOR") {
+    if (name == "DLL_FOR" || name == "PY_PROTOS_FOR" || name == "GO_TEST_FOR") {
         if (ModuleCount++ > 0) {
             YConfErrPrecise(Syntax, GetStatementRow(name), GetStatementColumn(name)) << "unexpected command [[alt1]]" << name << "[[rst]]. Only one module per ya make list is permitted." << Endl;
         }
@@ -698,12 +696,6 @@ bool TDirParser::MiscStatement(const TStringBuf& name, const TVector<TStringBuf>
             ReadModuleContentOnly = true;
             Vars().SetStoreOriginals(TStringBuf("GO_TEST_IMPORT_PATH"), ToString(args[0]), OrigVars());
             Vars().SetStoreOriginals(TStringBuf("_GO_IMPORT_PATH"), ToString(args[0]), OrigVars());
-            Vars().SetAppendStoreOriginals(NMacro::SRCDIR, ToString(args[0]), OrigVars());
-        }
-
-        if (name == "TS_TEST_FOR") {
-            ReadModuleContentOnly = true;
-            Vars().SetStoreOriginals(TStringBuf("TS_TEST_FOR_PATH"), ToString(args[0]), OrigVars());
             Vars().SetAppendStoreOriginals(NMacro::SRCDIR, ToString(args[0]), OrigVars());
         }
 
