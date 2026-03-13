@@ -77,13 +77,15 @@ struct TIndDepsRule {
         Use,
         Pass
     };
-    using TActions = TVector<std::pair<TPropertyType, EAction>>;
+    using TActions = std::vector<std::pair<TPropertyType, EAction>>;
 
     TActions Actions;
     bool PassInducedIncludesThroughFiles = false;
     bool PassNoInducedDeps = false;
 
-    TIndDepsRule(std::initializer_list<TPropertyType> types = {}, EAction act = EAction::Use) {
+    TIndDepsRule() noexcept = default;
+
+    explicit TIndDepsRule(std::initializer_list<TPropertyType> types, EAction act = EAction::Use) {
         Actions.reserve(types.size());
         for (const auto& type: types) {
             Actions.push_back(std::make_pair(type, act));

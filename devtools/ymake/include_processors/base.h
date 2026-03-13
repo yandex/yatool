@@ -23,8 +23,8 @@ public:
     TLangId LanguageId = TModuleIncDirs::C_LANG;
 
 public:
-    TIncludeProcessorBase() = default;
-    virtual ~TIncludeProcessorBase() = default;
+    TIncludeProcessorBase() noexcept = default;
+    virtual ~TIncludeProcessorBase() noexcept = default;
 
     const TIndDepsRule* DepsTransferRules() const;
     virtual void RegisterIndDepsRule(TSymbols&);
@@ -34,6 +34,7 @@ public:
                                        const TVector<TString>& includes) const = 0;
     virtual ui32 Version() const { return CommonVersion; }
 
+protected:
     template<class TIncl>
     static void ResolveAsUnset(const TVector<TIncl>& includes, TVector<TString>& resolved) {
         resolved.reserve(resolved.size() + includes.size());
