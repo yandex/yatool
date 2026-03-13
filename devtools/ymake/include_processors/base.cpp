@@ -41,14 +41,6 @@
 #include <devtools/ymake/add_dep_adaptor_inline.h>
 #include <devtools/ymake/module_wrapper.h>
 
-const TIndDepsRule* TIncludeProcessorBase::DepsTransferRules() const {
-    return &Rule;
-}
-
-void TIncludeProcessorBase::RegisterIndDepsRule(TSymbols&) {
-    // No operations.
-}
-
 void TStringIncludeProcessor::ProcessOutputIncludes(TAddDepAdaptor& node,
                                                     TModuleWrapper& module,
                                                     TFileView incFileName,

@@ -26,13 +26,13 @@ public:
     TIncludeProcessorBase() noexcept = default;
     virtual ~TIncludeProcessorBase() noexcept = default;
 
-    const TIndDepsRule* DepsTransferRules() const;
-    virtual void RegisterIndDepsRule(TSymbols&);
+    virtual void RegisterIndDepsRule(TSymbols&) {}
     virtual void ProcessOutputIncludes(TAddDepAdaptor& node,
                                        TModuleWrapper& module,
                                        TFileView incFileName,
                                        const TVector<TString>& includes) const = 0;
     virtual ui32 Version() const { return CommonVersion; }
+    const TIndDepsRule& DepsTransferRules() const noexcept { return Rule; }
 
 protected:
     template<class TIncl>
@@ -93,7 +93,7 @@ public:
                                        const TVector<TString>& includes) const = 0;
     virtual bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) = 0;
     virtual bool HasIncludeChanges(TFileContentHolder& incFile) const = 0;
-    virtual const TIndDepsRule* DepsTransferRules() const = 0;
+    virtual const TIndDepsRule& DepsTransferRules() const = 0;
     virtual void SetLanguageId(TLangId) {};
     virtual void SetParserType(EIncludesParserType) {};
     virtual void RegisterIndDepsRule(TSymbols&){};
@@ -180,7 +180,7 @@ public:
         return false;
     }
 
-    const TIndDepsRule* DepsTransferRules() const override {
+    const TIndDepsRule& DepsTransferRules() const override {
         return IncludeProcessor.DepsTransferRules();
     }
 

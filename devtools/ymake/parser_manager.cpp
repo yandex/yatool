@@ -303,8 +303,7 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
     ext = ExtPreprocess(ext, context.ModuleResolveContext.Graph.Names(), context.Stack);
 
     if (TParserBase* parser = ParserByExt(ext)) {
-        if (const TIndDepsRule* rule = parser->DepsTransferRules())
-            rule->ApplyNodeFlags(context.ModuleResolveContext.Graph.GetFileNodeData(incFile.GetTargetId()));
+        parser->DepsTransferRules().ApplyNodeFlags(context.ModuleResolveContext.Graph.GetFileNodeData(incFile.GetTargetId()));
 
         const auto start = Now();
         if (parser->ParseIncludes(context.Node, wrapper, incFile)) {
@@ -411,7 +410,7 @@ TParserBase* TIncParserManager::ParserByExt(const TStringBuf& ext) const {
 
 const TIndDepsRule* TIncParserManager::IndDepsRuleByExt(const TStringBuf& ext) const {
     if (TParserBase* pb = ParserByExt(ext)) {
-        return pb->DepsTransferRules();
+        return &pb->DepsTransferRules();
     }
     return nullptr;
 }

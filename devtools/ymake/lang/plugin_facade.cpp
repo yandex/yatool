@@ -106,8 +106,8 @@ public:
         return true;
     }
 
-    const TIndDepsRule* DepsTransferRules() const override {
-        return &Rule_;
+    const TIndDepsRule& DepsTransferRules() const override {
+        return Rule_;
     }
 };
 
