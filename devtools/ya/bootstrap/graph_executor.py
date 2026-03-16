@@ -15,8 +15,8 @@ from urllib.request import Request
 SOURCE_ROOT = sys.argv[1]
 BUILD_ROOT = sys.argv[2]
 
-URL = "https://devtools-registry.s3.yandex.net/5820921597"
-SHA256 = "60d361720cc98aace05e98b66716f847b03b0f4e38497f198a45c23993203e5c"
+URL = "https://devtools-registry.s3.yandex.net/11393818885"
+SHA256 = "0e1a09b8fdca5ae5598e1012f6880035fb7b77929d0c1516ffc878c1aeeeb921"
 
 
 _ssl_is_tuned = False
