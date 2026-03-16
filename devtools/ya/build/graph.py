@@ -965,6 +965,8 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
             if node.get('uid') in graph_result:
                 node['upload'] = True
 
+    return graph
+
 
 def _load_stat(graph_stat_path):
     load_graph_stat_stage = stager.start("load_graph_stat")
@@ -2455,7 +2457,7 @@ def _build_graph_and_tests(
         _transform_nodes_uids(graph, _transformer_for_pgo(pgo_hash))
 
     with stager.scope("finalize-graph"):
-        finalize_graph(graph, opts)
+        graph = finalize_graph(graph, opts)
     with stager.scope("imprint-store-and-stats"):
         imprint.store()
         imprint.stats()
