@@ -186,7 +186,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             modules_initialization_full_stage.finish()
 
             prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix()
-            if len(prefix) > 1 and prefix[1] in ("make", "test", "package"):
+            if prefix and len(prefix) > 1 and prefix[1] in ("make", "test", "package"):
                 ctx.host_health.start_watcher(prefix, ctx.params)
 
             with stager.scope("invoke-{}".format(action_name)):
@@ -877,7 +877,7 @@ def configure_report_interceptor(ctx, report_events):
         ctx.metrics_reporter.report_metric(
             monitoring.MetricNames.YA_FINISHED,
             labels={
-                "handler": prefix[1] if len(prefix) > 1 else "undefined",
+                "handler": prefix[1] if prefix and len(prefix) > 1 else "undefined",
                 "prefix": " ".join(prefix),
                 "exit_code": exit_code,
                 "exc_info": exception_name,
