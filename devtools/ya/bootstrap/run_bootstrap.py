@@ -9,8 +9,8 @@ import sys
 
 
 def _docker_or_podman():
-    if bin := (shutil.which('docker') or shutil.which('podman')):
-        return bin
+    if binary := (shutil.which('docker') or shutil.which('podman')):
+        return binary
     print("ERROR: Please install docker or podman in your system or add it to PATH.", file=sys.stderr)
     sys.exit(1)
 
