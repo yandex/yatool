@@ -10,11 +10,30 @@
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/trace.h>
 
-#include <util/string/cast.h>
 #include <library/cpp/string_utils/base64/base64.h>
+
+#include <util/string/cast.h>
 #include <util/string/subst.h>
 #include <util/generic/singleton.h>
+#include <util/generic/serialized_enum.h>
 #include <util/generic/yexception.h>
+
+#include <fmt/format.h>
+
+namespace {
+
+TString AllActions() {
+    TStringStream out;
+    bool first = true;
+    for (const auto& [_, name]: GetEnumNames<TIndDepsRule::EAction>()) {
+        if (!std::exchange(first, false))
+            out << '|';
+        out << name;
+    }
+    return out.Str();
+}
+
+}
 
 TMacroImpl* TMacroFacade::FindMacro(TStringBuf name) const {
     auto it = Name2Macro_.find(name);
@@ -50,15 +69,8 @@ public:
     void RegisterIndDepsRule(TSymbols& symbols) override {
         for (const auto& [type, actionStr]: Parser_->GetIndDepsRule()) {
             TIndDepsRule::EAction action;
-            if (!TryFromString(actionStr, action)) {
-                if (actionStr == "use") {
-                    action = TIndDepsRule::EAction::Use;
-                } else if (actionStr == "pass") {
-                    action = TIndDepsRule::EAction::Pass;
-                } else {
-                    ythrow yexception() << "Expected (Use|Pass) action, got " << actionStr;
-                }
-            }
+            if (!TryFromString(actionStr, action))
+                ythrow yexception() << "Expected (" << AllActions() << ") action, got " << actionStr;
 
             Rule_.Actions.push_back(std::make_pair(TPropertyType{symbols, EVI_InducedDeps, type}, action));
         }
