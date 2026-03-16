@@ -1,12 +1,34 @@
 # Building ya & ymake from sources
 
-This directory contains files reqiured to build a build system without a build system.
+This directory contains files required to build a build system.
 
-## Dependencies
+## 1st way: build using toolchain-registry
+
+Only linux-x86_64 is supported for bootstrapping. Note that the build process consumes some 100Gb of disk space and takes over 1 hour to complete depending on the machine used.
+
+```bash
+mkdir $HOME/tr_ya_bootstrap
+# or docker
+sudo podman build --network=host -f tr.Dockerfile --tag tr_ya_bootstrap
+sudo podman run --name tr_ya_bootstrap_container --network=host --mount type=bind,source=$HOME/tr_ya_bootstrap,target=/result tr_ya_bootstrap
+```
+
+After the process is successfully complete you will see `ya-bin`, `ymake` and other tools in `~/tr_ya_bootstrap`.
+Note that they will be owned by root if you run podman in rootful mode.
+
+You can then do a clean up
+```bash
+sudo podman container rm tr_ya_bootstrap_container
+sudo podman image rm tr_ya_bootstrap
+```
+
+## 2nd way: execute a premade graph
+
+### Dependencies
 
 For successful build it is required to have `docker` and `python3.9+` installed in system.
 
-## Launching bootstrap
+### Launching bootstrap
 
 Bootstrap is launched with `run_bootstrap.py` script
 
@@ -17,11 +39,11 @@ It has several flags, as follows:
 - `--all-platforms-build` -- This flag will also launch the second stage of bootstrap.
 - `--cleanup` -- Remove all containers and images created by this image.
 
-## How does it work?
+### How does it work?
 
 Bootstrap can be described in two stages
 
-### Stage one
+#### Stage one
 
 This stage's execution results in `ya` and `ymake` for linux.
 
@@ -48,7 +70,7 @@ The last argument is optional and sohuld be used only in debug purposes.
 
 **Important!** Python 3.9 or newer is required for this script.
 
-### Stage two
+#### Stage two
 
 This stage is optional and uses tooling built in the stage one to build all targets, namely:
 - `devtools/ya/bin`
@@ -61,7 +83,7 @@ It has similar to `stage1.sh` invocation syntax, but it builds _all_ targets fro
 
 Build results will be stored in `$result_root/stage2/<arch>` for main tools and in `$result_root/stage2/additional/<arch>` for additional ones (now it is `yexport` only)
 
-## Docker images
+### Docker images
 
 To ensure platform independency we use docker images built from two `Dockerfile`s.
 
@@ -70,14 +92,14 @@ These images each execute their own stage of bootstrap described earlier
 * `stage2.Dockerfile` is the basic `Ubuntu 22.04` image.
 Its launch allows you to get all the tools distributed in this repository.
 
-### How to build an image
+#### How to build an image
 
 An image is built by default as follows:
 ```
 docker build -f <path/to/dockerfile> . -t ya-bootstrap-stage<StageNo>:latest
 ```
 
-### How to run an image
+#### How to run an image
 
 These images are run as follows:
 ```
@@ -88,7 +110,7 @@ docker run \
     ya-bootstrap-stage<StageNo>:latest
 ```
 
-## How graph is distributed
+### How graph is distributed
 
 Graph is obtained with `gen_graph/gg` script and uploaded to S3.
 
