@@ -109,8 +109,6 @@ private:
         return EventsCache_[index];
     }
 
-    void ClearEventsCache() const;
-
     THolder<TLengthLimitedInput> Limiter_;
     mutable TVector<TConstEventPtr> EventsCache_;
 

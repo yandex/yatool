@@ -192,10 +192,6 @@ TFrame::TIterator TFrame::GetIterator(TIntrusiveConstPtr<TEventFilter> eventFilt
     return TIterator(*this, eventFilter);
 }
 
-void TFrame::ClearEventsCache() const {
-    EventsCache_.clear();
-}
-
 TString TFrame::GetCompressedFrame() const {
     const auto left = Limiter_->Left();
     TString payload = Limiter_->ReadAll();
