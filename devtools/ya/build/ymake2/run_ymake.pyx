@@ -55,7 +55,7 @@ result_ready_event = threading.Event()
 cdef THashMap[int, TRunYMakeResultPtr] results
 exception = dict()  # it is mandatory to have a container type here to sync between threads
 
-def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_provider=None, multiconfig=False, order=None):
+def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_provider=None, multiconfig=False, order=None, check_error_fn=None):
     cdef TString binary_c = six.ensure_binary(binary)
     cdef TList[TString] args_c
     cdef THashMap[TString, TString] env_c
@@ -83,7 +83,14 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
             'stderr_line_reader': stderr_line_reader,
             'stdin_line_provider': stdin_line_provider,
         }
-        result_ready_event.wait()
+        # Fixes the race:
+        # - when some of ymake threads fails to generate its commandline, run_scheduled() fails fast and resets the event
+        # - then concurrently running ymake pipelines reach the blocking point and hang forever since the event was reset
+        # So we making waiting threads to wakeup sometimes and check for external errors. Note that we cannot just check
+        # for error one time before waiting since it will be the race between different calls of checking function.
+        while not result_ready_event.wait(timeout=0.1):
+            if check_error_fn():
+                raise RuntimeError('some of ymakes cannot start')
         if exception:
             raise exception['e']
         res = results[order]
@@ -115,8 +122,7 @@ def run_scheduled(count, threads, check_error_fn):
     try:
         while len(arg_collection) < count:
             if check_error_fn():
-                arg_collection.clear()
-                return
+                raise RuntimeError('some of ymakes cannot start')
             time.sleep(0.005)
         for _, v in sorted(arg_collection.items()):
             param.Binary = six.ensure_binary(v['binary'])

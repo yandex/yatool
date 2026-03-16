@@ -130,6 +130,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('drop_foreign_start_modules', default_value=None),
         yarg.Param('multiconfig', default_value=False),
         yarg.Param('order', default_value=None),
+        yarg.Param('check_error_fn', default_value=None),
         yarg.Param('dont_check_transitive_requirements', default_value=None),
         yarg.Param('parallel_rendering', default_value=False),
         yarg.Param('use_subinterpreters', default_value=False),
@@ -667,6 +668,7 @@ def _run_ymake(**kwargs):
             stdin_line_provider = kwargs.pop('stdin_line_provider', None)
             multiconfig = kwargs.pop('multiconfig', False)
             order = kwargs.pop('order', None)
+            check_error_fn = kwargs.pop('check_error_fn', None)
             args = (
                 _cons_ymake_args(**kwargs)
                 + ['--quiet']
@@ -688,6 +690,7 @@ def _run_ymake(**kwargs):
                 stdin_line_provider=stdin_line_provider,
                 multiconfig=multiconfig,
                 order=order,
+                check_error_fn=check_error_fn,
             )
             _stat_info_execution['finish'] = time.time()
             _stat_info_execution['duration'] = _stat_info_execution['finish'] - _stat_info_execution['start']

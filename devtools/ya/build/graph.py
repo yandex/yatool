@@ -2293,7 +2293,11 @@ def _build_graph_and_tests(
     graph_handles: list[_TargetGraphsResult] = []
     tool_targets_queue = create_tool_event_queue(opts)
     enabled_events = EVENTS_WITH_PROGRESS + YmakeEvents.PREFETCH.value if opts.prefetch else EVENTS_WITH_PROGRESS
-    ymake_opts = {'multiconfig': opts.ymake_multiconfig}
+
+    def has_cmdline_generation_error_fn():
+        return graph_maker.has_cmdline_generation_error
+
+    ymake_opts = {'multiconfig': opts.ymake_multiconfig, 'check_error_fn': has_cmdline_generation_error_fn}
     for i, tc in enumerate(target_tcs, start=1):
         targets = []
         for target in tc.get('targets', []):
