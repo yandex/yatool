@@ -1,10 +1,21 @@
 #!/usr/bin/python3
 
-import sys
-import random
-import string
 import argparse
+import random
+import shutil
+import string
 import subprocess
+import sys
+
+
+def _docker_or_podman():
+    if bin := (shutil.which('docker') or shutil.which('podman')):
+        return bin
+    print("ERROR: Please install docker or podman in your system or add it to PATH.", file=sys.stderr)
+    sys.exit(1)
+
+
+BIN = _docker_or_podman()
 
 
 def _get_random_name(length=10):
@@ -15,10 +26,9 @@ def _get_mount_arg(source, target, readonly=False):
     return ["--mount", f"type=bind,source={source},target={target}{',readonly' if readonly else ''}"]
 
 
-def _execute_docker_cmd(args, cwd=None, stdout=None, stderr=None):
-    cmd = ["docker"] + args
+def _execute_cmd(cmd, cwd=None, stdout=None, stderr=None):
     proc = subprocess.Popen(
-        cmd,
+        [BIN] + cmd,
         stdout=stdout,
         stderr=stderr,
         cwd=cwd,
@@ -26,14 +36,6 @@ def _execute_docker_cmd(args, cwd=None, stdout=None, stderr=None):
     proc.communicate()
     assert proc.returncode == 0
     return
-
-
-def _check_docker():
-    try:
-        _execute_docker_cmd(["--version"])
-    except Exception:
-        print("ERROR: Please install docker in your system or add it to PATH.", file=sys.stderr)
-        sys.exit(1)
 
 
 def _build_images(source_root, all_platforms_build):
@@ -60,13 +62,12 @@ def _build_images(source_root, all_platforms_build):
             "--network",
             "host",
         ]
-        _execute_docker_cmd(cmd, source_root)
+        _execute_cmd(cmd, source_root)
 
     return images
 
 
-def prepare_docker(source_root, all_platforms_build):
-    _check_docker()
+def prepare_images(source_root, all_platforms_build):
     images = _build_images(source_root, all_platforms_build)
     return images
 
@@ -86,7 +87,7 @@ def execute_image(source_root, result_root, image_tag):
         + [image_tag]
     )
 
-    _execute_docker_cmd(cmd)
+    _execute_cmd(cmd)
     return name
 
 
@@ -94,11 +95,11 @@ def remove_images(images):
     tags = []
     for image in images.values():
         tags.append(image["tag"])
-    _execute_docker_cmd(["rmi"] + tags)
+    _execute_cmd(["rmi"] + tags)
 
 
 def remove_containers(containers):
-    _execute_docker_cmd(["rm"] + containers)
+    _execute_cmd(["rm"] + containers)
 
 
 def parse_args():
@@ -127,7 +128,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    images = prepare_docker(args.source_root, args.all_platforms_build)
+    images = prepare_images(args.source_root, args.all_platforms_build)
 
     executed_containers = []
 

@@ -151,8 +151,10 @@ PATH_SUBSTITUTES = {
     '$(DEFAULT_LINUX_X86_64)/bin/': '',
     '$(PYTHON)/python': 'python3',
     '$(ANTLR4-sbr:1861632725)': BUILD_ROOT,
-    '$(YMAKE_PYTHON3-3499513686)/python3': 'python3',
+    '$(YMAKE_PYTHON3-212672652)/bin/python3': 'python3',
     '$(BINUTILS_ROOT-sbr:360916612)/bin/': '',
+    '$(CLANG-2403293607)/bin/': '',
+    '$(LLD_ROOT-3107549726)/bin/': '',
     '$(RESOURCE_ROOT)': BUILD_ROOT,
     '$(SOURCE_ROOT)': SOURCE_ROOT,
     '$(BUILD_ROOT)': f'{BUILD_ROOT}/@uid@',
@@ -206,6 +208,10 @@ def check(x):
     return x
 
 
+def check_bool(x):
+    return '$' not in x
+
+
 def descr(n):
     return ' '.join(x[x.index('/') + 1 :] for x in n['outputs'])
 
@@ -250,6 +256,10 @@ def subst_n(n, v):
     return substitute_uid(n['uid'], substitute_path(v))
 
 
+def subst_env(n, d):
+    return {key: subst_n(n, val) for key, val in d.items()}
+
+
 def execute_impl(n):
     for fr, to in iter_links(n):
         try:
@@ -274,8 +284,9 @@ def execute_impl(n):
     for cmd in n['cmds']:
         args = iter_lst(n, fix_list(cmd['cmd_args'], 'a'))
         cwd = check(subst_n(n, cmd.get('cwd', BUILD_ROOT)))
+        env = {k: v for k, v in subst_env(n, cmd.get('env', {})).items() if check_bool(v)}
 
-        env = dict(**os.environ)
+        env = dict(**os.environ, **env)
         env['ARCADIA_ROOT_DISTBUILD'] = SOURCE_ROOT
 
         out = subprocess.check_output(args, env=env, cwd=cwd)

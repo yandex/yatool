@@ -26,7 +26,7 @@ sudo podman image rm tr_ya_bootstrap
 
 ### Dependencies
 
-For successful build it is required to have `docker` and `python3.9+` installed in system.
+For successful build it is required to have `docker` or `podman` and `python3.9+` installed in system.
 
 ### Launching bootstrap
 
@@ -40,6 +40,8 @@ It has several flags, as follows:
 - `--cleanup` -- Remove all containers and images created by this image.
 
 ### How does it work?
+
+Before running the script checkout to the commit when the graph was last updated. Blame a line with `URL` variable in `run_bootstrap.py` to find out.
 
 Bootstrap can be described in two stages
 
@@ -57,7 +59,7 @@ Here:
 * `build_root` - Path to the directory, where all build results will be stored;
 * `results_root` - Path to the directory, where final results will be stored.
 
-This script uses system libraries, thus tools built, for example, with `Ubuntu 22.04`, will not work on earlier Ubuntu's
+This script uses system libraries, thus tools built, for example, with `Ubuntu 24.04`, will not work on earlier Ubuntu's
 
 This script invokes `graph_executor.py`, which downloads build graph from S3 and executes it, then moves `ya`, `ymake` and `libiconv.so` from `build_root` to `$results_root/stage1`.
 
@@ -88,8 +90,8 @@ Build results will be stored in `$result_root/stage2/<arch>` for main tools and 
 To ensure platform independency we use docker images built from two `Dockerfile`s.
 
 These images each execute their own stage of bootstrap described earlier
-* `stage1.Dockerfile` is a `Ubuntu 22.04`-based image with everything needed for successful graph execution.
-* `stage2.Dockerfile` is the basic `Ubuntu 22.04` image.
+* `stage1.Dockerfile` is a `Ubuntu 24.04`-based image with everything needed for successful graph execution.
+* `stage2.Dockerfile` is the basic `Ubuntu 24.04` image.
 Its launch allows you to get all the tools distributed in this repository.
 
 #### How to build an image
@@ -112,17 +114,13 @@ docker run \
 
 ### How graph is distributed
 
-Graph is obtained with `gen_graph/gg` script and uploaded to S3.
+Graph is obtained with `gen_graph/gg2` script and uploaded to S3.
 
 This allows to avoid large diffs compared to committing graph straight into a repo.
 
-This script requires to have `clang-14` and `clang++-14` in user's system.
-
-Also the path to repository root is required in `source_root` variable.
+The path to repository root is required in `source_root` variable.
 
 The invocation is as follows:
 ```
-source_root=path/to/repo PATH=path/to/clangs:$PATH ./gen_graph/gg > fname
+source_root=path/to/repo ./gen_graph/gg2 > fname
 ```
-
-`PATH` setting is required only when compilers are in a custom directories.

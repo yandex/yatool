@@ -2,32 +2,31 @@
 
 cd $source_root
 
+# TODO: DEVTOOLSSUPPORT-80657 Enable YMAKE_USE_OBJCOPY
+# NOTE: must use release build type with musl, otherwise doesn't work
+# with tcmalloc
+# NOTE: don't set --c-compiler, otherwise get segfault
 ./ya make \
-    -DUSE_ICONV=static \
-    --host-platform-flag=USE_ICONV=static \
+    --host-platform-flag=USE_ICONV=static -DUSE_ICONV=static \
     --musl --host-platform-flag=MUSL \
     --host-platform-flag=USE_PREBUILT_TOOLS=no -DUSE_PREBUILT_TOOLS=no \
+    --host-platform-flag=YMAKE_USE_OBJCOPY=no -DYMAKE_USE_OBJCOPY=no \
     --host-platform-flag=OPENSOURCE=yes -DOPENSOURCE=yes \
     --host-platform-flag=OPENSOURCE_PROJECT="ya" -DOPENSOURCE_PROJECT="ya" \
-    -DDISABLE_YMAKE_CONF_CUSTOMIZATION=yes \
-    --host-platform-flag=DISABLE_YMAKE_CONF_CUSTOMIZATION=yes \
-    -DOS_SDK=local --host-platform-flag=OS_SDK=local \
+    --host-platform-flag=HAVE_CUDA=no -DHAVE_CUDA=no \
+    --host-platform-flag=DISABLE_YMAKE_CONF_CUSTOMIZATION=yes -DDISABLE_YMAKE_CONF_CUSTOMIZATION=yes \
+    --host-platform-flag=OS_SDK=local -DOS_SDK=local \
+    --host-platform-flag=EMBED_SBOM=no -DEMBED_SBOM=no \
+    --host-platform-flag=USE_PREBUILT_TOOLS=no -DUSE_PREBUILT_TOOLS=no \
     -DBUILD_PYTHON3_BIN=python3 \
     -DBUILD_PYTHON_BIN=python3 \
     -DUSE_SYSTEM_JDK=/usr \
     -DYA_OPENSOURCE=yes \
     -DYMAKE_EXCLUDE_IDL_TOOL=yes \
-    -DHAVE_CUDA=no \
-    -DEMBED_SBOM=no \
-    --host-platform-flag=EMBED_SBOM=no \
-    --host-platform-flag=USE_PREBUILT_TOOLS=no \
-    -DUSE_PREBUILT_TOOLS=no \
+    --build=release \
     --sandboxing \
-    --host-platform-flag=HAVE_CUDA=no \
     --no-ya-bin-resource \
-    --cxx-compiler clang++ \
-    --c-compiler clang \
-    --ymake-bin $(ya tool ymake --print-path) \
+    --ymake-bin $(./ya tool ymake --print-path) \
     --no-yt-store \
     -G -j 0 \
     devtools/ymake/bin \
