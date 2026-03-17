@@ -770,6 +770,7 @@ private:
     TGetPeerNodeResult GetPeerNodeIfNeeded(const TDGIterAddable& st);
 
     void PropagateIncDirs(const TDGIterAddable& st) const;
+    THashSet<TPropertyType> RestoreOutputNodeInducedDeps(TConstDepNodeRef node);
 };
 
 template <class V>

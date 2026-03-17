@@ -1059,43 +1059,51 @@ TUpdIter::TUpdIter(TYMake& yMake)
     , Nodes(yMake.Graph)
 {}
 
+THashSet<TPropertyType> TUpdIter::RestoreOutputNodeInducedDeps(TConstDepNodeRef node) {
+    Y_ASSERT(IsOutputType(node->NodeType));
+
+    THashSet<TPropertyType> inducedDepsToUse;
+    for (const auto& edge : node.Edges()) {
+        if (edge.Value() == EDT_OutTogetherBack) {
+            auto rule = YMake.IncParserManager.IndDepsRuleByPath(Graph.GetFileName(edge.To()));
+            if (rule) {
+                rule->InsertUseActionsTo(inducedDepsToUse);
+            }
+            MainOutputId[edge.To()->ElemId] = node->ElemId;
+        } else if (edge.Value() == EDT_OutTogether) {
+            // Properties for individual outputs of command with multiple outputs are not yet supported.
+            // Return empty set ot props as if there are no props for this node.
+            //
+            // Relevant ticket to support individual output props is: YMAKE-1471
+            return {};
+        }
+    }
+
+    // Current node is always "main output" because of return statement above. This assumption may break after
+    // implementing YMAKE-1471
+    MainOutputId[node->ElemId] = node->ElemId;
+
+    if (node->NodeType == EMNT_NonParsedFile) {
+        Y_ASSERT(UseFileId(node->NodeType));
+        TFileView name = Graph.GetFileName(node);
+        auto rule = YMake.IncParserManager.IndDepsRuleByPath(name);
+        if (rule) {
+            rule->InsertUseActionsTo(inducedDepsToUse);
+        }
+    }
+    inducedDepsToUse.insert(TPropertyType{Graph.Names(), EVI_InducedDeps, "*"});
+
+    return inducedDepsToUse;
+}
+
 void TUpdIter::RestorePropsToUse() {
     for (const auto& node : Graph.Nodes()) {
         if (!IsOutputType(node->NodeType))
             continue;
 
-        THashSet<TPropertyType> inducedDepsToUse;
-        bool isMainOutput = true;
-        for (const auto& edge : node.Edges()) {
-            if (edge.Value() == EDT_OutTogetherBack) {
-                auto rule = YMake.IncParserManager.IndDepsRuleByPath(Graph.GetFileName(edge.To()));
-                if (rule) {
-                    rule->InsertUseActionsTo(inducedDepsToUse);
-                }
-                MainOutputId[edge.To()->ElemId] = node->ElemId;
-            } else if (edge.Value() == EDT_OutTogether) {
-                isMainOutput = false;
-                break;
-            }
-        }
-
-        if (isMainOutput) {
-            MainOutputId[node->ElemId] = node->ElemId;
-
-            if (node->NodeType == EMNT_NonParsedFile) {
-                Y_ASSERT(UseFileId(node->NodeType));
-                TFileView name = Graph.GetFileName(node);
-                auto rule = YMake.IncParserManager.IndDepsRuleByPath(name);
-                if (rule) {
-                    rule->InsertUseActionsTo(inducedDepsToUse);
-                }
-            }
-
-            inducedDepsToUse.insert(TPropertyType{Graph.Names(), EVI_InducedDeps, "*"});
-
-            if (!inducedDepsToUse.empty()) {
-                PropsToUse[node->ElemId] = std::move(inducedDepsToUse);
-            }
+        THashSet<TPropertyType> inducedDepsToUse = RestoreOutputNodeInducedDeps(node);
+        if (!inducedDepsToUse.empty()) {
+            PropsToUse[node->ElemId] = std::move(inducedDepsToUse);
         }
     }
 }
