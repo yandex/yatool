@@ -150,6 +150,174 @@ namespace {
         res.SetDir(TString{modDir.CutType()});
         return res;
     }
+
+    class IPropertiesWrapper {
+    public:
+        virtual ~IPropertiesWrapper() = default;
+        virtual const TVector<TDepsCacheId>* FindValues(TPropertyType type) const = 0;
+        virtual bool HasProperty(TPropertyType type) const = 0;
+    };
+
+    class TPropertiesStateWrapper: public IPropertiesWrapper {
+    public:
+        TPropertiesStateWrapper(const TPropertiesState& props, TUsingRules propsToUse, TUsingRules restrictedProps)
+            : Props_(props)
+            , PropsToUse_(propsToUse)
+            , RestrictedProps_(restrictedProps)
+        {
+        }
+
+        const TVector<TDepsCacheId>* FindValues(TPropertyType type) const override {
+            if (RestrictedProps_.Defined() && RestrictedProps_->get().contains(type)) {
+                return nullptr;
+            }
+            auto values = Props_.FindValues(type);
+            return values ? &values->Data() : nullptr;
+        }
+
+        bool HasProperty(TPropertyType type) const override {
+            return PropsToUse_.Defined() && PropsToUse_->get().contains(type);
+        }
+    private:
+        const TPropertiesState& Props_;
+        TUsingRules PropsToUse_;
+        TUsingRules RestrictedProps_;
+    };
+
+    class TPropertiesCacheWrapper: public IPropertiesWrapper {
+    public:
+        TPropertiesCacheWrapper(const TRawIncludesInfo& info)
+            : RawIncludesInfo_(info)
+        {
+        }
+
+        const TVector<TDepsCacheId>* FindValues(TPropertyType type) const override {
+            if (auto ptr = RawIncludesInfo_.FindPtr(type); ptr && !ptr->empty()) {
+                return &ptr->Data();
+            }
+            return nullptr;
+        }
+
+        bool HasProperty(TPropertyType /* type */) const override {
+            return true;
+        }
+    private:
+        const TRawIncludesInfo& RawIncludesInfo_;
+    };
+
+    inline void AddInducedDepsToNode(TAddDepContext& ctx, const TVector<TDepsCacheId>& what) {
+        TAddDepAdaptor& to = ctx.Node;
+        const auto dummyFileElemId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
+        TModule& module = ctx.Module;
+        TModuleWrapper wrapper(module, ctx.YMake.Conf, ctx.YMake.GetModuleResolveContext(module));
+        TFileView srcFile = ctx.Graph.GetFileName(to.ElemId);
+        TVector<TResolveFile> resolved;
+        for (auto propNode : what) {
+            const auto elemId = ElemId(propNode);
+            const TFileView elemName = ctx.Graph.GetFileName(elemId);
+            if (elemId == dummyFileElemId) {
+                YDIAG(IPRP) << "    [skip] " << elemName << Endl;
+            } else {
+                resolved.clear();
+                wrapper.ResolveSingleInclude(srcFile, elemName.GetTargetStr(), resolved);
+                if (resolved.empty()) {
+                    YDIAG(IPRP) << "    [skip] " << elemName << " (sysincl resolved to nothing)" << Endl;
+                } else {
+                    for (const auto& incFile : resolved) {
+                        YDIAG(IPRP) << "    " << elemName << " (resolved to " << TResolveFileOut(wrapper, incFile) << ")" << Endl;
+                        to.AddUniqueDep(EDT_Include, FileTypeByRoot(incFile.Root()), incFile.GetElemId());
+                    }
+                }
+            }
+        }
+    }
+
+    inline void UpdateReresolveCache(TAddDepContext& ctx, TPropertyType type, const TVector<TDepsCacheId>& values) {
+        if (!ctx.UpdateReresolveCache)
+            return;
+        auto& rawIncludes = ctx.Module.RawIncludes[ctx.Node.ElemId][type];
+        for (auto id : values) {
+            rawIncludes.Push(id);
+        }
+    }
+
+    inline void ApplyOutputIncludes(TAddDepContext& ctx, const IPropertiesWrapper& iprops) {
+        TAddDepAdaptor& to = ctx.Node;
+        TModule& module = ctx.Module;
+
+        const TPropertyType outputIncludePropType{ctx.Graph.Names(), EVI_InducedDeps, "*"};
+        const auto* outputIncludes = iprops.FindValues(outputIncludePropType);
+        if (!outputIncludes)
+            return;
+
+        Y_ASSERT(UseFileId(to.NodeType));
+        YDIAG(IPRP) << "Inducing OUTPUT_INCLUDE to " << to.NodeType << " " <<
+            ctx.Graph.GetFileName(to.ElemId) << ":" << Endl;
+
+        // 1. Process OUTPUT_INCLUDES via include processor
+        TFileView srcFile = ctx.Graph.GetFileName(to.ElemId);
+        TVector<TString> includes(Reserve(outputIncludes->size()));
+        const auto dummyFileElemId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
+        for (const auto& cacheId : *outputIncludes) {
+            TFileView include = ctx.Graph.GetFileNameByCacheId(cacheId);
+            // Some resolving is already done in CheckInputs in macro processor
+            if (include.GetTargetId() == dummyFileElemId) {
+                YDIAG(IPRP) << "    [skip OUTPUT_INCLUDE]" << include << Endl;
+            } else if (include.IsType(NPath::Unset)) {
+                includes.emplace_back(include.CutType());
+            } else {
+                TString includeStr;
+                include.GetStr(includeStr);
+                includes.emplace_back(std::move(includeStr));
+            }
+        }
+
+        TModuleWrapper wrapper(module, ctx.YMake.Conf, ctx.YMake.GetModuleResolveContext(module));
+        auto& parserManager = ctx.YMake.IncParserManager;
+        bool parserRes = parserManager.ProcessOutputIncludes(srcFile,
+                                                            includes,
+                                                            wrapper,
+                                                            to,
+                                                            ctx.Graph.Names(),
+                                                            ctx.UpdIter.State);
+        // 2. Fallback to simpler OUTPUT_INCLUDES handling that just adds all
+        // deps to current node. We use this approach only
+        // when we failed to find include processor that supports OUTPUT_INCLUDES
+        // for srcFile in which case ProcessOutputIncludes will return false.
+        if (!parserRes) {
+            AddInducedDepsToNode(ctx, *outputIncludes);
+        }
+        UpdateReresolveCache(ctx, outputIncludePropType, *outputIncludes);
+    }
+
+    inline void ApplyDepRules(TAddDepContext& ctx, const IPropertiesWrapper& iprops) {
+        if (!ctx.DepsRule)
+            return;
+
+        const TAddDepAdaptor& to = ctx.Node;
+        const TIndDepsRule& rule = *ctx.DepsRule;
+
+        for (const auto& [type, action] : rule.Actions) {
+            YDIAG(IPRP) << "Inducing (" << action << ") " <<  type.GetName(ctx.Graph) <<
+                " deps to " << to.NodeType << " " <<
+                ctx.Graph.ToString(ctx.Graph.GetNodeById(to.NodeType, to.ElemId)) << ":" << Endl;
+
+            if (action != TIndDepsRule::EAction::Use)
+                continue;
+            const auto* values = iprops.FindValues(type);
+            if (!values) {
+                continue;
+            }
+
+            AddInducedDepsToNode(ctx, *values);
+            UpdateReresolveCache(ctx, type, *values);
+        }
+    }
+
+    inline void InduceDeps(TAddDepContext& ctx, const IPropertiesWrapper& iprops) {
+        ApplyOutputIncludes(ctx, iprops);
+        ApplyDepRules(ctx, iprops);
+    }
 }
 
 TModuleResolveContext MakeModuleResolveContext(const TModule& mod, const TRootsOptions& conf, TDepGraph& graph, const TUpdIter& updIter,
@@ -524,62 +692,6 @@ bool TDGIterAddable::NeedUpdate(TYMake& yMake, TFileHolder& fileContent, bool re
     return false;
 }
 
-class IPropertiesWrapper {
-public:
-    virtual ~IPropertiesWrapper() = default;
-    virtual const TVector<TDepsCacheId>* FindValues(TPropertyType type) const = 0;
-    virtual bool HasProperty(TPropertyType type) const = 0;
-};
-
-class TPropertiesStateWrapper: public IPropertiesWrapper {
-public:
-    TPropertiesStateWrapper(const TPropertiesState& props, TUsingRules propsToUse, TUsingRules restrictedProps)
-        : Props_(props)
-        , PropsToUse_(propsToUse)
-        , RestrictedProps_(restrictedProps)
-    {
-    }
-
-    const TVector<TDepsCacheId>* FindValues(TPropertyType type) const override {
-        if (RestrictedProps_.Defined() && RestrictedProps_->get().contains(type)) {
-            return nullptr;
-        }
-        auto values = Props_.FindValues(type);
-        return values ? &values->Data() : nullptr;
-    }
-
-    bool HasProperty(TPropertyType type) const override {
-        return PropsToUse_.Defined() && PropsToUse_->get().contains(type);
-    }
-private:
-    const TPropertiesState& Props_;
-    TUsingRules PropsToUse_;
-    TUsingRules RestrictedProps_;
-};
-
-class TPropertiesCacheWrapper: public IPropertiesWrapper {
-public:
-    TPropertiesCacheWrapper(const TRawIncludesInfo& info)
-        : RawIncludesInfo_(info)
-    {
-    }
-
-    const TVector<TDepsCacheId>* FindValues(TPropertyType type) const override {
-        if (auto ptr = RawIncludesInfo_.FindPtr(type); ptr && !ptr->empty()) {
-            return &ptr->Data();
-        }
-        return nullptr;
-    }
-
-    bool HasProperty(TPropertyType /* type */) const override {
-        return true;
-    }
-private:
-    const TRawIncludesInfo& RawIncludesInfo_;
-};
-
-inline void InduceDeps(TAddDepContext& ctx, const IPropertiesWrapper& iprops);
-
 void TDGIterAddable::RepeatResolving(TYMake& ymake, TAddIterStack& stack, TFileHolder& fileContent) {
     YDIAG(VV) << "Repeat resolving for " << Graph.GetFileName(Node.ElemId) << Endl;
     Entry().OnceProcessedAsFile = true;
@@ -758,112 +870,6 @@ inline EMakeNodeType GetFileNodeType(NPath::ERoot root) {
             break;
     }
     return elemNodeType;
-}
-
-inline void AddInducedDepsToNode(TAddDepContext& ctx, const TVector<TDepsCacheId>& what) {
-    TAddDepAdaptor& to = ctx.Node;
-    const auto dummyFileElemId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
-    TModule& module = ctx.Module;
-    TModuleWrapper wrapper(module, ctx.YMake.Conf, ctx.YMake.GetModuleResolveContext(module));
-    TFileView srcFile = ctx.Graph.GetFileName(to.ElemId);
-    TVector<TResolveFile> resolved;
-    for (auto propNode : what) {
-        const auto elemId = ElemId(propNode);
-        const TFileView elemName = ctx.Graph.GetFileName(elemId);
-        if (elemId == dummyFileElemId) {
-            YDIAG(IPRP) << "    [skip] " << elemName << Endl;
-        } else {
-            resolved.clear();
-            wrapper.ResolveSingleInclude(srcFile, elemName.GetTargetStr(), resolved);
-            if (resolved.empty()) {
-                YDIAG(IPRP) << "    [skip] " << elemName << " (sysincl resolved to nothing)" << Endl;
-            } else {
-                for (const auto& incFile : resolved) {
-                    YDIAG(IPRP) << "    " << elemName << " (resolved to " << TResolveFileOut(wrapper, incFile) << ")" << Endl;
-                    to.AddUniqueDep(EDT_Include, FileTypeByRoot(incFile.Root()), incFile.GetElemId());
-                }
-            }
-        }
-    }
-}
-
-inline void InduceDeps(TAddDepContext& ctx, const IPropertiesWrapper& iprops) {
-    TAddDepAdaptor& to = ctx.Node;
-    TModule& module = ctx.Module;
-
-    const TPropertyType outputIncludePropType{ctx.Graph.Names(), EVI_InducedDeps, "*"};
-    if (const auto* outputIncludes = iprops.FindValues(outputIncludePropType)) {
-        Y_ASSERT(UseFileId(to.NodeType));
-        YDIAG(IPRP) << "Inducing OUTPUT_INCLUDE to " << to.NodeType << " " <<
-            ctx.Graph.GetFileName(to.ElemId) << ":" << Endl;
-
-        // 1. Process OUTPUT_INCLUDES via include processor
-        TFileView srcFile = ctx.Graph.GetFileName(to.ElemId);
-        TVector<TString> includes(Reserve(outputIncludes->size()));
-        const auto dummyFileElemId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
-        for (const auto& cacheId : *outputIncludes) {
-            TFileView include = ctx.Graph.GetFileNameByCacheId(cacheId);
-            // Some resolving is already done in CheckInputs in macro processor
-            if (include.GetTargetId() == dummyFileElemId) {
-                YDIAG(IPRP) << "    [skip OUTPUT_INCLUDE]" << include << Endl;
-            } else if (include.IsType(NPath::Unset)) {
-                includes.emplace_back(include.CutType());
-            } else {
-                TString includeStr;
-                include.GetStr(includeStr);
-                includes.emplace_back(std::move(includeStr));
-            }
-        }
-
-        TModuleWrapper wrapper(module, ctx.YMake.Conf, ctx.YMake.GetModuleResolveContext(module));
-        auto& parserManager = ctx.YMake.IncParserManager;
-        bool parserRes = parserManager.ProcessOutputIncludes(srcFile,
-                                                             includes,
-                                                             wrapper,
-                                                             to,
-                                                             ctx.Graph.Names(),
-                                                             ctx.UpdIter.State);
-        // 2. Fallback to simpler OUTPUT_INCLUDES handling that just adds all
-        // deps to current node. We use this approach only
-        // when we failed to find include processor that supports OUTPUT_INCLUDES
-        // for srcFile in which case ProcessOutputIncludes will return false.
-        if (!parserRes) {
-            AddInducedDepsToNode(ctx, *outputIncludes);
-        }
-        Y_ASSERT(iprops.HasProperty(outputIncludePropType));
-        if (ctx.UpdateReresolveCache) {
-            auto& rawIncludes = module.RawIncludes[to.ElemId][outputIncludePropType];
-            for (auto id : *outputIncludes) {
-                rawIncludes.Push(id);
-            }
-        }
-    }
-
-    if (!ctx.DepsRule) {
-        return;
-    }
-
-    const TIndDepsRule& rule = *ctx.DepsRule;
-    for (const auto& [type, action] : rule.Actions) {
-        YDIAG(IPRP) << "Inducing (" << action << ") " <<  type.GetName(ctx.Graph) <<
-            " deps to " << to.NodeType << " " <<
-            ctx.Graph.ToString(ctx.Graph.GetNodeById(to.NodeType, to.ElemId)) << ":" << Endl;
-
-        const auto* values = iprops.FindValues(type);
-        if (!values) {
-            continue;
-        }
-        if (action == TIndDepsRule::EAction::Use) {
-            AddInducedDepsToNode(ctx, *values);
-            Y_ASSERT(iprops.HasProperty(type));
-            if (ctx.UpdateReresolveCache) {
-                auto& rawIncludes = module.RawIncludes[to.ElemId][type];
-                for (auto id : *values) {
-                    rawIncludes.Push(id);
-                }
-            }
-        }
-    }
 }
 
 inline void UseByName(TNodeAddCtx& to, const TPropertiesState& iprops, TPropertyType propType, EDepType depType, EMakeNodeType defNodeType) {
