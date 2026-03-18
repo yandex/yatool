@@ -1140,14 +1140,3 @@ class DumpDebugOptions(Options):
             ),
             ConfigConsumer("dump_debug_enabled"),
         ]
-
-
-class YaBin3Options(Options):
-    def __init__(self):
-        self.ya_bin3_required = None
-
-    @staticmethod
-    def consumer():
-        return [
-            ConfigConsumer("enable_ya_bin3", hook=SetValueHook("ya_bin3_required", transform=bool)),
-        ]

@@ -83,7 +83,6 @@ class PackageYaHandler(devtools.ya.core.yarg.OptsHandler):
                 test_opts.TestToolOptions(),
                 test_opts.UidCalculationOptions(cache_tests=False),
                 test_opts.LintersOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
                 devtools.ya.core.common_opts.OutputStyleOptions(),
                 devtools.ya.core.common_opts.PrintStatisticsOptions(),
             ]

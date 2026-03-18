@@ -71,7 +71,6 @@ from devtools.ya.build.build_opts import YMakeRetryOptions, ConfigurationPresets
 from devtools.ya.core.common_opts import (
     BeVerboseOptions,
     CrossCompilationOptions,
-    YaBin3Options,
     OutputStyleOptions,
     LogFileOptions,
     EventLogFileOptions,
@@ -126,7 +125,6 @@ class DumpYaHandler(CompositeHandler):
             BuildTargetsOptions(with_free=with_free_targets),
             ToolsOptions(),
             ConfigurationPresetsOptions(),
-            YaBin3Options(),
             ArcPrefetchOptions(),
             OutputStyleOptions(),
         ]

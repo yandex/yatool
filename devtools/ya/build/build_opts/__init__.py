@@ -55,7 +55,6 @@ from devtools.ya.core.common_opts import (
     AuthOptions,
     DumpDebugCommonOptions,
     DumpDebugOptions,
-    YaBin3Options,
 )
 from devtools.ya.core.yarg import (
     ArgConsumer,
@@ -3610,7 +3609,6 @@ def ya_make_options(  # compat
             DumpDebugCommonOptions(),
             DumpDebugOptions(),
             CompressYmakeOutputOptions(),
-            YaBin3Options(),
         ]
         + distbs_options(use_distbuild=use_distbuild)
         + checkout_options()

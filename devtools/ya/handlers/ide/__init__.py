@@ -664,7 +664,6 @@ class IdeYaHandler(yarg.CompositeHandler):
             + [
                 CLionOptions(),
                 TidyOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=False,
         )
@@ -690,7 +689,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.ExecutorOptions(),
                 build_opts.CustomFetcherOptions(),
                 build_opts.SandboxAuthOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             unknown_args_as_free=True,
         )
@@ -710,7 +708,6 @@ class IdeYaHandler(yarg.CompositeHandler):
             opts=devtools.ya.ide.ide_common.ide_via_ya_make_opts()
             + [
                 devtools.ya.ide.goland.GolandOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
         )
         self['pycharm'] = yarg.OptsHandler(
@@ -722,7 +719,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 devtools.ya.ide.ide_common.IdeYaMakeOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 build_opts.DistCacheOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -739,7 +735,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.BuildThreadsOptions(build_threads=None),
                 build_opts.ContentUidsOptions(),
                 build_opts.ToolsOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=False,
         )
@@ -754,7 +749,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.BuildThreadsOptions(build_threads=None),
                 build_opts.ContentUidsOptions(),
                 build_opts.ToolsOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=False,
         )
@@ -769,7 +763,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.BuildThreadsOptions(build_threads=None),
                 build_opts.ContentUidsOptions(),
                 build_opts.ToolsOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=False,
         )
@@ -784,7 +777,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.BuildThreadsOptions(build_threads=None),
                 build_opts.ContentUidsOptions(),
                 build_opts.ToolsOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -801,7 +793,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 build_opts.BuildThreadsOptions(build_threads=None),
                 build_opts.ContentUidsOptions(),
                 build_opts.ToolsOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
         )
         self['venv'] = yarg.OptsHandler(
@@ -819,7 +810,6 @@ class IdeYaHandler(yarg.CompositeHandler):
                 devtools.ya.core.common_opts.CrossCompilationOptions(),
                 devtools.ya.ide.ide_common.YaExtraArgsOptions(),
                 devtools.ya.ide.venv.VenvOptions(),
-                devtools.ya.core.common_opts.YaBin3Options(),
             ],
             visible=(pm.my_platform() != 'win32'),
         )
@@ -832,6 +822,5 @@ class IdeYaHandler(yarg.CompositeHandler):
                     devtools.ya.core.common_opts.ShowHelpOptions(),
                     devtools.ya.core.common_opts.DumpDebugOptions(),
                     devtools.ya.core.common_opts.AuthOptions(),
-                    devtools.ya.core.common_opts.YaBin3Options(),
                 ],
             )
