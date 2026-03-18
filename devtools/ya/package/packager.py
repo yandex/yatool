@@ -126,14 +126,6 @@ TYPES_FOR_BUILDING = ["program", "package"]
 DEFAULT_BUILD_KEY = None
 
 
-def stage_started(stage_name):
-    devtools.ya.core.profiler.profile_step_started(stage_name)
-
-
-def stage_finished(stage_name):
-    devtools.ya.core.profiler.profile_step_finished(stage_name)
-
-
 @timeit
 def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatters):
     targets = [t.format(**formatters) for t in build_info['targets']]
@@ -839,19 +831,18 @@ def create_package(package_context, output_root, builds):
                         extra={"package_ext": "tar", "package_name": package_context.package_name + '-dbg'}
                     )
 
-                    stage_started("create_tarball_package-dbg")
-                    debug_package_path = package.tarball.create_tarball_package(
-                        result_dir,
-                        debug_dir,
-                        package_filename,
-                        compress=params.compress_archive,
-                        codec=params.codec,
-                        threads=params.build_threads,
-                        compression_filter=params.compression_filter,
-                        compression_level=params.compression_level,
-                        stable_archive=params.stable_archive,
-                    )
-                    stage_finished("create_tarball_package-dbg")
+                    with stager.scope("create_tarball_package_dbg"):
+                        debug_package_path = package.tarball.create_tarball_package(
+                            result_dir,
+                            debug_dir,
+                            package_filename,
+                            compress=params.compress_archive,
+                            codec=params.codec,
+                            threads=params.build_threads,
+                            compression_filter=params.compression_filter,
+                            compression_level=params.compression_level,
+                            stable_archive=params.stable_archive,
+                        )
 
             elif package_format == const.PackageFormat.AAR:
                 package_path = package.aar.create_aar_package(
@@ -1078,11 +1069,6 @@ def create_package(package_context, output_root, builds):
                 exts.fs.copytree3(temp_work_dir, result_temp, symlinks=True)
                 package.display.emit_message('Result temp directory: [[imp]]{}'.format(result_temp))
 
-        stat = stage_tracer.get_stat("ya-package")
-        telemetry.report(
-            ReportTypes.PACKAGE_STATS,
-            stat,
-        )
         return package_name, package_version, package_path, debug_package_path
 
 
@@ -1347,223 +1333,231 @@ def do_package(params):
 
     package.display = app_ctx.display
 
-    stage_started("do_package")
+    with stager.scope("do_package"):
 
-    if params.list_codecs:
-        package.display.emit_message("\n".join(package.tarball.get_codecs_list()))
-        return
+        if params.list_codecs:
+            package.display.emit_message("\n".join(package.tarball.get_codecs_list()))
+            return
 
-    if not params.packages:
-        raise YaPackageException('No packages to create')
+        if not params.packages:
+            raise YaPackageException('No packages to create')
 
-    validate_package_filename(params.package_filename)
+        validate_package_filename(params.package_filename)
 
-    arcadia_root = _get_arcadia_root(params)
+        arcadia_root = _get_arcadia_root(params)
 
-    if params.run_tests == test_opts.RunTestOptions.RunAllTests and params.use_distbuild:
-        raise YaPackageException('Cannot use --run-all-tests with --dist')
+        if params.run_tests == test_opts.RunTestOptions.RunAllTests and params.use_distbuild:
+            raise YaPackageException('Cannot use --run-all-tests with --dist')
 
-    if getattr(params, "checkout", False):
-        logger.warning("--checkout option is not supported any more")
+        if getattr(params, "checkout", False):
+            logger.warning("--checkout option is not supported any more")
 
-    packages_meta_info = []
+        packages_meta_info = []
 
-    if params.publish_to:
-        if isinstance(params.publish_to, (six.string_types, six.text_type)):
-            # support for older YaPackage task that passes args via stdin
-            params.publish_to = {params.publish_to: ""}
+        if params.publish_to:
+            if isinstance(params.publish_to, (six.string_types, six.text_type)):
+                # support for older YaPackage task that passes args via stdin
+                params.publish_to = {params.publish_to: ""}
 
-        publish_to_keys = copy.copy(set(params.publish_to.keys()))
-        for key in publish_to_keys:
-            if key.startswith('http://') or key.startswith('https://') and params.publish_to[key]:
-                # it's url, not splited publish instruction
-                params.publish_to[key + '=' + params.publish_to[key]] = None
-                params.publish_to.pop(key)
+            publish_to_keys = copy.copy(set(params.publish_to.keys()))
+            for key in publish_to_keys:
+                if key.startswith('http://') or key.startswith('https://') and params.publish_to[key]:
+                    # it's url, not splited publish instruction
+                    params.publish_to[key + '=' + params.publish_to[key]] = None
+                    params.publish_to.pop(key)
 
-        if len(params.publish_to.keys()) == 1 and not list(params.publish_to.values())[0]:  # --publish-to <repo string>
-            repos = list(params.publish_to.keys())[0].split(";")
-            repos_iterator = itertools.chain(iter(repos), itertools.repeat(repos[-1]))
+            if len(params.publish_to.keys()) == 1 and not list(params.publish_to.values())[0]:
+                # --publish-to <repo string>
+                repos = list(params.publish_to.keys())[0].split(";")
+                repos_iterator = itertools.chain(iter(repos), itertools.repeat(repos[-1]))
 
-            def repos_getter(package_file_name):
-                return next(repos_iterator)
+                def repos_getter(package_file_name):
+                    return next(repos_iterator)
+
+            else:
+                for key, value in tuple(params.publish_to.items()):
+                    params.publish_to[get_package_file(arcadia_root, key)] = value
+
+                def repos_getter(package_file_name):
+                    return params.publish_to.get(package_file_name, "")
 
         else:
-            for key, value in tuple(params.publish_to.items()):
-                params.publish_to[get_package_file(arcadia_root, key)] = value
 
             def repos_getter(package_file_name):
-                return params.publish_to.get(package_file_name, "")
+                return ""
 
-    else:
+        # make package files path absolute
+        params.packages = [get_package_file(arcadia_root, p) for p in params.packages]
 
-        def repos_getter(package_file_name):
-            return ""
+        if params.dump_build_targets:
+            targets = []
+            for package_file in params.packages:
+                package_data = load_package(get_tree_info(arcadia_root, package_file))
+                package_build = package_data.get("build", {})
+                if "targets" in package_build:
+                    targets.extend(package_build["targets"])
+                else:
+                    for build_key in package_build:
+                        if "targets" in package_build[build_key]:
+                            targets.extend(package_build[build_key]["targets"])
+            targets = list(set(targets))
+            logger.debug("Will dump build targets %s to %s", targets, params.dump_build_targets)
+            with open(params.dump_build_targets, "w") as f:
+                json.dump(targets, f)
+            return
 
-    # make package files path absolute
-    params.packages = [get_package_file(arcadia_root, p) for p in params.packages]
+        if params.stat_only_report_file:
+            params.build_only = True
 
-    if params.dump_build_targets:
-        targets = []
+        if params.dump_inputs:
+            do_dump_input(params, arcadia_root, params.dump_inputs)
+            return
+
+        if not params.yt_store_wt:
+            package.display.emit_message('[[warn]]Run in YT heater mode. No real package will be created')
+            params.build_only = True
+
+        if not params.build_only and params.yt_replace_result:
+            raise YaPackageException("--yt-replace-result option is allowed with --build-only or --no-yt-write-through")
+
         for package_file in params.packages:
-            package_data = load_package(get_tree_info(arcadia_root, package_file))
-            package_build = package_data.get("build", {})
-            if "targets" in package_build:
-                targets.extend(package_build["targets"])
-            else:
-                for build_key in package_build:
-                    if "targets" in package_build[build_key]:
-                        targets.extend(package_build[build_key]["targets"])
-        targets = list(set(targets))
-        logger.debug("Will dump build targets %s to %s", targets, params.dump_build_targets)
-        with open(params.dump_build_targets, "w") as f:
-            json.dump(targets, f)
-        return
+            logger.debug("Creating package: %s", package_file)
+            package_params = copy.copy(params)
+            package_params.publish_to = [_f for _f in repos_getter(package_file).split(";") if _f]
+            if package_params.publish_to:
+                logger.debug("Will publish %s to: %s", package_file, package_params.publish_to)
 
-    if params.stat_only_report_file:
-        params.build_only = True
+            def build_package(params, output_root):
+                # XXX move to postprocess
+                if params.change_log:
+                    params.change_log = six.ensure_str(params.change_log)
 
-    if params.dump_inputs:
-        do_dump_input(params, arcadia_root, params.dump_inputs)
-        return
+                try:
+                    package_context = PackageContext(arcadia_root, package_file, params)
+                except Exception as e:
+                    logger.debug(traceback.format_exc())
+                    package.display.emit_message('[[bad]]{}[[rst]]'.format(e))
+                    raise YaPackageException("Failed to load package: {}".format(package_file)) from e
 
-    if not params.yt_store_wt:
-        package.display.emit_message('[[warn]]Run in YT heater mode. No real package will be created')
-        params.build_only = True
+                try:
+                    logger.debug("Creating package: %s", locals())
+                    package.display.emit_message('Creating package: [[imp]]{}'.format(package_file))
+                    package.display.emit_message('Package root: [[imp]]{}'.format(package_context.package_root))
+                    package.display.emit_message('Package name: [[imp]]{}'.format(package_context.package_name))
+                    package.display.emit_message('Package branch: [[imp]]{}'.format(package_context.branch))
 
-    if not params.build_only and params.yt_replace_result:
-        raise YaPackageException("--yt-replace-result option is allowed with --build-only or --no-yt-write-through")
+                    builds = {}
 
-    for package_file in params.packages:
-        logger.debug("Creating package: %s", package_file)
-        package_params = copy.copy(params)
-        package_params.publish_to = [_f for _f in repos_getter(package_file).split(";") if _f]
-        if package_params.publish_to:
-            logger.debug("Will publish %s to: %s", package_file, package_params.publish_to)
-
-        def build_package(params, output_root):
-            # XXX move to postprocess
-            if params.change_log:
-                params.change_log = six.ensure_str(params.change_log)
-
-            try:
-                package_context = PackageContext(arcadia_root, package_file, params)
-            except Exception as e:
-                logger.debug(traceback.format_exc())
-                package.display.emit_message('[[bad]]{}[[rst]]'.format(e))
-                raise YaPackageException("Failed to load package: {}".format(package_file)) from e
-
-            try:
-                logger.debug("Creating package: %s", locals())
-                package.display.emit_message('Creating package: [[imp]]{}'.format(package_file))
-                package.display.emit_message('Package root: [[imp]]{}'.format(package_context.package_root))
-                package.display.emit_message('Package name: [[imp]]{}'.format(package_context.package_name))
-                package.display.emit_message('Package branch: [[imp]]{}'.format(package_context.branch))
-
-                builds = {}
-
-                if 'build' in package_context.parsed_package:
-                    if "targets" in package_context.parsed_package["build"]:
-                        build_info = package_context.parsed_package["build"]
-                        build_info["build_key"] = DEFAULT_BUILD_KEY
-                        build_info["output_root"] = output_root
-                        builds[DEFAULT_BUILD_KEY] = build_info
-                    else:
-                        for build_key in package_context.parsed_package["build"]:
-                            build_info = package_context.parsed_package["build"][build_key]
-                            build_info["build_key"] = build_key
-                            build_info["output_root"] = os.path.join(output_root, build_key)
-                            builds[build_key] = build_info
-
-                    for build_info in builds.values():
-                        if params.build_debian_scripts:
-                            if 'targets' not in build_info:
-                                build_info['targets'] = []
-                            # dirty hack, fix it
-                            build_info['targets'].append(os.path.relpath(os.path.dirname(package_file), arcadia_root))
-                        if build_info.get("targets"):
-                            stage_started("build_targets")
-                            _do_build(
-                                build_info,
-                                params,
-                                arcadia_root,
-                                app_ctx,
-                                package_context.parsed_package,
-                                package_context.formatters,
-                            )
-                            stage_finished("build_targets")
-
-                if not params.build_only:
-                    stage_started("create_package")
-                    name, version, path, debug_path = create_package(package_context, output_root, builds)
-                    stage_finished("create_package")
-
-                    if params.format == const.PackageFormat.DEBIAN and not params.store_debian:
-                        return True
-
-                    package_context.update_context(
-                        {
-                            'name': name,
-                            'version': version,
-                            'path': os.path.abspath(path),
-                            'debug_path': debug_path and os.path.abspath(debug_path),
-                        }
-                    )
-                    if params.upload:
-                        if params.mds:
-                            if not params.mds_token:
-                                params.mds_token = mds_uploader.get_mds_token(params)
-                            package_resource_url, platform_run_resource_url = upload_package_to_mds(
-                                path, package_file, params
-                            )
-                            package_context.set_context("package_resource_url", package_resource_url)
-                            if platform_run_resource_url:
-                                package_context.set_context("platform_run_resource_url", platform_run_resource_url)
+                    if 'build' in package_context.parsed_package:
+                        if "targets" in package_context.parsed_package["build"]:
+                            build_info = package_context.parsed_package["build"]
+                            build_info["build_key"] = DEFAULT_BUILD_KEY
+                            build_info["output_root"] = output_root
+                            builds[DEFAULT_BUILD_KEY] = build_info
                         else:
-                            package_resource_id, platform_run_resource_id = upload_package(path, package_file, params)
-                            package_context.set_context("package_resource_id", package_resource_id)
-                            if platform_run_resource_id:
-                                package_context.set_context("platform_run_resource_id", platform_run_resource_id)
-                    if params.store_debian:
-                        packages_meta_info.append(package_context.context)
-            except (YaPackageBuildException, YaPackageTestException):
-                logger.info("Build or test failed, stop")
-                raise
-            except Exception as e:
-                logger.info("Exception %s while build", e)
-                logger.debug("Traceback: ", exc_info=True)
-                package.display.emit_message(f'[[bad]]{e}[[rst]]')
-                raise YaPackageException(f"Packaging {package_file} failed") from e
-            finally:
-                if not params.cleanup and os.path.exists(output_root):
-                    build_temp = f"build.{package_context.package_name}.{random.random()}"
-                    package.fs_util.copy_tree(output_root, build_temp, symlinks=True)
-                    package.display.emit_message(f'Build temp directory: [[imp]]{build_temp}')
+                            for build_key in package_context.parsed_package["build"]:
+                                build_info = package_context.parsed_package["build"][build_key]
+                                build_info["build_key"] = build_key
+                                build_info["output_root"] = os.path.join(output_root, build_key)
+                                builds[build_key] = build_info
 
-        with exts.tmp.temp_dir() as output_root:
-            try:
-                is_package_skipped = build_package(package_params, output_root)
-            except YaPackageTestException:
-                return devtools.ya.core.error.ExitCodes.TEST_FAILED
-            except YaPackageBuildException as e:
-                return e.original_error_code
-            finally:
-                if params.output_root:
-                    package_path = os.path.relpath(os.path.abspath(package_file), os.path.abspath(arcadia_root))
-                    exts.fs.hardlink_tree(
-                        output_root,
-                        os.path.join(params.output_root, package_path),
-                        hardlink_function=package.fs_util.hardlink_or_copy,
-                        mkdir_function=exts.fs.ensure_dir,
-                    )
+                        for build_info in builds.values():
+                            if params.build_debian_scripts:
+                                if 'targets' not in build_info:
+                                    build_info['targets'] = []
+                                # dirty hack, fix it
+                                build_info['targets'].append(
+                                    os.path.relpath(os.path.dirname(package_file), arcadia_root)
+                                )
+                            if build_info.get("targets"):
+                                with stager.scope("build_targets"):
+                                    _do_build(
+                                        build_info,
+                                        params,
+                                        arcadia_root,
+                                        app_ctx,
+                                        package_context.parsed_package,
+                                        package_context.formatters,
+                                    )
 
-        if is_package_skipped:
-            continue
+                    if not params.build_only:
+                        with stager.scope("create_package"):
+                            name, version, path, debug_path = create_package(package_context, output_root, builds)
 
-    if packages_meta_info:
-        with open('packages.json', 'w') as afile:
-            json.dump(packages_meta_info, afile, indent=4)
+                        if params.format == const.PackageFormat.DEBIAN and not params.store_debian:
+                            return True
 
-    stage_finished("do_package")
+                        package_context.update_context(
+                            {
+                                'name': name,
+                                'version': version,
+                                'path': os.path.abspath(path),
+                                'debug_path': debug_path and os.path.abspath(debug_path),
+                            }
+                        )
+                        if params.upload:
+                            if params.mds:
+                                if not params.mds_token:
+                                    params.mds_token = mds_uploader.get_mds_token(params)
+                                package_resource_url, platform_run_resource_url = upload_package_to_mds(
+                                    path, package_file, params
+                                )
+                                package_context.set_context("package_resource_url", package_resource_url)
+                                if platform_run_resource_url:
+                                    package_context.set_context("platform_run_resource_url", platform_run_resource_url)
+                            else:
+                                package_resource_id, platform_run_resource_id = upload_package(
+                                    path, package_file, params
+                                )
+                                package_context.set_context("package_resource_id", package_resource_id)
+                                if platform_run_resource_id:
+                                    package_context.set_context("platform_run_resource_id", platform_run_resource_id)
+                        if params.store_debian:
+                            packages_meta_info.append(package_context.context)
+                except (YaPackageBuildException, YaPackageTestException):
+                    logger.info("Build or test failed, stop")
+                    raise
+                except Exception as e:
+                    logger.info("Exception %s while build", e)
+                    logger.debug("Traceback: ", exc_info=True)
+                    package.display.emit_message(f'[[bad]]{e}[[rst]]')
+                    raise YaPackageException(f"Packaging {package_file} failed") from e
+                finally:
+                    if not params.cleanup and os.path.exists(output_root):
+                        build_temp = f"build.{package_context.package_name}.{random.random()}"
+                        package.fs_util.copy_tree(output_root, build_temp, symlinks=True)
+                        package.display.emit_message(f'Build temp directory: [[imp]]{build_temp}')
+
+            with exts.tmp.temp_dir() as output_root:
+                try:
+                    is_package_skipped = build_package(package_params, output_root)
+                except YaPackageTestException:
+                    return devtools.ya.core.error.ExitCodes.TEST_FAILED
+                except YaPackageBuildException as e:
+                    return e.original_error_code
+                finally:
+                    if params.output_root:
+                        package_path = os.path.relpath(os.path.abspath(package_file), os.path.abspath(arcadia_root))
+                        exts.fs.hardlink_tree(
+                            output_root,
+                            os.path.join(params.output_root, package_path),
+                            hardlink_function=package.fs_util.hardlink_or_copy,
+                            mkdir_function=exts.fs.ensure_dir,
+                        )
+
+            if is_package_skipped:
+                continue
+
+        if packages_meta_info:
+            with open('packages.json', 'w') as afile:
+                json.dump(packages_meta_info, afile, indent=4)
+
+    stat = stage_tracer.get_stat("ya-package")
+    stat_dict = {k: v.to_dict() for k, v in stat.items()}
+    telemetry.report(
+        ReportTypes.PACKAGE_STATS,
+        stat_dict,
+    )
 
 
 def upload_package(built_package_file, package_json, opts):
