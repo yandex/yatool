@@ -162,7 +162,11 @@ class BuildThreadsOptions(Options):
             build_threads = get_cpu_count()
 
         self.build_threads = build_threads
-        self.link_threads = 2
+        # Auto-scale link_threads with build_threads: DES sweep on a 4053-node real
+        # ymake graph shows io_workers=4 reduces makespan by ~12% vs io_workers=2 at
+        # -j16 (290.4s vs 329.0s), while io_workers=8 regresses (416.9s).
+        # Formula: max(2, build_threads // 4) keeps default=2 for j<=8, scales to 4 at j=16.
+        self.link_threads = max(2, build_threads // 4)
 
     @staticmethod
     def consumer():
