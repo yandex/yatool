@@ -13,6 +13,7 @@
 #include "sem_graph.h"
 #include "transitive_requirements_check.h"
 #include "ymake.h"
+#include "ymake_async.h"
 #include "configure_tasks.h"
 
 #include <devtools/ymake/build_graph_scope.h>
@@ -98,6 +99,7 @@ TYMake::TYMake(TBuildConfiguration& conf)
     , IncParserManager(conf, Names)
     , Yndex(Conf.CommandDefinitions, Conf.CommandReferences)
     , Modules(Names, conf.PeersRules, Conf)
+    , AsyncState_(std::make_unique<TAsyncState>())
 {
     TimeStamps.StartSession();
     Diag()->Where.clear();

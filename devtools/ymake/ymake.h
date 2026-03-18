@@ -26,9 +26,9 @@
 
 #include <util/stream/format.h>
 
+#include <memory>
+
 #include <asio/awaitable.hpp>
-#include <asio/experimental/promise.hpp>
-#include <asio/thread_pool.hpp>
 #include <asio/strand.hpp>
 
 using TConfigurationExecutor = asio::strand<asio::any_io_executor>;
@@ -51,6 +51,8 @@ public:
     virtual asio::awaitable<void> AddStartTarget(TConfigurationExecutor exec, const TString& dir, const TString& tag = "", bool followRecurses = true) = 0;
     virtual asio::awaitable<void> AddTarget(TConfigurationExecutor exec, const TString& dir) = 0;
 };
+
+struct TAsyncState;
 
 class TYMake final : public ITargetConfigurator {
 public:
@@ -80,8 +82,7 @@ public:
     TModules Modules;
     TCommands Commands;
 
-    std::optional<asio::experimental::promise<void(std::exception_ptr, THolder<TMakePlanCache>)>> JSONCachePreloadingPromise;
-    std::optional<asio::experimental::promise<void(std::exception_ptr, THolder<TUidsData>)>> UidsCachePreloadingPromise;
+    std::unique_ptr<TAsyncState> AsyncState_;
 
 private:
     TFsPath DepCacheTempFile;      // Name of temporary file with delayed save data
