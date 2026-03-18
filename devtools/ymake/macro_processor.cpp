@@ -1166,9 +1166,6 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
         }
     }
 
-    THashSet<TPropertyType> inducedDepsToUse;
-    inducedDepsToUse.insert(TPropertyType{Graph->Names(), EVI_InducedDeps, "*"});
-
     // 2. Additional output files (we have to add them after the inputs or Induced deps processing will fail)
     // NOTE: this was previously after BuildCommand!
     if (hasExtraOuts) {
@@ -1185,46 +1182,54 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
         }
     }
 
-    bool mainOut = true;
+    {
+        THashSet<TPropertyType> inducedDepsToUse;
+        inducedDepsToUse.insert(TPropertyType{Graph->Names(), EVI_InducedDeps, "*"});
+        bool mainOut = true;
+        for (auto [outNodeRef, outVar] : outs) {
+            TAddDepAdaptor& outNode = outNodeRef;
 
-    for (auto [outNodeRef, outVar] : outs) {
-        TAddDepAdaptor& outNode = outNodeRef;
-
-        if (mainOutAsExtra || !mainOut) {
-            YDIAG(Star) << "Linking main " << actionNode.ElemId << " <-> " << outNode.ElemId << Endl;
-            outNode.SetAction(&actionNode);
-            outNode.AddDepIface(EDT_OutTogether, actionNode.NodeType, actionNode.ElemId);
-            actionNode.AddDepIface(EDT_OutTogetherBack, outNode.NodeType, outNode.ElemId);
-        }
-
-        // Current implementation sets "pass induced" flags only for main output.
-        // It is considered bug, but correct behaviour should be enabled only after additional testing.
-        static constexpr bool oldPassMode = true;
-        const bool setPassFlags = oldPassMode ? mainOut : true;
-
-        // outVar is nullptr for "finalTargetCmd", which means this is a module target.
-        // And we do not pass induced dependencies through modules.
-        if (outVar) {
-            const TIndDepsRule* rule = outNode.SetDepsRuleByName(outVar->Name);
-            if (rule) {
-                rule->InsertUseActionsTo(inducedDepsToUse);
+            if (mainOutAsExtra || !mainOut) {
+                YDIAG(Star) << "Linking main " << actionNode.ElemId << " <-> " << outNode.ElemId << Endl;
+                outNode.SetAction(&actionNode);
+                outNode.AddDepIface(EDT_OutTogether, actionNode.NodeType, actionNode.ElemId);
+                actionNode.AddDepIface(EDT_OutTogetherBack, outNode.NodeType, outNode.ElemId);
             }
 
-            if (setPassFlags) {
-                auto setFlags = [&](ui32 elemId) {
-                    TNodeData& nodeData = Graph->GetFileNodeData(elemId);
-                    rule ? rule->ApplyNodeFlags(nodeData) : TIndDepsRule::ResetNodeFlags(nodeData);
-                };
+            // Current implementation sets "pass induced" flags only for main output.
+            // It is considered bug, but correct behaviour should be enabled only after additional testing.
+            static constexpr bool oldPassMode = true;
+            const bool setPassFlags = oldPassMode ? mainOut : true;
 
-                setFlags(outNode.ElemId);
+            // outVar is nullptr for "finalTargetCmd", which means this is a module target.
+            // And we do not pass induced dependencies through modules.
+            if (outVar) {
+                const TIndDepsRule* rule = outNode.SetDepsRuleByName(outVar->Name);
+                if (rule) {
+                    rule->InsertUseActionsTo(inducedDepsToUse);
+                }
 
-                if (mainOut && mainOutAsExtra) {
-                    setFlags(actionNode.ElemId);
+                if (setPassFlags) {
+                    auto setFlags = [&](ui32 elemId) {
+                        TNodeData& nodeData = Graph->GetFileNodeData(elemId);
+                        rule ? rule->ApplyNodeFlags(nodeData) : TIndDepsRule::ResetNodeFlags(nodeData);
+                    };
+
+                    setFlags(outNode.ElemId);
+
+                    if (mainOut && mainOutAsExtra) {
+                        setFlags(actionNode.ElemId);
+                    }
                 }
             }
+
+            mainOut = false;
         }
 
-        mainOut = false;
+        for (const auto& out : GetOutput()) {
+            UpdIter->MainOutputId[out.ElemId] = mainOutId;
+        }
+        UpdIter->PropsToUse[mainOutId] = std::move(inducedDepsToUse);
     }
 
     if (moduleNode) {
@@ -1247,11 +1252,6 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     for (auto [outNodeRef, _] : outs) {
         addOutputIncludes(outNodeRef);
     }
-
-    for (const auto& out : GetOutput()) {
-        UpdIter->MainOutputId[out.ElemId] = mainOutId;
-    }
-    UpdIter->PropsToUse[mainOutId] = std::move(inducedDepsToUse);
 
     // 4. The command
     YDIAG(DG) << "Cmd dep: " << curCmdName << " " << Cmd.Id << Endl;
