@@ -1,6 +1,6 @@
 JAVA_PROGRAM(hello-prog)
 
-JDK_VERSION(11)
+JDK_VERSION(17)
 
 JAVA_SRCS(SRCDIR src/main/java **/*.java)
 

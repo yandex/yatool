@@ -1,6 +1,6 @@
 JAVA_PROGRAM()
 
-JDK_VERSION(11)
+JDK_VERSION(17)
 
 PEERDIR(devtools/examples/tutorials/protobuf/example3/book)
 
