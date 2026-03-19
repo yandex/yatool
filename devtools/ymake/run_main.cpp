@@ -145,14 +145,14 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
 
         const TOptsParseResult res(&opts, value.size(), const_cast<const char**>(value.data()));
 
-        // Create writer as early as possible to notify readers on destruction.
-        conf.ForeignTargetWriter = pipeline.CreateWriter(conf);
+        // Create writer as early as possible to notify readers on FinalizeConfig.
+        conf.ForeignTargetWriter = pipeline.GetWriter(conf);
 
         // This calls FORCE_TRACE(U, NEvent::TStageStated("ymake run")); after tracing initialization
         conf.PostProcess(res.GetFreeArgs());
 
         // Readers may require input stream to be set.
-        conf.ForeignTargetReader = pipeline.CreateReader(conf);
+        conf.ForeignTargetReader = pipeline.GetReader(conf);
     } catch (const yexception& error) {
         YErr() << "Conf initialization failed with error: " << error.what() << Endl;
         return BR_FATAL_ERROR;
@@ -174,6 +174,7 @@ asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyIn
     }
 
     Y_DEFER {
+        pipeline.FinalizeConfig(conf);
         conf.ClearPlugins();
     };
 

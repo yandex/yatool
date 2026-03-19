@@ -25,14 +25,28 @@ public:
 };
 
 
-THolder<TLineReader> TForeignTargetPipelineExternal::CreateReader(TBuildConfiguration& conf) {
-    return MakeHolder<TStreamLineReader>(*conf.InputStream);
+TLineReader* TForeignTargetPipelineExternal::GetReader(TBuildConfiguration& conf) {
+    IInputStream* key = conf.InputStream.Get();
+    if (!key) {
+        return nullptr;
+    }
+    auto& reader = Readers_[key];
+    if (!reader) {
+        reader = MakeHolder<TStreamLineReader>(*conf.InputStream);
+    }
+    return reader.Get();
 }
-THolder<TLineWriter> TForeignTargetPipelineExternal::CreateWriter(TBuildConfiguration&){
-    return MakeHolder<TTraceLineWriter>();
+TLineWriter* TForeignTargetPipelineExternal::GetWriter(TBuildConfiguration&) {
+    if (!Writer_) {
+        Writer_ = MakeHolder<TTraceLineWriter>();
+    }
+    return Writer_.Get();
 }
 bool TForeignTargetPipelineExternal::RegisterConfig(const TVector<const char*>&) {
     return true;
+}
+void TForeignTargetPipelineExternal::FinalizeConfig(TBuildConfiguration&) {
+    // Nothing to do
 }
 
 // Internal pipeline
@@ -94,12 +108,6 @@ public:
          : Destinations_(dests)
     {}
 
-    ~TQueueLineWriter() {
-        if (!FinalSent_) {
-            WriteLineInt(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
-        }
-    }
-
     void WriteLine(const TString& target) override {
         // This double-tracing is needed for some tests
         // and pool loops waiting for TAllForeignPlatformsReported.
@@ -138,6 +146,13 @@ private:
         }
     }
 
+    void Send(Queue& dst, const TString& target) {
+        asio::error_code ec;
+        if (!dst.try_send(ec, target)) {
+            throw std::system_error{ec, "Queue::try_send"};
+        }
+    }
+
     void WriteLineInt(const TString& target) {
         NJson::TJsonValue json;
         TString evtype;
@@ -149,18 +164,17 @@ private:
             return;
         }
 
-        asio::error_code ec;
-        if (evtype == "NEvent.TAllForeignPlatformsReported") {
+        if (evtype == "NEvent.TAllForeignPlatformsReported" && !FinalSent_) {
             FinalSent_ = true;
             for (auto& [_, dst] : Destinations_) {
-                dst->try_send(ec, target);
+                Send(*dst, target);
             }
             return;
         }
 
         if (evtype == "NEvent.TBypassConfigure") {
             for (auto& [_, dst] : Destinations_) {
-                dst->try_send(ec, target);
+                Send(*dst, target);
             }
             return;
         }
@@ -178,7 +192,7 @@ private:
                 YDebug() << "Internal servermode: cannot find destination for event " << target << Endl;
                 return;
             }
-            Destinations_.at(destinationKey)->try_send(ec, target);
+            Send(*Destinations_.at(destinationKey), target);
             return;
         }
     }
@@ -195,24 +209,35 @@ public:
     void WriteBypassLine(const TString&) override {}
 };
 
-THolder<TLineReader> TForeignTargetPipelineInternal::CreateReader(TBuildConfiguration& conf) {
-    if (Subscriptions_.count(std::make_pair(conf.TargetPlatformId, conf.TransitionSource)) == 0) {
+TLineReader* TForeignTargetPipelineInternal::GetReader(TBuildConfiguration& conf) {
+    TConfigKey key{conf.TargetPlatformId, conf.TransitionSource};
+    if (!Subscriptions_.contains(key)) {
         return nullptr;
     }
-    const auto& queue = PipesByTargetPlatformId_.at(conf.TargetPlatformId).at(conf.TransitionSource);
-    return MakeHolder<TQueueLineReader>(queue, Subscriptions_.at(std::make_pair(conf.TargetPlatformId, conf.TransitionSource)));
+    auto& reader = Readers_[key];
+    if (!reader) {
+        const auto& queue = PipesByTargetPlatformId_.at(conf.TargetPlatformId).at(conf.TransitionSource);
+        reader = MakeHolder<TQueueLineReader>(queue, Subscriptions_.at(key));
+    }
+    return reader.Get();
 }
-THolder<TLineWriter> TForeignTargetPipelineInternal::CreateWriter(TBuildConfiguration& conf){
-    if (Subscribers_.count(std::make_pair(conf.TargetPlatformId, conf.TransitionSource)) == 0) {
-        return MakeHolder<TDummyLineWriter>();
+TLineWriter* TForeignTargetPipelineInternal::GetWriter(TBuildConfiguration& conf) {
+    TConfigKey key{conf.TargetPlatformId, conf.TransitionSource};
+    auto& writer = Writers_[key];
+    if (!writer) {
+        if (!Subscribers_.contains(key)) {
+            writer = MakeHolder<TDummyLineWriter>();
+        } else {
+            const auto& queuesForPlatform = PipesByTargetPlatformId_.at(conf.TargetPlatformId);
+            THashMap<ETransition, TAtomicSharedPtr<Queue>> dests;
+            const auto& subscribers = Subscribers_.at(key);
+            for (const auto subscriber : subscribers) {
+                dests[subscriber] = queuesForPlatform.at(subscriber);
+            }
+            writer = MakeHolder<TQueueLineWriter>(dests);
+        }
     }
-    const auto& queuesForPlatform = PipesByTargetPlatformId_.at(conf.TargetPlatformId);
-    THashMap<ETransition, TAtomicSharedPtr<Queue>> dests;
-    const auto& subscribers = Subscribers_.at(std::make_pair(conf.TargetPlatformId, conf.TransitionSource));
-    for (const auto subscriber : subscribers) {
-        dests[subscriber] = queuesForPlatform.at(subscriber);
-    }
-    return MakeHolder<TQueueLineWriter>(dests);
+    return writer.Get();
 }
 bool TForeignTargetPipelineInternal::RegisterConfig(const TVector<const char*>& config) {
     // TStartupOptions alone doesn't work somehow.
@@ -253,5 +278,8 @@ bool TForeignTargetPipelineInternal::RegisterConfig(const TVector<const char*>& 
 
     return !conf.TargetPlatformId.empty() && conf.TransitionSource != ETransition::None;
 }
-
+void TForeignTargetPipelineInternal::FinalizeConfig(TBuildConfiguration& conf) {
+    TConfigKey key{conf.TargetPlatformId, conf.TransitionSource};
+    Writers_.at(key)->WriteLine(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
+}
 } // namespace NForeignTargetPipeline
