@@ -5,6 +5,7 @@
 #include "convert.h"
 
 #include <devtools/ymake/conf.h>
+#include <devtools/ymake/plugins/pybridge/raii.h>
 #include <devtools/ymake/lang/plugin_facade.h>
 
 namespace {
@@ -12,63 +13,50 @@ namespace {
 
     class TPluginAddParserImpl : public TParser {
     private:
-        PyObject *Obj = nullptr;
-        std::map<TString, TString> IndDepsRule;
-        bool PassInducedIncludes = false;
+        NYMake::NPy::OwnedRef<PyObject> Obj_;
+        std::map<TString, TString> IndDepsRule_;
+        bool PassInducedIncludes_ = false;
 
     public:
         TPluginAddParserImpl(PyObject *obj, const std::map<TString, TString> &indDepsRule, bool passInducedIncludes)
-            : Obj(obj)
-            , IndDepsRule(indDepsRule)
-            , PassInducedIncludes(passInducedIncludes)
+            : Obj_{NYMake::NPy::FromBorrowedRef(obj)}
+            , IndDepsRule_(indDepsRule)
+            , PassInducedIncludes_(passInducedIncludes)
         {
-            Py_XINCREF(Obj);
-        }
-
-        ~TPluginAddParserImpl() override {
-            Py_XDECREF(Obj);
         }
 
         void Execute(const TString &path, TPluginUnit &unit, TVector<TString> &includes,
                      TPyDictReflection &inducedDeps) override {
-            PyObject *context = CreateContextObject(&unit);
+            PyObject *argList2 = Py_BuildValue("(sO)", path.data(), CreateContextObject(&unit).get());
             CheckForError();
-
-            PyObject *argList2 = Py_BuildValue("(sO)", path.data(), context);
-            Py_DecRef(context);
-            CheckForError();
-            PyObject *parserObj = PyObject_CallObject(Obj, argList2);
+            NYMake::NPy::OwnedRef<PyObject> parserObj{PyObject_CallObject(Obj_.get(), argList2)};
             CheckForError();
             Py_DecRef(argList2);
 
-            PyObject *includesMethod = PyObject_GetAttrString(parserObj, "includes");
+            PyObject *includesMethod = PyObject_GetAttrString(parserObj.get(), "includes");
             CheckForError();
-            PyObject *emptyArgs = Py_BuildValue("()");
+            NYMake::NPy::OwnedRef<PyObject> emptyArgs{Py_BuildValue("()")};
             CheckForError();
-            PyObject *pyIncludes = PyObject_CallObject(includesMethod, emptyArgs);
+            PyObject *pyIncludes = PyObject_CallObject(includesMethod, emptyArgs.get());
             CheckForError();
             Flatten(pyIncludes, includes);
             Py_DecRef(includesMethod);
 
-            if (PyObject_HasAttrString(parserObj, "induced_deps")) {
-                PyObject *inducedDepsMethod = PyObject_GetAttrString(parserObj, "induced_deps");
+            if (PyObject_HasAttrString(parserObj.get(), "induced_deps")) {
+                NYMake::NPy::OwnedRef<PyObject> inducedDepsMethod{PyObject_GetAttrString(parserObj.get(), "induced_deps")};
                 CheckForError();
-                PyObject *pyInducedDeps = PyObject_CallObject(inducedDepsMethod, emptyArgs);
+                PyObject *pyInducedDeps = PyObject_CallObject(inducedDepsMethod.get(), emptyArgs.get());
                 CheckForError();
                 Flatten(pyInducedDeps, inducedDeps);
-                Py_DecRef(inducedDepsMethod);
             }
-
-            Py_DecRef(parserObj);
-            Py_DecRef(emptyArgs);
         }
 
         bool GetPassInducedIncludes() const override {
-            return PassInducedIncludes;
+            return PassInducedIncludes_;
         }
 
         const std::map<TString, TString>& GetIndDepsRule() const override {
-            return IndDepsRule;
+            return IndDepsRule_;
         };
     };
 }

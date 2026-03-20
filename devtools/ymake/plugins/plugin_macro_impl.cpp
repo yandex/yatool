@@ -18,7 +18,7 @@ namespace NYMake::NPlugins {
         void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) override {
             NYMake::NPy::OwnedRef tupleArgs{PyTuple_New(params.size() + 1)};
 
-            PyTuple_SetItem(tupleArgs.get(), 0, CreateContextObject(&unit));
+            PyTuple_SetItem(tupleArgs.get(), 0, CreateContextObject(&unit).Release());
             CheckForError();
 
             for (size_t i = 0; i < params.size(); ++i) {

@@ -564,7 +564,7 @@ namespace NYMake::NPlugins {
         GetYMakeState(mod.get())->Conf = &conf;
     }
 
-    PyObject* CreateContextObject(TPluginUnit* unit) {
+    NYMake::NPy::OwnedRef<PyObject> CreateContextObject(TPluginUnit* unit) {
         NYMake::NPy::OwnedRef args{Py_BuildValue("()")};
         NYMake::NPy::OwnedRef ymakeModule{PyImport_ImportModule("ymake")};
         CheckForError();
@@ -574,7 +574,8 @@ namespace NYMake::NPlugins {
             Context* context = reinterpret_cast<Context*>(obj);
             context->Unit = unit;
         }
-        return obj;
+        CheckForError();
+        return NYMake::NPy::OwnedRef<PyObject>{obj};
     }
 
     PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName) {

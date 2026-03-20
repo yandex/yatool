@@ -1,5 +1,7 @@
 #pragma once
 
+#include <devtools/ymake/plugins/pybridge/raii.h>
+
 #include <Python.h>
 
 class TPluginUnit;
@@ -10,6 +12,6 @@ namespace NYMake::NPlugins {
 
     void BindYmakeConf(TBuildConfiguration& conf);
 
-    PyObject* CreateContextObject(TPluginUnit*);
+    NYMake::NPy::OwnedRef<PyObject> CreateContextObject(TPluginUnit*);
     PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName);
 }
