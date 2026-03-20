@@ -162,7 +162,7 @@ namespace {
             if (!tryParse(cmdVar))
                 if (!cmdVar.BaseVal || !tryParse(*cmdVar.BaseVal))
                     cmdName = "[unspecified macro]";
-            YConfErr(BadInput) << msg << " in " << cmdName << " " << var.Name << " is a directory! Won't be processed! Pathetic interloper! Grah!" << Endl;
+            YConfErr(BadInput) << msg << " in " << cmdName << " " << var.Name << " points to a directory and cannot be processed. Please provide a file path instead." << Endl;
             return false;
         }
         return true;
