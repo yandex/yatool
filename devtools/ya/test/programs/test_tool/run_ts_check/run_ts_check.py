@@ -3,9 +3,7 @@ import logging
 import os
 import shutil
 import stat
-import threading
 import time
-from typing import Callable
 
 import build.plugins.lib.nots.package_manager.constants as pm_const
 import build.plugins.lib.nots.package_manager.utils as pm_utils
@@ -80,29 +78,76 @@ def create_suite(cwd: str, log_path: str) -> PerformedTestSuite:
     return suite
 
 
-def watch_report_file(process_lines: Callable[[str], None], report_path: str, stop_event: threading.Event):
-    """Watch report file and log the last line as it's written."""
-    last_position = 0
+def parse_event(line: str, script_name: str) -> TestCase:
+    """Parse a single event line from the report file and return a TestCase."""
+    event = json.loads(line)
+    name = event.get("name")
+    subtest_name = event.get("subtestName")
+    subtest_name = f"{script_name}/{subtest_name}" if subtest_name else script_name
 
-    def check_report_file():
-        nonlocal last_position
-        if os.path.exists(report_path):
+    status = STATUS_MAPPING.get(event.get("status"))
+    duration = event.get("duration")
+    test_case = TestCase(
+        name=f"{name}::{subtest_name}",
+        status=status,
+        comment=simplify_colors(event.get("richSnippet")) if status == Status.FAIL else "",
+        elapsed=None if duration is None else duration / 1000,
+        metrics=event.get("metrics"),
+        tags=event.get("tags"),
+    )
+    return test_case
+
+
+class ReportFileWatcher:
+    """Process progress listener that watches report file and processes new lines."""
+
+    def __init__(self, report_path: str, suite: PerformedTestSuite, script_name: str, tracefile: str):
+        self.report_path = report_path
+        self.suite = suite
+        self.script_name = script_name
+        self.tracefile = tracefile
+        self.last_position = 0
+        self.last_check_time = 0
+        self.check_interval = 0.2  # Check every 500ms
+
+    def open(self, command, process, out_file, err_file):
+        """Called when process starts."""
+        pass
+
+    def __call__(self):
+        """Called periodically while process is running."""
+        current_time = time.monotonic()
+        # Throttle checks to avoid excessive file I/O
+        if current_time - self.last_check_time < self.check_interval:
+            return
+
+        self.last_check_time = current_time
+        self._check_report_file()
+
+    def _check_report_file(self):
+        """Read new content from report file and process it."""
+        if os.path.exists(self.report_path):
             try:
-                with open(report_path, 'r') as f:
-                    f.seek(last_position)
+                with open(self.report_path, 'r') as f:
+                    f.seek(self.last_position)
                     new_content = f.read()
                     if new_content:
-                        last_position = f.tell()
+                        self.last_position = f.tell()
                         lines = new_content.splitlines()
-                        process_lines(lines)
+                        self._process_event_lines(lines)
             except (IOError, OSError) as e:
                 logger.debug(f"Error reading report file: {e}")
 
-    while not stop_event.is_set():
-        check_report_file()
-        time.sleep(0.5)  # Check every 500ms
+    def _process_event_lines(self, lines: list[str]):
+        """Process event lines from report file."""
+        for line in lines:
+            test_case = parse_event(line, self.script_name)
+            self.suite.chunk.tests.append(test_case)
+        self.suite.generate_trace_file(self.tracefile, append=True)
 
-    check_report_file()  # last check
+    def close(self):
+        """Called when process finishes - do final check."""
+        self._check_report_file()
 
 
 def run(args: CliArgs):
@@ -120,48 +165,20 @@ def run(args: CliArgs):
     cmd = get_cmd(args)
     suite = create_suite(cwd, args.log_path)
 
-    def process_event_lines(lines: str):
-        for line in lines:
-            event = json.loads(line)
-            name = event.get("name")
-            subtest_name = event.get("subtestName")
-            subtest_name = f"{args.script_name}/{subtest_name}" if subtest_name else args.script_name
-
-            status = STATUS_MAPPING.get(event.get("status"))
-            duration = event.get("duration")
-            test_case = TestCase(
-                name=f"{name}::{subtest_name}",
-                status=status,
-                comment=simplify_colors(event.get("richSnippet")) if status == Status.FAIL else "",
-                elapsed=None if duration is None else duration / 1000,
-                metrics=event.get("metrics"),
-                tags=event.get("tags"),
-            )
-            suite.chunk.tests.append(test_case)
-        suite.generate_trace_file(args.tracefile)
-
-    # Start watching the report file
-    stop_event = threading.Event()
-    watcher_thread = threading.Thread(
-        target=watch_report_file, args=(process_event_lines, report_path, stop_event), daemon=True
-    )
-    watcher_thread.start()
+    # Create progress listener that will watch the report file
+    watcher = ReportFileWatcher(report_path, suite, args.script_name, args.tracefile)
 
     start_time = time.monotonic()
-    try:
-        res = execute(
-            cmd,
-            cwd=cwd,
-            env=get_env(args, report_path),
-            check_exit_code=False,
-            stderr=node_run_log,
-            stdout_to_stderr=True,
-        )
-    finally:
-        # Stop the watcher thread
-        stop_event.set()
-        watcher_thread.join(timeout=1.0)
-
+    res = execute(
+        cmd,
+        cwd=cwd,
+        env=get_env(args, report_path),
+        check_exit_code=False,
+        stderr=node_run_log,
+        stdout_to_stderr=True,
+        timeout=10000000,  # without timeout process_progress_listener is not called periodically
+        process_progress_listener=watcher,
+    )
     messages = []
     if res.exit_code != 0:
         messages = [
@@ -182,7 +199,7 @@ def run(args: CliArgs):
 
     logger.debug(f"Generate trace file '{args.tracefile}'")
     logger.debug(f"Found tests count: {len(suite.chunk.tests)}")
-    suite.generate_trace_file(args.tracefile)
+    suite.generate_trace_file(args.tracefile, append=True)
     return 0
 
 
