@@ -2,6 +2,7 @@ PY3_LIBRARY()
 
 PY_SRCS(
     cli_args.py
+    colors.py
     run_ts_check.py
 )
 
