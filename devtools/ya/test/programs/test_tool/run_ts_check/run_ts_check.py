@@ -86,12 +86,12 @@ def parse_event(line: str, script_name: str) -> TestCase:
     subtest_name = f"{script_name}/{subtest_name}" if subtest_name else script_name
 
     status = STATUS_MAPPING.get(event.get("status"))
-    duration = event.get("duration")
+    duration = event.get("duration", 0)
     test_case = TestCase(
         name=f"{name}::{subtest_name}",
         status=status,
         comment=simplify_colors(event.get("richSnippet")) if status == Status.FAIL else "",
-        elapsed=None if duration is None else duration / 1000,
+        elapsed=duration / 1000,
         metrics=event.get("metrics"),
         tags=event.get("tags"),
     )
