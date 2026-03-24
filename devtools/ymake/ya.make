@@ -63,6 +63,7 @@ SRCS(
     addincls.cpp
     args_converter.cpp
     args2locals.cpp
+    asio_extern_templates.cpp
     blacklist.cpp
     blacklist_checker.cpp
     cmd_properties.cpp
