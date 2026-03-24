@@ -115,7 +115,7 @@ def run_tests(opts):
     )
 
     bindir_node_modules_path = os.path.join(opts.build_root, test_for_project_path, NODE_MODULES_DIRNAME)
-    os.environ["PATH"] = opts.nodejs
+    os.environ["PATH"] = os.pathsep.join([opts.nodejs, os.environ.get("PATH", "")])
     os.environ["NODE_PATH"] = os.pathsep.join(
         [
             os.path.join(build_vs_store_path(opts.build_root, test_for_project_path), NODE_MODULES_DIRNAME),
