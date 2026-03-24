@@ -82,6 +82,31 @@ def run(
         raise
 
 
+class CapCalculator:
+    def __init__(self, host_health, max_cap: worker_threads.ResInfo, memory_limit: dict[str, float] | None):
+        self._host_health = host_health
+        self._max_cap = max_cap
+        self._mem_limit = memory_limit
+        self._notified = False
+
+    def __call__(self) -> worker_threads.ResInfo:
+        if not self._mem_limit:
+            return self._max_cap
+        cur_mem_state = self._host_health.get_host_state()["mem_limit"]
+        memory_is_over = any(
+            (
+                self._mem_limit["abs"] and cur_mem_state["used"] > self._mem_limit["abs"],
+                self._mem_limit["rel"] and cur_mem_state["used_perc"] > self._mem_limit["rel"],
+            )
+        )
+        if memory_is_over:
+            if not self._notified:
+                self._notified = True
+                logger.warning("Memory limit is reached. Build may be slower.")
+            return self._max_cap.copy(mem=1)
+        return self._max_cap
+
+
 class TaskContext(object):
     def __init__(
         self,
@@ -513,21 +538,23 @@ class TaskContext(object):
         net_threads = self.opts.yt_store_threads + self.opts.dist_store_threads
         io_limit = min(self.opts.link_threads, self._threads)
 
-        cap = worker_threads.ResInfo(
+        max_cap = worker_threads.ResInfo(
             io=io_limit,
             cpu=self._threads,
             test=self._test_threads,
             download=self._threads + net_threads,
             upload=net_threads,
+            mem=self._threads,
         )
         worker_pools = {WorkerPoolType.BASE: self._threads + 1, WorkerPoolType.SERVICE: net_threads}
         strategy = schedule_strategy.Strategies.pick(self.opts.schedule_strategy, build_time_cache_availability)
+        calc_cap = CapCalculator(self._app_ctx.host_health, max_cap, self.opts.memory_limit)
 
         self._workers = worker_threads.WorkerThreads(
             state=self.state,
             worker_pools=worker_pools,
             zero=worker_threads.ResInfo(),
-            cap=cap,
+            calc_cap=calc_cap,
             evlog=getattr(self._app_ctx, 'evlog', None),
             schedule_strategy=strategy,
         )

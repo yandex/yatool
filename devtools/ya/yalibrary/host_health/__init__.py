@@ -26,20 +26,29 @@ class HostHealth:
     def __init__(self):
         self._watcher = None
 
-    def start_watcher(self, prefix: list[str], params):
+    def start_watcher(self, prefix: list[str], params) -> None:
         assert self._watcher is None
         self._watcher = HostWatcher(prefix, getattr(params, "build_threads", None))
 
-    def stop_watcher(self):
+    def stop_watcher(self) -> None:
         if self._watcher:
             self._watcher.stop()
+
+    def get_host_state(self) -> dict:
+        return self._watcher.get_host_state()
 
 
 class HostWatcher:
     def __init__(self, prefix: list[str], build_threads: int):
-        self._prefix = prefix
-        self._build_threads = build_threads
-        self._host_platform = "-".join((platform.system(), platform.machine())).lower()
+        self._state = {
+            "cpu_count": psutil.cpu_count(),
+            "build_threads": build_threads,
+            "host_platform": "-".join((platform.system(), platform.machine())).lower(),
+            "prefix": prefix,
+        }
+        self._state_lock = threading.Lock()
+        self._cpu_usage = CpuUsage()
+        self._threshold_idx = -1
 
         try:
             import app_ctx
@@ -48,65 +57,72 @@ class HostWatcher:
         except (AttributeError, ImportError):
             self._evlog_writer = lambda *args, **kwargs: None
 
-        self._cpu_usage = CpuUsage()
         self._watching_thread = StoppableThread(target=self._watch_func)
 
     def stop(self):
         self._watching_thread.stop(wait=True)
         self._cpu_usage.stop()
 
-    def _report_host_state(self, cause: ReportCause, state: dict | None = None):
-        state = state or {}
-        vm = psutil.virtual_memory()
-        cpu_usage = self._cpu_usage.get()
-        state.update(
-            {
-                "cause": cause,
-                "prefix": self._prefix,
-                "ram": {
-                    "total": vm.total,
-                    "used": vm.total - vm.available,
-                    "used_perc": vm.percent,
-                },
-                "cpu_usage_perc": {
-                    "user": cpu_usage.user_perc,
-                    "system": cpu_usage.system_perc,
-                },
-                "cpu_count": psutil.cpu_count(),
-                "build_threads": self._build_threads,
-                "host_platform": self._host_platform,
-            }
-        )
+    def get_host_state(self):
+        with self._state_lock:
+            return self._state.copy()
+
+    def _report_host_state(self, cause: ReportCause):
+        state = {
+            "cause": cause,
+        }
+        state.update(self._state)
         self._evlog_writer("host_state", **state)
         report.telemetry.report(report.ReportTypes.HOST_HEALTH, state, urgent=True)
 
+    def _update_state(self):
+        # TODO Add cgroup support for memory limits
+        vm = psutil.virtual_memory()
+        limiter = MemLimiter.RAM
+        cpu_usage = self._cpu_usage.get()
+        mem_limit = vm.total
+        mem_used = vm.total - vm.available
+        mem_perc = mem_used / mem_limit * 100.0
+
+        mem_limit_info = {
+            "limiter": limiter,
+            "total": mem_limit,
+            "used": mem_used,
+            "used_perc": mem_perc,
+        }
+
+        while mem_perc >= MEMORY_THRESHOLDS[self._threshold_idx + 1]:
+            self._threshold_idx += 1
+
+        if self._threshold_idx >= 0:
+            mem_limit_info["threshold"] = MEMORY_THRESHOLDS[self._threshold_idx]
+
+        with self._state_lock:
+            self._state.update(
+                {
+                    "mem_limit": mem_limit_info,
+                    "ram": {
+                        "total": vm.total,
+                        "used": vm.total - vm.available,
+                        "used_perc": vm.percent,
+                    },
+                    "cpu_usage_perc": {
+                        "user": cpu_usage.user_perc,
+                        "system": cpu_usage.system_perc,
+                    },
+                }
+            )
+
     def _watch_func(self, stopped):
-        next_threshold_idx = 0
+        prev_threshold_id = self._threshold_idx
+        self._update_state()
         self._report_host_state(ReportCause.INIT)
         while not stopped():
-            # TODO Add cgroup support
-            vm = psutil.virtual_memory()
-            mem_limit = vm.total
-            mem_used = vm.total - vm.available
-            mem_perc = mem_used / mem_limit * 100.0
-
-            current_threshold = None
-            while mem_perc >= MEMORY_THRESHOLDS[next_threshold_idx]:
-                current_threshold = MEMORY_THRESHOLDS[next_threshold_idx]
-                next_threshold_idx += 1
-
-            if current_threshold is not None:
-                state = {
-                    "mem_limit": {
-                        "threshold": current_threshold,
-                        "limiter": MemLimiter.RAM,
-                        "total": mem_limit,
-                        "used": mem_used,
-                        "used_perc": mem_perc,
-                    }
-                }
-                self._report_host_state(ReportCause.MEM_THRESHOLD, state)
             time.sleep(WATCH_INTERVAL)
+            self._update_state()
+            if prev_threshold_id != self._threshold_idx:
+                self._report_host_state(ReportCause.MEM_THRESHOLD)
+                prev_threshold_id = self._threshold_idx
 
 
 class CpuUsage:

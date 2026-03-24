@@ -1064,6 +1064,7 @@ class ExecutorOptions(Options):
         self.runner_dir_outputs = True
         self.dir_outputs_test_mode = False
         self.schedule_strategy = None
+        self.memory_limit = None
 
     @staticmethod
     def consumer():
@@ -1147,7 +1148,23 @@ class ExecutorOptions(Options):
                 group=ADVANCED_OPT_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
+            ArgConsumer(
+                ['--memory-limit'],
+                help='The upper limit above which no build tasks are started (Examples: 50GB, 92%)',
+                hook=SetValueHook('memory_limit'),
+                group=ADVANCED_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            EnvConsumer('YA_MEMORY_LIMIT', hook=SetValueHook('memory_limit')),
+            ConfigConsumer('memory_limit'),
         ]
+
+    def postprocess(self):
+        if self.memory_limit:
+            if self.memory_limit.endswith('%'):
+                self.memory_limit = {'abs': None, 'rel': float(self.memory_limit.removesuffix('%'))}
+            else:
+                self.memory_limit = {'abs': parse_size(self.memory_limit, binary=True), 'rel': None}
 
     def postprocess2(self, params):
         if (

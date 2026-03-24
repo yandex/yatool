@@ -694,7 +694,7 @@ class RunNodeTask(object):
             'AR',
             'LD',
         ):
-            return worker_threads.ResInfo(io=1)
+            return worker_threads.ResInfo(io=1, mem=1)
         if p in (
             'SB',
             'XT',
@@ -709,8 +709,8 @@ class RunNodeTask(object):
             else:
                 cpu = parse_cpu_requirement(cpu)
                 cpu = min(max(int(cpu), 1), self._threads)
-            return worker_threads.ResInfo(test=1, cpu=cpu)
-        return worker_threads.ResInfo(cpu=1)
+            return worker_threads.ResInfo(test=1, cpu=cpu, mem=1)
+        return worker_threads.ResInfo(cpu=1, mem=1)
 
     def status(self):
         return fmt_node(self._node, self._tags, self._status)

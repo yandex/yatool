@@ -48,6 +48,9 @@ class ResInfo(object):
         self.__d = dict(*args, **kwargs)
         self._hash = hash(tuple(sorted(self.__d.items())))
 
+    def copy(self, *args, **kwargs):
+        return ResInfo(self.__d | dict(*args, **kwargs))
+
     @staticmethod
     def _iter(d1, d2):
         for k in set(d1.keys()) | set(d2.keys()):
@@ -83,7 +86,7 @@ class PrioritizedTask(object):
 
 
 class WorkerThreads(object):
-    def __init__(self, state, worker_pools, zero, cap, evlog, schedule_strategy):
+    def __init__(self, state, worker_pools, zero, calc_cap, evlog, schedule_strategy):
         self._all_threads = []
         self._state = state
         self._out_q = Queue.Queue()
@@ -99,6 +102,7 @@ class WorkerThreads(object):
             def take_or_wait():
                 while self._state.check_cancel_state():
                     with self._condition:
+                        cap = calc_cap()
                         best_actions = {}
                         for k, pt_list in self._active_set.items():
                             if pt_list and k + self._active_res_usage[0] <= cap:
