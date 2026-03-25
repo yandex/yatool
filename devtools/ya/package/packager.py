@@ -311,6 +311,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         "strip_cache",
         "strip_symlinks",
         "symlinks_ttl",
+        "test_disable_timeout",
         "test_log_level",
         "test_params",
         "test_size_filters",
