@@ -1,6 +1,5 @@
 # coding: utf-8
 
-from __future__ import print_function
 import io
 import os
 import re
@@ -11,6 +10,7 @@ import json
 import time
 import uuid
 import errno
+import typing
 import signal
 import logging
 import argparse
@@ -18,6 +18,7 @@ import traceback
 import threading
 import subprocess
 import collections
+import dataclasses
 import concurrent.futures as futures
 
 from six import string_types
@@ -156,46 +157,100 @@ def filter_tests_by_filter(test_names, filters, binary_name):
     return list(filter(make_testname_filter(filters), test_names))
 
 
-def split_test_name(test_name):
+def split_test_name(test_name: str) -> list[str]:
     return test_name.rsplit("::", 1)
 
 
-def get_test_classes(project_path, binary, test_filter, tracefile, list_timeout, gdb_path, wine_path):
+def _parse_test_output(raw_lines: list[str]) -> typing.Generator['TestInfo', None, None]:
+    for line in filter(None, raw_lines):
+        try:
+            test_obj = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            yield TestInfo(nodeid=line)
+            continue
+
+        if 'nodeid' in test_obj:
+            yield TestInfo.from_dict(test_obj)
+        else:
+            yield TestInfo(nodeid=line)
+
+
+@dataclasses.dataclass
+class TestInfo:
+    nodeid: str
+    test_suite_name: str = ''
+    name: str = ''
+    file: str = ''
+    line: int = 0
+    params: typing.Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> 'TestInfo':
+        return cls(
+            nodeid=d.get('nodeid', ''),
+            test_suite_name=d.get('test_suite_name', ''),
+            name=d.get('name', ''),
+            file=d.get('file', ''),
+            line=d.get('line', 0),
+            params=d.get('params'),
+        )
+
+
+def _make_list_error_handler(project_path: str, tracefile: typing.Optional[str]):
     def dump_error(comment, status):
         suite = gen_suite(project_path)
         suite.add_chunk_error(comment, status)
         shared.dump_trace_file(suite, tracefile)
         raise Exception(comment)
 
+    return dump_error
+
+
+def _make_list_timeout_handler(gdb_path: str):
     def on_timeout(result, timeout):
         process._kill_process_tree(result.process.pid, signal.SIGQUIT)
-
         logging.debug("Waiting for process (%d) to dump core dump file", result.process.pid)
         os.waitpid(result.process.pid, 0)
-
         result.process_backtrace = ""
         core_path = cores.recover_core_dump_file(result.command[0], os.getcwd(), result.process.pid)
         if core_path:
             result.process_backtrace = cores.get_gdb_full_backtrace(result.command[0], core_path, gdb_path)
 
+    return on_timeout
+
+
+def _build_list_cmd(binary: str, wine_path: typing.Optional[str], filename: str):
+    cmd = [binary, "--list-verbose", "--list-path"]
+    cwd = None
+    stdin = None
+    if wine_path:
+        if os.environ.get("YA_TEST_SHORTEN_WINE_PATH"):
+            local_filename = os.path.basename(filename)
+            if not os.path.exists(local_filename):
+                os.symlink(filename, local_filename)
+            cmd += [WINE_CWD_PATH + local_filename]
+            cmd, cwd, stdin = shorten_wine_paths(wine_path, cmd)
+        else:
+            cmd = [wine_path] + cmd + [filename]
+    else:
+        cmd += [filename]
+    return cmd, cwd, stdin
+
+
+def _list_tests_from_binary(
+    project_path: str,
+    binary: str,
+    tracefile: typing.Optional[str],
+    list_timeout: int,
+    gdb_path: str,
+    wine_path: typing.Optional[str],
+) -> list[TestInfo]:
+    dump_error = _make_list_error_handler(project_path, tracefile)
+    on_timeout = _make_list_timeout_handler(gdb_path)
+
     try:
         with exts.tmp.temp_file() as filename:
-            cmd = [binary, "--list-verbose", "--list-path"]
-            cwd = None
-            stdin = None
-
-            if wine_path:
-                if os.environ.get("YA_TEST_SHORTEN_WINE_PATH"):
-                    local_filename = os.path.basename(filename)
-                    if not os.path.exists(local_filename):
-                        os.symlink(filename, local_filename)
-                    cmd += [WINE_CWD_PATH + local_filename]
-                    cmd, cwd, stdin = shorten_wine_paths(wine_path, cmd)
-                else:
-                    cmd = [wine_path] + cmd + [filename]
-            else:
-                cmd += [filename]
-
+            cmd, cwd, stdin = _build_list_cmd(binary, wine_path, filename)
             process.execute(
                 cmd,
                 timeout=list_timeout,
@@ -206,20 +261,12 @@ def get_test_classes(project_path, binary, test_filter, tracefile, list_timeout,
                 stdin=stdin,
                 text=True,
             )
+            raw_lines = exts.fs.read_text(filename).strip().split("\n")
 
-            result = exts.fs.read_text(filename).strip().split("\n")
-            test_names = []
-            for line in filter(None, result):
-                try:
-                    test_obj = json.loads(line)
-                    if 'nodeid' in test_obj:
-                        test_names.append(test_obj['nodeid'])
-                    else:
-                        # Fallback to old behavior if nodeid is absent
-                        test_names.append(line)
-                except (json.JSONDecodeError, ValueError):
-                    test_names.append(line)
-            logger.debug("Found tests: '%s'", "' '".join(test_names))
+        test_info_list = list(_parse_test_output(raw_lines))
+        logger.debug("Found tests: '%s'", "' '".join(t.nodeid for t in test_info_list))
+        return test_info_list
+
     except process.TimeoutError as e:
         comment = "[[bad]]Cannot obtain list of ut tests in the allotted time ('ut --list-verbose' worked longer than [[imp]]{}s[[bad]])".format(
             list_timeout
@@ -228,45 +275,63 @@ def get_test_classes(project_path, binary, test_filter, tracefile, list_timeout,
         if bt:
             logger.debug("Stack trace for hung process:\n%s", bt)
             comment += "\n{}".format(cores.colorize_backtrace(cores.get_problem_stack(bt), TEST_BT_COLORS))
-
         sys.stderr.write("Process stderr:\n{}".format(e.execution_result.stderr))
         sys.stdout.write("Process stdout:\n{}".format(e.execution_result.stdout))
-
         dump_error(comment, Status.TIMEOUT)
-    except process.ExecutionError as e:
-        result = e.execution_result
-        parts = ["[[bad]]Ut test failed with exit code [[imp]]{}[[bad]] while listing tests.".format(result.exit_code)]
 
-        if result.exit_code < 0:
-            core_path = cores.recover_core_dump_file(
-                e.execution_result.command[0], os.getcwd(), e.execution_result.process.pid
-            )
+    except process.ExecutionError as e:
+        exec_result = e.execution_result
+        parts = [
+            "[[bad]]Ut test failed with exit code [[imp]]{}[[bad]] while listing tests.".format(exec_result.exit_code)
+        ]
+        if exec_result.exit_code < 0:
+            core_path = cores.recover_core_dump_file(exec_result.command[0], os.getcwd(), exec_result.process.pid)
             if core_path:
-                bt = cores.get_gdb_full_backtrace(result.command[0], core_path, gdb_path)
+                bt = cores.get_gdb_full_backtrace(exec_result.command[0], core_path, gdb_path)
                 parts.append("Problem thread backtrace:")
                 parts.append(cores.colorize_backtrace(cores.get_problem_stack(bt), TEST_BT_COLORS))
-
-        if result.stderr:
+        if exec_result.stderr:
             parts.append("Process stderr:")
-            parts.append(result.stderr)
-        comment = '\n'.join(parts)
-        sys.stderr.write(display.strip_markup(comment))
-        dump_error(comment, Status.CRASHED)
+            parts.append(exec_result.stderr)
+        sys.stderr.write(display.strip_markup('\n'.join(parts)))
+        dump_error('\n'.join(parts), Status.CRASHED)
+
     except Exception:
-        comment = "[[bad]]Internal error while listing tests: {}".format(traceback.format_exc())
-        dump_error(comment, Status.INTERNAL)
+        dump_error("[[bad]]Internal error while listing tests: {}".format(traceback.format_exc()), Status.INTERNAL)
 
+
+def get_test_info_list(
+    project_path: str,
+    binary: str,
+    test_filter: list[str],
+    tracefile: typing.Optional[str],
+    list_timeout: int,
+    gdb_path: str,
+    wine_path: typing.Optional[str],
+) -> list[TestInfo]:
+    test_info_list = _list_tests_from_binary(project_path, binary, tracefile, list_timeout, gdb_path, wine_path)
     if test_filter:
-        test_names = filter_tests_by_filter(test_names, test_filter, os.path.basename(binary))
-        logger.debug("Tests applying filter (%s): '%s'", test_filter, "' '".join(test_names))
+        all_names = [t.nodeid for t in test_info_list]
+        filtered_names = set(filter_tests_by_filter(all_names, test_filter, os.path.basename(binary)))
+        logger.debug("Tests applying filter (%s): '%s'", test_filter, "' '".join(sorted(filtered_names)))
+        test_info_list = [t for t in test_info_list if t.nodeid in filtered_names]
+    return test_info_list
 
-    result = {}
-    for name in test_names:
-        class_name = split_test_name(name)[0]
-        if class_name not in result:
-            result[class_name] = [name]
-        else:
-            result[class_name].append(name)
+
+def get_test_classes(
+    project_path: str,
+    binary: str,
+    test_filter: list[str],
+    tracefile: typing.Optional[str],
+    list_timeout: int,
+    gdb_path: str,
+    wine_path: typing.Optional[str],
+) -> dict[str, list[str]]:
+    test_info_list = get_test_info_list(project_path, binary, test_filter, tracefile, list_timeout, gdb_path, wine_path)
+    result: dict[str, list[str]] = {}
+    for t in test_info_list:
+        class_name = split_test_name(t.nodeid)[0]
+        result.setdefault(class_name, []).append(t.nodeid)
     return result
 
 
@@ -1023,9 +1088,9 @@ def fill_suite_with_empty_test_records(suite, test_names):
         suite.chunk.tests.append(test_case)
 
 
-def list_tests(test_names):
-    for test_case in sorted(test_names):
-        print(test_case)
+def list_tests(test_info_list: list[TestInfo]) -> None:
+    for test_info in sorted(test_info_list, key=lambda x: x.nodeid):
+        print(json.dumps(dataclasses.asdict(test_info)))
 
 
 def gen_suite(project_path):
@@ -1071,15 +1136,33 @@ def main():
                     test_names.append(item)
     else:
         try:
-            test_classes = get_test_classes(
-                args.project_path,
-                args.binary,
-                args.test_filter,
-                args.trace_path,
-                args.list_timeout,
-                args.gdb_path,
-                wine_path,
-            )
+            if args.test_list:
+                test_info_list = get_test_info_list(
+                    args.project_path,
+                    args.binary,
+                    args.test_filter,
+                    args.trace_path,
+                    args.list_timeout,
+                    args.gdb_path,
+                    wine_path,
+                )
+                test_names_for_log = [t.nodeid for t in test_info_list]
+                dups = get_duplicates(test_names_for_log)
+                test_info_list_filtered = [t for t in test_info_list if t.nodeid not in dups]
+                test_names_filtered = sorted([t.nodeid for t in test_info_list_filtered])
+                logger.debug("Tests to be listed to file: %s", test_names_filtered)
+                list_tests(test_info_list_filtered)
+                return
+            else:
+                test_classes = get_test_classes(
+                    args.project_path,
+                    args.binary,
+                    args.test_filter,
+                    args.trace_path,
+                    args.list_timeout,
+                    args.gdb_path,
+                    wine_path,
+                )
         except Exception as e:
             # stack trace it not really necessary for listing
             if args.test_list:
@@ -1105,12 +1188,6 @@ def main():
         # marked as FAIL in fill_suite_with_empty_test_records method
         test_names = sorted(list(set(test_names) - dups))
         logger.debug("Tests to be launched: %s", test_names)
-    else:
-        logger.debug("Tests to be launched: %s", sorted(list(set(test_names) - get_duplicates(test_names))))
-
-    if args.test_list:
-        list_tests(test_names)
-        return
 
     logsdir = args.output_dir or os.path.dirname(args.trace_path) or os.getcwd()
     suite.chunk.logs = {"logsdir": logsdir}

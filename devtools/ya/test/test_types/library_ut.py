@@ -1,17 +1,78 @@
 import os
+import json
 import six
 import logging
+from typing import List  # noqa: F401
+from typing import Optional  # noqa: F401
+from typing import Union  # noqa: F401
 
 import exts.windows
 import devtools.ya.test.common as test_common
 import devtools.ya.test.const
 from devtools.ya.test.system import process
 from devtools.ya.test.test_types import common as common_types
-from devtools.ya.test.util import tools, shared
+from devtools.ya.test.util import tools
 
 logger = logging.getLogger(__name__)
 
 UNITTEST_TYPE = "unittest"
+
+
+class CppSubtestInfo(test_common.SubtestInfo):
+    @classmethod
+    def from_json(cls, json_str):
+        # type: (str) -> CppSubtestInfo
+        test_obj = json.loads(json_str)
+        nodeid = test_obj['nodeid']
+        if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR in nodeid:
+            test_obj['test'], test_obj['subtest'] = nodeid.split(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1)
+        else:
+            test_obj['test'], test_obj['subtest'] = nodeid, ""
+        return cls.from_dict(test_obj)
+
+    @classmethod
+    def from_dict(cls, data):
+        # type: (dict) -> CppSubtestInfo
+        return cls(
+            data["test"],
+            data.get("subtest", ""),
+            skipped=data.get("skipped", False),
+            tags=data.get("tags", []),
+            file=data.get("file"),
+            line=data.get("line"),
+            nodeid=data.get("nodeid"),
+            name=data.get("name"),
+            test_suite_name=data.get("test_suite_name"),
+        )
+
+    def __init__(
+        self,
+        test,  # type: str
+        subtest="",  # type: str
+        skipped=False,  # type: bool
+        tags=None,  # type: Optional[List[str]]
+        file=None,  # type: Optional[str]
+        line=None,  # type: Optional[int]
+        nodeid=None,  # type: Optional[str]
+        name=None,  # type: Optional[str]
+        test_suite_name=None,  # type: Optional[str]
+    ):
+        # type: (...) -> None
+        super(CppSubtestInfo, self).__init__(test, subtest, skipped, tags=tags)
+        self.file = file
+        self.line = line
+        self.nodeid = nodeid
+        self.name = name
+        self.test_suite_name = test_suite_name
+
+    def to_json(self):
+        result = super(CppSubtestInfo, self).to_json()
+        result["file"] = self.file
+        result["line"] = self.line
+        result["nodeid"] = self.nodeid
+        result["name"] = self.name
+        result["test_suite_name"] = self.test_suite_name
+        return result
 
 
 class UnitTestSuite(common_types.AbstractTestSuite):
@@ -161,10 +222,33 @@ class UnitTestSuite(common_types.AbstractTestSuite):
 
     @classmethod
     def list(cls, cmd, cwd):
-        return [
-            test_common.SubtestInfo(*info)
-            for info in shared.get_testcases_info(process.execute(cmd, check_exit_code=False, cwd=cwd))
-        ]
+        return cls._get_cpp_subtests_info(process.execute(cmd, check_exit_code=False, cwd=cwd))
+
+    @staticmethod
+    def _get_cpp_subtests_info(cmd_result):
+        result = []  # type: List[Union[CppSubtestInfo, test_common.SubtestInfo]]
+        if cmd_result.exit_code == 0:
+            for line in cmd_result.std_out.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+
+                # processing new detailed JSON tests info format, for example:
+                #  {"file":"path/to/test.cpp","name":"Test","test_suite_name":"TestGroup","nodeid":"TestGroup::Test","line":3}
+                try:
+                    result.append(CppSubtestInfo.from_json(line))
+                    continue
+                except (ValueError, KeyError) as exc:
+                    logger.debug('Failed to add test list info due to error: %s', exc)
+                    pass
+
+                # Fallback to old format, "suite::test" string (without extra fields)
+                if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR in line:
+                    test, subtest = line.split(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1)
+                    result.append(test_common.SubtestInfo(test, subtest))
+
+            return result
+        raise Exception(cmd_result.std_err)
 
     @property
     def supports_canonization(self):
