@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: marisa-trie
-Version: 1.3.1
+Version: 1.4.0
 Summary: Static memory-efficient and fast Trie-like structures for Python.
 Author-email: Mikhail Korobov <kmike84@gmail.com>
 License-Expression: MIT AND (BSD-2-Clause OR LGPL-2.1-or-later)
@@ -17,6 +17,7 @@ Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Programming Language :: Python :: 3.13
 Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: Free Threading :: 2 - Beta
 Classifier: Programming Language :: Python :: Implementation :: CPython
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
 Classifier: Topic :: Scientific/Engineering :: Information Analysis
@@ -31,6 +32,8 @@ Provides-Extra: test
 Requires-Dist: hypothesis; extra == "test"
 Requires-Dist: pytest; extra == "test"
 Requires-Dist: readme_renderer; extra == "test"
+Requires-Dist: pytest-run-parallel; python_version >= "3.13" and extra == "test"
+Requires-Dist: hypothesis>=6.136.9; python_version >= "3.13" and extra == "test"
 Dynamic: license-file
 
 MARISA Trie
@@ -47,7 +50,7 @@ MARISA Trie
 
    |Patreon|
 
-Static memory-efficient Trie-like structures for Python (3.8+)
+Static memory-efficient Trie-like structures for Python (3.9+)
 based on `marisa-trie`_ C++ library.
 
 String data in a MARISA-trie may take up to 50x-100x less memory than
@@ -74,6 +77,9 @@ Usage
 
 See `tutorial`_ and `API`_ for details.
 
+For immutable ``str -> str`` mappings, use ``marisa_trie.StringTrie``
+(implemented as two internal tries plus a compact ID mapping table).
+
 .. _tutorial: https://marisa-trie.readthedocs.io/en/latest/tutorial.html
 .. _API: https://marisa-trie.readthedocs.io/en/latest/api.html
 
@@ -85,7 +91,8 @@ Current limitations
   and doesn't have iterator counterpart;
 * ``read()`` and ``write()`` methods don't work with file-like objects
   (they work only with real files; pickling works fine for file-like objects);
-* there are ``keys()`` and ``items()`` methods but no ``values()`` method.
+* ``Trie``, ``BytesTrie`` and ``RecordTrie`` provide ``keys()`` and
+  ``items()`` methods but no ``values()`` method.
 
 License
 =======
@@ -109,6 +116,13 @@ LGPL or BSD 2-clause license.
 
 CHANGES
 =======
+
+1.4.0 (2026-03-10)
+------------------
+
+* Initial free-threading support and testing (#128).
+* Added ``StringTrie``: an immutable ``str -> str`` mapping backed by two
+  MARISA tries and a fixed-width 4-byte key-ID to value-ID table (#138).
 
 1.3.1 (2025-08-26)
 ------------------

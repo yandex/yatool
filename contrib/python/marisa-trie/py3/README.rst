@@ -12,7 +12,7 @@ MARISA Trie
 
    |Patreon|
 
-Static memory-efficient Trie-like structures for Python (3.8+)
+Static memory-efficient Trie-like structures for Python (3.9+)
 based on `marisa-trie`_ C++ library.
 
 String data in a MARISA-trie may take up to 50x-100x less memory than
@@ -39,6 +39,9 @@ Usage
 
 See `tutorial`_ and `API`_ for details.
 
+For immutable ``str -> str`` mappings, use ``marisa_trie.StringTrie``
+(implemented as two internal tries plus a compact ID mapping table).
+
 .. _tutorial: https://marisa-trie.readthedocs.io/en/latest/tutorial.html
 .. _API: https://marisa-trie.readthedocs.io/en/latest/api.html
 
@@ -50,7 +53,8 @@ Current limitations
   and doesn't have iterator counterpart;
 * ``read()`` and ``write()`` methods don't work with file-like objects
   (they work only with real files; pickling works fine for file-like objects);
-* there are ``keys()`` and ``items()`` methods but no ``values()`` method.
+* ``Trie``, ``BytesTrie`` and ``RecordTrie`` provide ``keys()`` and
+  ``items()`` methods but no ``values()`` method.
 
 License
 =======
