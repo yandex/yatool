@@ -25,7 +25,6 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
     const bool lastMayBeEmpty = argNames.size() - args.size() == 1 && hasVarArg;
     if (argNames.size() != args.size() && (argNames.empty() || (argNames.size() > args.size() && !lastMayBeEmpty))) {
         return std::unexpected(TMapMacroVarsErr{
-            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
             .Message = FormatWrongNumberOfArgumentsErr(argNames.size(), args.size())}
         );
     }
@@ -37,7 +36,6 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
     for (TStringBuf arg : args) {
         if (argNamesIndex >= argNames.size() && !hasVarArg) {
             return std::unexpected(TMapMacroVarsErr{
-                .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
                 .Message = FormatWrongNumberOfArgumentsErr(argNames.size(), args.size())}
             );
         }
@@ -48,7 +46,6 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
 
         if (!isLastArg && insideArray && !isArrayArg) {
             return std::unexpected(TMapMacroVarsErr{
-                .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
                 .Message = fmt::format("Passed array but expected element {}", name)}
             );
         }
@@ -67,7 +64,6 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
         if (arg.StartsWith(NStaticConf::ARRAY_START)) {
             if (insideArray) {
                 return std::unexpected(TMapMacroVarsErr{
-                    .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
                     .Message = "'[' inside '[ ]'"}
                 );
             }
@@ -82,7 +78,6 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
         if (arg.EndsWith(NStaticConf::ARRAY_END)) {
             if (!insideArray) {
                 return std::unexpected(TMapMacroVarsErr{
-                    .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
                     .Message = "Expected '[' before ']'"}
                 );
             }
@@ -120,14 +115,12 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
 
     if (insideArray) {
         return std::unexpected(TMapMacroVarsErr{
-            .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
             .Message = "Expected ']'"}
         );
     }
 
     if (!isLastArg) {
         return std::unexpected(TMapMacroVarsErr{
-            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
             .Message = FormatWrongNumberOfArgumentsErr(argNames.size(), args.size())}
         );
     }
@@ -227,7 +220,6 @@ TMapMacroVarsResult ConsumePositionals(
         return {};
     if (vararg.empty()) {
         return std::unexpected(TMapMacroVarsErr{
-            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
             .Message = fmt::format("More positional arguments passed then expected. Can't handle args '{}'", fmt::join(args, ", "))
         });
     }
@@ -268,7 +260,6 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
     while (auto kwVal = kwArgs.TakeNext()) {
         if (kwVal->Args.size() < kwVal->Kw.From) {
             return std::unexpected(TMapMacroVarsErr{
-                .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
                 .Message = fmt::format(
                     "Keyword {} requires from {} to {} arguments but got '{}'",
                     kwArgs.KeywordName(kwVal->Kw),
@@ -284,7 +275,6 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
         // TODO(svidyuk) better deduplication please!!!
         if (!isArr && locals.contains(kwArgs.KeywordName(kwVal->Kw))) {
             return std::unexpected(TMapMacroVarsErr{
-                .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
                 .Message = fmt::format(
                     "Keyword {} appears more than once and is not an array",
                     kwArgs.KeywordName(kwVal->Kw)
@@ -298,7 +288,6 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
             const auto posArgs = kwVal->Args.subspan(kwVal->Kw.To);
             if (!lastArr.empty()) {
                 return std::unexpected(TMapMacroVarsErr{
-                    .ErrorClass = EMapMacroVarsErrClass::ArgsSequenceError,
                     .Message = fmt::format(
                         "Mixing positional arguments with named arrays is error prone and forbidden.\n"
                         "Got positional args '{}' after named array {} have been started",
@@ -321,7 +310,6 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
 
     if (!positionalScalars.empty()) {
         return std::unexpected(TMapMacroVarsErr{
-            .ErrorClass = EMapMacroVarsErrClass::UserSyntaxError,
             .Message = fmt::format("Value for '{}' argument is missing", positionalScalars.front())
         });
     }

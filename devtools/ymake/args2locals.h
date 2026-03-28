@@ -7,12 +7,7 @@
 
 class TSignature;
 
-enum class EMapMacroVarsErrClass {
-    UserSyntaxError,
-    ArgsSequenceError
-};
 struct TMapMacroVarsErr {
-    EMapMacroVarsErrClass ErrorClass;
     std::string Message;
 
     void Report(TStringBuf macroName, TStringBuf argsStr) const;
