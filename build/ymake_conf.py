@@ -1550,7 +1550,7 @@ class GnuCompiler(Compiler):
         ]
         self.cxx_warnings = []
 
-        self.c_defines = ['${hide:CPP_FAKEID}']
+        self.c_defines = ['${hide:CPP_FAKEID_SCOPED}']
         if self.target.is_android:
             self.c_defines.append('${hide:ANDROID_FAKEID}')
 
@@ -2044,7 +2044,7 @@ class MSVCCompiler(MSVC, Compiler):
         ]
 
         defines = [
-            '${hide:CPP_FAKEID}',
+            '${hide:CPP_FAKEID_SCOPED}',
             # FIXME: This is quick fix to let catboost build from MSVS IDE
             # This place is questionable overall, see YMAKE-437
             '/DARCADIA_ROOT=${ARCADIA_ROOT}',
