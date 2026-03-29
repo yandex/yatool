@@ -39,8 +39,8 @@ struct TStartUpOptions: public TRootsOptions {
     TAtomicSharedPtr<IOutputStream> OutputStream;
     TAtomicSharedPtr<IOutputStream> ErrorStream;
 
-    NForeignTargetPipeline::TLineReader* ForeignTargetReader = nullptr;
-    NForeignTargetPipeline::TLineWriter* ForeignTargetWriter = nullptr;
+    THolder<NForeignTargetPipeline::TLineReader> ForeignTargetReader;
+    THolder<NForeignTargetPipeline::TLineWriter> ForeignTargetWriter;
 
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
