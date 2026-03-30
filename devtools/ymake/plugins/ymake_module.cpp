@@ -9,6 +9,7 @@
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/include_parsers/cython_parser.h>
 #include <devtools/ymake/lang/plugin_facade.h>
+#include <devtools/ymake/plugins/pybridge/lambda.h>
 #include <devtools/ymake/plugins/pybridge/raii.h>
 
 #include <util/generic/string.h>
@@ -37,15 +38,23 @@ namespace {
         using TType = M;
     };
 
-    template<typename T>
-    concept MemberFunction = TMemberTraits<T>::IsMemberFunction;
+    template<typename T, typename... Args>
+    concept MemberFunction = TMemberTraits<T>::IsMemberFunction && std::invocable<T, typename TMemberTraits<T>::TClass&, Args...>;
 
-    template<MemberFunction auto Member>
+    template<MemberFunction<std::span<PyObject*>> auto Member>
     PyObject* WrapMember(PyObject* self, PyObject* const* args, Py_ssize_t nargs) noexcept {
         Y_ASSERT(self);
         Y_ASSERT(PyModule_Check(self));
         auto* obj = static_cast<TMemberTraits<decltype(Member)>::TClass*>(PyModule_GetState(self));
         return (obj->*Member)(std::span{args, static_cast<size_t>(nargs)});
+    }
+
+    template<MemberFunction<PyObject*, PyObject*> auto Member>
+    PyObject* WrapMember(PyObject* self, PyObject* args, PyObject* kwargs) noexcept {
+        Y_ASSERT(self);
+        Y_ASSERT(PyModule_Check(self));
+        auto* obj = static_cast<TMemberTraits<decltype(Member)>::TClass*>(PyModule_GetState(self));
+        return (obj->*Member)(args, kwargs);
     }
 
     TStringBuf CutLastExtension(const TStringBuf path) noexcept {
@@ -203,65 +212,6 @@ namespace {
         .flags = Py_TPFLAGS_DEFAULT,
         .slots = YMakeCmdContextTypeSlots,
     };
-
-    PyObject* MethodAddParser(PyObject* /*self*/, PyObject* args, PyObject* kwargs) {
-        const char* ext;
-        PyObject* confObj;
-        PyObject* callableObj;
-        PyObject* inducedDepsObj = nullptr;
-        int passInducedIncludes = 0;
-        const char* keys[] = {
-            "",
-            "",
-            "",
-            "induced",
-            "pass_induced_includes",
-            nullptr
-        };
-        if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OsO|$Op:ymake.add_parser", (char**)keys, &confObj, &ext, &callableObj, &inducedDepsObj, &passInducedIncludes) || PyErr_Occurred()) {
-            return nullptr;
-        }
-        TBuildConfiguration* conf = nullptr;
-        if (PyCapsule_CheckExact(confObj)) {
-            conf = reinterpret_cast<TBuildConfiguration*>(PyCapsule_GetPointer(confObj, "BuildConfiguration"));
-        }
-        if (conf == nullptr) {
-            PyErr_SetString(PyExc_TypeError, "first argument of ymake.add_parser is expected to be a PyCapsule object containing a pointer to TBuildConfiguration");
-            return nullptr;
-        }
-        std::map<TString, TString> inducedDeps;
-        if (inducedDepsObj) {
-            if (!PyDict_Check(inducedDepsObj)) {
-                PyErr_SetString(PyExc_TypeError, "'induced' argument of ymake.add_parser is expected to be of type 'dict'");
-                return nullptr;
-            }
-
-            Py_ssize_t pos = 0;
-            PyObject* keyObj = nullptr;
-            PyObject* valueObj = nullptr;
-            while (PyDict_Next(inducedDepsObj, &pos, &keyObj, &valueObj)) {
-                if (!PyUnicode_Check(keyObj)) {
-                    PyErr_SetString(PyExc_TypeError, "key of dict (of 'induced' argument) must be a string");
-                    return nullptr;
-                }
-                const char* key = PyUnicode_AsUTF8AndSize(keyObj, nullptr);
-                if (!key || PyErr_Occurred()) {
-                    return nullptr;
-                }
-                if (!PyUnicode_Check(valueObj)) {
-                    PyErr_SetString(PyExc_TypeError, "value of dict (of 'induced' argument) must be a string");
-                    return nullptr;
-                }
-                const char* value = PyUnicode_AsUTF8AndSize(valueObj, nullptr);
-                if (!value || PyErr_Occurred()) {
-                    return nullptr;
-                }
-                inducedDeps.emplace(key, value);
-            }
-        }
-        AddParser(conf, ext, callableObj, inducedDeps, passInducedIncludes);
-        Py_RETURN_NONE;
-    }
 
     PyObject* MethodReportConfigureError(PyObject* /*self*/, PyObject* args) {
         const char* errorMessage = nullptr;
@@ -424,6 +374,40 @@ namespace {
         Py_RETURN_NONE;
     }
 
+    bool ParseInducedDepsArg(PyObject* inducedDepsObj, std::map<TString, TString>& inducedDeps) {
+        if (!inducedDepsObj)
+            return true;
+
+        if (!PyDict_Check(inducedDepsObj)) {
+            PyErr_SetString(PyExc_TypeError, "'induced' argument of ymake.add_parser is expected to be of type 'dict'");
+            return false;
+        }
+
+        Py_ssize_t pos = 0;
+        PyObject* keyObj = nullptr;
+        PyObject* valueObj = nullptr;
+        while (PyDict_Next(inducedDepsObj, &pos, &keyObj, &valueObj)) {
+            if (!PyUnicode_Check(keyObj)) {
+                PyErr_SetString(PyExc_TypeError, "key of dict (of 'induced' argument) must be a string");
+                return false;
+            }
+            const char* key = PyUnicode_AsUTF8AndSize(keyObj, nullptr);
+            if (!key || PyErr_Occurred()) {
+                return false;
+            }
+            if (!PyUnicode_Check(valueObj)) {
+                PyErr_SetString(PyExc_TypeError, "value of dict (of 'induced' argument) must be a string");
+                return false;
+            }
+            const char* value = PyUnicode_AsUTF8AndSize(valueObj, nullptr);
+            if (!value || PyErr_Occurred()) {
+                return false;
+            }
+            inducedDeps.emplace(key, value);
+        }
+        return true;
+    }
+
     struct YMakeState {
         NYMake::NPy::OwnedRef<PyTypeObject> ContextType;
         NYMake::NPy::OwnedRef<PyTypeObject> CmdContextType;
@@ -440,6 +424,67 @@ namespace {
             Py_VISIT(ContextType.Get());
             Py_VISIT(CmdContextType.Get());
             return 0;
+        }
+
+        PyObject* DecoratorParser(PyObject* args, PyObject* kwargs) {
+            const char* ext;
+            PyObject* inducedDepsObj = nullptr;
+            int passInducedIncludes = 0;
+            const char* keys[] = {
+                "",
+                "induced",
+                "pass_induced_includes",
+                nullptr
+            };
+            if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|$Op:ymake.parser", keys, &ext, &inducedDepsObj, &passInducedIncludes))
+                return nullptr;
+            std::map<TString, TString> inducedDeps;
+            if (!ParseInducedDepsArg(inducedDepsObj, inducedDeps))
+                return nullptr;
+
+            return NYMake::NPy::MakePyLambda([this, ext=TString{ext}, inducedDeps=std::move(inducedDeps), passInducedIncludes](std::span<PyObject* const> args) -> PyObject* {
+                if (args.size() != 1) {
+                    PyErr_SetString(PyExc_RuntimeError, "ymake.parser decorator expects single decorated class to register as a parser");
+                    return nullptr;
+                }
+                AddParser(Conf, ext, args[0], inducedDeps, passInducedIncludes);
+                Py_INCREF(args[0]);
+                return args[0];
+            }).Release();
+        }
+
+        PyObject* MethodAddParser(PyObject* args, PyObject* kwargs) {
+            const char* ext;
+            PyObject* confObj;
+            PyObject* callableObj;
+            PyObject* inducedDepsObj = nullptr;
+            int passInducedIncludes = 0;
+            const char* keys[] = {
+                "",
+                "",
+                "",
+                "induced",
+                "pass_induced_includes",
+                nullptr
+            };
+            if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OsO|$Op:ymake.add_parser", (char**)keys, &confObj, &ext, &callableObj, &inducedDepsObj, &passInducedIncludes) || PyErr_Occurred()) {
+                return nullptr;
+            }
+            TBuildConfiguration* conf = nullptr;
+            if (PyCapsule_CheckExact(confObj)) {
+                conf = reinterpret_cast<TBuildConfiguration*>(PyCapsule_GetPointer(confObj, "BuildConfiguration"));
+            }
+            if (conf == nullptr) {
+                PyErr_SetString(PyExc_TypeError, "first argument of ymake.add_parser is expected to be a PyCapsule object containing a pointer to TBuildConfiguration");
+                return nullptr;
+            }
+            Y_ASSERT(conf == Conf);
+            std::map<TString, TString> inducedDeps;
+            if (!ParseInducedDepsArg(inducedDepsObj, inducedDeps))
+                return nullptr;
+
+            AddParser(conf, ext, callableObj, inducedDeps, passInducedIncludes);
+            Py_RETURN_NONE;
         }
 
         PyObject* MacroDecorator(std::span<PyObject* const> args) {
@@ -527,7 +572,8 @@ namespace {
     }
 
     PyMethodDef YMakeMethods[] = {
-        {"add_parser", (PyCFunction)MethodAddParser, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Add a parser for files with the given extension")},
+        {"parser", (PyCFunction)WrapMember<&YMakeState::DecoratorParser>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Use class as a parser for files with the given extension")},
+        {"add_parser", (PyCFunction)WrapMember<&YMakeState::MethodAddParser>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Add a parser for files with the given extension")},
         {"macro", (PyCFunction)WrapMember<&YMakeState::MacroDecorator>, METH_FASTCALL, PyDoc_STR("Register function as ya.make macro")},
         {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS, PyDoc_STR("Report configure error")},
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},

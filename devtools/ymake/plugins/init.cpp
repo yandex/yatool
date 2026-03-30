@@ -99,6 +99,7 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &p
             continue;
         }
 
+        // TODO(YMAKE-1996) remove old way to register parsers after switching all parser to decorator registration
         if (!RegisterParsersFromModule(*conf, mod.get()))
             continue;
         RegisterMacrosFromModule(*conf, mod.get());
