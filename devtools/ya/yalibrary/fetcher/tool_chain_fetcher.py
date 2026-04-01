@@ -459,9 +459,11 @@ def _to_list(val):
 def _get_fetcher(name, resource_type):
     def default_progress_callback(_, __):
         sys.stderr.write('.')
+        sys.stderr.flush()
 
     def default_finish_callback():
         sys.stderr.write('\n')
+        sys.stderr.flush()
 
     progress_callback = default_progress_callback
     finish_callback = default_finish_callback
