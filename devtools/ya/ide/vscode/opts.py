@@ -24,6 +24,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.black_formatter_enabled = True
         self.ruff_formatter_enabled = False
         self.write_pyright_config = True
+        self.python_type_checking_mode = None
         self.python_index_enabled = True
         self.python_new_extra_paths = False
         self.build_venv = False
@@ -211,18 +212,18 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
-                ["--write-pyright-config"],
-                help="Write pyrightconfig.json on disk",
-                hook=devtools.ya.core.yarg.SetConstValueHook("write_pyright_config", True),
-                group=cls.GROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.NONE,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
                 ["--no-pyright-config"],
                 help="Do not write pyrightconfig.json on disk",
                 hook=devtools.ya.core.yarg.SetConstValueHook("write_pyright_config", False),
                 group=cls.GROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--python-type-checking-mode"],
+                help="Type checking mode for python language server",
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    "python_type_checking_mode",
+                    values=("basic", "standard", "strict", "off"),
+                ),
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--no-python-index"],

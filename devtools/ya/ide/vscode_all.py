@@ -231,6 +231,12 @@ class VSCodeProject:
             devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
 
     def get_default_settings(self):
+        python_params_prefixes = ["python"]
+        if self.params.ide_name == IDEName.VSCODIUM:
+            python_params_prefixes.append("basedpyright")
+        elif self.params.ide_name == IDEName.CURSOR:
+            python_params_prefixes.append("cursorpyright")
+
         settings = OrderedDict(
             (
                 ("C_Cpp.intelliSenseEngine", "disabled"),
@@ -255,19 +261,17 @@ class VSCodeProject:
                 ("go.toolsManagement.checkForUpdates", "off"),
                 ("go.useLanguageServer", False),
                 ("npm.autoDetect", "off"),
-                ("python.analysis.autoSearchPaths", False),
-                ("python.analysis.diagnosticMode", "openFilesOnly"),
-                ("python.analysis.enablePytestSupport", pm.my_platform().startswith("linux")),
-                ("python.analysis.indexing", False),
                 ("python.languageServer", "None"),
-                ("python.testing.autoTestDiscoverOnSaveEnabled", False),
                 ("search.followSymlinks", False),
                 ("task.autoDetect", "off"),
-                ("typescript.suggest.autoImports", False),
-                ("typescript.tsc.autoDetect", "off"),
+                ("js/ts.suggest.autoImports", False),
+                ("js/ts.tsc.autoDetect", "off"),
                 ("vsicons.projectDetection.disableDetect", True),
             )
         )
+        for python_prefix in python_params_prefixes:
+            settings[f"{python_prefix}.analysis.autoSearchPaths"] = False
+            settings[f"{python_prefix}.analysis.indexing"] = False
         if self.is_cpp:
             settings["clangd.arguments"] = [
                 "--enable-config",
@@ -284,12 +288,11 @@ class VSCodeProject:
             settings["clangd.checkUpdates"] = False
 
         if self.is_py3:
-            settings["python.analysis.indexing"] = self.params.python_index_enabled
-            settings["python.analysis.persistAllIndices"] = True
+            for python_prefix in python_params_prefixes:
+                settings[f"{python_prefix}.analysis.indexing"] = self.params.python_index_enabled
+                settings[f"{python_prefix}.analysis.persistAllIndices"] = True
             if self.params.ide_name == IDEName.VSCODE:
                 settings["python.languageServer"] = "Pylance"
-            else:
-                settings["python.languageServer"] = "None"
 
         if self.is_go:
             settings.update(
@@ -444,8 +447,13 @@ class VSCodeProject:
             pyright_config = vscode.workspace.gen_pyrightconfig(
                 self.params, python_srcdirs, extra_paths, python_excludes
             )
+            python_param_prefix = "python"
+            if self.params.ide_name == IDEName.VSCODIUM:
+                python_param_prefix = "basedpyright"
+            elif self.params.ide_name == IDEName.CURSOR:
+                python_param_prefix = "cursorpyright"
             for key, value in pyright_config.items():
-                workspace["settings"]["python.analysis.%s" % key] = value
+                workspace["settings"][f"{python_param_prefix}.analysis.{key}"] = value
         run_modules = vscode.dump.filter_run_modules(modules, self.params.rel_targets, self.params.tests_enabled)
         if self.params.debug_enabled:
             if self.params.tests_enabled:

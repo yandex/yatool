@@ -1,15 +1,28 @@
 import json
 import os
 import shutil
-import sys
 from collections import OrderedDict
 from pathlib import Path
+from copy import deepcopy
 
 import devtools.ya.test.const as const
 import yalibrary.platform_matcher as pm
 from devtools.ya.ide import ide_common
 from . import excludes
 from .opts import IDEName
+
+SKIP_UPDATING_SETTINGS = (
+    "python.analysis.typeCheckingMode",
+    "basedpyright.analysis.typeCheckingMode",
+    "cursorpyright.analysis.typeCheckingMode",
+)
+
+UPDATE_CONFIGURATION_OPTIONS = (
+    "miDebuggerPath",
+    "setupCommands",
+    "substitutePath",
+    "sourceMap",
+)
 
 
 def merge_workspace(new, workspace_path):
@@ -42,7 +55,7 @@ def merge_workspace(new, workspace_path):
         name = conf["name"]
         if name in new_configurations:
             for key in conf:
-                if key not in ("miDebuggerPath", "setupCommands", "substitutePath", "sourceMap"):
+                if key not in UPDATE_CONFIGURATION_OPTIONS:
                     new_configurations[name][key] = conf[key]
         else:
             new_configurations[name] = conf
@@ -52,11 +65,8 @@ def merge_workspace(new, workspace_path):
         new["launch"]["compounds"] = old_compounds
 
     for setting in old.get("settings", []):
-        if setting not in new["settings"]:
+        if setting not in new["settings"] or setting in SKIP_UPDATING_SETTINGS:
             new["settings"][setting] = old["settings"][setting]
-
-    # Drop deprecated settings
-    new["settings"].pop("black-formatter.args", None)
 
 
 def sort_tasks(workspace):
@@ -300,16 +310,23 @@ def gen_pyrights_excludes(arc_root, srcdirs):
 
 
 def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):
-    def _write_config(config, path):
+    def _update_config_file(config, path):
+        if os.path.isfile(path):
+            try:
+                ide_common.emit_message(f"Reading existing {path}")
+                with open(path, "r") as f:
+                    old_config = json.load(f)
+                for key, value in old_config.items():
+                    if key not in ("include", "exclude", "extraPaths"):
+                        config[key] = value
+            except Exception as e:
+                ide_common.emit_message(f"[[warn]]Failed to read existing config[[rst]]: {e!r}")
         ide_common.emit_message(f"Writing {path}")
         with open(path, "w") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
 
     pyrightconfig = {
-        "typeCheckingMode": "off",
-        "pythonVersion": f"{sys.version_info.major}.{sys.version_info.minor}",
-        "reportMissingImports": "warning",
-        "reportUndefinedVariable": "error",
+        "typeCheckingMode": params.python_type_checking_mode or "off",
         "extraPaths": extraPaths,
     }
 
@@ -318,10 +335,12 @@ def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):
         pyrightconfig["exclude"] = excludes
     if params.write_pyright_config:
         if params.use_arcadia_root:
-            _write_config(pyrightconfig, os.path.join(params.arc_root, "pyrightconfig.json"))
+            _update_config_file(deepcopy(pyrightconfig), os.path.join(params.arc_root, "pyrightconfig.json"))
         else:
             for target in params.rel_targets:
-                _write_config(pyrightconfig, os.path.join(params.arc_root, target, "pyrightconfig.json"))
+                _update_config_file(
+                    deepcopy(pyrightconfig), os.path.join(params.arc_root, target, "pyrightconfig.json")
+                )
     return pyrightconfig
 
 
@@ -343,10 +362,14 @@ def get_recommended_extensions(params):
                 "ms-python.debugpy",
             ]
         )
+
         if params.ide_name == IDEName.VSCODE:
             extensions.append("ms-python.vscode-pylance")
-        else:
+        elif params.ide_name == IDEName.VSCODIUM:
             extensions.append("detachhead.basedpyright")
+        elif params.ide_name == IDEName.CURSOR:
+            extensions.append("anysphere.cursorpyright")
+
         if params.black_formatter_enabled:
             extensions.append("ms-python.black-formatter")
         if params.ruff_formatter_enabled:
