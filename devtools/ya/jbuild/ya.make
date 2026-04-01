@@ -14,6 +14,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/attrs
     contrib/python/Jinja2
     devtools/ya/build
     devtools/ya/core/common_opts

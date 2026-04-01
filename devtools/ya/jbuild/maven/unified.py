@@ -429,6 +429,7 @@ def import_unified(
         nodes = {}
         empty_ya_makes, empty_incs = set(), set()
 
+        artifacts = utils.enrich_with_extra_options(arcadia, artifacts)
         artifacts = license.enrich_with_licenses(artifacts)
         license_aliases = license.build_licenses_aliases(license_aliases_file, artifacts, canonize_licenses)
 
@@ -446,6 +447,7 @@ def import_unified(
             else:
                 my_licenses = [license_aliases.get(i, i) for i in data.get('licenses', [])]
 
+            peerdirs = extract_artefacts(data.get('dependencies', []), replace_version)
             nodes[str(key)] = {
                 'artifact': key,
                 'generate_ya_make': data.get('generate_ya_make', False),
@@ -453,10 +455,10 @@ def import_unified(
                 'pom_file': data.get('pom_file'),
                 'jar_file': data.get('jar_file'),
                 'source_file': data.get('source_file'),
-                'includes': [extract_artefact(i['artifact'], replace_version) for i in data.get('managed_imports', [])],
-                'peerdirs': [extract_artefact(i['artifact'], replace_version) for i in data.get('dependencies', [])],
-                "excludes": [utils.Artifact.from_unified_dict(i['artifact']) for i in data.get("exclusions", [])],
-                'dm': [extract_artefact(i['artifact'], replace_version) for i in data.get('managed_dependencies', [])],
+                'includes': extract_artefacts(data.get('managed_imports', []), replace_version),
+                'peerdirs': data['extra_options'].filter_dependencies(peerdirs),
+                'excludes': [utils.Artifact.from_unified_dict(i['artifact']) for i in data.get('exclusions', [])],
+                'dm': extract_artefacts(data.get('managed_dependencies', []), replace_version),
                 'licenses': my_licenses,
                 'repository': data.get('repository'),
             }
@@ -506,6 +508,10 @@ def import_unified(
         if "not_imported" in meta:
             contribs = '\n'.join(contrib for contrib in meta["not_imported"])
             logger.info('Managed dependency(ies) not added:\n%s', contribs)
+
+
+def extract_artefacts(raw_artefacts, replace_version):
+    return [extract_artefact(i['artifact'], replace_version) for i in raw_artefacts]
 
 
 def extract_artefact(raw_artefact, replace_versions: dict):

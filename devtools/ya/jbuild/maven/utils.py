@@ -1,17 +1,21 @@
 import six
 
-import os
-import exts.yjson as json
-import uuid
-import logging
-import tempfile
+import attr
+import importlib
 import jinja2
+import logging
+import os
+import shutil
+import tempfile
+import uuid
 
 import library.python.filelock
 import library.python.resource as rs
 
 import exts.fs as fs
 import exts.hashing as hashing
+import exts.tmp as tmp
+import exts.yjson as json
 import yalibrary.makelists.macro_definitions as md
 
 import devtools.ya.build.build_opts as bo
@@ -46,6 +50,12 @@ class MavenImporterError(Exception):
 
 class ArtifactUploadError(Exception):
     mute = True
+
+
+@attr.s(slots=True)
+class MavenImportProject:
+    license_transform = attr.ib(default=lambda x: x)
+    filter_dependencies = attr.ib(default=lambda x: x)
 
 
 class Artifact(object):
@@ -116,7 +126,7 @@ class Artifact(object):
         return ':'.join(filter(bool, self.coordinates()))
 
 
-def contrib_location(artifact):
+def contrib_location(artifact, with_version=True):
     path = [get_contrib_path()] + artifact.group_id.split('.')
 
     if not artifact.classifier or artifact.classifier == 'sources':
@@ -125,7 +135,7 @@ def contrib_location(artifact):
         suffix = '-' + artifact.classifier
     path.append(artifact.artifactId + suffix)
 
-    if artifact.version:
+    if artifact.version and with_version:
         path.append(artifact.version)
 
     return graph_base.hacked_path_join(*path)
@@ -299,3 +309,34 @@ def get_dm_line(dep, forced_deps):
 
 def forced_deps_as_list(forced_deps):
     return forced_deps if forced_deps is not None else []
+
+
+def enrich_with_extra_options(arcadia, artifacts):
+    with tmp.temp_dir() as td:
+        for data in artifacts:
+            artifact = Artifact.from_unified_dict(data['artifact'])
+            data["extra_options"] = get_extra_options(arcadia, artifact, td)
+    return artifacts
+
+
+def get_extra_options(arcadia, artifact, tmp_dir):
+    project_path = contrib_location(artifact, with_version=False)
+    yaml_path = os.path.join(arcadia.arc_root, project_path, ".yandex_meta", "__init__.py")
+    if not os.path.exists(yaml_path):
+        return MavenImportProject()
+
+    dst_path = os.path.join(tmp_dir, "__init__.py")
+    shutil.copy2(yaml_path, dst_path)
+
+    spec = importlib.util.spec_from_file_location("yandex_meta", dst_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    project = None
+    for mod_attr in dir(module):
+        maven_import_project = getattr(module, mod_attr)
+        if not isinstance(maven_import_project, MavenImportProject):
+            continue
+
+        project = maven_import_project
+    return project
