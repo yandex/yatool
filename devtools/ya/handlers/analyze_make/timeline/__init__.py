@@ -39,10 +39,13 @@ def main(opts):
 
     file_name, nodes = common.load_evlog(opts, display, check_for_distbuild=True)
 
+    # YA-3025
+    filtered_nodes = filter(lambda n: not n.thread_name.startswith("Dummy"), nodes)
+
     if nodes:
         fname = os.path.abspath(file_name + '.json')
         with open(fname, 'w') as fout:
-            json.dump(list(convert_to_chromium_trace(nodes)), fout)
+            json.dump(list(convert_to_chromium_trace(filtered_nodes)), fout)
         display.emit_message(
             f'[[imp]]Open [[alt1]]about://tracing[[imp]] in Chromium and load [[alt1]]{fname}[[imp]] file.'
         )
