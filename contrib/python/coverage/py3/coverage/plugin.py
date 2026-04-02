@@ -511,7 +511,7 @@ class FileReporter(CoveragePluginBase):
         return set(arcs)
 
     def exit_counts(self) -> dict[TLineNo, int]:
-        """Get a count of exits from that each line.
+        """Get a count of exits from each line.
 
         To determine which lines are branches, coverage.py looks for lines that
         have more than one exit.  This function creates a dict mapping each

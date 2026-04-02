@@ -906,7 +906,7 @@ class Coverage(TConfigurable):
         .. versionadded:: 4.3
             The `strict` parameter.
 
-        .. versionadded: 5.5
+        .. versionadded:: 5.5
             The `keep` parameter.
         """
         self._init()

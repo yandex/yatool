@@ -211,7 +211,7 @@ class PythonFileReporter(FileReporter):
         return self.parser.multiline_map
 
     def excluded_lines(self) -> set[TLineNo]:
-        """Return the line numbers of statements in the file."""
+        """Return the line numbers of excluded statements in the file."""
         return self.parser.excluded
 
     def translate_lines(self, lines: Iterable[TLineNo]) -> set[TLineNo]:

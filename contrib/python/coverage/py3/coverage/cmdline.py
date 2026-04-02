@@ -102,7 +102,7 @@ class Opts:
             """
         ),
     )
-    datafle_input = optparse.make_option(
+    datafile_input = optparse.make_option(
         "",
         "--data-file",
         action="store",
@@ -532,7 +532,7 @@ COMMANDS = {
         "annotate",
         [
             Opts.directory,
-            Opts.datafle_input,
+            Opts.datafile_input,
             Opts.ignore_errors,
             Opts.include,
             Opts.omit,
@@ -603,7 +603,7 @@ COMMANDS = {
         [
             Opts.contexts,
             Opts.directory,
-            Opts.datafle_input,
+            Opts.datafile_input,
             Opts.fail_under,
             Opts.ignore_errors,
             Opts.include,
@@ -630,7 +630,7 @@ COMMANDS = {
         "json",
         [
             Opts.contexts,
-            Opts.datafle_input,
+            Opts.datafile_input,
             Opts.fail_under,
             Opts.ignore_errors,
             Opts.include,
@@ -647,7 +647,7 @@ COMMANDS = {
     "lcov": CmdOptionParser(
         "lcov",
         [
-            Opts.datafle_input,
+            Opts.datafile_input,
             Opts.fail_under,
             Opts.ignore_errors,
             Opts.include,
@@ -663,7 +663,7 @@ COMMANDS = {
         "report",
         [
             Opts.contexts,
-            Opts.datafle_input,
+            Opts.datafile_input,
             Opts.fail_under,
             Opts.format,
             Opts.ignore_errors,
@@ -704,7 +704,7 @@ COMMANDS = {
     "xml": CmdOptionParser(
         "xml",
         [
-            Opts.datafle_input,
+            Opts.datafile_input,
             Opts.fail_under,
             Opts.ignore_errors,
             Opts.include,
