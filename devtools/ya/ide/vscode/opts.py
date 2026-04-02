@@ -224,6 +224,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                     "python_type_checking_mode",
                     values=("basic", "standard", "strict", "off"),
                 ),
+                group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--no-python-index"],
