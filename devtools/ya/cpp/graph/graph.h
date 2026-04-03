@@ -105,7 +105,6 @@ namespace NYa::NGraph {
             ((bool) HostPlatform),
             ((bool) Sandboxing),
             ((i8) Type),
-            ((TMaybe<bool>) Broadcast),
             ((TMaybe<bool>) Cache),
             ((TMaybe<bool>) StableDirOutputs),
             ((i32) Timeout),

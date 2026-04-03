@@ -84,7 +84,6 @@ def inject_python_coverage_merge_node(graph, suites, source_filename, output_pat
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": [],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -136,7 +135,6 @@ def inject_create_python_coverage_report_node(graph, suites, py_bin_deps, merge_
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -191,7 +189,6 @@ def inject_python_coverage_resolve_nodes(
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": [coverage_tar_path],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",

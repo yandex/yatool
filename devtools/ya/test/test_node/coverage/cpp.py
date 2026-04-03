@@ -67,7 +67,6 @@ def inject_sancov_resolve_nodes(graph, suites, coverage_tar_name, result_filenam
         node = {
             "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
             "cache": True,
-            "broadcast": False,
             "inputs": list(inputs),
             "uid": uid,
             "cwd": "$(BUILD_ROOT)",
@@ -110,7 +109,6 @@ def inject_create_sancov_coverage_report_node(graph, resolve_node_uids, inputs, 
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": inputs,
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -170,7 +168,6 @@ def inject_clang_coverage_unify_node(graph, suite, clang_resolver_uid, raw_resol
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": [input_filename],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -248,7 +245,6 @@ def inject_clang_coverage_resolve_node(
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": [input_filename, binary_path],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -357,7 +353,6 @@ def inject_create_clang_coverage_report_node(graph, suites, coverage_tar_name, o
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": list(inputs),
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -474,7 +469,6 @@ def inject_coverage_resolve_awaiting_node(graph, suite, deps, opts=None):
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": [script_append_file],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",

@@ -77,7 +77,6 @@ def inject_create_ts_coverage_report_node(graph, suites, resolve_uids, opts=None
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
-        "broadcast": False,
         "inputs": inputs_for_node,
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -125,7 +124,6 @@ def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_fi
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
-        "broadcast": False,
         "inputs": [coverage_tar_path],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",

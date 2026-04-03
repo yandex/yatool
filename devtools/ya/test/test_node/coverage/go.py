@@ -54,7 +54,6 @@ def inject_create_go_coverage_report_node(graph, suites, coverage_path, opts):
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -105,7 +104,6 @@ def inject_go_coverage_resolve_nodes(graph, suite, coverage_tar_path, resolved_f
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": [coverage_tar_path],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",

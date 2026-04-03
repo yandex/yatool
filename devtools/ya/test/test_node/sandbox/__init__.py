@@ -65,7 +65,6 @@ def inject_download_sandbox_resource_node(graph, resource, opts, global_resource
 
         node = {
             "node-type": "download",
-            "broadcast": False,
             "inputs": [],
             "uid": uid,
             "cwd": "$(BUILD_ROOT)",

@@ -72,7 +72,6 @@ def inject_coverage_merge_node(graph, tests, source_filename, result_filename, o
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": cache_node,
-        "broadcast": False,
         "inputs": [merge_coverage_script],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -113,7 +112,6 @@ def inject_unified_coverage_merger_node(graph, suite, resolved_filename, opts):
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": resolved_coverage_paths,
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -175,7 +173,6 @@ def inject_inplace_coverage_merger_node(graph, coverage_uids, suites, opts):
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": resolved_coverage_paths,
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",

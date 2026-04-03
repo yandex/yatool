@@ -191,7 +191,6 @@ class _NodeGen:
 
         ret = {
             'uid': hashing.md5_value(node['uid'] + '-' + suffix),
-            'broadcast': False,
             'cmds': [
                 {
                     'cmd_args': [
@@ -278,7 +277,7 @@ def _merge_nodes(x, y):
         'cmds': list(_iter_cmds(y)) + list(_iter_cmds(x)),
     }
 
-    for k in ('cache', 'broadcast', 'target_properties', 'platform', 'priority', 'kv'):
+    for k in ('cache', 'target_properties', 'platform', 'priority', 'kv'):
         if k in x:
             ret[k] = x[k]
 

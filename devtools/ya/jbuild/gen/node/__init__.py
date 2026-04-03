@@ -93,7 +93,6 @@ class JNode(graph_node.Node):
         n.update(
             {
                 'type': 2,
-                'broadcast': False,
                 'priority': 0,
                 'env': {
                     'YA_CACHE_DIR': consts.BUILD_ROOT,

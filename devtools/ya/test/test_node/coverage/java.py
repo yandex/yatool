@@ -36,7 +36,6 @@ def inject_jacoco_report_nodes(graph, tests, source_filename, opts=None, add_to_
         node = {
             "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
             "cache": cache_nodes,
-            "broadcast": False,
             "inputs": [script_path],
             "uid": uid,
             "cwd": "$(BUILD_ROOT)",
@@ -115,7 +114,6 @@ def inject_create_java_coverage_report_node(
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [CREATE_COVERAGE_REPORT_SCRIPT],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -302,7 +300,6 @@ def inject_java_coverage_resolve_node(
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "broadcast": False,
         "inputs": inputs,
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",

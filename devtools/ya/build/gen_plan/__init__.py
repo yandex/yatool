@@ -421,7 +421,6 @@ def gen_dummy_graph(
             'type': 2,
             'uid': None,
             'priority': 0,
-            'broadcast': False,
             'cmds': [
                 {'cwd': '$(BUILD_ROOT)', 'cmd_args': (cmd if for_uid else cmd + cmd_no_uid)} for cmd, cmd_no_uid in cmds
             ],
@@ -498,7 +497,6 @@ def generate_fetch_from_sandbox_node(uid, res_id, archive, source_root_pattern):
         'type': 2,
         "uid": uid,
         "priority": 0,
-        'broadcast': False,
         "cmds": [
             {
                 "cmd_args": [

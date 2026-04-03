@@ -69,7 +69,6 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [],
         "uid": uid_gen.get_uid([yt_table_root], 'coverage_create_table'),
         "cwd": "$(BUILD_ROOT)",
@@ -144,7 +143,6 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [input_file],
         "uid": node_uid,
         "cwd": "$(BUILD_ROOT)",

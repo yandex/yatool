@@ -103,7 +103,6 @@ def inject_fuzz_upload_node(graph, suite, deps, input_path, minimize, opts):
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [input_path],
         "uid": uid_gen.get_uid(deps, "fuzz_upload"),
         "cwd": "$(BUILD_ROOT)",
@@ -193,7 +192,6 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": testdeps.unique(inputs),
         "uid": uid_gen.get_uid(suite.result_uids, "fuzz_minimize"),
         "cwd": "$(BUILD_ROOT)",
@@ -271,7 +269,6 @@ def inject_fuzz_result_node(arc_root, graph, suites, upload_nodes, input_files, 
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": input_files,
         "uid": node_uid,
         "cache": False,

@@ -117,7 +117,6 @@ def inject_download_docker_image_node(graph, image, opts):
         node = {
             "timeout": timeout,
             "node-type": devtools.ya.test.const.NodeType.DOWNLOAD,
-            "broadcast": False,
             "inputs": [],
             "uid": uid,
             "cwd": "$(BUILD_ROOT)",
@@ -179,7 +178,6 @@ def inject_mds_resource_to_graph(graph, resource, opts):
 
         node = {
             "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-            "broadcast": False,
             "inputs": [FETCH_FROM_MDS_SCRIPT, FETCH_FROM_SCRIPT],
             "uid": uid,
             "cwd": "$(BUILD_ROOT)",
@@ -342,7 +340,6 @@ class TestFramer(object):
             node = {
                 "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
                 'uid': uid,
-                'broadcast': False,
                 'cmds': [
                     {
                         'cmd_args': [
@@ -735,7 +732,6 @@ def create_test_node(
             node = {
                 "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
                 'uid': uid,
-                'broadcast': False,
                 'cmds': [
                     {
                         'cmd_args': test_common.get_python_cmd(opts=opts)
@@ -917,7 +913,6 @@ def create_test_node(
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
-        "broadcast": False,
         "cache": _should_cache_suite(suite, opts),
         "cmds": node_cmds,
         "cwd": "$(BUILD_ROOT)",
@@ -1183,7 +1178,6 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
-        "broadcast": False,
         "inputs": [frepkage_res_info],
         "uid": suite.uid,
         "cache": False,
@@ -1523,7 +1517,6 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         },
         "cache": _should_cache_suite(suite, opts),
         "backup": backup,
-        "broadcast": False,
         "inputs": testdeps.unique(node_inputs),
         "uid": uid,
         "priority": _get_suite_priority(suite),
@@ -1628,7 +1621,6 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_t
             "module_lang": suite.meta.module_lang,
         },
         "backup": backup,
-        "broadcast": False,
         "upload": upload_to_remote_store,
         "inputs": testdeps.unique(node_inputs),
         "uid": uid,
@@ -2075,7 +2067,6 @@ def create_populate_token_to_sandbox_vault_node(global_resources, opts):
 
     return {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [],
         "uid": uid_gen.get_random_uid("populate_token_2_sb_vault"),
         "cwd": "$(BUILD_ROOT)",
@@ -2132,7 +2123,6 @@ def create_upload_frepkage_node(filename, global_resources, opts):
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "inputs": [filename],
         # Don't cache this node - it has external temporary file as input
         "uid": uid_gen.get_random_uid("frepkage_upload"),
@@ -2174,7 +2164,6 @@ def inject_canonization_result_node(tests, graph, canonization_nodes, opts):
 
     canonization_result_node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
-        "broadcast": False,
         "cache": False,
         "inputs": PROJECTS_FILE_INPUTS,
         "env": sysenv.get_common_env().dump(),
@@ -2254,7 +2243,6 @@ def inject_allure_report_node(graph, tests, allure_path, opts=None, extra_deps=N
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
-        "broadcast": False,
         "inputs": allure_tars,
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -2342,7 +2330,6 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
         node_cmd += ["--backend", opts.canonization_backend]
 
     node = {
-        "broadcast": False,
         "inputs": [],
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
@@ -2405,7 +2392,6 @@ def inject_test_checkout_node(graph, tests, arc_root, opts=None):
         uid = uid_gen.get_random_uid("checkout")
 
         node = {
-            "broadcast": False,
             "inputs": [],
             "uid": uid,
             "cache": False,
@@ -2626,7 +2612,6 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
         cmds = extra_cmds + cmds
 
     list_node = {
-        "broadcast": False,
         "cache": False,
         "inputs": testdeps.unique(inputs),
         "uid": uid,
@@ -2682,7 +2667,6 @@ def inject_list_result_node(graph, tests, opts, tests_filter_descr):
         show_list_cmd.extend(["--test-name-filter", tf])
 
     show_list_node = {
-        "broadcast": False,
         "cache": False,
         "inputs": PROJECTS_FILE_INPUTS,
         "env": sysenv.get_common_env().dump(),
