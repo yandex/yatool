@@ -184,9 +184,18 @@ def get_project_path_filters(opts):
 
 def project_path_filter(project_paths):
     if project_paths:
+        full_paths = set()
+        template_paths = []
+        for path in project_paths:
+            if '*' in path:
+                template_paths.append(path)
+            else:
+                full_paths.add(path)
 
         def filter_function(test_suite):
-            return test_suite.project_path in project_paths
+            return test_suite.project_path in full_paths or any(
+                [fnmatch.fnmatch(test_suite.project_path, path) for path in template_paths]
+            )
 
         return filter_function
     else:
