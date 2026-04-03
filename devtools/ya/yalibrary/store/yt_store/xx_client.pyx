@@ -396,9 +396,8 @@ cdef class YtStoreImpl:
         if p in YT_CACHE_EXCLUDED_P:
             return False
         for o in outputs:
-            for p in 'library/cpp/svnversion', 'library/cpp/build_info':
-                if o.startswith('$(BUILD_ROOT)/' + p):
-                    return False
+            if o.startswith('$(BUILD_ROOT)/library/cpp/build_info'):
+                return False
         if not self._allow_tar and all(o.endswith('.tar') for o in outputs):
             return False
         return True
