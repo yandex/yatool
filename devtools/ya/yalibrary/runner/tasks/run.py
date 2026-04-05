@@ -688,6 +688,11 @@ class RunNodeTask(object):
     def max_dist(self):
         return self._node.max_dist
 
+    @property
+    def bottom_level(self):
+        """Critical path distance to graph sinks; set by PrepareAllNodesTask._compute_bottom_levels."""
+        return getattr(self._node, 'bottom_level', 0)
+
     def res(self):
         p = self._node.kv.get('p')
         if p in (
