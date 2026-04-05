@@ -2,7 +2,6 @@ import os
 import time
 import exts.yjson as json
 import logging
-import multiprocessing
 
 from six import iteritems
 
@@ -15,6 +14,7 @@ STAGES_FILE = None
 
 @func.lazy
 def _lock():
+    import multiprocessing
     return multiprocessing.Lock()
 
 
