@@ -447,7 +447,13 @@ namespace {
                     PyErr_SetString(PyExc_RuntimeError, "ymake.parser decorator expects single decorated class to register as a parser");
                     return nullptr;
                 }
-                AddParser(Conf, ext, args[0], inducedDeps, passInducedIncludes);
+                if (Conf) {
+                    AddParser(Conf, ext, args[0], inducedDeps, passInducedIncludes);
+                } else {
+                    // Using YErr() here since it will fail build for case when this error happens inside ymake application but will not
+                    // fail python code which tries to import plugins with ymake module being used as regular python module.
+                    YErr() << "ymake.parser decorator called without active build configuration! Parser will not be registered!" << Endl;
+                }
                 Py_INCREF(args[0]);
                 return args[0];
             }).Release();
@@ -488,8 +494,6 @@ namespace {
         }
 
         PyObject* MacroDecorator(std::span<PyObject* const> args) {
-            Y_ASSERT(Conf);
-
             if (args.size() != 1 || !PyFunction_Check(args[0])) {
                 PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single function to register as a macro");
                 return nullptr;
@@ -514,7 +518,13 @@ namespace {
                 return nullptr;
             }
 
-            NYMake::NPlugins::RegisterMacro(*Conf, macroName, NYMake::NPy::FromBorrowedRef(args[0]));
+            if (Conf) {
+                NYMake::NPlugins::RegisterMacro(*Conf, macroName, NYMake::NPy::FromBorrowedRef(args[0]));
+            } else {
+                // Using YErr() here since it will fail build for case when this error happens inside ymake application but will not
+                // fail python code which tries to import plugins with ymake module being used as regular python module.
+                YErr() << "ymake.macro decorator called without active build configuration! Macro will not be registered!" << Endl;
+            }
 
             Py_INCREF(args[0]);
             return args[0];
