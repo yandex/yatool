@@ -258,19 +258,13 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
         return res;
     TStringBuf lastArr = {};
     while (auto kwVal = kwArgs.TakeNext()) {
-        if (kwVal->Args.size() < kwVal->Kw.From) {
+        if (kwVal->Kw.Kind == TKeyword::Scalar && kwVal->Args.empty()) {
             return std::unexpected(TMapMacroVarsErr{
-                .Message = fmt::format(
-                    "Keyword {} requires from {} to {} arguments but got '{}'",
-                    kwArgs.KeywordName(kwVal->Kw),
-                    kwVal->Kw.From,
-                    kwVal->Kw.To,
-                    fmt::join(kwVal->Args, ", ")
-                )
+                .Message = fmt::format("Missing value for scalar keyword {}", kwArgs.KeywordName(kwVal->Kw))
             });
         }
 
-        const bool isArr = kwVal->Kw.To > 1;
+        const bool isArr = kwVal->Kw.Kind == TKeyword::Array;
 
         // TODO(svidyuk) better deduplication please!!!
         if (!isArr && locals.contains(kwArgs.KeywordName(kwVal->Kw))) {
@@ -284,8 +278,9 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
         if (isArr)
             lastArr = kwArgs.KeywordName(kwVal->Kw);
 
-        if (kwVal->Args.size() > kwVal->Kw.To) {
-            const auto posArgs = kwVal->Args.subspan(kwVal->Kw.To);
+        const size_t arity = kwVal->Kw.Arity();
+        if (kwVal->Args.size() > arity) {
+            const auto posArgs = kwVal->Args.subspan(arity);
             if (!lastArr.empty()) {
                 return std::unexpected(TMapMacroVarsErr{
                     .Message = fmt::format(
@@ -299,7 +294,7 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
             res = ConsumePositionals(posArgs, positionalScalars, vararg, locals);
             if (!res)
                 return res;
-            kwVal->Args = kwVal->Args.subspan(0, kwVal->Kw.To);
+            kwVal->Args = kwVal->Args.subspan(0, arity);
         }
 
         if (kwVal->Args.empty() && !kwVal->Kw.OnKwPresent.empty()) {

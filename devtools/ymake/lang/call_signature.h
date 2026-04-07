@@ -7,35 +7,47 @@
 #include <span>
 
 struct TKeyword {
-    size_t From;
-    size_t To;
+    enum class EKind {
+        Flag,
+        Scalar,
+        Array
+    };
+    using enum EKind;
+
+    EKind Kind = Flag;
     size_t Pos;
     TString DeepReplaceTo;
     TVector<TString> OnKwPresent;
     TVector<TString> OnKwMissing;
     TKeyword()
-        : From(0)
-        , To(0)
-        , Pos(0)
+        : Pos(0)
     {
     }
-    TKeyword(const TString& myName, size_t from, size_t to, const TString& deepReplaceTo, TStringBuf onKwPresent = {}, TStringBuf onKwMissing = {})
-        : From(from)
-        , To(to)
+    TKeyword(const TString& myName, EKind type, const TString& deepReplaceTo, TStringBuf onKwPresent = {}, TStringBuf onKwMissing = {})
+        : Kind(type)
         , Pos(0)
         , DeepReplaceTo(deepReplaceTo)
     {
         if (onKwPresent.data() != nullptr) // "" from file is not NULL
             OnKwPresent.emplace_back(onKwPresent);
-        else if (!From && !To)
+        else if (Kind == Flag)
             OnKwPresent.push_back(myName);
         if (onKwMissing.data() != nullptr)
             OnKwMissing.emplace_back(onKwMissing);
     }
 
+    size_t Arity() const noexcept {
+        size_t res;
+        switch (Kind) {
+        case TKeyword::Flag: res = 0; break;
+        case TKeyword::Scalar: res = 1; break;
+        case TKeyword::Array: res = ::Max<ssize_t>(); break;
+        }
+        return res;
+    }
+
     Y_SAVELOAD_DEFINE(
-        From,
-        To,
+        Kind,
         Pos,
         DeepReplaceTo,
         OnKwPresent,
@@ -55,16 +67,14 @@ public:
         TKeywords(TKeywords&&) noexcept = default;
         TKeywords& operator=(TKeywords&&) noexcept = default;
 
-
-        void AddKeyword(const TString& word, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
         void AddArrayKeyword(const TString& word, const TString& deepReplaceTo) {
-            AddKeyword(word, 0, ::Max<ssize_t>(), deepReplaceTo);
+            AddKeyword(word, TKeyword::Array, deepReplaceTo);
         }
         void AddScalarKeyword(const TString& word, const TStringBuf& defaultVal, const TString& deepReplaceTo) {
-            AddKeyword(word, 1, 1, deepReplaceTo, nullptr, defaultVal);
+            AddKeyword(word, TKeyword::Scalar, deepReplaceTo, nullptr, defaultVal);
         }
         void AddFlagKeyword(const TString& word, const TStringBuf& setVal, const TStringBuf& unsetVal) {
-            AddKeyword(word, 0, 0, {}, setVal, unsetVal);
+            AddKeyword(word, TKeyword::Flag, {}, setVal, unsetVal);
         }
 
         bool Empty() const noexcept {
@@ -74,6 +84,9 @@ public:
         TVector<std::pair<TString, TKeyword>> Take() && noexcept {
             return std::move(Collected_);
         }
+    private:
+        void AddKeyword(const TString& word, TKeyword::EKind type, const TString& deepReplaceTo, const TStringBuf& onKwPresent = nullptr, const TStringBuf& onKwMissing = nullptr);
+
     private:
         TVector<std::pair<TString, TKeyword>> Collected_;
     };

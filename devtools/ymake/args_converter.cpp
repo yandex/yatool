@@ -80,9 +80,7 @@ TTypedArgs FillTypedArgs(const TSignature& sign, const TVector<TStringBuf>& args
     bool inArgArray = false; //array is one argument
     for (size_t i = 0; i < args.size(); ++i) {
         if (const TKeyword* kw = sign.GetKeywordData(args[i])) { //if it is a keyword, designate argLimit and array to put
-            bool useKeyItself = kw->To == 0 && kw->From == 0;
-
-            argLimit = useKeyItself ? -1 : kw->To;
+            argLimit = kw->Kind == TKeyword::Flag ? -1 : kw->Arity();
             needDeepReplace = kw->DeepReplaceTo.size();
             argId = sign.Key2ArrayIndex(args[i]);
             TTypedArgArray& outArg = typedArgs[argId];
@@ -169,8 +167,8 @@ size_t ConvertTypedArgs(const TSignature& sign, const TVector<TStringBuf>& args,
         }
         if (cnt != typedArgs.OrigArgId) {
             const TKeyword& kw = sign.GetKeywordData(cnt);
-            if (outArg.GotKeyword && outArg.NumNativeArgs() < kw.From)
-                YWarn() << "Received only " << outArg.NumNativeArgs() << " args with keyword " << sign.GetKeyword(cnt) << "; must be greater than " << kw.From << ". Args: "<< JoinVectorIntoString(args, " ") << Endl;
+            if (outArg.GotKeyword && kw.Kind == TKeyword::Scalar && outArg.NumNativeArgs() < 1)
+                YWarn() << "Received only " << outArg.NumNativeArgs() << " args with keyword " << sign.GetKeyword(cnt) << "; must be greater than " << 1 << ". Args: " << JoinVectorIntoString(args, " ") << Endl;
             if (!outArg.GotKeyword && !kw.OnKwMissing.empty())
                 res.insert(res.end(), kw.OnKwMissing.begin(), kw.OnKwMissing.end());
             res.push_back(NStaticConf::ARRAY_END);

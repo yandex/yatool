@@ -46,6 +46,6 @@ size_t TSignature::Key2ArrayIndex(TStringBuf arg) const {
     return first->second.Pos;
 }
 
-void TSignature::TKeywords::AddKeyword(const TString& keyword, size_t from, size_t to, const TString& deepReplaceTo, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
-    Collected_.emplace_back(keyword, TKeyword{keyword, from, to, deepReplaceTo, onKwPresent, onKwMissing});
+void TSignature::TKeywords::AddKeyword(const TString& keyword, TKeyword::EKind type, const TString& deepReplaceTo, const TStringBuf& onKwPresent, const TStringBuf& onKwMissing) {
+    Collected_.emplace_back(keyword, TKeyword{keyword, type, deepReplaceTo, onKwPresent, onKwMissing});
 }

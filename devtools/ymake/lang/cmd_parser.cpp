@@ -163,8 +163,8 @@ namespace {
             static const auto ifBlockData = [&]() {
                 // cf. TConfBuilder::EnterMacro
                 auto keywords = TSignature::TKeywords();
-                keywords.AddKeyword("THEN", 0, -1, "");
-                keywords.AddKeyword("ELSE", 0, -1, "");
+                keywords.AddArrayKeyword("THEN", "");
+                keywords.AddArrayKeyword("ELSE", "");
                 auto blockData = TBlockData{};
                 blockData.Completed = true;
                 blockData.IsUserMacro = true;
@@ -255,7 +255,7 @@ namespace {
             auto maybeStartNamedArg = [&]() {
                 Y_ASSERT(kwDesc);
                 auto namedArg = &args[kwDesc->Pos];
-                if (kwDesc->To == 0)
+                if (kwDesc->Kind == TKeyword::Flag)
                     return;
                 if (namedArg->Script.empty())
                     namedArg->Script.emplace_back();
@@ -265,13 +265,13 @@ namespace {
                 if (!kwDesc)
                     return;
                 auto namedArg = &args[kwDesc->Pos];
-                if (kwDesc->To == 0) {
+                if (kwDesc->Kind == TKeyword::Flag) {
                     if (namedArg->Script.empty()) // it will not be empty if we repeat the respective arg; TBD do we even want to allow this?
                         AssignPreset(namedArg->Script, kwDesc->OnKwPresent);
                     kwDesc = nullptr;
                     return;
                 }
-                if (namedArg->Script.back().size() == kwDesc->To)
+                if (namedArg->Script.back().size() == kwDesc->Arity())
                     kwDesc = nullptr;
             };
 
@@ -319,7 +319,7 @@ namespace {
                 auto namedArg = &args[kw.Pos];
                 if (!namedArg->Script.empty()) {
                     Y_ASSERT(namedArg->Script.size() == 1);
-                    if (namedArg->Script.back().size() < kw.From)
+                    if (kw.Kind == TKeyword::Scalar && namedArg->Script.back().empty())
                         throw TError()
                             << "Macro " << macroName
                             << " did not get enough data for the named argument " << name;
