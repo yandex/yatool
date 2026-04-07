@@ -16,20 +16,14 @@ import devtools.ya.core.sig_handler
 import devtools.ya.core.stage_tracer as stage_tracer
 import devtools.ya.core.stage_aggregator as stage_aggregator
 import devtools.ya.core.event_handling as event_handling
-import devtools.ya.core.monitoring as monitoring
-import devtools.ya.core.sec as sec
-import devtools.ya.core.user as user
 import devtools.ya.core.yarg
-import exts.asyncthread
 import exts.os2
 import exts.strings
 import exts.windows
 import devtools.ya.yalibrary.app_ctx
 import yalibrary.find_root
-import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
-from yalibrary.vcs import vcsversion
 
 from .modules import evlog
 from .modules import params
@@ -439,6 +433,7 @@ def configure_uid():
 
 
 def configure_user_heuristic():
+    import devtools.ya.core.user as user
     yield user.get_user()
 
 
@@ -663,6 +658,7 @@ def configure_fast_vcs_info_json(ctx):
         logger.debug('Unable to get vcs root for %s. Snowden vcs info log skipped', os.getcwd())
         result = _empty_vcs_info
     else:
+        import exts.asyncthread
         result = exts.asyncthread.future(lambda: _load_fast_vcs_info(arc_root))
 
     yield result
@@ -671,6 +667,7 @@ def configure_fast_vcs_info_json(ctx):
 def _load_fast_vcs_info(arc_root):
     # type: (str) -> dict
     from devtools.ya.core.report import telemetry, ReportTypes
+    from yalibrary.vcs import vcsversion
 
     result = vcsversion.get_fast_version_info(arc_root, timeout=5)
     telemetry.report(ReportTypes.FAST_VCS_INFO_JSON, result)
@@ -679,6 +676,7 @@ def _load_fast_vcs_info(arc_root):
 
 
 def configure_vcs_type(ctx=None):
+    import yalibrary.vcs as vcs
     if ctx is None:
         cwd = os.getcwd()
     else:
@@ -765,6 +763,8 @@ def _resources_report():
 def configure_report_interceptor(ctx, report_events):
     # we can only do that after respawn with valid python
     from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args, parse_events_filter
+    import devtools.ya.core.monitoring as monitoring
+    import devtools.ya.core.sec as sec
 
     params_dict = ctx.params.__dict__ if hasattr(ctx, "params") else None
     parsed_report_events = parse_events_filter.parse_events_filter(report_events)
@@ -890,6 +890,8 @@ def configure_report_interceptor(ctx, report_events):
 
 def configure_metrics_reporter(ctx):
     from devtools.ya.core.report import telemetry, compact_system_info
+    import devtools.ya.core.monitoring as monitoring
+    import devtools.ya.core.user as user
 
     metrics_reporter = monitoring.MetricStore(
         {

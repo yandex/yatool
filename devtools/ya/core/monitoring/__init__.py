@@ -1,4 +1,3 @@
-import devtools.ya.core.report as report
 import enum
 
 
@@ -19,8 +18,11 @@ class MetricStore:
         labels: dict[str, str] | None = None,
         value: int = 1,
         urgent: bool = False,
-        report_type: report.ReportTypes = report.ReportTypes.YA_METRICS,
+        report_type=None,
     ):
+        import devtools.ya.core.report as report
+        if report_type is None:
+            report_type = report.ReportTypes.YA_METRICS
         labels = labels or {}
         metric_name = name.value
         self.telemetry.report(

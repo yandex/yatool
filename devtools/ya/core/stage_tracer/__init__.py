@@ -8,7 +8,6 @@ import time
 
 from abc import ABCMeta, abstractmethod
 
-from devtools.ya.core import stages_profiler
 from devtools.ya.core import profiler
 
 import typing as tp  # noqa
@@ -51,10 +50,12 @@ class StagesProfilerConsumer(Consumer):
 
     def start(self, event):
         # type: (StageTracer._StartEvent) -> None
+        from devtools.ya.core import stages_profiler
         stages_profiler.stage_started(event.tag, event.time)
 
     def finish(self, event):
         # type: (StageTracer._FinishEvent) -> None
+        from devtools.ya.core import stages_profiler
         stages_profiler.stage_finished(event.tag, event.time)
 
 

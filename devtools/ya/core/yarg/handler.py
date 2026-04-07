@@ -8,7 +8,6 @@ import typing as tp  # noqa: F401
 from collections import defaultdict
 
 import devtools.ya.core.yarg
-import devtools.ya.core.report
 
 import exts.strings
 import exts.yjson as json
@@ -393,6 +392,8 @@ class OptsHandler(BaseHandler):
 
     def handle(self, root_handler, args, prefix):
         try:
+            import devtools.ya.core.report
+
             OptsHandler._latest_handled_prefix = prefix
             handler = {
                 'args': [exts.strings.to_unicode(arg, exts.strings.guess_default_encoding()) for arg in args],
