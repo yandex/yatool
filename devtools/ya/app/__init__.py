@@ -29,7 +29,6 @@ import yalibrary.find_root
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
-from yalibrary.vcs import vcsversion
 
 from .modules import evlog
 from .modules import params
@@ -174,7 +173,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             modules.append(('evlog', evlog.configure(ctx)))
 
         modules.append(('dump_debug', configure_debug(ctx)))
-        modules.append(('fast_vcs_info_json_callback', configure_fast_vcs_info_json(ctx)))
+        modules.append(('vcs_info_json_callback', configure_vcs_info_json(ctx)))
 
         with ctx.configure(modules, modules_stager):
             el = getattr(ctx, "evlog", None)
@@ -653,7 +652,7 @@ def _empty_vcs_info():
     return {}
 
 
-def configure_fast_vcs_info_json(ctx):
+def configure_vcs_info_json(ctx):
     # type: (devtools.ya.yalibrary.app_ctx.AppCtx) -> typing.Generator[typing.Callable[[], dict], None, None]
     arc_root = getattr(ctx.params, 'arc_root', None)
     if getattr(ctx.params, 'report', None) is False:
@@ -663,19 +662,21 @@ def configure_fast_vcs_info_json(ctx):
         logger.debug('Unable to get vcs root for %s. Snowden vcs info log skipped', os.getcwd())
         result = _empty_vcs_info
     else:
-        result = exts.asyncthread.future(lambda: _load_fast_vcs_info(arc_root))
+        result = exts.asyncthread.future(lambda: _load_vcs_info(arc_root))
 
     yield result
 
 
-def _load_fast_vcs_info(arc_root):
+def _load_vcs_info(arc_root):
     # type: (str) -> dict
     from devtools.ya.core.report import telemetry, ReportTypes
+    from yalibrary.vcs.vcsversion import VcsInfo
 
-    result = vcsversion.get_fast_version_info(arc_root, timeout=5)
-    telemetry.report(ReportTypes.FAST_VCS_INFO_JSON, result)
+    vcs_info = VcsInfo(arc_root)
+    info_data = vcs_info.get_info(wait_for=True, require_slow=False)
+    telemetry.report(ReportTypes.FAST_VCS_INFO_JSON, info_data)
 
-    return result
+    return vcs_info
 
 
 def configure_vcs_type(ctx=None):

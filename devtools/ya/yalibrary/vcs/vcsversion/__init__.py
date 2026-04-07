@@ -14,10 +14,13 @@ import six
 import socket
 import subprocess
 import sys
+import threading
+import traceback
 import time
 import typing
 
 import exts.process
+import exts.retry
 
 import yalibrary.find_root
 import yalibrary.tools
@@ -28,6 +31,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_VCS_REVISION: int = -1
 DEFAULT_VCS_PATCH_NUMBER: int = 0
 INDENT: str = ' ' * 4
+VCS_INFO_TIMEOUT = 5
 
 
 try:
@@ -58,6 +62,10 @@ class UnknownVcsTypeError(Exception):
     pass
 
 
+class VcsInfoError(Exception):
+    pass
+
+
 @dataclasses.dataclass
 class ArcRevisionInfo:
     revision: str
@@ -66,12 +74,6 @@ class ArcRevisionInfo:
 
     def __str__(self) -> str:
         return f'last svn:{self.revision}, patch_number:{self.patch_number}, dirty:{self.dirty}'
-
-
-@dataclasses.dataclass
-class SvnRevisionInfo:
-    vcs_info: ParsedVcsInfo
-    root: str
 
 
 @dataclasses.dataclass
@@ -84,12 +86,8 @@ class VCSData:
 
     @classmethod
     @abc.abstractmethod
-    def from_repository_root(cls, vcs_root: str) -> typing.Self:
+    def from_repository_root(cls, vcs_root: str, **kwargs) -> typing.Self:
         pass
-
-    @classmethod
-    def from_repository_root_fast(cls, vcs_root: str, timeout: int | None = None) -> typing.Self:
-        return cls.from_repository_root(vcs_root)
 
     @classmethod
     @functools.cache
@@ -120,6 +118,9 @@ class VCSData:
         return result
 
 
+ARC_DEFAULT_RETRIES: int = 3
+
+
 @dataclasses.dataclass
 class ArcInfo(VCSData):
     VCS_TOOL_NAME: typing.ClassVar[str] = 'arc'
@@ -131,9 +132,28 @@ class ArcInfo(VCSData):
     dirty: bool = False
 
     @classmethod
-    def from_repository_root(cls, vcs_root: str) -> typing.Self:
-        arc_json_out = cls._get_arc_info(vcs_root)
-        revision_info = cls._get_last_svn_revision(vcs_root)
+    @exts.retry.retrying(
+        max_times=ARC_DEFAULT_RETRIES,
+        retry_sleep=lambda i, t: 0,
+        ignore_exception=lambda e: isinstance(e, exts.process.TimeoutExpired),
+    )
+    def _execute_command(cls, args: list[str], timeout: int | None = None, **kwargs: typing.Any) -> typing.Any:
+        return super()._execute_command(args, timeout=timeout, **kwargs)
+
+    @classmethod
+    def from_repository_root(
+        cls,
+        vcs_root: str,
+        *,
+        timeout: int | None = None,
+        is_arc_describe_required: bool = False,
+        **kwargs,
+    ) -> typing.Self:
+        arc_json_out = cls._get_arc_info(vcs_root, timeout=timeout)
+        if is_arc_describe_required:
+            revision_info = cls._get_last_svn_revision(vcs_root)
+        else:
+            revision_info = get_default_revision_info()
         logger.debug('Arc info: %s, %s', arc_json_out, str(revision_info))
 
         return cls.from_revision_info(arc_info_string=arc_json_out, revision_info=revision_info)
@@ -189,17 +209,6 @@ class ArcInfo(VCSData):
         return '\n'.join(scm_lines)
 
     @classmethod
-    def from_repository_root_fast(cls, vcs_root: str, timeout: int | None = None) -> typing.Self:
-        arc_json_out = cls._get_arc_info(vcs_root, timeout=timeout)
-
-        return cls(
-            info_output_string=arc_json_out,
-            revision=DEFAULT_VCS_REVISION,
-            patch_number=DEFAULT_VCS_PATCH_NUMBER,
-            dirty=False,
-        )
-
-    @classmethod
     def _get_arc_info(cls, arc_root: str, *, timeout: int | None = None) -> str:
         key = arc_root
         if key in cls._arc_info_cache:
@@ -247,9 +256,9 @@ class SvnInfo(VCSData):
     xml: str
 
     @classmethod
-    def from_repository_root(cls, vcs_root: str) -> typing.Self:
+    def from_repository_root(cls, vcs_root: str, *, timeout: int | None = None, **kwargs) -> typing.Self:
         svn_info_args = ['info', '--xml']
-        xml = cls._execute_command(svn_info_args, cwd=vcs_root)
+        xml = cls._execute_command(svn_info_args, cwd=vcs_root, timeout=timeout)
         logger.debug('Svn xml: %s', xml)
         return cls(xml=xml)
 
@@ -320,12 +329,12 @@ class HgInfo(VCSData):
     output: str
 
     @classmethod
-    def from_repository_root(cls, vcs_root: str) -> typing.Self:
+    def from_repository_root(cls, vcs_root: str, *, timeout: int | None = None, **kwargs) -> typing.Self:
         env = os.environ.copy()
         env['TZ'] = ''
 
         hg_args = ['--config', 'alias.log=log', '--config', 'defaults.log=', 'log', '-r', '.']
-        output = cls._execute_command(hg_args, env=env, cwd=vcs_root)
+        output = cls._execute_command(hg_args, env=env, cwd=vcs_root, timeout=timeout)
         logger.debug('Hg log: %s', output)
 
         return cls(output=output)
@@ -389,7 +398,7 @@ class GitInfo(VCSData):
     depth: str
 
     @classmethod
-    def from_repository_root(cls, vcs_root: str) -> typing.Self:
+    def from_repository_root(cls, vcs_root: str, **kwargs) -> typing.Self:
         env = os.environ.copy()
         env['TZ'] = ''
 
@@ -516,7 +525,7 @@ class TarInfo(VCSData):
     content: str
 
     @classmethod
-    def from_repository_root(cls, vcs_root: str) -> typing.Self:
+    def from_repository_root(cls, vcs_root: str, **kwargs) -> typing.Self:
         with open(os.path.join(vcs_root, '__SVNVERSION__'), 'r') as f:
             content = f.read()
 
@@ -616,7 +625,7 @@ class TarInfo(VCSData):
         return out
 
 
-def _dump_json(
+def dump_vcs_json(
     arc_root: str,
     info: ParsedVcsInfo,
     other_data: str | None = None,
@@ -816,6 +825,14 @@ def get_vcs_handler(vcs_type: str) -> type[VCSData]:
         raise UnknownVcsTypeError(f'Unknown vcs type: {vcs_type}')
 
 
+def get_default_revision_info() -> ArcRevisionInfo:
+    return ArcRevisionInfo(
+        revision=DEFAULT_VCS_REVISION,
+        patch_number=DEFAULT_VCS_PATCH_NUMBER,
+        dirty=False,
+    )
+
+
 def _get_default_dictionary() -> ParsedVcsInfo:
     return ArcInfo.from_revision_info(
         arc_info_string='''{
@@ -828,66 +845,189 @@ def _get_default_dictionary() -> ParsedVcsInfo:
         "author":"ordinal",
         "patch_number": 0
     }''',
-        revision_info=ArcRevisionInfo(
-            revision=DEFAULT_VCS_REVISION,
-            patch_number=DEFAULT_VCS_PATCH_NUMBER,
-            dirty=False,
-        ),
+        revision_info=get_default_revision_info(),
     ).parse()
 
 
-def _get_default_json() -> SvnRevisionInfo:
-    return SvnRevisionInfo(vcs_info=_get_default_dictionary(), root='')
+class VcsInfo:
+    _instance: typing.Optional['VcsInfo'] = None
+    _lock = threading.Lock()
+
+    def __new__(cls, arc_root: str | None = None):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+
+    def _check_arc_root_consistency(self, arc_root: str | None) -> None:
+        if arc_root is not None and arc_root != self._arc_root:
+            logger.error('VcsInfo initial call traceback:\n%s', self._init_traceback)
+            raise VcsInfoError(f'VcsInfo already initialized with different arc_root: {self._arc_root} != {arc_root}')
+
+    def __init__(self, arc_root: str | None = None):
+        if self._initialized:
+            self._check_arc_root_consistency(arc_root)
+            return
+
+        with self._lock:
+            if self._initialized:
+                self._check_arc_root_consistency(arc_root)
+                return
+
+            if arc_root is None:
+                raise VcsInfoError('arc_root required for initial VcsInfo initialization')
+
+            self._arc_root = arc_root
+            self._init_traceback = ''.join(traceback.format_stack())
+            self._data: ParsedVcsInfo = self._get_dummy_data()
+            self._vcs_root: str = ''
+            self._fast_done: bool = False
+            self._fast_ok: bool = False
+            self._slow_done: bool = False
+            self._slow_ok: bool = False
+            self._last_error: Exception | None = None
+            self._fast_lock = threading.Lock()
+            self._slow_lock = threading.Lock()
+            self._initialized = True
+
+    @staticmethod
+    def _get_dummy_data() -> ParsedVcsInfo:
+        return _get_default_dictionary()
+
+    def _fill_fast(self) -> None:
+        try:
+            logger.debug("Starting fast VCS info retrieval for %s", self._arc_root)
+
+            arc_root = yalibrary.find_root.detect_root(self._arc_root)
+            if arc_root is None:
+                raise VcsDetectError('VCS root is None, cannot proceed')
+
+            vcs_type, vcs_root, _ = yalibrary.vcs.detect([arc_root], check_tar=True)
+            if not vcs_type:
+                raise VcsDetectError(f'Cannot detect VCS type for {arc_root}')
+            if not vcs_root:
+                vcs_root = arc_root
+
+            self._vcs_root = vcs_root
+            handler = get_vcs_handler(vcs_type[0])
+            info = handler.from_repository_root(
+                vcs_root,
+                timeout=VCS_INFO_TIMEOUT,
+                is_arc_describe_required=False,
+            ).parse()
+
+            self._data = info
+            self._fast_ok = True
+            logger.debug("Fast VCS info retrieved successfully")
+
+        except Exception as e:
+            logger.debug("Failed to get fast VCS information", exc_info=e)
+            self._last_error = e
+            self._data = self._get_dummy_data()
+        finally:
+            self._fast_done = True
+
+    def _fill_slow(self, timeout: int | None = None) -> None:
+        if not self._fast_ok:
+            logger.debug("Skipping slow part: fast part did not succeed")
+            self._slow_done = True
+            return
+
+        try:
+            logger.debug("Starting slow VCS info retrieval for %s", self._arc_root)
+
+            arc_root = yalibrary.find_root.detect_root(self._arc_root)
+            if arc_root is None:
+                raise VcsDetectError('VCS root is None, cannot proceed')
+
+            vcs_type, vcs_root, _ = yalibrary.vcs.detect([arc_root], check_tar=True)
+            if not vcs_type:
+                raise VcsDetectError(f'Cannot detect VCS type for {arc_root}')
+            if not vcs_root:
+                vcs_root = arc_root
+
+            self._vcs_root = vcs_root
+            handler = get_vcs_handler(vcs_type[0])
+            info = handler.from_repository_root(
+                vcs_root,
+                timeout=timeout,
+                is_arc_describe_required=True,
+            ).parse()
+
+            self._data = info
+            self._slow_ok = True
+            logger.debug("Slow VCS info retrieved successfully")
+
+        except Exception as e:
+            logger.debug("Failed to get slow VCS information", exc_info=e)
+            self._last_error = e
+
+        self._slow_done = True
+
+    def get_info(
+        self,
+        wait_for: bool = True,
+        require_slow: bool = False,
+        timeout: int | None = None,
+        raise_on_failure: bool = False,
+    ) -> ParsedVcsInfo | None:
+        if not wait_for:
+            if require_slow:
+                return self._data if self._slow_ok else None
+            return self._data
+
+        if not self._fast_done:
+            with self._fast_lock:
+                if not self._fast_done:
+                    self._fill_fast()
+
+        if not self._fast_ok:
+            if raise_on_failure:
+                raise VcsInfoError(f'Failed to get VCS info for {self._arc_root}') from self._last_error
+            return self._data
+
+        if require_slow and not self._slow_done:
+            with self._slow_lock:
+                if not self._slow_done:
+                    self._fill_slow(timeout=timeout)
+
+        if require_slow and not self._slow_ok:
+            if raise_on_failure:
+                raise VcsInfoError(f'Failed to get full VCS info for {self._arc_root}') from self._last_error
+
+        return self._data
+
+    def get_vcs_root(self) -> str:
+        return self._vcs_root or ''
+
+    def get_revision(self, require_slow: bool = False, timeout: int | None = None) -> int:
+        info = self.get_info(require_slow=require_slow, timeout=timeout)
+        return info.get('revision', info.get('commit_revision', info.get('svn_commit_revision', DEFAULT_VCS_REVISION)))
+
+    @classmethod
+    def reset(cls) -> None:
+        with cls._lock:
+            cls._instance = None
 
 
-def _get_json(arc_root: str | None) -> SvnRevisionInfo:
-    arc_root: str | None = yalibrary.find_root.detect_root(arc_root)
-    try:
-        if arc_root is None:
-            raise VcsDetectError('VCS root is None, can\'t proceed')
-        vcs_type, vcs_root, _ = yalibrary.vcs.detect([arc_root], check_tar=True)
-        if vcs_root:
-            vcs_root = arc_root
-        else:
-            raise VcsDetectError(f'Arcadia root \'{arc_root}\' is not subdir of vcs root {vcs_root}')
-        handler = get_vcs_handler(vcs_type[0])
-        info = handler.from_repository_root(vcs_root).parse()
-
-        return SvnRevisionInfo(vcs_info=info, root=vcs_root)
-    except Exception as e:
-        logger.debug('Cannot get vcs information', exc_info=e)
-        return _get_default_json()
+def repo_config(arc_root: str | None, is_arc_describe_required: bool = False) -> tuple[int, str]:
+    vcs_info = VcsInfo(arc_root)
+    info = vcs_info.get_info(require_slow=is_arc_describe_required)
+    return (
+        vcs_info.get_revision(require_slow=is_arc_describe_required),
+        yalibrary.svn.get_svn_path_from_url(info.get('url', info.get('svn_url', ''))),
+    )
 
 
-def repo_config(arc_root: str | None) -> tuple[int, str]:
-    info = _get_json(arc_root).vcs_info
-    return info.get(
-        'revision', info.get('commit_revision', info.get('svn_commit_revision', -1))
-    ), yalibrary.svn.get_svn_path_from_url(info.get('url', info.get('svn_url', '')))
-
-
-def get_raw_version_info(arc_root: str | None, bld_root=None) -> ParsedVcsInfo:
-    info = _get_json(arc_root).vcs_info
-    return info
-
-
-def get_fast_version_info(arc_root: str, timeout: int | None = None) -> dict[str, str | int]:
-    try:
-        if arc_root is None:
-            raise VcsDetectError('VCS root is None, can\'t proceed')
-        vcs_type, vcs_root, _ = yalibrary.vcs.detect([arc_root], check_tar=True)
-        if vcs_root:
-            vcs_root = arc_root
-        else:
-            raise VcsDetectError(f'Arcadia root \'{arc_root}\' is not subdir of vcs root {vcs_root}')
-        handler = get_vcs_handler(vcs_type[0])
-        vcs_data = handler.from_repository_root_fast(vcs_root, timeout=timeout)
-        info = handler.parse(vcs_data)
-
-        return info
-    except Exception as e:
-        logger.debug('Cannot get vcs information', exc_info=e)
-        return _get_default_json().vcs_info
+def get_raw_version_info(
+    arc_root: str | None,
+    bld_root=None,
+    is_arc_describe_required: bool = False,
+) -> ParsedVcsInfo:
+    vcs_info = VcsInfo(arc_root)
+    return vcs_info.get_info(require_slow=is_arc_describe_required)
 
 
 def get_version_info(
@@ -898,12 +1038,19 @@ def get_version_info(
     custom_version: str = '',
     release_version: str = '',
 ) -> str:
-    vcs_info = _get_default_json() if fake_data else _get_json(arc_root)
-    return _dump_json(
-        vcs_info.root,
-        vcs_info.vcs_info,
+    if fake_data:
+        vcs_info_data = _get_default_dictionary()
+        vcs_root = ''
+    else:
+        vcs_info = VcsInfo(arc_root)
+        vcs_info_data = vcs_info.get_info(require_slow=False)
+        vcs_root = vcs_info.get_vcs_root()
+
+    return dump_vcs_json(
+        vcs_root or arc_root or '',
+        vcs_info_data,
         other_data=_SystemInfo.get_other_data(
-            src_dir=vcs_info.root,
+            src_dir=vcs_root or arc_root or '',
             build_dir=bld_root,
             fake_build_info=fake_build_info,
         ),

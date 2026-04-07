@@ -46,7 +46,6 @@ import yalibrary.graph.const as graph_const
 import yalibrary.graph.node as graph_node
 from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 from yalibrary.toolscache import toolscache_version
-import yalibrary.vcs.vcsversion as vcsversion
 import yalibrary.debug_store
 from yalibrary.monitoring import YaMonEvent
 
@@ -3568,18 +3567,37 @@ def get_version_info(arc_root, bld_root, outer_file=None, flags=None, custom_ver
     timer = exts.timer.Timer('get_version_info')
     fake_data = strtobool(flags.get('NO_VCS_DEPENDS', 'no'))
     fake_build_info = strtobool(flags.get('CONSISTENT_BUILD', 'no'))
+    force_vcs_info_update = strtobool(flags.get('FORCE_VCS_INFO_UPDATE', 'no'))
+
     if outer_file:
         with open(outer_file) as f:
             json_str = f.read()
     else:
-        json_str = vcsversion.get_version_info(
+        from yalibrary.vcs import vcsversion
+
+        vcs_info = vcsversion.VcsInfo(arc_root)
+        info_data = vcs_info.get_info(
+            wait_for=True,
+            require_slow=force_vcs_info_update,
+            raise_on_failure=force_vcs_info_update,
+        )
+
+        json_str = vcsversion.dump_vcs_json(
             arc_root,
-            bld_root,
-            fake_data,
-            fake_build_info,
+            info_data,
+            other_data=vcsversion._SystemInfo.get_other_data(
+                src_dir=arc_root,
+                build_dir=bld_root,
+                fake_build_info=fake_build_info,
+            ),
+            build_user=vcsversion._SystemInfo.get_user(fake_build_info=fake_build_info),
+            build_host=vcsversion._SystemInfo.get_hostname(fake_build_info=fake_build_info),
+            build_date=vcsversion._SystemInfo.get_date(0 if fake_build_info else None),
+            build_timestamp=vcsversion._SystemInfo.get_timestamp(fake_build_info=fake_build_info),
             custom_version=custom_version,
             release_version=release_version,
         )
+
     logger.debug("Got version json  %s", json.dumps(json_str, sort_keys=True))
 
     if not fake_data:

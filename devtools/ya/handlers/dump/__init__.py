@@ -1213,7 +1213,16 @@ def do_dump_raw_vcs_info(params):
 def do_dump_vcs_info(params):
     fake_data = strtobool(params.flags.get('NO_VCS_DEPENDS', 'no'))
     fake_build_info = strtobool(params.flags.get('CONSISTENT_BUILD', 'no'))
-    sys.stdout.write(vcsversion.get_version_info(params.arc_root, params.bld_root, fake_data, fake_build_info) + '\n')
+
+    sys.stdout.write(
+        vcsversion.get_version_info(
+            params.arc_root,
+            params.bld_root,
+            fake_data,
+            fake_build_info,
+        )
+        + '\n'
+    )
 
 
 def do_dump_svn_revision(params):

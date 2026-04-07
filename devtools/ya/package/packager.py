@@ -46,6 +46,7 @@ import package.squashfs
 import package.tarball
 import package.vcs
 import package.wheel
+from exts.strtobool import strtobool
 from package.package_tree import load_package, get_tree_info
 from devtools.ya.core.report import telemetry, ReportTypes
 from devtools.ya.package import const
@@ -1144,7 +1145,14 @@ class PackageContext:
 
         self._params = update_params(self._spec, self._params, self._package_path)
 
-        self._branch = str(package.vcs.Branch(self._arcadia_root, self._params.arc_revision_means_trunk))
+        force_vcs_info_update = bool(strtobool(self._params.flags.get('FORCE_VCS_INFO_UPDATE', 'no')))
+        self._branch = str(
+            package.vcs.Branch(
+                self._arcadia_root,
+                self._params.arc_revision_means_trunk,
+                force_vcs_info_update=force_vcs_info_update,
+            ),
+        )
         self._package_name = self._read_spec_safe('meta', 'name', 'package_name')
         # package_filename has patterns in brackets {}
         # so format_package_meta wants to format it but we don't have package_ext yet
@@ -1169,10 +1177,18 @@ class PackageContext:
                 "package_name": self._package_name,
                 "package_path": self._package_path,
                 "package_version": self._version,
-                "revision": str(package.vcs.Revision(self._arcadia_root)),
-                "revision_date": package.vcs.RevisionDate(self._arcadia_root),
+                "revision": str(package.vcs.Revision(self._arcadia_root, force_vcs_info_update=force_vcs_info_update)),
+                "revision_date": package.vcs.RevisionDate(
+                    self._arcadia_root,
+                    force_vcs_info_update=force_vcs_info_update,
+                ),
                 "sandbox_task_id": self._params.sandbox_task_id,
-                "svn_revision": str(package.vcs.SvnRevision(self._arcadia_root)),
+                "svn_revision": str(
+                    package.vcs.SvnRevision(
+                        self._arcadia_root,
+                        force_vcs_info_update=force_vcs_info_update,
+                    ),
+                ),
             }
         )
 

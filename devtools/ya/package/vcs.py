@@ -1,11 +1,6 @@
 import datetime
-import json
 import logging
-import traceback
 import re
-
-import exts.func
-import exts.tmp
 
 from yalibrary.vcs import vcsversion
 from yalibrary import vcs
@@ -16,14 +11,10 @@ UNDEFINED = 'undefined'
 DEFAULT_DATE = '1970-01-01T00:00:00'
 
 
-@exts.func.memoize()
-def _get_vcs_info(source_root):
-    return vcsversion.get_raw_version_info(source_root)
-
-
 class VcsInfo(object):
-    def __init__(self, arcadia_root):
+    def __init__(self, arcadia_root, force_vcs_info_update=False):
         self._arcadia_root = arcadia_root
+        self._force_vcs_info_update = force_vcs_info_update
 
     def __str__(self):
         return str(self())
@@ -31,9 +22,8 @@ class VcsInfo(object):
     def __format__(self, spec):
         return format(str(self), spec)
 
-    @exts.func.memoize()
     def __call__(self):
-        return self.calc(_get_vcs_info(self._arcadia_root))
+        return self.calc(vcsversion.VcsInfo(self._arcadia_root).get_info(raise_on_failure=self._force_vcs_info_update))
 
     def calc(self, info):
         raise NotImplementedError
@@ -59,22 +49,13 @@ class RevisionDate(VcsInfo):
 
 class SvnRevision(VcsInfo):
     def calc(self, info):
-        return info.get('revision') or self.get_last_change_revision(default=UNDEFINED)
-
-    def get_last_change_revision(self, default):
-        with exts.tmp.temp_dir() as tmpdir:
-            try:
-                line = vcsversion.get_version_info(self._arcadia_root, tmpdir)
-                data = json.loads(line)
-                return data.get('ARCADIA_SOURCE_LAST_CHANGE', default)
-            except Exception:
-                logger.debug("Can't extract svn revision from arc repo: %s", traceback.format_stack())
-                return default
+        # type: (dict) -> object
+        return info.get('svn_commit_revision', UNDEFINED)
 
 
 class Branch(VcsInfo):
-    def __init__(self, arcadia_root, revision_means_trunk=True):
-        super(Branch, self).__init__(arcadia_root)
+    def __init__(self, arcadia_root, revision_means_trunk=True, force_vcs_info_update=False):
+        super(Branch, self).__init__(arcadia_root, force_vcs_info_update=force_vcs_info_update)
         self.revision_means_trunk = revision_means_trunk
 
     def calc(self, info):
