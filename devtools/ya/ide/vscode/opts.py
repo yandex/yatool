@@ -26,7 +26,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.write_pyright_config = True
         self.python_type_checking_mode = None
         self.python_index_enabled = True
-        self.python_new_extra_paths = False
+        self.python_new_extra_paths = True
         self.build_venv = False
         self.clang_format_enabled = False
         self.clang_tidy_enabled = True
@@ -238,6 +238,17 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook("python_new_extra_paths", True),
                 group=cls.GROUP,
                 visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--no-python-new-extra-paths"],
+                help="Do not use new logic for adding source paths to PYTHONPATH",
+                hook=devtools.ya.core.yarg.SetConstValueHook("python_new_extra_paths", False),
+                group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer(
+                'python_new_extra_paths',
+                help="Use new logic for adding source paths to PYTHONPATH",
+                group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--build-venv"],
