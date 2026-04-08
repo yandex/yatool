@@ -80,7 +80,6 @@ from devtools.ya.core.yarg import (
     RawParamsOptions,
     return_true_if_enabled,
     NoValueDummyHook,
-    SwallowValueDummyHook,
 )
 
 from library.python.fs import supports_clone
@@ -1358,13 +1357,6 @@ class ContentUidsOptions(Options):
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
-            ArgConsumer(
-                ['--force-content-uids'],
-                help='Deprecated, do nothing',
-                hook=NoValueDummyHook(),
-                group=DEVELOPERS_OPT_GROUP,
-                visible=False,
-            ),
             ConfigConsumer('content_uids'),
             EnvConsumer(
                 'YA_USE_CONTENT_UIDS',
@@ -2147,117 +2139,6 @@ class StreamReportOptions(Options):
                 visible=HelpLevel.INTERNAL,
             ),
             EnvConsumer('YA_STREAMING_STAGE_NAMESPACE', hook=SetValueHook('streaming_stage_namespace')),
-        ] + StreamReportOptions._deprecated_options()
-
-    # TODO Remove when we make sure no one uses it
-    @staticmethod
-    def _deprecated_options():
-        return [
-            ArgConsumer(
-                ['--streaming-report-url'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--streaming-report-id'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--stream-partition'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--streaming-task-id'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--keep-alive-streams'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--keep-alive-all-streams'],
-                help='Deprecated. Do nothing',
-                hook=NoValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--report-only-stages'],
-                help='Deprecated. Do nothing',
-                hook=NoValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--report-to-ci'],
-                help='Deprecated. Do nothing',
-                hook=NoValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--ci-topic'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--ci-source-id'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--ci-check-id'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--ci-check-type'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--ci-iteration-number'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--ci-task-id-string'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
-            ArgConsumer(
-                ['--ci-logbroker-partition-group'],
-                help='Deprecated. Do nothing',
-                hook=SwallowValueDummyHook(),
-                visible=False,
-                deprecated=True,
-            ),
         ]
 
 
@@ -2979,14 +2860,6 @@ class DistCacheOptions(DistCacheSetupOptions):
                     hook=SetConstValueHook('yt_self_uid', True),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
-                    deprecated=True,
-                ),
-                ArgConsumer(
-                    ['--yt-store-filter'],
-                    help='YT store filter (DEPRECATED. Do nothing)',
-                    hook=SwallowValueDummyHook(),
-                    group=YT_CACHE_PUT_CONTROL_GROUP,
-                    visible=HelpLevel.NONE,
                     deprecated=True,
                 ),
                 ArgConsumer(
