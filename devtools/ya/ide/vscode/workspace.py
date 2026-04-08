@@ -306,7 +306,14 @@ def gen_pyrights_excludes(arc_root, srcdirs):
     for dirs in srcdirs.values():
         for path in dirs:
             tree.add_path(path)
-    return ["**/node_modules"] + tree.gen_excludes(arc_root, relative=True, only_dirs=True)
+    return ["**/node_modules", "**/__pycache__", "**/.*"] + tree.gen_excludes(arc_root, relative=True, only_dirs=True)
+
+
+def gen_ruff_excludes(arc_root, targets):
+    tree = excludes.Tree()
+    for path in targets:
+        tree.add_path(path)
+    return ["**/node_modules", "**/__pycache__", "**/.*"] + tree.gen_excludes(arc_root, relative=False, only_dirs=True)
 
 
 def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):

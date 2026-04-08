@@ -284,25 +284,16 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
-                ['-t', '--tests'],
-                help="Generate tests configurations for debug",
-                hook=devtools.ya.core.yarg.SetConstValueHook('tests_enabled', True),
-                group=cls.GROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.NONE,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
                 ["--vscodium"],
                 help="Generate workspace for VSCodium",
                 hook=devtools.ya.core.yarg.SetConstValueHook("ide_name", IDEName.VSCODIUM),
                 group=cls.GROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--cursor"],
                 help="Generate workspace for Cursor IDE",
                 hook=devtools.ya.core.yarg.SetConstValueHook("ide_name", IDEName.CURSOR),
                 group=cls.GROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
         ]
 
