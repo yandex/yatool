@@ -13,6 +13,7 @@ import exts.shlex2
 import yalibrary.tools
 
 from devtools.ya.ide import ide_common, vscode
+from devtools.ya.ide.vscode.opts import IDEName
 
 
 class VSCodeTypeScriptOptions(devtools.ya.core.yarg.Options):
@@ -23,6 +24,7 @@ class VSCodeTypeScriptOptions(devtools.ya.core.yarg.Options):
         self.workspace_name = None
         self.build_enabled = False
         self.install_deps = False
+        self.ide_name = IDEName.VSCODE
 
     @classmethod
     def consumer(cls):
@@ -49,6 +51,18 @@ class VSCodeTypeScriptOptions(devtools.ya.core.yarg.Options):
                 ['--build-target'],
                 help='Run build additionally',
                 hook=devtools.ya.core.yarg.SetConstValueHook('build_enabled', True),
+                group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--vscodium"],
+                help="Generate workspace for VSCodium",
+                hook=devtools.ya.core.yarg.SetConstValueHook("ide_name", IDEName.VSCODIUM),
+                group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--cursor"],
+                help="Generate workspace for Cursor IDE",
+                hook=devtools.ya.core.yarg.SetConstValueHook("ide_name", IDEName.CURSOR),
                 group=cls.GROUP,
             ),
         ]
@@ -168,14 +182,14 @@ def get_workspace_template(params, YA_PATH):
                             ],
                         ),
                         ('task.autoDetect', 'off'),
-                        ('typescript.preferences.importModuleSpecifier', 'relative'),
-                        ('typescript.tsc.autoDetect', 'off'),
+                        ('js/ts.preferences.importModuleSpecifier', 'relative'),
+                        ('js/ts.tsc.autoDetect', 'off'),
                         (
-                            'typescript.tsdk',
+                            'js/ts.tsdk.path',
                             'node_modules/typescript/lib',
                         ),  # override default typescript version built-in to VSCode
                         (
-                            'typescript.updateImportsOnFileMove.enabled',
+                            'js/ts.updateImportsOnFileMove.enabled',
                             'never',
                         ),  # TS Language Server don't support aliases
                         ("yandex.arcRoot", params.arc_root),
@@ -422,8 +436,12 @@ def gen_vscode_workspace(params):
     ide_common.emit_message(FINISH_HELP % workspace_path)
 
     if os.getenv('SSH_CONNECTION'):
-        remote_ide_link = 'vscode://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank'
-        ide_common.emit_message(remote_ide_link.format(hostname=platform.node(), workspace_path=workspace_path))
+        remote_ide_link = '{ide_name}://vscode-remote/ssh-remote+{hostname}{workspace_path}?windowId=_blank'
+        ide_common.emit_message(
+            remote_ide_link.format(
+                ide_name=params.ide_name.value, hostname=platform.node(), workspace_path=workspace_path
+            )
+        )
     else:
-        local_ide_link = 'vscode://file/{workspace_path}?windowId=_blank'
-        ide_common.emit_message(local_ide_link.format(workspace_path=workspace_path))
+        local_ide_link = '{ide_name}://file/{workspace_path}?windowId=_blank'
+        ide_common.emit_message(local_ide_link.format(ide_name=params.ide_name.value, workspace_path=workspace_path))
