@@ -246,6 +246,7 @@ RECURSE_FOR_TESTS(
     symbols/ut
     ut
     ut/hexencoder
+    ut/macro_signature
 )
 
 IF (OS_WINDOWS OR YA_OPENSOURCE OR OPENSOURCE)
