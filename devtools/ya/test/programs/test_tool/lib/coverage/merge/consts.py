@@ -1,2 +1,4 @@
+# cython: profile=True
+
 COUNTER_LIMIT = 1 << 62
 MCDC_EXECUTED_TEST_VECTORS_IDX = 7

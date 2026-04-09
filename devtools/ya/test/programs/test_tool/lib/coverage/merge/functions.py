@@ -1,3 +1,6 @@
+# cython: profile=True
+
+
 def merge_functions_inplace(result, record):
     for start_pos, entries in record.items():
         if start_pos not in result:

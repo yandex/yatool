@@ -1,3 +1,5 @@
+# cython: profile=True
+
 from .consts import COUNTER_LIMIT
 
 

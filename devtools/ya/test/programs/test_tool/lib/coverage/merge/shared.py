@@ -1,3 +1,5 @@
+# cython: profile=True
+
 from collections.abc import Sequence
 from typing import Protocol, Literal, Self
 

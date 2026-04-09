@@ -1,3 +1,5 @@
+# cython: profile=True
+
 import collections
 import typing as tp
 

@@ -1,3 +1,5 @@
+# cython: profile=True
+
 import typing as tp
 import itertools
 
@@ -6,7 +8,7 @@ from collections.abc import Sequence, Generator
 from .consts import MCDC_EXECUTED_TEST_VECTORS_IDX
 from .shared import dedup_and_sort, compare_records
 
-type Condition = bool | None  # true, false, null (null when it's been short circuited)
+Condition = bool | None  # true, false, null (null when it's been short circuited)
 
 
 class ExecutedTestVector(tp.NamedTuple):
