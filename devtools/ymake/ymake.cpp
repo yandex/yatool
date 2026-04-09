@@ -1,4 +1,5 @@
 #include "ymake.h"
+#include "ymake_async.h"
 
 #include "json_visitor.h"
 #include "mkcmd.h"
