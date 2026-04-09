@@ -459,40 +459,6 @@ namespace {
             }).Release();
         }
 
-        PyObject* MethodAddParser(PyObject* args, PyObject* kwargs) {
-            const char* ext;
-            PyObject* confObj;
-            PyObject* callableObj;
-            PyObject* inducedDepsObj = nullptr;
-            int passInducedIncludes = 0;
-            const char* keys[] = {
-                "",
-                "",
-                "",
-                "induced",
-                "pass_induced_includes",
-                nullptr
-            };
-            if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OsO|$Op:ymake.add_parser", (char**)keys, &confObj, &ext, &callableObj, &inducedDepsObj, &passInducedIncludes) || PyErr_Occurred()) {
-                return nullptr;
-            }
-            TBuildConfiguration* conf = nullptr;
-            if (PyCapsule_CheckExact(confObj)) {
-                conf = reinterpret_cast<TBuildConfiguration*>(PyCapsule_GetPointer(confObj, "BuildConfiguration"));
-            }
-            if (conf == nullptr) {
-                PyErr_SetString(PyExc_TypeError, "first argument of ymake.add_parser is expected to be a PyCapsule object containing a pointer to TBuildConfiguration");
-                return nullptr;
-            }
-            Y_ASSERT(conf == Conf);
-            std::map<TString, TString> inducedDeps;
-            if (!ParseInducedDepsArg(inducedDepsObj, inducedDeps))
-                return nullptr;
-
-            AddParser(conf, ext, callableObj, inducedDeps, passInducedIncludes);
-            Py_RETURN_NONE;
-        }
-
         PyObject* MacroDecorator(std::span<PyObject* const> args) {
             if (args.size() != 1 || !PyFunction_Check(args[0])) {
                 PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single function to register as a macro");
@@ -583,7 +549,6 @@ namespace {
 
     PyMethodDef YMakeMethods[] = {
         {"parser", (PyCFunction)WrapMember<&YMakeState::DecoratorParser>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Use class as a parser for files with the given extension")},
-        {"add_parser", (PyCFunction)WrapMember<&YMakeState::MethodAddParser>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Add a parser for files with the given extension")},
         {"macro", (PyCFunction)WrapMember<&YMakeState::MacroDecorator>, METH_FASTCALL, PyDoc_STR("Register function as ya.make macro")},
         {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS, PyDoc_STR("Report configure error")},
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},

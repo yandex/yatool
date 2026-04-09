@@ -16,23 +16,6 @@
 using namespace NYMake::NPlugins;
 
 namespace {
-    const static char BuildConfigurationName[] = "BuildConfiguration";
-
-    bool RegisterParsersFromModule(TBuildConfiguration& conf, PyObject* mod) {
-        if (!PyObject_HasAttrString(mod, "register_parsers"))
-            return true;
-
-        if (NYMake::NPy::OwnedRef initFunc{PyObject_GetAttrString(mod, "register_parsers")}; PyCallable_Check(initFunc.get())) {
-            NYMake::NPy::OwnedRef confPtr{PyCapsule_New(&conf, BuildConfigurationName, nullptr)};
-            PyObject_CallOneArg(initFunc.get(), confPtr.get());
-            if (PyErr_Occurred()) {
-                PyErr_Print();
-                return false;
-            }
-        }
-        return true;
-    }
-
     void RegisterMacrosFromModule(TBuildConfiguration& conf, PyObject* mod) {
         NYMake::NPy::OwnedRef attrs{PyObject_Dir(mod)};
         if (attrs == nullptr) {
@@ -99,9 +82,9 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &p
             continue;
         }
 
-        // TODO(YMAKE-1996) remove old way to register parsers after switching all parser to decorator registration
-        if (!RegisterParsersFromModule(*conf, mod.get()))
-            continue;
+        // Parsers registration is implemented via decorator and happens inside `PyImport_ImportModule`. No explicit
+        // registration here required.
+        // TODO(YMAKE-1797) reimplement macro registration via decorator as well and remove the line bellow.
         RegisterMacrosFromModule(*conf, mod.get());
     }
 
