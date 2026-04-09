@@ -345,6 +345,10 @@ class NewStore(object):
         logger.debug("Cleaning uid store")
         self._uid_store.gc(used_uids)
 
+    def close(self):
+        self._lru.close()
+        self._size_store.close()
+
     def flush(self):
         self._size_store.flush()
         self._lru.flush()

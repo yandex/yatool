@@ -98,6 +98,14 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_
     proc = subprocess.Popen(cmd, env=env, stdout=out_stream, stderr=out_stream)
     pid = proc.pid
 
+    if terminate_at_exit:
+        def shutdown():
+            if proc.poll() is None:
+                proc.terminate()
+                proc.wait()
+
+        atexit.register(shutdown)
+
     def wait_till_initialized(connect_timeout=15):
         tries = 0
         last_error = ''
@@ -113,12 +121,6 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_
                 last_error = e
                 time.sleep(0.05)
             else:
-                if terminate_at_exit:
-                    def shutdown():
-                        if proc.poll() is None:
-                            proc.terminate()
-
-                    atexit.register(shutdown)
                 return
 
         logging.debug("Failed to connect to external executor within %d tries. Last error: %s", tries, last_error)

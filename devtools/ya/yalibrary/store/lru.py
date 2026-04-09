@@ -78,6 +78,12 @@ class LruQueue(object):
     def analyze(self, analyzer):
         return self._queue.analyze(lambda value: self.__action(analyzer, value))
 
+    def close(self):
+        self._queue.close()
+        self._usage.close()
+        if self._updater:
+            self._update_queue.close()
+
     def flush(self):
         if self._updater:
             # Process postponed updates

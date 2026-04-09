@@ -75,6 +75,9 @@ class StatusStore:
             self.store.strip(SizeFilter(max_size))
         self.flush()
 
+    def close(self) -> None:
+        self.store.close()
+
     def flush(self) -> None:
         self.store.flush()
 
@@ -204,3 +207,4 @@ def cache_test_statuses(res, tests: list[AbstractTestSuite], garbage_dir: str, l
             res_info = _merge_statuses_info(old_statuses_info, new_info)
             status_storage.put(h, res_info)
     status_storage.flush()
+    status_storage.close()
