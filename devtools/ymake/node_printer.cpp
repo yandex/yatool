@@ -1912,6 +1912,8 @@ void TYMake::DumpSrcDeps(IOutputStream& cmsg) {
     }
 
     for (const auto& dirPath : fetchedDirs.GetPaths()) {
+        if (InBuildDir(dirPath))
+            continue;
         cmsg << "Directory: " << dirPath << Endl;
     }
 
