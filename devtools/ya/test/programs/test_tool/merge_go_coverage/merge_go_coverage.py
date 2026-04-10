@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+import re
 
 import exts.archive
 from yatest.common import process
@@ -40,6 +41,17 @@ def merge_coverage(params):
         assert not os.path.exists(dirname)
         exts.archive.extract_from_tar(coverage_path, dirname)
         cov_dirs.append(dirname)
+        # Test with retries rename coverage files by add _0,_1 ... to names
+        # But Go tool covdata check filenames and ignore renamed files
+        # Here rename files to original namesfor covdata
+        # (covmeta.* file names based on segments and may repeated on few retries,
+        # and will be overwrited by this renaming, but no segments will be lost)
+        for path, _, files in os.walk(dirname):
+            for file in files:
+                renamed_file = re.sub(r'_\d(?=[^\d]|$)', '', file)
+                if renamed_file != file:
+                    os.rename(os.path.join(path, file), os.path.join(path, renamed_file))
+            break
     mergebin_dir = params.output + '.mergebin'
     os.mkdir(mergebin_dir)
     cmd = [
@@ -51,7 +63,7 @@ def merge_coverage(params):
         mergebin_dir,
     ]
     os.environ["GOCACHE"] = os.path.abspath("tmp/.gocache")
-    process.execute(cmd, stderr=sys.stderr, check_sanitizer=False)
+    process.execute(cmd, stderr=sys.stderr, check_sanitizer=False, check_exit_code=True)
     merge_dir = params.output + '.merge'
     os.mkdir(merge_dir)
     merged_covraw = os.path.join(merge_dir, 'covraw')
@@ -64,7 +76,7 @@ def merge_coverage(params):
         "-o",
         merged_covraw,
     ]
-    process.execute(cmd, stderr=sys.stderr, check_sanitizer=False)
+    process.execute(cmd, stderr=sys.stderr, check_sanitizer=False, check_exit_code=True)
     file_filter = (
         coverage_utils.make_filter(params.prefix_filter, params.exclude_regexp)
         if params.prefix_filter or params.exclude_regexp

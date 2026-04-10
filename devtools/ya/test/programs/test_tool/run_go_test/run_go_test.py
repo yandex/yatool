@@ -85,6 +85,7 @@ def parse_args():
         "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
     )
     parser.add_argument("--allure", action="store_true")
+    parser.add_argument("--go-coverage-per-pkg", action="store_true")
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -489,7 +490,9 @@ def run_tests(opts):
     cov_path = os.environ.get(const.COVERAGE_GO_ENV_NAME)
     if cov_path:
         cov_path = cov_path.format(pid=os.getpid(), time=time.time())
-        cmd += ["-test.coverprofile={}".format(cov_path)]
+        cmd += [f"-test.coverprofile={cov_path}"]
+        if opts.go_coverage_per_pkg:
+            cmd += [f"-test.gocoverdir={os.path.dirname(cov_path)}"]
 
     #  here we get only Test names without benchmarks, subbenchmarks and subtests. thus we can't detect not launched subtests
     tests, deselected = get_tests(opts, opts.wine_path)
@@ -632,9 +635,9 @@ def run_tests(opts):
     shared.dump_trace_file(empty_suite, opts.tracefile)
 
     if exit_code not in [0, const.TestRunExitCode.TimeOut]:
-        if (
-            cov_path
-            and "cannot use -test.coverprofile because test binary was not built with coverage enabled" in std_err
+        if cov_path and (
+            "cannot use -test.coverprofile because test binary was not built with coverage enabled" in std_err
+            or "cannot use -test.gocoverdir because test binary was not built with coverage enabled" in std_err
         ):
             suite.add_chunk_error('Test did not provide coverage data', const.Status.DESELECTED)
         elif results and results.result == const.Status.GOOD:

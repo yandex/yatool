@@ -453,6 +453,7 @@ def parse_args(args=None):
     parser.add_argument("--sancov-coverage", dest="sancov_coverage", action='store_true', default=None)
     parser.add_argument("--clang-coverage", dest="clang_coverage", action='store_true', default=None)
     parser.add_argument("--go-coverage-path", dest="go_coverage_path", default=None)
+    parser.add_argument("--go-coverage-per-pkg", dest="go_coverage_per_pkg", action='store_true', default=None)
     parser.add_argument("--fast-clang-coverage-merge", dest="fast_clang_coverage_merge", action="store")
     parser.add_argument("--python3-coverage-path", dest="python3_coverage_path", default=None)
     parser.add_argument("--ts-coverage-path", dest="ts_coverage_path", default=None)

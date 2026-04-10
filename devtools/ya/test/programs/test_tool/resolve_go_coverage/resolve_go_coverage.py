@@ -1,13 +1,10 @@
 import re
 import os
 import logging
-import six
 import functools
-
 import argparse
 
 import exts.fs
-import exts.func
 import exts.archive
 from devtools.ya.test.programs.test_tool.lib import runtime
 from devtools.ya.test.util import shared
@@ -17,8 +14,9 @@ from library.python.testing import coverage_utils as coverage_utils_library
 logger = logging.getLogger(__name__)
 
 
-def combine_cov_files(cov_files, merge_dir, new_cov_filename):
+def combine_cov_files(cov_files, merge_dir, new_cov_filename, prefix_filter, exclude_regexp):
     """returns merged coverage filename"""
+    file_filter = coverage_utils_library.make_filter(prefix_filter, exclude_regexp)
     merged_coverage = {}
     for filename in cov_files:
         with open(filename, 'r') as afile:
@@ -33,21 +31,28 @@ def combine_cov_files(cov_files, merge_dir, new_cov_filename):
     merged_coverage_filename = os.path.join(merge_dir, new_cov_filename)
     with open(merged_coverage_filename, 'w') as afile:
         afile.write("mode: set\n")
-        for key, value in six.iteritems(merged_coverage):
-            afile.write(key + str(int(value)) + '\n')
+        regex = re.compile(r"^a.yandex-team.ru/([^:]+):")
+        for key, value in merged_coverage.items():
+            match = regex.search(key)
+            if match and file_filter(match.group(1)):
+                afile.write(key + str(int(value)) + '\n')
     return merged_coverage_filename
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', required=True)
-    parser.add_argument('--coverage-path', required=True)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--coverage-path')  # , required=True deprecated
+    group.add_argument('--merged-coverage-tar')  # , required=True Already merged coverage at input
     parser.add_argument('--log-path')
     parser.add_argument('--log-level', default='INFO')
-    parser.add_argument("--exclude-regexp")
-    parser.add_argument("--prefix-filter")
+    parser.add_argument("--exclude-regexp")  # deprecated, moved to merge_go_coverage
+    parser.add_argument("--prefix-filter")  # deprecated, moved to merge_go_coverage
 
     args = parser.parse_args()
+    if not args.coverage_path and not args.merged_coverage_tar:
+        raise ValueError("Either --coverage-path or --merged-coverage-tar must be provided")
     return args
 
 
@@ -66,20 +71,17 @@ def extract(cov_filename):
     return [os.path.join(tmpdir, fn) for fn in dir_files]
 
 
-def parse_coverage(coverage_path, prefix_filter, exclude_regexp):
-    file_filter = coverage_utils_library.make_filter(prefix_filter, exclude_regexp)
+def parse_coverage(coverage_path):
     cov = []  # coverage format: filename start_line start_offset end_line end_offset cover_flag
-    regex = re.compile(r"a.yandex-team.ru/(.*?):(\d+)\.(\d+),(\d+)\.(\d+)\s+(\d+)\s+(\d+)")
+    regex = re.compile(r"^a.yandex-team.ru/([^:]+):(\d+)\.(\d+),(\d+)\.(\d+)\s+(\d+)\s+(\d+)")
     with open(coverage_path, "r") as afile:
         afile.readline()  # skip coverage mode
         for line in afile:
             line = line.strip()
             match = regex.search(line)
             assert match, "bad line\n"
-            filename, spos, sshift, epos, eshift, _, covered = match.groups()
-            # filtering filenames by prefix and regexp
-            if file_filter(filename):
-                cov.append((filename, [int(spos) - 1, int(sshift), int(epos) - 1, int(eshift), int(covered)]))
+            filename, sline, sofs, eline, eofs, _, covered = match.groups()
+            cov.append((filename, [int(sline) - 1, int(sofs), int(eline) - 1, int(eofs), int(covered)]))
     return cov
 
 
@@ -97,14 +99,14 @@ def transform_coverage(go_cov):
             uni_cov[filename] = {"segments": [], "functions": {}}
         uni_cov[filename]["segments"].append(segment)
 
-    for filename, cov in six.iteritems(uni_cov):
+    for filename, cov in uni_cov.items():
         cov["segments"].sort(key=functools.cmp_to_key(segment_comp))
 
     return uni_cov
 
 
-def resolve_covergage(cov_path, output, prefix_filter, exclude_regexp):
-    go_cov = parse_coverage(cov_path, prefix_filter, exclude_regexp)
+def resolve_coverage(cov_path, output):
+    go_cov = parse_coverage(cov_path)
     unified_cov = transform_coverage(go_cov)
     lib_coverage.export.dump_coverage(unified_cov, output)
 
@@ -112,12 +114,14 @@ def resolve_covergage(cov_path, output, prefix_filter, exclude_regexp):
 def main():
     args = parse_args()
     setup_env(args)
-    dir_files = extract(args.coverage_path)
-    merge_dir = 'merge'
-    cov_fn = "cov"
-    os.mkdir(merge_dir)
-    merged_coverage_filename = combine_cov_files(dir_files, merge_dir, cov_fn)
-    resolve_covergage(merged_coverage_filename, args.output, args.prefix_filter, args.exclude_regexp)
+    if args.merged_coverage_tar:
+        merged_coverage_file = extract(args.merged_coverage_tar)[0]
+    else:  # deprecated
+        dir_files = extract(args.coverage_path)
+        merge_dir = 'merge'
+        os.mkdir(merge_dir)
+        merged_coverage_file = combine_cov_files(dir_files, merge_dir, 'cov', args.prefix_filter, args.exclude_regexp)
+    resolve_coverage(merged_coverage_file, args.output)
 
     logger.debug('maxrss: %d', runtime.get_maxrss())
     return 0

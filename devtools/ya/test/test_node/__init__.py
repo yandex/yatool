@@ -521,6 +521,9 @@ def create_test_node(
             runner_cmd += ["--fast-clang-coverage-merge", log_path]
             outputs += [log_path]
 
+        if opts and getattr(opts, "go_coverage_per_pkg", False):
+            runner_cmd += ["--go-coverage-per-pkg"]
+
     if suite.supports_allure and getattr(opts, 'allure_report', None):
         allure_path = os.path.join(work_dir, 'allure.tar')
         runner_cmd += ['--allure', allure_path]
