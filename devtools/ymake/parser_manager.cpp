@@ -246,15 +246,15 @@ namespace NLanguages {
 }
 
 TIncParserManager::TIncParserManager(const TBuildConfiguration& conf, TSymbols& names)
-    : Conf(conf)
-    , Names(names)
+    : Conf_(conf)
+    , Names_(names)
 {
 }
 
 TStringBuf TIncParserManager::ExtPreprocess(TStringBuf ext,
                                             const TSymbols& names,
                                             const TAddIterStack& stack) const {
-    if (ext.empty() || !Ext2Parser.contains(ext)) {
+    if (ext.empty() || !Ext2Parser_.contains(ext)) {
         Y_ASSERT(stack.size());
         bool found = false;
         for (auto stackItem = stack.rbegin() + 1; stackItem != stack.rend(); stackItem++) {
@@ -264,14 +264,14 @@ TStringBuf TIncParserManager::ExtPreprocess(TStringBuf ext,
             Y_ASSERT(UseFileId(stackItem->Node.NodeType));
             TFileView pName = names.FileNameById(stackItem->Node.ElemId);
             TStringBuf newExt = pName.Extension();
-            if (Ext2Parser.contains(newExt)) {
+            if (Ext2Parser_.contains(newExt)) {
                 ext = newExt;
                 found = true;
                 break;
             }
         }
         if (!found) {
-            ext = ExtForDefaultParser;
+            ext = ExtForDefaultParser_;
         }
     }
 
@@ -282,8 +282,8 @@ void TIncParserManager::ProcessFileWithSubst(TFileContentHolder& incFile, TFileP
     if (typeid(context.Node) == typeid(TNodeAddCtx)) {
         TNodeAddCtx& node = static_cast<TNodeAddCtx&>(context.Node);
         PrepareFile(node, incFile);
-        Stats.Inc(NStats::EIncParserManagerStats::InFilesCount);
-        Stats.Inc(NStats::EIncParserManagerStats::InFilesSize, incFile.Size());
+        Stats_.Inc(NStats::EIncParserManagerStats::InFilesCount);
+        Stats_.Inc(NStats::EIncParserManagerStats::InFilesSize, incFile.Size());
     }
 }
 
@@ -307,11 +307,11 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
 
         const auto start = Now();
         if (parser->ParseIncludes(context.Node, wrapper, incFile)) {
-            Stats.Inc(NStats::EIncParserManagerStats::ParseTime, (Now() - start).MicroSeconds());
-            Stats.Inc(NStats::EIncParserManagerStats::ParsedFilesCount);
-            Stats.Inc(NStats::EIncParserManagerStats::ParsedFilesSize, incFile.Size());
+            Stats_.Inc(NStats::EIncParserManagerStats::ParseTime, (Now() - start).MicroSeconds());
+            Stats_.Inc(NStats::EIncParserManagerStats::ParsedFilesCount);
+            Stats_.Inc(NStats::EIncParserManagerStats::ParsedFilesSize, incFile.Size());
         } else {
-            Stats.Inc(NStats::EIncParserManagerStats::ParsedFilesRecovered);
+            Stats_.Inc(NStats::EIncParserManagerStats::ParsedFilesRecovered);
         }
     } else {
         YDIAG(VV) << "unknown type of " << incFile.GetName() << " !!!" << Endl;
@@ -338,15 +338,15 @@ void TIncParserManager::AddParser(TParserBaseRef parser, const TVector<TString>&
     Y_ASSERT(type < EIncludesParserType::PARSERS_COUNT);
     parser->SetLanguageId(NLanguages::GetLanguageIdByParserType(type));
     parser->SetParserType(type);
-    ParsersByType[static_cast<ui32>(type)] = parser;
+    ParsersByType_[static_cast<ui32>(type)] = parser;
     for (const auto& ext : extensions) {
-        Ext2Parser[ext] = parser;
+        Ext2Parser_[ext] = parser;
     }
 }
 
 void TIncParserManager::AddParsers(const TParsersList& parsersList) {
     for (const auto& [parser, extensions] : parsersList) {
-        parser->RegisterIndDepsRule(Names);
+        parser->RegisterIndDepsRule(Names_);
         AddParser(parser, extensions, EIncludesParserType::EmptyParser);
     }
 }
@@ -372,15 +372,15 @@ TParserBase* TIncParserManager::GetParserFor(TFileView fileName) const {
 }
 
 void TIncParserManager::SetDefaultParserSameAsFor(TFileView fileName) {
-    ExtForDefaultParser = fileName.Extension();
+    ExtForDefaultParser_ = fileName.Extension();
 }
 
 void TIncParserManager::InitManager(const TParsersList& parsersList) {
-    TVarsEvaluator evaluator(Conf);
-    auto* cache = &Cache;
+    TVarsEvaluator evaluator(Conf_);
+    auto* cache = &Cache_;
 
-    ParsersByType.resize(static_cast<ui32>(EIncludesParserType::PARSERS_COUNT), nullptr);
-    Cache.SetParserTypeToParserIdMapper([this](EIncludesParserType type) {
+    ParsersByType_.resize(static_cast<ui32>(EIncludesParserType::PARSERS_COUNT), nullptr);
+    Cache_.SetParserTypeToParserIdMapper([this](EIncludesParserType type) {
         if (auto parser = GetParserByType(type)) {
             return parser->GetParserId();
         }
@@ -388,14 +388,14 @@ void TIncParserManager::InitManager(const TParsersList& parsersList) {
     });
 
     for (const auto& [parserType, _, exts, constructor] : ParsersAndExtensions) {
-        AddParser(constructor(cache, evaluator, Names), {exts.begin(), exts.end()}, parserType);
+        AddParser(constructor(cache, evaluator, Names_), {exts.begin(), exts.end()}, parserType);
     }
 
     AddParsers(parsersList);
 }
 
 TParserBase* TIncParserManager::ParserByExt(const TStringBuf& ext) const {
-    if (const TParserBaseRef* p = Ext2Parser.FindPtr(ext)) {
+    if (const TParserBaseRef* p = Ext2Parser_.FindPtr(ext)) {
         return p->Get();
     }
     return nullptr;

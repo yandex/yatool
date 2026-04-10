@@ -140,7 +140,7 @@ TYMake::~TYMake() {
 
 TModuleResolveContext TYMake::GetModuleResolveContext(const TModule& mod) {
     Y_ASSERT(UpdIter != nullptr);
-    return MakeModuleResolveContext(mod, Conf, Graph, *UpdIter, IncParserManager.Cache);
+    return MakeModuleResolveContext(mod, Conf, Graph, *UpdIter, IncParserManager.Cache());
 }
 
 TRestoreContext TYMake::GetRestoreContext() {
@@ -159,7 +159,7 @@ TFileProcessContext TYMake::GetFileProcessContext(TModule* module, TAddDepAdapto
 
 void TYMake::ReportGraphBuildStats() {
     Names.FileConf.ReportStats();
-    IncParserManager.Stats.Report();
+    IncParserManager.Stats().Report();
     Parser->ReportStats();
     Graph.ReportStats();
     UpdIter->Stats.Report();

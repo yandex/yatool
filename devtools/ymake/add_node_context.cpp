@@ -98,7 +98,7 @@ void TNodeAddCtx::AddInputs() {
         }
         AssertEx(ModuleBldr == nullptr && !Module->IsInputsComplete(), "Module was already processed: " + Module->GetFileName());
 
-        ModuleBldr = new TModuleBuilder(*ModuleDef, *this, {YMake.Conf, Graph, UpdIter, YMake.Commands}, YMake.IncParserManager.Cache);
+        ModuleBldr = new TModuleBuilder(*ModuleDef, *this, {YMake.Conf, Graph, UpdIter, YMake.Commands}, YMake.IncParserManager.Cache());
         ModuleBldr->ProcessMakeFile();
         if (!Module->SelfPeers.empty()) {
             THashSet<TString> ignoreSelfPeers;

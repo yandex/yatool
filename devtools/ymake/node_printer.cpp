@@ -1040,7 +1040,7 @@ static void PrintTargetSuggest(const TDepGraph& graph,
 }
 
 bool TYMake::ResolveRelationTargets(const TVector<TString>& targets, THashSet<TNodeId>& result) {
-    TResolveContext ctx(Conf, Graph, TOwnEntries(), IncParserManager.Cache);
+    TResolveContext ctx(Conf, Graph, TOwnEntries(), IncParserManager.Cache());
     TPathResolver resolver(ctx, Conf.ShouldForceListDirInResolving());
     auto& fileConf = Graph.Names().FileConf;
     TFileView srcDir = fileConf.SrcDir();

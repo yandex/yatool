@@ -109,7 +109,7 @@ struct TIncFixer: public TDirectPeerdirsVisitor<TIFixEntryStats, TIFixStData> {
         TModuleRestorer restorer({Conf, Graph, Modules}, moduleIterator->Node());
         TModule& module = *restorer.RestoreModule();
 
-        TModuleResolver modRes(module, Conf, MakeModuleResolveContext(module, Conf, Graph, UpdIter, IncParserManager.Cache));
+        TModuleResolver modRes(module, Conf, MakeModuleResolveContext(module, Conf, Graph, UpdIter, IncParserManager.Cache()));
         // modRes.Resolver().MutableOptionsWithClear().NoFS = true;
 
         auto emitConfigureError = [&](const TStringBuf& s) {

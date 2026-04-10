@@ -51,17 +51,6 @@ struct TFileProcessContext {
 };
 
 class TIncParserManager {
-private:
-    THashMap<TString, TParserBaseRef> Ext2Parser;
-    TVector<TParserBaseRef> ParsersByType;
-    const TBuildConfiguration& Conf;
-    TSymbols& Names;
-    TString ExtForDefaultParser;
-
-public:
-    TParsersCache Cache;
-    mutable NStats::TIncParserManagerStats Stats{"Parsing stats"};
-
 public:
     explicit TIncParserManager(const TBuildConfiguration& conf, TSymbols& names);
     void InitManager(const TParsersList& parsersList); // must be called after loading graph from cache (uses id's for Graph)
@@ -75,27 +64,41 @@ public:
                                TAddDepAdaptor& node,
                                const TSymbols& names,
                                const TAddIterStack& stack) const;
-    void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type);
     bool HasParserFor(TStringBuf fileName) const;
     bool HasParserFor(TFileView fileName) const;
-    TParserBase* GetParserFor(TStringBuf fileName) const;
     TParserBase* GetParserFor(TFileView fileName) const;
     inline TParserBase* GetParserByType(EIncludesParserType parserType) const {
         Y_ASSERT(parserType < EIncludesParserType::PARSERS_COUNT);
-        return ParsersByType[static_cast<ui32>(parserType)].Get();
+        return ParsersByType_[static_cast<ui32>(parserType)].Get();
     }
     void SetDefaultParserSameAsFor(TFileView fileName);
     void ResetDefaultParser() {
-        ExtForDefaultParser.clear();
+        ExtForDefaultParser_.clear();
     }
 
     const TIndDepsRule* IndDepsRuleByPath(const TStringBuf& path) const;
     const TIndDepsRule* IndDepsRuleByPath(TFileView path) const;
-    const TIndDepsRule* IndDepsRuleByExt(const TStringBuf& path) const;
+
+    const TParsersCache& Cache() const noexcept {return Cache_;}
+    TParsersCache& Cache() noexcept {return Cache_;}
+
+    const NStats::TIncParserManagerStats& Stats() const noexcept {return Stats_;}
 
 private:
+    void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type);
+    const TIndDepsRule* IndDepsRuleByExt(const TStringBuf& ext) const;
+    TParserBase* GetParserFor(TStringBuf fileName) const;
     TParserBase* ParserByExt(const TStringBuf& ext) const;
     TStringBuf ExtPreprocess(TStringBuf ext,
                              const TSymbols& names,
                              const TAddIterStack& stack) const;
+
+private:
+    TParsersCache Cache_;
+    mutable NStats::TIncParserManagerStats Stats_{"Parsing stats"};
+    THashMap<TString, TParserBaseRef> Ext2Parser_;
+    TVector<TParserBaseRef> ParsersByType_;
+    const TBuildConfiguration& Conf_;
+    TSymbols& Names_;
+    TString ExtForDefaultParser_;
 };

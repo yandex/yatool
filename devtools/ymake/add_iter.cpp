@@ -713,8 +713,8 @@ void TDGIterAddable::RepeatResolving(TYMake& ymake, TAddIterStack& stack, TFileH
             node.NodeType = Node.NodeType;
             node.ElemId = Node.ElemId;
 
-            const auto fileName = Graph.GetFileName(Node.NodeType, Node.ElemId).GetTargetStr();
-            const auto depRule = ymake.IncParserManager.IndDepsRuleByPath(fileName);
+            const auto file = Graph.GetFileName(Node.NodeType, Node.ElemId);
+            const auto depRule = ymake.IncParserManager.IndDepsRuleByPath(file);
             TAddDepContext nodeCtx(node, *module, Graph, ymake, *ymake.UpdIter, depRule);
             InduceDeps(nodeCtx, TPropertiesCacheWrapper(*ptr));
         } else {

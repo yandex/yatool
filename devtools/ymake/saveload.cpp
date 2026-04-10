@@ -361,14 +361,14 @@ namespace {
             auto parsesCacheBuilder = MakeHolder<TMultiBlobBuilder>();
             if (SaveFsCacheOnly) {
                 // Symbols table was compacted, we have to fix fileIds
-                YMake.IncParserManager.Cache.RemapKeys([this](ui64 oldId) {
+                YMake.IncParserManager.Cache().RemapKeys([this](ui64 oldId) {
                     auto fileId = NParsersCache::GetFileIdFromResultId(oldId);
                     TFileView name = YMake.Names.FileConf.GetName(fileId);
                     fileId = CompactSymbols.FileConf.Add(name.GetTargetStr());
                     return NParsersCache::GetResultId(NParsersCache::GetParserIdFromResultId(oldId), fileId);
                 });
             }
-            YMake.IncParserManager.Cache.Save(*parsesCacheBuilder);
+            YMake.IncParserManager.Cache().Save(*parsesCacheBuilder);
             Writer.AddBlob(parsesCacheBuilder.Release());
             Stats.Set(NStats::EInternalCacheSaverStats::ParsersCacheSize, GetLastSavedSize());
         }
@@ -589,7 +589,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         }
         if (cacheReader.HasNextBlob()) {
             TDebugTimer timer("inc parser manager");
-            IncParserManager.Cache.Load(cacheReader.GetNextBlob());
+            IncParserManager.Cache().Load(cacheReader.GetNextBlob());
         } else {
             return false;
         }
@@ -942,7 +942,7 @@ void TYMake::Save(const TFsPath& file, bool delayed) {
         Conf.OnDepsCacheSaved();
     }
 
-    IncParserManager.Cache.Clear();
+    IncParserManager.Cache().Clear();
 }
 
 void TYMake::Compact() {
