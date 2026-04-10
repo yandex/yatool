@@ -45,7 +45,7 @@ void TGraphChangesPredictor::AnalyzeChanges() {
         if (parser != nullptr && parser->GetParserId().GetType() != EIncludesParserType::EmptyParser)
         {
             auto fileContent = FileConf_.GetFileByName(fileView);
-            if (IncParserManager_.HasIncludeChanges(*fileContent, parser)) {
+            if (parser->HasIncludeChanges(*fileContent)) {
                 HasChanges_ = true;
                 YDebug() << "Graph has structural changes because " << change.Name << " file has includes changes" << Endl;
                 return;

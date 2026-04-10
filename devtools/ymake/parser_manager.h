@@ -68,7 +68,6 @@ public:
     void AddParsers(const TParsersList& parsersList);
 
     void ProcessFile(TFileContentHolder& incFile, TFileProcessContext context) const;
-    bool HasIncludeChanges(TFileContentHolder& incFile, const TParserBase* parser) const;
     void ProcessFileWithSubst(TFileContentHolder& incFile, TFileProcessContext context) const;
     bool ProcessOutputIncludes(TFileView outputFileName,
                                const TVector<TString>& includes,

@@ -318,13 +318,6 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
     }
 }
 
-bool TIncParserManager::HasIncludeChanges(TFileContentHolder& incFile, const TParserBase* parser) const {
-    if (parser) {
-        return parser->HasIncludeChanges(incFile);
-    }
-    return false;
-}
-
 bool TIncParserManager::ProcessOutputIncludes(TFileView outputFileName,
                                               const TVector<TString>& includes,
                                               TModuleWrapper& module,
