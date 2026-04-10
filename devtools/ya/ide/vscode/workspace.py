@@ -329,6 +329,8 @@ def gen_pyrightconfig(params, srcdirs, extraPaths, excludes):
             except Exception as e:
                 ide_common.emit_message(f"[[warn]]Failed to read existing config[[rst]]: {e!r}")
         ide_common.emit_message(f"Writing {path}")
+        if params.python_type_checking_mode:
+            config["typeCheckingMode"] = params.python_type_checking_mode
         with open(path, "w") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
 
