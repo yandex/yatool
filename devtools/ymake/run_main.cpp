@@ -145,7 +145,7 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
 
         const TOptsParseResult res(&opts, value.size(), const_cast<const char**>(value.data()));
 
-        // Create writer as early as possible to notify readers on destruction.
+        // Create writer as early as possible to notify readers on FinalizeConfig.
         conf.ForeignTargetWriter = pipeline.CreateWriter(conf);
 
         // This calls FORCE_TRACE(U, NEvent::TStageStated("ymake run")); after tracing initialization
@@ -174,6 +174,7 @@ asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyIn
     }
 
     Y_DEFER {
+        pipeline.FinalizeConfig(conf);
         conf.ClearPlugins();
     };
 
