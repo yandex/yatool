@@ -5,10 +5,10 @@ LICENSE(Apache-2.0)
 VERSION(v1.79.1)
 
 SRCS(
-    attributes.go
+    weight.go
 )
 
-GO_XTEST_SRCS(attributes_test.go)
+GO_XTEST_SRCS(weight_test.go)
 
 END()
 
