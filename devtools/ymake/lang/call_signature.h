@@ -98,27 +98,27 @@ public:
         return ArgNames_;
     }
 
-    bool HasKeyword(TStringBuf arg) const {
+    bool HasKeyword(TStringBuf arg) const noexcept {
         return std::ranges::binary_search(Keywords_, arg, std::less<>{}, &std::pair<TString, TKeyword>::first);
     }
     bool IsNonPositional() const {
         return !Keywords_.empty();
     }
-    size_t GetKeyArgsNum() const {
+    size_t GetKeyArgsNum() const noexcept {
         return Keywords_.size();
     }
     const TVector<std::pair<TString, TKeyword>>& GetKeywords() const noexcept {
         return Keywords_;
     }
-    const TString& GetKeyword(size_t arrNum) const {
+    const TString& GetKeyword(size_t arrNum) const noexcept {
         Y_ASSERT(arrNum < Keywords_.size());
         return Keywords_[arrNum].first;
     }
-    const TKeyword& GetKeywordData(size_t arrNum) const {
+    const TKeyword& GetKeywordData(size_t arrNum) const noexcept {
         Y_ASSERT(arrNum < Keywords_.size());
         return Keywords_[arrNum].second;
     }
-    const TKeyword* GetKeywordData(TStringBuf name) const {
+    const TKeyword* GetKeywordData(TStringBuf name) const noexcept {
         const auto [first, last] = std::ranges::equal_range(Keywords_, name, std::less<>{}, &std::pair<TString, TKeyword>::first);
         return first != last ? &first->second : nullptr;
     }
