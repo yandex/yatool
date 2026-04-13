@@ -54,5 +54,3 @@ def with_display_log(app_ctx, level, replacements):
         root.removeHandler(handler)
 
     root.addHandler(display_handler)
-
-    yield

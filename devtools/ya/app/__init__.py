@@ -418,10 +418,10 @@ def configure_showstack():
     import signal
 
     if hasattr(signal, "SIGUSR1"):
-        for x in showstack.configure_show_stack_on_signal(signal.SIGUSR1):
-            yield x
+        with showstack.configure_show_stack_on_signal(signal.SIGUSR1):
+            yield
     else:
-        yield None
+        yield
 
 
 def configure_lifecycle_timestamps():
@@ -454,15 +454,14 @@ def configure_null_log(app_ctx):
 def configure_file_log(app_ctx):
     from yalibrary.loggers import file_log
 
-    for x in file_log.with_file_log(devtools.ya.core.config.logs_root(), app_ctx.uid):
-        yield x
+    yield file_log.with_file_log(devtools.ya.core.config.logs_root(), app_ctx.uid)
 
 
 def configure_changelist_store(app_ctx):
     from devtools.ya.yalibrary.build_graph_cache import changelist_storage
 
     if getattr(app_ctx.params, "build_graph_cache_force_local_cl", False):
-        for x in changelist_storage.with_changelist_storage(devtools.ya.core.config.logs_root(), app_ctx.uid):
+        with changelist_storage.with_changelist_storage(devtools.ya.core.config.logs_root(), app_ctx.uid) as x:
             yield x
     else:
         yield
@@ -474,23 +473,22 @@ def configure_in_memory_log(app_ctx, level=None):
 
     level = level or logger.level()
 
-    for x in in_memory_log.with_in_memory_log(level):
-        yield x
+    yield in_memory_log.with_in_memory_log(level)
 
 
 def configure_custom_file_log(app_ctx):
     from yalibrary.loggers import file_log
 
-    for x in file_log.with_custom_file_log(app_ctx, app_ctx.params, app_ctx.hide_token):
-        yield x
+    file_log.with_custom_file_log(app_ctx, app_ctx.params, app_ctx.hide_token)
+    yield
 
 
 def configure_display_log(app_ctx):
     from yalibrary.loggers import display_log
     from devtools.ya.core import logger  # XXX
 
-    for x in display_log.with_display_log(app_ctx, logger.level(), app_ctx.hide_token):
-        yield x
+    display_log.with_display_log(app_ctx, logger.level(), app_ctx.hide_token)
+    yield
 
 
 def configure_profiler_support(ctx):

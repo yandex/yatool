@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import threading
 import traceback
 import sys
@@ -18,6 +19,7 @@ def format_stack(my_frame):
     return out.getvalue()
 
 
+@contextmanager
 def configure_show_stack_on_signal(sig):
     def sig_handler(sig, frame):
         sys.stderr.write(format_stack(frame))

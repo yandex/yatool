@@ -30,4 +30,4 @@ def with_in_memory_log(level):
         handler.setLevel(level)
 
     root.addHandler(handler)
-    yield handler
+    return handler

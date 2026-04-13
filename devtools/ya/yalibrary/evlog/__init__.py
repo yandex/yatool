@@ -1,4 +1,5 @@
 import contextlib
+from contextlib import contextmanager
 import datetime
 import io
 import logging
@@ -320,6 +321,7 @@ class EvlogFacade(BaseEvlogFacade):
                 logging.debug("While analysing %s:", _dir, exc_info=sys.exc_info())
 
 
+@contextmanager
 def with_evlog(params, evlog_dir, hide_token):
     filename = getattr(params, 'evlog_file', None)
     compress_evlog = getattr(params, 'compress_evlog', True)

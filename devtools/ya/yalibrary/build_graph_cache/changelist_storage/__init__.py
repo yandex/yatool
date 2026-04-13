@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import os
 import uuid
 
@@ -8,6 +9,7 @@ _UUID_LENGTH = 6
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
 def with_changelist_storage(log_dir, run_uid):
     now = file_log.log_creation_time(run_uid)
 

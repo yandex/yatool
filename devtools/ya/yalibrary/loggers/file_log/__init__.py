@@ -147,7 +147,7 @@ def with_file_log(log_dir, run_uid):
     file_name = os.path.join(log_chunk, format_time(now) + '.' + run_uid + '.log')
     root.addHandler(_file_logger(file_name))
 
-    yield file_name
+    return file_name
 
 
 def with_custom_file_log(ctx, params, replacements):
@@ -165,8 +165,6 @@ def with_custom_file_log(ctx, params, replacements):
 
     in_memory_handler.close()
     root.removeHandler(in_memory_handler)
-
-    yield
 
 
 def _file_logger(log_file, loglevel=logging.DEBUG, replacements=None):
