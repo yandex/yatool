@@ -12,6 +12,8 @@ DEFAULT_DATE = '1970-01-01T00:00:00'
 
 
 class VcsInfo(object):
+    _require_slow = False
+
     def __init__(self, arcadia_root, force_vcs_info_update=False):
         self._arcadia_root = arcadia_root
         self._force_vcs_info_update = force_vcs_info_update
@@ -23,7 +25,12 @@ class VcsInfo(object):
         return format(str(self), spec)
 
     def __call__(self):
-        return self.calc(vcsversion.VcsInfo(self._arcadia_root).get_info(raise_on_failure=self._force_vcs_info_update))
+        return self.calc(
+            vcsversion.VcsInfo(self._arcadia_root).get_info(
+                require_slow=self._require_slow or self._force_vcs_info_update,
+                raise_on_failure=self._force_vcs_info_update,
+            )
+        )
 
     def calc(self, info):
         raise NotImplementedError
@@ -48,6 +55,8 @@ class RevisionDate(VcsInfo):
 
 
 class SvnRevision(VcsInfo):
+    _require_slow = True
+
     def calc(self, info):
         # type: (dict) -> object
         return info.get('svn_commit_revision', UNDEFINED)
