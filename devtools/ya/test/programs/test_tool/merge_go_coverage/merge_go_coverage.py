@@ -42,10 +42,10 @@ def merge_coverage(params):
         exts.archive.extract_from_tar(coverage_path, dirname)
         cov_dirs.append(dirname)
         # Test with retries rename coverage files by add _0,_1 ... to names
-        # But Go tool covdata check filenames and ignore renamed files
-        # Here rename files to original namesfor covdata
-        # (covmeta.* file names based on segments and may repeated on few retries,
-        # and will be overwrited by this renaming, but no segments will be lost)
+        # But Go tool covdata checks filenames and ignores renamed files
+        # Here we rename files to original names for covdata
+        # (covmeta.* file names based on segments and may be repeated on few retries,
+        # and will be overwritten by this renaming, but no segments will be lost)
         for path, _, files in os.walk(dirname):
             for file in files:
                 renamed_file = re.sub(r'_\d(?=[^\d]|$)', '', file)
