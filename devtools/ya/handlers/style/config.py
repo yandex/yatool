@@ -129,8 +129,10 @@ class AutoincludeConfig:
         # for now stick to sequential search and the config file existence
         map_ = {}
         for path in self._trie.keys():
-            for config_name in const.LINTER_CONFIG_TYPES[self._linter_name]:
-                config: Path = Path(path) / config_name
+            for config_tuple in const.LINTER_CONFIG_TYPES[self._linter_name]:
+                if len(config_tuple) != 1:
+                    raise AssertionError('Multiple config files are not expected by underlying formatters')
+                config: Path = Path(path) / config_tuple[0]
 
                 if config.exists():
                     map_[path] = Config(config, str(config.relative_to(self._root)))
