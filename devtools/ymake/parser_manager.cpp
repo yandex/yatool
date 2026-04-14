@@ -251,31 +251,29 @@ TIncParserManager::TIncParserManager(const TBuildConfiguration& conf, TSymbols& 
 {
 }
 
-TStringBuf TIncParserManager::ExtPreprocess(TStringBuf ext,
-                                            const TSymbols& names,
-                                            const TAddIterStack& stack) const {
-    if (ext.empty() || !Ext2Parser_.contains(ext)) {
-        Y_ASSERT(stack.size());
-        bool found = false;
-        for (auto stackItem = stack.rbegin() + 1; stackItem != stack.rend(); stackItem++) {
-            if (stackItem->Node.NodeType != EMNT_File && stackItem->Node.NodeType != EMNT_NonParsedFile || stackItem->Dep.DepType != EDT_Include) {
-                break;
-            }
-            Y_ASSERT(UseFileId(stackItem->Node.NodeType));
-            TFileView pName = names.FileNameById(stackItem->Node.ElemId);
-            TStringBuf newExt = pName.Extension();
-            if (Ext2Parser_.contains(newExt)) {
-                ext = newExt;
-                found = true;
-                break;
-            }
+TParserBase* TIncParserManager::FindSuitableParser(
+    TStringBuf path,
+    const TSymbols& names,
+    const TAddIterStack& stack
+) const {
+    auto ext = NPath::Extension(path);
+    auto* parser = ParserByExt(ext);
+    if (parser)
+        return parser;
+
+    Y_ASSERT(!stack.empty());
+    for (auto stackItem = stack.rbegin() + 1; stackItem != stack.rend(); stackItem++) {
+        if (stackItem->Node.NodeType != EMNT_File && stackItem->Node.NodeType != EMNT_NonParsedFile || stackItem->Dep.DepType != EDT_Include) {
+            break;
         }
-        if (!found) {
-            ext = ExtForDefaultParser_;
-        }
+        Y_ASSERT(UseFileId(stackItem->Node.NodeType));
+        const TFileView pName = names.FileNameById(stackItem->Node.ElemId);
+        TStringBuf newExt = pName.Extension();
+        if (parser = ParserByExt(newExt))
+            return parser;
     }
 
-    return ext;
+    return ParserByExt(ExtForDefaultParser_);
 }
 
 void TIncParserManager::ProcessFileWithSubst(TFileContentHolder& incFile, TFileProcessContext context) const {
@@ -293,17 +291,17 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
         return;
     }
 
-    TStringBuf ext = incFile.GetName().Extension();
-    TModuleWrapper wrapper(context.Module, context.Conf, context.ModuleResolveContext);
-
-    if (ext == "in") {
+    TStringBuf file = incFile.GetName().Basename();
+    if (incFile.GetName().Extension() == "in") {
         ProcessFileWithSubst(incFile, context);
-        ext = NPath::Extension(incFile.GetName().NoExtension()); // e.g. x.cpp.in -> x.cpp, ext=cpp
+        file = incFile.GetName().NoExtension(); // e.g. x.cpp.in -> x.cpp, ext=cpp
     }
-    ext = ExtPreprocess(ext, context.ModuleResolveContext.Graph.Names(), context.Stack);
 
-    if (TParserBase* parser = ParserByExt(ext)) {
+    TParserBase* parser = FindSuitableParser(file, context.ModuleResolveContext.Graph.Names(), context.Stack);
+
+    if (parser) {
         parser->DepsTransferRules().ApplyNodeFlags(context.ModuleResolveContext.Graph.GetFileNodeData(incFile.GetTargetId()));
+        TModuleWrapper wrapper(context.Module, context.Conf, context.ModuleResolveContext);
 
         const auto start = Now();
         if (parser->ParseIncludes(context.Node, wrapper, incFile)) {
@@ -324,8 +322,7 @@ bool TIncParserManager::ProcessOutputIncludes(TFileView outputFileName,
                                               TAddDepAdaptor& node,
                                               const TSymbols& names,
                                               const TAddIterStack& stack) const {
-    TStringBuf ext = ExtPreprocess(outputFileName.Extension(), names, stack);
-    TParserBase* parser = ParserByExt(ext);
+    TParserBase* parser = FindSuitableParser(outputFileName.Basename(), names, stack);
     if (parser) {
         return parser->ProcessOutputIncludes(node, module, outputFileName, includes);
     } else {
@@ -401,17 +398,13 @@ TParserBase* TIncParserManager::ParserByExt(const TStringBuf& ext) const {
     return nullptr;
 }
 
-const TIndDepsRule* TIncParserManager::IndDepsRuleByExt(const TStringBuf& ext) const {
-    if (TParserBase* pb = ParserByExt(ext)) {
+const TIndDepsRule* TIncParserManager::IndDepsRuleByPath(const TStringBuf& path) const {
+    if (TParserBase* pb = GetParserFor(path)) {
         return &pb->DepsTransferRules();
     }
     return nullptr;
 }
 
-const TIndDepsRule* TIncParserManager::IndDepsRuleByPath(const TStringBuf& path) const {
-    return IndDepsRuleByExt(NPath::Extension(path));
-}
-
 const TIndDepsRule* TIncParserManager::IndDepsRuleByPath(TFileView path) const {
-    return IndDepsRuleByExt(path.Extension());
+    return IndDepsRuleByPath(path.GetTargetStr());
 }

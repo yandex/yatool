@@ -86,12 +86,9 @@ public:
 
 private:
     void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type);
-    const TIndDepsRule* IndDepsRuleByExt(const TStringBuf& ext) const;
     TParserBase* GetParserFor(TStringBuf fileName) const;
     TParserBase* ParserByExt(const TStringBuf& ext) const;
-    TStringBuf ExtPreprocess(TStringBuf ext,
-                             const TSymbols& names,
-                             const TAddIterStack& stack) const;
+    TParserBase* FindSuitableParser(TStringBuf path, const TSymbols& names, const TAddIterStack& stack) const;
 
 private:
     TParsersCache Cache_;
