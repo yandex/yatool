@@ -214,6 +214,12 @@ inline TStringBuf Extension(TStringBuf path) {
     return path;
 }
 
+inline TStringBuf AllExtensions(TStringBuf path) {
+    path = Basename(path);
+    const size_t dot = path.find('.');
+    return dot < path.size() ? TStringBuf{path, dot + 1, TStringBuf::npos} : TStringBuf{};
+}
+
 inline TStringBuf BasenameWithoutExtension(TStringBuf path) {
     size_t dot = path.rfind('.');
     size_t slash = path.rfind(PATH_SEP);
