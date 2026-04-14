@@ -73,7 +73,7 @@ public:
     }
     void SetDefaultParserSameAsFor(TFileView fileName);
     void ResetDefaultParser() {
-        ExtForDefaultParser_.clear();
+        DefaultParser_ = nullptr;
     }
 
     const TIndDepsRule* IndDepsRuleByPath(const TStringBuf& path) const;
@@ -87,8 +87,8 @@ public:
 private:
     void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type);
     TParserBase* GetParserFor(TStringBuf fileName) const;
-    TParserBase* ParserByExt(const TStringBuf& ext) const;
-    TParserBase* FindSuitableParser(TStringBuf path, const TSymbols& names, const TAddIterStack& stack) const;
+    TParserBase* FindOrInheritParser(TStringBuf path, const TSymbols& names, const TAddIterStack& stack) const;
+    TParserBase* FindParser(TStringBuf path) const;
 
 private:
     TParsersCache Cache_;
@@ -97,5 +97,5 @@ private:
     TVector<TParserBaseRef> ParsersByType_;
     const TBuildConfiguration& Conf_;
     TSymbols& Names_;
-    TString ExtForDefaultParser_;
+    TParserBase* DefaultParser_ = nullptr;
 };

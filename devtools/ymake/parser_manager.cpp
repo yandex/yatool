@@ -251,14 +251,12 @@ TIncParserManager::TIncParserManager(const TBuildConfiguration& conf, TSymbols& 
 {
 }
 
-TParserBase* TIncParserManager::FindSuitableParser(
+TParserBase* TIncParserManager::FindOrInheritParser(
     TStringBuf path,
     const TSymbols& names,
     const TAddIterStack& stack
 ) const {
-    auto ext = NPath::Extension(path);
-    auto* parser = ParserByExt(ext);
-    if (parser)
+    if (auto* parser = FindParser(path))
         return parser;
 
     Y_ASSERT(!stack.empty());
@@ -268,12 +266,11 @@ TParserBase* TIncParserManager::FindSuitableParser(
         }
         Y_ASSERT(UseFileId(stackItem->Node.NodeType));
         const TFileView pName = names.FileNameById(stackItem->Node.ElemId);
-        TStringBuf newExt = pName.Extension();
-        if (parser = ParserByExt(newExt))
+        if (auto* parser = FindParser(pName.Basename()))
             return parser;
     }
 
-    return ParserByExt(ExtForDefaultParser_);
+    return DefaultParser_;
 }
 
 void TIncParserManager::ProcessFileWithSubst(TFileContentHolder& incFile, TFileProcessContext context) const {
@@ -297,7 +294,7 @@ void TIncParserManager::ProcessFile(TFileContentHolder& incFile, TFileProcessCon
         file = incFile.GetName().NoExtension(); // e.g. x.cpp.in -> x.cpp, ext=cpp
     }
 
-    TParserBase* parser = FindSuitableParser(file, context.ModuleResolveContext.Graph.Names(), context.Stack);
+    TParserBase* parser = FindOrInheritParser(file, context.ModuleResolveContext.Graph.Names(), context.Stack);
 
     if (parser) {
         parser->DepsTransferRules().ApplyNodeFlags(context.ModuleResolveContext.Graph.GetFileNodeData(incFile.GetTargetId()));
@@ -322,7 +319,7 @@ bool TIncParserManager::ProcessOutputIncludes(TFileView outputFileName,
                                               TAddDepAdaptor& node,
                                               const TSymbols& names,
                                               const TAddIterStack& stack) const {
-    TParserBase* parser = FindSuitableParser(outputFileName.Basename(), names, stack);
+    TParserBase* parser = FindOrInheritParser(outputFileName.Basename(), names, stack);
     if (parser) {
         return parser->ProcessOutputIncludes(node, module, outputFileName, includes);
     } else {
@@ -357,11 +354,10 @@ bool TIncParserManager::HasParserFor(TFileView fileName) const {
 }
 
 TParserBase* TIncParserManager::GetParserFor(TStringBuf fileName) const {
-    TStringBuf ext = NPath::Extension(fileName);
-    if (ext == "in"sv) {
-        ext = NPath::Extension(NPath::NoExtension(fileName));
-    }
-    return ParserByExt(ext);
+    if (NPath::Extension(fileName) == "in"sv)
+        fileName = NPath::NoExtension(fileName);
+
+    return FindParser(fileName);
 }
 
 TParserBase* TIncParserManager::GetParserFor(TFileView fileName) const {
@@ -369,7 +365,7 @@ TParserBase* TIncParserManager::GetParserFor(TFileView fileName) const {
 }
 
 void TIncParserManager::SetDefaultParserSameAsFor(TFileView fileName) {
-    ExtForDefaultParser_ = fileName.Extension();
+    DefaultParser_ = FindParser(fileName.Basename());
 }
 
 void TIncParserManager::InitManager(const TParsersList& parsersList) {
@@ -391,13 +387,6 @@ void TIncParserManager::InitManager(const TParsersList& parsersList) {
     AddParsers(parsersList);
 }
 
-TParserBase* TIncParserManager::ParserByExt(const TStringBuf& ext) const {
-    if (const TParserBaseRef* p = Ext2Parser_.FindPtr(ext)) {
-        return p->Get();
-    }
-    return nullptr;
-}
-
 const TIndDepsRule* TIncParserManager::IndDepsRuleByPath(const TStringBuf& path) const {
     if (TParserBase* pb = GetParserFor(path)) {
         return &pb->DepsTransferRules();
@@ -407,4 +396,12 @@ const TIndDepsRule* TIncParserManager::IndDepsRuleByPath(const TStringBuf& path)
 
 const TIndDepsRule* TIncParserManager::IndDepsRuleByPath(TFileView path) const {
     return IndDepsRuleByPath(path.GetTargetStr());
+}
+
+TParserBase* TIncParserManager::FindParser(TStringBuf path) const {
+    const auto ext = NPath::Extension(path);
+    if (const TParserBaseRef* p = Ext2Parser_.FindPtr(ext)) {
+        return p->Get();
+    }
+    return nullptr;
 }
