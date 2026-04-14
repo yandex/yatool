@@ -210,8 +210,11 @@ namespace {
                 throw yexception() << " Unable to read json tree from " << Path;
             }
 
-            auto changesArray = parsedJson.GetArraySafe().front().GetMapSafe().at("names").GetArraySafe();
-            for (const auto& element : changesArray) {
+            auto changesValue = parsedJson.GetValueByPath("[0].names");
+            if (!changesValue) {
+                throw yexception() << "Incorrect structure of changelist file " << Path;
+            }
+            for (const auto& element : changesValue->GetArraySafe()) {
                 auto change = element.GetMapSafe();
                 auto changePath = change.at("path").GetStringSafe();
                 auto changeType = GetChangeType(change.at("status").GetStringSafe());
