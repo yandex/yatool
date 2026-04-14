@@ -7,6 +7,7 @@
 #include <devtools/ymake/conf.h>
 #include <devtools/ymake/config/config.h>
 #include <devtools/ymake/lang/confreader.h>
+#include <devtools/ymake/saveload.h>
 
 #include <library/cpp/digest/md5/md5.h>
 
@@ -155,6 +156,24 @@ namespace NConfReader {
             }
             YDebug() << "Conf cache has been loaded..." << Endl;
         } else {
+            if (status != ELoadStatus::DoesNotExist) {
+                auto reason = TCacheFileReader::ERejectCacheReason::ERCR_Unknown;
+                switch (status) {
+                    case ELoadStatus::UnknownFormat:
+                    case ELoadStatus::VersionMismatch:
+                        reason = TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat;
+                        break;
+                    case ELoadStatus::ConfigurationChanged:
+                        reason = TCacheFileReader::ERejectCacheReason::ERCR_ChangedConfig;
+                        break;
+                    case ELoadStatus::UnhandledException:
+                        reason = TCacheFileReader::ERejectCacheReason::ERCR_Exception;
+                        break;
+                    default:
+                        break;
+                }
+                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedConfCache, reason);
+            }
             conf.ClearYmakeConfig();
             YDebug() << "Conf cache has not been loaded (reason: " << status << ")..." << Endl;
         }

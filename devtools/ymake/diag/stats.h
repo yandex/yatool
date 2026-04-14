@@ -11,6 +11,20 @@
 #include <util/system/yassert.h>
 
 namespace NStats {
+    #define MON_NAME(index) #index
+
+    static const TString MonName_UsedConfCache = MON_NAME(EYmakeStats::UsedConfCache);
+    static const TString MonName_UsedFSCache = MON_NAME(EYmakeStats::UsedFSCache);
+    static const TString MonName_UsedDepsCache = MON_NAME(EYmakeStats::UsedDepsCache);
+    static const TString MonName_UsedJSONCache = MON_NAME(EYmakeStats::UsedJSONCache);
+    static const TString MonName_UsedUidsCache = MON_NAME(EYmakeStats::UsedUidsCache);
+
+    static const TString MonName_RejectedConfCache = MON_NAME(EYmakeStats::RejectedConfCache);
+    static const TString MonName_RejectedFSCache = MON_NAME(EYmakeStats::RejectedFSCache);
+    static const TString MonName_RejectedDepsCache = MON_NAME(EYmakeStats::RejectedDepsCache);
+    static const TString MonName_RejectedJSONCache = MON_NAME(EYmakeStats::RejectedJSONCache);
+    static const TString MonName_RejectedUidsCache = MON_NAME(EYmakeStats::RejectedUidsCache);
+
     class TStatsBase {
     protected:
         void Report() const;
@@ -119,7 +133,6 @@ namespace NStats {
 
     #define INT_MON_EVENT(index) IntMonEvent(index, #index)
     #define BOOL_MON_EVENT(index) BoolMonEvent(index, #index)
-    #define MON_NAME(index) #index
 
     using TModulesStats = TStats<EModulesStats>;
     using TMakeCommandStats = TStats<EMakeCommandStats>;

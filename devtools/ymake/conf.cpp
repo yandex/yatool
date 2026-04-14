@@ -3,6 +3,7 @@
 #include "sysincl_conf.h"
 #include "licenses_conf.h"
 #include "autoincludes_conf.h"
+#include "saveload.h"
 
 #include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/lang/confreader_cache.h>
@@ -152,21 +153,26 @@ void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
     Y_ASSERT(!GetFromCache());
 
     bool fromCache = false;
+    if (!ReadConfCache) {
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedConfCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
+    }
     if (ReadConfCache && LoadCache(*this, confMd5) == ELoadStatus::Success) {
         updateConfCacheFlags();
         // call to updateConfCacheFlag() may change the value of ReadConfCache
         if (ReadConfCache) {
             fromCache = true;
         } else {
+            // Conf cache manual disabled by conf var
+            TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedConfCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
             ClearYmakeConfig();
         }
     }
     Y_ASSERT(GetFromCache() == fromCache);
 
     if (fromCache) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedConfCache), true);
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedConfCache, true);
     } else {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedConfCache), false);
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedConfCache, false);
         MD5 tempConfData;
         NYMake::TTraceStage stage("Load configuration (no cache)");
         LoadConfig(YmakeConf.GetPath(), SourceRoot.GetPath(), BuildRoot.GetPath(), tempConfData);

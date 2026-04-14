@@ -469,6 +469,7 @@ TMakePlanCache::~TMakePlanCache()
 
 bool TMakePlanCache::LoadFromFile() {
     if (!LoadFromCache) {
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedJSONCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
         return false;
     }
 
@@ -479,7 +480,9 @@ bool TMakePlanCache::LoadFromFile() {
     NYMake::TTraceStage stage{"Load JSON cache"};
 
     TCacheFileReader cacheReader(Conf, false, false, JsonConfHash);
-    if (cacheReader.Read(CachePath) != TCacheFileReader::EReadResult::Success) {
+    auto readResult = cacheReader.Read(CachePath);
+    if (readResult != TCacheFileReader::EReadResult::Success) {
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedJSONCache, readResult);
         return false;
     }
 

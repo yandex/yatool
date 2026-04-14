@@ -146,6 +146,11 @@ namespace NStats {
         UsedJSONCache /* "Used JSON cache, bool" */,
         UsedUidsCache /* "Used Uids cache, bool" */,
         BadLoops /* "Bad loops were detected, bool" */,
+        RejectedConfCache /* "Rejected Conf cache, int" */,
+        RejectedFSCache /* "Rejected FS cache, int" */,
+        RejectedDepsCache /* "Rejected Deps cache, int" */,
+        RejectedJSONCache /* "Rejected JSON cache, int" */,
+        RejectedUidsCache /* "Rejected Uids cache, int" */,
     };
 
     enum class EStackDepthStats {

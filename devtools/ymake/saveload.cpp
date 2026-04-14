@@ -443,6 +443,31 @@ bool TCacheFileReader::HasNextBlob() const {
     return SubBlobsIt != SubBlobs.Get()->end();
 }
 
+void TCacheFileReader::RejectedMonEvent(const TString& cacheName, EReadResult result) {
+    switch (result) {
+        case EReadResult::Success:
+            // Cache sucessfully loaded, not rejected
+            break;
+        case EReadResult::Exception:
+            NStats::TStatsBase::MonEvent(cacheName, ERejectCacheReason::ERCR_Exception);
+            break;
+        case EReadResult::IncompatibleFormat:
+            NStats::TStatsBase::MonEvent(cacheName, ERejectCacheReason::ERCR_IncompatibleFormat);
+            break;
+        case EReadResult::UpdatedBinary:
+            NStats::TStatsBase::MonEvent(cacheName, ERejectCacheReason::ERCR_UpdatedBinary);
+            break;
+        case EReadResult::ChangedConfig:
+        case EReadResult::ChangedExtraConfig:
+            NStats::TStatsBase::MonEvent(cacheName, ERejectCacheReason::ERCR_ChangedConfig);
+            break;
+    }
+}
+
+void TCacheFileReader::RejectedMonEvent(const TString& cacheName, ERejectCacheReason reason) {
+    NStats::TStatsBase::MonEvent(cacheName, reason);
+}
+
 TCacheFileReader::EReadResult TCacheFileReader::CheckVersionInfo() {
     TSubBlobs& blobs = *SubBlobs.Get();
 
@@ -594,6 +619,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             TDebugTimer timer("inc parser manager");
             IncParserManager.Cache().Load(cacheReader.GetNextBlob());
         } else {
+            TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedFSCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
             return false;
         }
         return true;
@@ -653,13 +679,20 @@ bool TYMake::LoadImpl(const TFsPath& file) {
                 PrevStartTargets_.emplace_back(Graph.GetFileNodeById(cached.ElemId_).Id(), cached.AllFlags_);
             }
         } else {
+            TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
             return false;
         }
         return true;
     };
 
     bool loadFsCache = Conf.ReadFsCache;
+    if (!loadFsCache) {
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedFSCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
+    }
     bool loadDepsCache = Conf.ReadDepsCache;
+    if (!loadDepsCache) {
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
+    }
     const char* info = nullptr;
     switch (readResult) {
         case TCacheFileReader::Success:
@@ -676,24 +709,42 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             break;
         case TCacheFileReader::IncompatibleFormat:
             info = "Incompatible ymake.cache format, graph will be rebuilt...";
-            loadFsCache = false;
-            loadDepsCache = false;
+            if (loadFsCache) {
+                loadFsCache = false;
+                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedFSCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
+            }
+            if (loadDepsCache) {
+                loadDepsCache = false;
+                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
+            }
             break;
         case TCacheFileReader::ChangedConfig:
             info = "Config has changed, graph will be rebuilt...";
-            loadDepsCache = false;
+            if (loadDepsCache) {
+                loadDepsCache = false;
+                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_ChangedConfig);
+            }
             break;
         case TCacheFileReader::UpdatedBinary:
             if (forceLoad) {
                 info = "Current ymake binary and cache may be not compatible.";
             } else {
                 info = "Updated ymake binary, graph will be rebuilt...";
-                loadDepsCache = false;
+                if (loadDepsCache) {
+                    loadDepsCache = false;
+                    TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_UpdatedBinary);
+                }
             }
             break;
         default:
-            loadFsCache = false;
-            loadDepsCache = false;
+            if (loadFsCache) {
+                loadFsCache = false;
+                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_Unknown);
+            }
+            if (loadDepsCache) {
+                loadDepsCache = false;
+                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_Unknown);
+            }
     }
 
     if (info != nullptr) {
@@ -775,9 +826,14 @@ bool TYMake::LoadPatch() {
 
 bool TYMake::LoadUids(TUidsCachable* cachable) {
     if (!Conf.ReadUidsCache) {
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedUidsCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
         return false;
     }
-    return UidsCacheLoaded_ = TryLoadUids(cachable);
+    UidsCacheLoaded_ = TryLoadUids(cachable);
+    if (!UidsCacheLoaded_ && Conf.YmakeUidsCache.Exists()) {
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedUidsCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
+    }
+    return UidsCacheLoaded_;
 }
 
 TCacheFileReader::EReadResult TYMake::LoadDependencyManagementCache(const TFsPath& cacheFile) {
@@ -1082,17 +1138,17 @@ void TYMake::JSONCacheLoaded(bool jsonCacheLoaded) {
 
 void TYMake::FSCacheMonEvent() const {
     if (FSCacheLoaded_) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedFSCache), true); // loaded OK
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedFSCache, true); // loaded OK
     } else if (Conf.ReadFsCache) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedFSCache), false); // enabled, but not loaded
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedFSCache, false); // enabled, but not loaded
     }
 }
 
 void TYMake::DepsCacheMonEvent() const {
     if (DepsCacheLoaded_) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedDepsCache), true); // loaded OK
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedDepsCache, true); // loaded OK
     } else if (Conf.ReadDepsCache) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedDepsCache), false); // enabled, but not loaded
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedDepsCache, false); // enabled, but not loaded
     }
 }
 
@@ -1104,16 +1160,16 @@ void TYMake::GraphChangesPredictionEvent() const {
 
 void TYMake::JSONCacheMonEvent() const {
     if (JSONCacheLoaded_) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedJSONCache), true); // loaded OK
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedJSONCache, true); // loaded OK
     } else  if (Conf.ReadJsonCache) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedJSONCache), false); // enabled, but not loaded
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedJSONCache, false); // enabled, but not loaded
     }
 }
 
 void TYMake::UidsCacheMonEvent() const {
     if (UidsCacheLoaded_) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), true); // loaded OK
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedUidsCache, true); // loaded OK
     } else  if (Conf.ReadUidsCache) {
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::UsedUidsCache), false); // enabled, but not loaded
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedUidsCache, false); // enabled, but not loaded
     }
 }

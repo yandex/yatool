@@ -40,6 +40,15 @@ public:
     };
     using enum EReadResult;
 
+    enum ERejectCacheReason: ui64 {
+        ERCR_Unknown            = 0,
+        ERCR_ManualDisabled     = 1, // cache load manual disabled
+        ERCR_Exception          = 2, // exception during read cache file
+        ERCR_IncompatibleFormat = 3, // cache has previous version or file corrupted
+        ERCR_UpdatedBinary      = 4, // ymake binary updated
+        ERCR_ChangedConfig      = 5, // some core.conf files changed
+    };
+
     TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, bool useExtraConf, TConfHash confHash = DefaultConfHash, TConfHash extraConf = ExtraConfHash);
 
     EReadResult Read(const TFsPath& file);
@@ -47,6 +56,8 @@ public:
     bool HasNextBlob() const;
     TBlob& GetNextBlob();
 
+    static void RejectedMonEvent(const TString& cacheName, EReadResult result); // send monitoring event about reject cache by EReadResult
+    static void RejectedMonEvent(const TString& cacheName, ERejectCacheReason reason); // send monitoring event about reject cache
 private:
     EReadResult CheckVersionInfo();
 };
