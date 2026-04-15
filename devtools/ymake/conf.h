@@ -51,7 +51,7 @@ public:
     TMaybe<std::underlying_type_t<EConfMsgType>> WarnLevel;
 
     THashMap<TString, TFsPath> CustomDataGen;
-    TParsersList ParserPlugins;
+    TUserParsersList ParserPlugins;
 
     TVector<TFsPath> Plugins;
     THashMap<TString, THashSet<TString>> PluginDeps;

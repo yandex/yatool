@@ -338,7 +338,7 @@ void TIncParserManager::AddParser(TParserBaseRef parser, const TVector<TString>&
     }
 }
 
-void TIncParserManager::AddParsers(const TParsersList& parsersList) {
+void TIncParserManager::AddParsers(const TUserParsersList& parsersList) {
     for (const auto& [parser, extensions] : parsersList) {
         parser->RegisterIndDepsRule(Names_);
         AddParser(parser, extensions, EIncludesParserType::EmptyParser);
@@ -368,7 +368,7 @@ void TIncParserManager::SetDefaultParserSameAsFor(TFileView fileName) {
     DefaultParser_ = FindParser(fileName.Basename());
 }
 
-void TIncParserManager::InitManager(const TParsersList& parsersList) {
+void TIncParserManager::InitManager(const TUserParsersList& parsersList) {
     TVarsEvaluator evaluator(Conf_);
     auto* cache = &Cache_;
 

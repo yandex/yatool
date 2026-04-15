@@ -55,7 +55,7 @@ void TMacroFacade::Clear() {
     Name2Macro_.clear();
 }
 
-class TParserAdapter: public TParserBase {
+class TParserAdapter: public TUserParserBase {
 private:
     TSimpleSharedPtr<TParser> Parser_;
     TIndDepsRule Rule_;

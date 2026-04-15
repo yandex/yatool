@@ -26,7 +26,6 @@ public:
     TIncludeProcessorBase() noexcept = default;
     virtual ~TIncludeProcessorBase() noexcept = default;
 
-    virtual void RegisterIndDepsRule(TSymbols&) {}
     virtual void ProcessOutputIncludes(TAddDepAdaptor& node,
                                        TModuleWrapper& module,
                                        TFileView incFileName,
@@ -96,7 +95,6 @@ public:
     virtual const TIndDepsRule& DepsTransferRules() const = 0;
     virtual void SetLanguageId(TLangId) {};
     virtual void SetParserType(EIncludesParserType) {};
-    virtual void RegisterIndDepsRule(TSymbols&){};
     virtual ~TParserBase() = default;
 
     TParserId GetParserId() const { return ParserId; }
@@ -109,8 +107,19 @@ private:
     TParserId ParserId;
 };
 
+// Interface for user provided parsers implemented in build configuration rather than in
+// tho core part of the build system.
+// User provided parsers has some limitations and require different setup in the parser
+// creation pipeline. This intermediate abstract class extends base interface with necessary
+// customization points.
+class TUserParserBase: public TParserBase {
+public:
+    virtual void RegisterIndDepsRule(TSymbols&) = 0;
+};
+
 using TParserBaseRef = TSimpleSharedPtr<TParserBase>;
-using TParsersList = TVector<std::pair<TParserBaseRef /*parser*/, TVector<TString> /*extensions*/>>;
+using TUserParserBaseRef = TSimpleSharedPtr<TUserParserBase>;
+using TUserParsersList = TVector<std::pair<TUserParserBaseRef /*parser*/, TVector<TString> /*extensions*/>>;
 
 class TEvaluatorBase {
 public:

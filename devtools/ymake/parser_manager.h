@@ -53,8 +53,8 @@ struct TFileProcessContext {
 class TIncParserManager {
 public:
     explicit TIncParserManager(const TBuildConfiguration& conf, TSymbols& names);
-    void InitManager(const TParsersList& parsersList); // must be called after loading graph from cache (uses id's for Graph)
-    void AddParsers(const TParsersList& parsersList);
+    void InitManager(const TUserParsersList& parsersList); // must be called after loading graph from cache (uses id's for Graph)
+    void AddParsers(const TUserParsersList& parsersList);
 
     void ProcessFile(TFileContentHolder& incFile, TFileProcessContext context) const;
     void ProcessFileWithSubst(TFileContentHolder& incFile, TFileProcessContext context) const;
