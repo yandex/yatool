@@ -181,7 +181,7 @@ class ArcInfo(VCSData):
         except Exception:
             logger.debug('Incorrect date format %s for date %s', t_pattern, info['date'])
 
-        info['svn_commit_revision'] = int(self.revision)
+        info['svn_commit_revision'] = int(info.get('revision', 0)) or int(self.revision)
         info['scm_text'] = self._format_scm_data(info)
         info['vcs'] = 'arc'
 
