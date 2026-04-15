@@ -8,8 +8,7 @@ import traceback
 import collections
 
 import exts.fs
-import exts.tmp
-
+from library.python import tmp
 import devtools.ya.test.const
 import devtools.ya.test.explore
 import devtools.ya.test.filter as test_filter
@@ -191,7 +190,7 @@ def main():
         else:
             python_dirs.add(p)
     tools.append_python_paths(env, python_dirs, overwrite=True)
-    with exts.tmp.environment(env):
+    with tmp.environment(env):
         try:
             if options.is_skipped:
                 tests = []

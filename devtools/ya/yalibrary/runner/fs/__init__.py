@@ -4,7 +4,7 @@ import os.path
 import filecmp
 
 import exts.fs
-import exts.windows
+from library.python import windows
 import six
 from six.moves import xrange
 
@@ -102,7 +102,7 @@ def make_hardlink(target, link, retries=10, prepare=False):
     raise RuntimeError('Invalid state')
 
 
-@exts.windows.win_disabled
+@windows.win_disabled
 def make_symlink(target, link, prepare=True, warn_is_file=True, compare_file=False):
     assert target and link
 

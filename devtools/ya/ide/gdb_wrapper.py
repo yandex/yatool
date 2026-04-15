@@ -15,7 +15,7 @@ import devtools.ya.core.yarg
 import yalibrary.tools
 import exts.fs
 import exts.process
-import exts.windows
+from library.python import windows
 import devtools.ya.ide.ide_common
 
 logger = logging.getLogger(__name__)
@@ -206,7 +206,7 @@ def run_proc_slave(cmd, sysin_mod=None, procout_mod=None, procerr_mod=None, alwa
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         bufsize=0,
-        close_fds=exts.windows.on_win(),
+        close_fds=windows.on_win(),
     )
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGTERM, signal.SIG_IGN)

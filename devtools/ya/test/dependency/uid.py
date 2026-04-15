@@ -2,12 +2,10 @@ import os
 import base64
 import logging
 
-import exts.func
-import exts.tmp
-import exts.uniq_id
 from . import testdeps
 from devtools.ya.core.imprint import imprint
 import devtools.ya.test.const as const
+from library.python import func, tmp, unique_id
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +86,12 @@ class TestUidGenerator(object):
         return imprint.combine_imprints(*imprint_parts)
 
 
-@exts.func.memoize()
+@func.memoize()
 def get_robot_canons_dloader_key_path(arc_root):
     key = "ROBOT_CANONS_DLOADER_SSH_KEY"
     if key in os.environ:
         logging.info("Using key from env['%s']", key)
-        path = exts.tmp.create_temp_file()
+        path = tmp.create_temp_file()
         with open(path, "w") as f:
             f.write(base64.b64decode(os.environ[key].strip()).strip())
         os.chmod(path, 0o644)
@@ -125,4 +123,4 @@ def get_test_node_uid(params, prefix=None):
 
 
 def get_random_uid(prefix=None):
-    return const.UID_PREFIX_DELIMITER.join([_f for _f in ["rnd", prefix, exts.uniq_id.gen16()] if _f])
+    return const.UID_PREFIX_DELIMITER.join([_f for _f in ["rnd", prefix, unique_id.gen16()] if _f])

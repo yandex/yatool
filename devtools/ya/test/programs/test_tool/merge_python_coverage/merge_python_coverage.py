@@ -7,8 +7,7 @@ import argparse
 import coverage
 
 import exts.archive
-import exts.tmp
-import exts.uniq_id
+from library.python import unique_id
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 
 
@@ -25,7 +24,7 @@ def merge_coverage(params):
     cov_files = []
 
     for archive_path in params.coverage_paths:
-        dirname = exts.uniq_id.gen32()
+        dirname = unique_id.gen32()
         assert not os.path.exists(dirname)
         exts.archive.extract_from_tar(archive_path, dirname)
         for filename in os.listdir(dirname):

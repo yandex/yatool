@@ -6,7 +6,7 @@ import multiprocessing
 
 from six import iteritems
 
-from exts import func
+from library.python import func
 
 logger = logging.getLogger(__name__)
 

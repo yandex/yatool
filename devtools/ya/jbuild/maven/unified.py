@@ -7,7 +7,7 @@ import logging
 import base64
 
 import exts.fs as fs
-import exts.tmp as tmp
+from library.python import tmp
 import exts.hashing as hashing
 import yalibrary.makelists as ml
 import yalibrary.makelists.macro_definitions as md

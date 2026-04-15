@@ -13,7 +13,7 @@ from yalibrary.debug_store.processor._common import pretty_date
 from yalibrary.debug_store.processor.html_generator import HTMLGenerator
 from exts import yjson
 import exts.fs
-import exts.windows
+from library.python import windows
 import yalibrary.evlog as evlog_lib
 
 
@@ -96,7 +96,7 @@ class BaseDumpItem:
     @staticmethod
     def _check_executable(path):
         # type: (Path) -> bool
-        if exts.windows.on_win():
+        if windows.on_win():
             # os.access didn't work properly on Windows
             return path.name.endswith(".exe")
         else:

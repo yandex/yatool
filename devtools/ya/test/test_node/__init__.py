@@ -29,13 +29,8 @@ from . import fuzzing
 from . import sandbox as sandbox_node
 
 import exts.fs
-import exts.func
 import exts.os2
-import exts.strings
 import exts.timer
-import exts.uniq_id
-import exts.windows
-
 import devtools.ya.test.canon.data as canon_data
 import devtools.ya.test.common as test_common
 from devtools.ya.test.test_types.common import AbstractTestSuite
@@ -46,6 +41,9 @@ import devtools.ya.test.system.env as sysenv
 import devtools.ya.test.test_types.fuzz_test as fuzz_test
 import devtools.ya.test.util.shared as util_shared
 import devtools.ya.test.util.tools as util_tools
+from library.python import func
+from library.python import strings
+from library.python import windows
 
 import yalibrary.last_failed.last_failed as last_failed
 import yalibrary.upload.consts
@@ -72,7 +70,7 @@ class _DependencyException(Exception):
     pass
 
 
-@exts.func.lazy
+@func.lazy
 def get_mds_storage(storage_root):
     return mds_storage.MdsStorage(storage_root)
 
@@ -461,7 +459,7 @@ def create_test_node(
         runner_cmd += ["--same-process-group"]
         runner_cmd += ["--test-stderr"]
 
-    if exts.windows.on_win():
+    if windows.on_win():
         gdb_require = False
     else:
         gdb_require = True
@@ -1419,7 +1417,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         ]
 
     # XXX
-    if not exts.windows.on_win():
+    if not windows.on_win():
         cmd += ["--gdb-path", "$(GDB)/gdb/bin/gdb"]
 
     if opts.keep_temps:
@@ -2428,7 +2426,7 @@ def inject_test_checkout_node(graph, tests, arc_root, opts=None):
             if p.startswith(devtools.ya.test.const.CORPUS_DATA_ROOT_DIR):
                 arcadia_weak_dirs.append(p)
             elif p.startswith(arcadia):
-                arcadia_dirs.append(exts.strings.left_strip(p, arcadia))
+                arcadia_dirs.append(strings.left_strip(p, arcadia))
             else:
                 arcadia_dirs.append(p)
 

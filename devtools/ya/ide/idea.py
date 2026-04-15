@@ -4,7 +4,7 @@ import os
 import logging
 import json
 
-import exts.tmp as tmp
+from library.python import tmp
 
 import devtools.ya.jbuild.gen.consts as consts
 import devtools.ya.jbuild.gen.actions.idea as idea

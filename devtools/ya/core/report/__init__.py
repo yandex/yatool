@@ -10,9 +10,9 @@ import json
 
 import six
 
-from exts import func
 from exts import flatten
-from exts import strings
+from library.python import func
+from library.python import strings
 from devtools.ya.core import config
 from devtools.ya.core import gsid
 from devtools.ya.core import sec

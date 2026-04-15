@@ -11,12 +11,7 @@ import time
 
 import six
 
-import exts.func
-import exts.windows
-
 from exts import archive
-from exts import uniq_id
-from exts import filelock
 from exts import fs
 
 from yalibrary import formatter
@@ -25,6 +20,10 @@ from yalibrary.runner import worker_threads
 
 from devtools.libs.limits.python import limits
 import devtools.libs.acdigest.python as acdigest
+import library.python.func as func
+import library.python.windows as windows
+import library.python.unique_id as uniq_id
+import library.python.filelock as filelock
 
 STAMP_FILE = 'STAMP'
 CONTENT_HASH_FILE_NAME = '.content_hash.md5'  # deprecated
@@ -105,7 +104,7 @@ class BuildRoot(object):
         if dir_outputs:
             self._dir_outputs = [x.replace('$(BUILD_ROOT)', path) for x in dir_outputs]
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def dir_outputs_files(self):
         dir_output_files = []
         empty_dirs = []
@@ -265,7 +264,7 @@ class BuildRoot(object):
             if (
                 not os.path.exists(dir_output)
                 and dir_output_archive_path is not None
-                and exts.archive.is_archive_type(dir_output_archive_path)
+                and archive.is_archive_type(dir_output_archive_path)
             ):
                 archive.extract_from_tar(dir_output_archive_path, dir_output)
 
@@ -274,7 +273,7 @@ class BuildRoot(object):
             self._outputs.append(real_dir_output)
             self._original_outputs.append(real_dir_output.replace(self.path, "$(BUILD_ROOT)"))
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def dir_outputs_archive_map(self):
         dir_outputs_archive_map = {}
         for dir_out in self._dir_outputs:
@@ -503,7 +502,7 @@ class BuildRootSet(object):
                 acquired = self._flock.acquire(blocking=False)
                 if acquired:
                     logger.debug('Removing root %s', self._build_root)
-                    if exts.windows.on_win():
+                    if windows.on_win():
                         fs.remove_tree_safe(self._build_root)
                     else:
                         try:

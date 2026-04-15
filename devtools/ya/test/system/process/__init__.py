@@ -5,7 +5,7 @@ import subprocess
 import six
 import yatest.common
 import exts.process
-import exts.windows
+from library.python import windows
 from yatest.common import TimeoutError, ExecutionError, ExecutionTimeoutError, SignalInterruptionError, wait_for  # noqa
 
 
@@ -30,7 +30,7 @@ def execute(
     collect_cores = False
     check_sanitizer = False
     preexec_fn = None
-    if create_new_process_group and exts.windows.on_win():
+    if create_new_process_group and windows.on_win():
         creationflags |= subprocess.CREATE_NEW_PROCESS_GROUP
         create_new_process_group = False
     if create_new_process_group or stdout_to_stderr:

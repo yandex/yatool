@@ -8,6 +8,7 @@ import re
 import exts.archive
 from yatest.common import process
 from library.python.testing import coverage_utils
+from library.python import unique_id
 
 
 def get_options():
@@ -37,7 +38,7 @@ def resolve_go_tool(path, binname):
 def merge_coverage(params):
     cov_dirs = []
     for coverage_path in params.coverage_paths:
-        dirname = exts.uniq_id.gen32()
+        dirname = unique_id.gen32()
         assert not os.path.exists(dirname)
         exts.archive.extract_from_tar(coverage_path, dirname)
         cov_dirs.append(dirname)

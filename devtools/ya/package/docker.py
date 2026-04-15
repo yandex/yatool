@@ -7,7 +7,6 @@ import requests
 
 import exts.archive
 import exts.fs
-import exts.tmp
 import exts.yjson as json
 
 import package.source
@@ -15,6 +14,7 @@ import package.fs_util
 import package.process
 
 from devtools.ya.package import const
+from library.python import tmp
 
 logger = logging.getLogger(__name__)
 PackageInfo = collections.namedtuple('PackageInfo', ['image_tag', 'digest'])
@@ -183,7 +183,7 @@ def create_package(
                 headers={'Content-Type': 'application/json'},
                 data=json.dumps(data),
             )
-    with exts.tmp.temp_dir() as temp_dir:
+    with tmp.temp_dir() as temp_dir:
         base_result_name = package_context.resolve_filename(extra={"pattern": "{package_name}.{package_version}"})
         out_file = os.path.join(temp_dir, "build_docker_package.out.txt")
         with open(out_file, "w") as f:

@@ -10,7 +10,7 @@ import devtools.ya.build.ya_make
 import devtools.ya.core.common_opts
 import devtools.ya.core.event_handling
 import devtools.ya.core.yarg as yarg
-import exts.tmp
+from library.python import tmp
 
 import devtools.ya.app
 
@@ -148,7 +148,7 @@ def run(params):
 
     bin_rel_path = _get_bin_rel_path(app_ctx, graph, opts.rel_targets[0])
 
-    with exts.tmp.temp_dir() as output_root:
+    with tmp.temp_dir() as output_root:
         opts.output_root = output_root
 
         _build(opts, app_ctx, graph)

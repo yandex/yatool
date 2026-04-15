@@ -5,8 +5,8 @@ import shutil
 import six
 
 import exts.fs
-import exts.tmp
 
+import library.python.tmp as tmp
 import library.python.archive as archive
 from library.python.archive import (  # noqa
     GZIP,
@@ -55,7 +55,7 @@ def create_tar(
     if isinstance(paths, six.string_types):
         # (path, arcname)
         paths = [(paths, ".")]
-    with exts.tmp.temp_dir(dir=work_dir) as temp_dir:
+    with tmp.temp_dir(dir=work_dir) as temp_dir:
         temp_tar_path = os.path.join(temp_dir, os.path.basename(tar_file_path))
         archive.tar(
             paths, temp_tar_path, compression_filter, compression_level, fixed_mtime, onerror, postprocess, dereference

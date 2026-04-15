@@ -13,7 +13,6 @@ import coverage.results
 import ujson as json
 
 import exts.fs
-import exts.func
 import exts.archive
 from devtools.ya.test.programs.test_tool.lib import runtime
 from devtools.ya.test.util import shared

@@ -9,7 +9,7 @@ import devtools.ya.core.config
 import yalibrary.fetcher.tool_chain_fetcher
 import yalibrary.platform_matcher as pm
 from yalibrary.toolscache import toolscache_version
-from exts import func
+from library.python import func
 import exts.path2
 import devtools.libs.yaplatform.python.platform_map as platform_map
 

@@ -5,7 +5,7 @@ import xml.dom.minidom
 import six
 
 import exts.fs
-import exts.tmp
+import library.python.tmp as tmp
 
 
 class QxmlError(Exception):
@@ -120,7 +120,7 @@ def from_qxml_tree(tree):
 
 def save(path, data, root, doctype=None, comment=None):
     tree = to_qxml_tree(data, root)
-    with exts.tmp.temp_path(path + '.tmp') as tmp_path:
+    with tmp.temp_path(path + '.tmp') as tmp_path:
         with codecs.open(tmp_path, 'wb', encoding='utf-8', errors='replace') as f:
             f.write(u'<?xml version="1.0" encoding="UTF-8"?>\n')
             if doctype:

@@ -15,7 +15,7 @@ import devtools.ya.core.yarg
 import exts.fs
 import exts.hashing
 import exts.process
-from exts.windows import on_win
+from library.python.windows import on_win
 import yalibrary.makelists
 import yalibrary.makelists.macro_definitions
 import yalibrary.makelists.mk_common

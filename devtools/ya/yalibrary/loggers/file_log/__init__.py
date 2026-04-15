@@ -7,8 +7,8 @@ import six
 import sys
 
 from exts import fs
-from exts import func
-from exts import windows
+from library.python import func
+from library.python import windows
 from exts.compress import UCompressor
 
 if not windows.on_win():

@@ -30,7 +30,7 @@ from devtools.ya.build.dir_graph import reachable, gen_dir_graph
 from devtools.ya.build.compilation_database import dump_compilation_database, COMPILATION_DATABASE_OPTS
 
 from exts.strtobool import strtobool
-from exts.tmp import temp_dir
+from library.python.tmp import temp_dir
 from devtools.ya.core.yarg import (
     CompositeHandler,
     OptsHandler,

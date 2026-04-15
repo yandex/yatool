@@ -7,7 +7,7 @@ import collections
 
 from six import iteritems
 
-from exts import func
+from library.python import func
 from exts import fs
 
 logger = logging.getLogger(__name__)

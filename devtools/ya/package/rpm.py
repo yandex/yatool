@@ -3,7 +3,6 @@ import re
 
 import exts.archive
 import exts.fs
-import exts.tmp
 import exts.os2
 import exts.path2
 

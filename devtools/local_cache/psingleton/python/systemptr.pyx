@@ -1,5 +1,5 @@
 import cython
-import exts.func
+from library.python import func 
 from util.generic.maybe cimport TMaybe
 from util.generic.string cimport TString
 from util.system.types cimport i32, i64
@@ -59,7 +59,7 @@ def get_server_info(lock_file, log_file=None, non_blocking=False, fresh=False):
     return (name.GetPid(), name.GetStartTime(), name.ToGrpcAddress().decode())
 
 
-@exts.func.memoize()
+@func.memoize()
 def get_my_name():
     cdef TProcessUID name = GetMyName()
     return (name.GetPid(), name.GetStartTime())

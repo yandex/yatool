@@ -9,7 +9,8 @@ from copy import deepcopy
 
 import exts.yjson as json
 import yalibrary.fetcher.progress_info as progress_info_lib
-from exts import fs, func
+from exts import fs
+from library.python import func
 from yalibrary import guards
 from yalibrary import platform_matcher
 from yalibrary import toolscache

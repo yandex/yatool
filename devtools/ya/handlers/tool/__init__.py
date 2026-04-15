@@ -32,7 +32,7 @@ from yalibrary.platform_matcher import is_darwin_rosetta
 import devtools.ya.core.config
 import devtools.ya.core.respawn
 import exts.process
-import exts.windows
+from library.python import windows
 import exts.asyncthread
 
 logger = logging.getLogger(__name__)
@@ -190,7 +190,7 @@ def do_tool(params):
     )
     tool_path = tool_getter()
 
-    if exts.windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
+    if windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
         logger.debug('Rename tool for win: %s', tool_path)
         tool_path += '.exe'
 

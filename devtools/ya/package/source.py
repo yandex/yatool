@@ -10,8 +10,7 @@ import path as pathlib
 import exts.archive
 import exts.path2
 import exts.fs
-import exts.tmp
-
+from library.python import tmp
 from pathlib2 import PurePath
 
 import package
@@ -466,7 +465,7 @@ class BuildOutputSource(Source):
             if not exts.archive.check_archive(source):
                 raise YaPackageSourceException("{} does not seem to be a correct archive to be untared".format(source))
 
-            with exts.tmp.temp_dir() as tmp_dir:
+            with tmp.temp_dir() as tmp_dir:
                 extract_dir = os.path.join(tmp_dir, "extracted")
                 exts.fs.ensure_dir(extract_dir)
                 exts.archive.extract_from_tar(source, extract_dir)
@@ -535,7 +534,7 @@ class InlineFileSource(Source):
     def _prepare(self):
         destination = os.path.join(self.result_dir, self.destination_path())
         content = self.data['source']['content'].format(**self._formaters)
-        with exts.tmp.temp_file() as source:
+        with tmp.temp_file() as source:
             with codecs.open(source, "w", encoding="utf-8") as f:
                 f.write(content)
             self.copy(source, destination)

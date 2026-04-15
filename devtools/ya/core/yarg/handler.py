@@ -10,7 +10,7 @@ from collections import defaultdict
 import devtools.ya.core.yarg
 import devtools.ya.core.report
 
-import exts.strings
+from library.python import strings
 import exts.yjson as json
 
 from six import iteritems
@@ -395,7 +395,7 @@ class OptsHandler(BaseHandler):
         try:
             OptsHandler._latest_handled_prefix = prefix
             handler = {
-                'args': [exts.strings.to_unicode(arg, exts.strings.guess_default_encoding()) for arg in args],
+                'args': [strings.to_unicode(arg, strings.guess_default_encoding()) for arg in args],
                 'prefix': prefix,
             }
 

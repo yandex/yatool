@@ -8,14 +8,13 @@ import traceback
 
 import devtools.ya.core.error
 import exts.archive
-import exts.func
 import exts.fs
-import exts.windows
 import devtools.ya.test.common as test_common
 import devtools.ya.test.const
 from yalibrary import platform_matcher
 from exts.limiter import Limiter
 from library.python import strings
+from library.python import func
 
 import app_config
 
@@ -65,7 +64,7 @@ class BaseTestSuiteRunResult(object):
     def target_platform_descriptor(self):
         raise NotImplementedError
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def trace_report_path(self):
         raise NotImplementedError
 
@@ -75,59 +74,59 @@ class TestPackedResultView(BaseTestSuiteRunResult):
         super(TestPackedResultView, self).__init__()
         self._output_dir = out_dir
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def exit_code(self):
         return self._meta['exit_code']
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def elapsed(self):
         return self._meta['elapsed']
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def test_timeout(self):
         return self._meta['test_timeout']
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def trace_report_path(self):
         return self._output_path(devtools.ya.test.const.TRACE_FILE_NAME)
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def stderr(self):
         return exts.fs.read_file_unicode(self._output_path('stderr'), binary=True)
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def stdout(self):
         return exts.fs.read_file_unicode(self._output_path('stdout'), binary=True)
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def suite_name(self):
         return self._meta['name']
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def suite_project_path(self):
         return self._meta['project']
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def test_size(self):
         return self._meta.get('test_size', devtools.ya.test.const.TestSize.Small)
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def test_tags(self):
         return self._meta.get('test_tags', [])
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def target_platform_descriptor(self):
         return self._meta.get("target_platform_descriptor", "")
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def multi_target_platform_run(self):
         return self._meta.get("multi_target_platform_run", False)
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def suite_type(self):
         return self._meta['test_type']
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def suite_ci_type(self):
         return self._meta['test_ci_type']
 
@@ -137,7 +136,7 @@ class TestPackedResultView(BaseTestSuiteRunResult):
     def get_output_dir(self):
         return self._output_dir
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def _meta(self):
         with open(self._output_path('meta.json')) as fp:
             return test_common.strings_to_utf8(json.load(fp=fp))

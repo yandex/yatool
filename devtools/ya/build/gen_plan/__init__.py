@@ -1,10 +1,8 @@
 import base64
 import copy
 
-import exts.func
 import exts.yjson as json
 import exts.asyncthread as core_async
-import exts.windows
 import exts.hashing as hashing
 import getpass
 import logging
@@ -22,6 +20,8 @@ from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 import yalibrary.tools as tools
 import devtools.ya.core.config as config
 import devtools.ya.core.patch_tools as patch_tools
+import library.python.func as func
+import library.python.windows as windows
 
 logger = logging.getLogger(__name__)
 TRUNK_PATH = '/arc/trunk/arcadia'
@@ -187,9 +187,9 @@ def _gen_arc_graph_file(opts):
     return _gen_graph_file(opts, gen_extra_dict_by_opts(opts))
 
 
-@exts.func.memoize()
+@func.memoize()
 def get_ya_bin_resource(arc_root, platform):
-    ya_path = os.path.join(arc_root, 'ya.bat' if exts.windows.on_win() else 'ya')
+    ya_path = os.path.join(arc_root, 'ya.bat' if windows.on_win() else 'ya')
     if not os.path.isfile(ya_path):
         logger.debug("ya was not found in {}".format(arc_root))
         return None
@@ -205,7 +205,7 @@ def get_ya_bin_resource(arc_root, platform):
         return None
 
 
-@exts.func.memoize()
+@func.memoize()
 def get_tool_resource(tool_name, platform):
     res_id = tools.resource_id(tool_name, None, platform)
     return '{}-{}'.format(tool_name.upper(), res_id), res_id if res_id else None
@@ -530,7 +530,7 @@ def generate_fetch_from_sandbox_node(uid, res_id, archive, source_root_pattern):
     }
 
 
-@exts.func.memoize()
+@func.memoize()
 def get_fetch_node_for_build_graph_cache(opts):
     if not opts.build_graph_cache_resource:
         return None
@@ -550,7 +550,7 @@ def get_fetch_node_for_build_graph_cache(opts):
     return node, uid, archive
 
 
-@exts.func.memoize()
+@func.memoize()
 def get_fetch_node_for_nodes_statistics(opts):
     if not opts.nodes_stat_resource:
         return None

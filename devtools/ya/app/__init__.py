@@ -22,8 +22,8 @@ import devtools.ya.core.user as user
 import devtools.ya.core.yarg
 import exts.asyncthread
 import exts.os2
-import exts.strings
-import exts.windows
+import library.python.strings as strings
+import library.python.windows as windows
 import devtools.ya.yalibrary.app_ctx
 import yalibrary.find_root
 import yalibrary.vcs as vcs
@@ -903,7 +903,7 @@ def configure_metrics_reporter(ctx):
 
 
 def configure_tmp_dir_interceptor(keep_tmp_dir):
-    from exts import tmp
+    import library.python.tmp as tmp
 
     try:
         tmp.set_tmp_dir(devtools.ya.core.config.tmp_path(), keep_dir=keep_tmp_dir)
@@ -948,9 +948,9 @@ def configure_exit_interceptor(error_file):
         yield
         sys.exit(0)
     except Exception as e:
-        if exts.windows.on_win() and isinstance(e, WindowsError):
+        if windows.on_win() and isinstance(e, WindowsError):
             # Transcode system Windows errors to utf-8
-            from exts.windows import transcode_error
+            from library.python.windows import transcode_error
 
             transcode_error(e)
 
@@ -963,7 +963,7 @@ def configure_exit_interceptor(error_file):
 
             exc_str = six.ensure_str(
                 traceback.format_exc(),
-                encoding=exts.strings.get_stream_encoding(sys.stderr),
+                encoding=strings.get_stream_encoding(sys.stderr),
             )
             sys.stderr.write(exc_str)
 

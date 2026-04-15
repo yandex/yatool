@@ -23,8 +23,7 @@ from devtools.ya.test.util import shared
 import devtools.ya.test.filter as test_filter
 import devtools.ya.test.ios.simctl_control as ios_simctl_control
 import devtools.ya.test.android.android_emulator as android_control
-import exts.uniq_id
-
+from library.python import unique_id
 from yatest.common import cores
 
 logger = logging.getLogger(__name__)
@@ -78,7 +77,7 @@ def setup_logging(verbose):
 
 def get_tests(args):
     if args.ios_app:
-        device_name = "-".join([_f for _f in ["rnd", exts.uniq_id.gen16()] if _f])
+        device_name = "-".join([_f for _f in ["rnd", unique_id.gen16()] if _f])
         ios_simctl_control.prepare(
             args.ios_simctl,
             args.ios_profiles,
@@ -91,7 +90,7 @@ def get_tests(args):
         res = ios_simctl_control.run(args.ios_simctl, args.ios_profiles, os.getcwd(), device_name, ["list"])
         ios_simctl_control.cleanup(args.ios_simctl, args.ios_profiles, os.getcwd(), device_name)
     elif args.android_app:
-        device_name = "-".join([_f for _f in ["rnd", exts.uniq_id.gen16()] if _f])
+        device_name = "-".join([_f for _f in ["rnd", unique_id.gen16()] if _f])
         if args.android_arch not in ('i686', 'x86_64'):
             raise Exception('Only i686 and x86_64 architectures supported for tests run')
         arch = 'x86' if args.android_arch == 'i686' else 'x86_64'
@@ -259,7 +258,7 @@ def run_tests(opts):
         cmd += run_params
 
     if opts.ios_app:
-        device_name = "-".join([_f for _f in ["rnd", exts.uniq_id.gen16()] if _f])
+        device_name = "-".join([_f for _f in ["rnd", unique_id.gen16()] if _f])
         ios_simctl_control.prepare(
             opts.ios_simctl, opts.ios_profiles, os.getcwd(), device_name, cmd[0], opts.ios_device_type, opts.ios_runtime
         )
@@ -278,7 +277,7 @@ def run_tests(opts):
         entry_point = opts.android_activity
         app_name = entry_point.split('/')[0]
         exit_code = 0
-        device_name = "-".join([_f for _f in ["rnd", exts.uniq_id.gen16()] if _f])
+        device_name = "-".join([_f for _f in ["rnd", unique_id.gen16()] if _f])
         device_report_path = '/data/data/{}/files/report.xml'.format(app_name)
         device_log_path = '/data/data/{}/files/log.xml'.format(app_name)
         end_marker = '/data/data/{}/files/ya.end'.format(app_name)

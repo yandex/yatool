@@ -22,7 +22,7 @@ from devtools.ya.test.test_types.common import PerformedTestSuite
 from devtools.ya.test.util import shared
 from yatest_lib import test_splitter
 from exts import fs
-import exts.windows
+from library.python import windows
 import devtools.ya.test.filter as test_filter
 
 logger = logging.getLogger(__name__)
@@ -472,7 +472,7 @@ def colorize_bt(text):
 
 
 def terminate(proc):
-    if not exts.windows.on_win():
+    if not windows.on_win():
         proc.send_signal(signal.SIGQUIT)
         proc.wait()
         return proc.returncode

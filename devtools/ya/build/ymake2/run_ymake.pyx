@@ -15,9 +15,7 @@ import threading
 import time
 
 import exts.yjson as json
-import exts.strings
-
-
+from library.python import strings
 logger = logging.getLogger(__name__)
 
 cdef extern from "devtools/ya/build/ymake2/run_ymake.h":
@@ -62,7 +60,7 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
     cdef TRunYMakeResultPtr res
     cdef CppStringWrapper wrapped_output
 
-    unicode_env = exts.strings.unicodize_deep(env, exts.strings.guess_default_encoding())
+    unicode_env = strings.unicodize_deep(env, strings.guess_default_encoding())
     logger.debug("run: '{0} {1}' with env:\n{2}".format(
         binary,
         ' '.join(args),

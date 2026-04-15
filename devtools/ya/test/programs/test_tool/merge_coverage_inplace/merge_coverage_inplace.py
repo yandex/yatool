@@ -6,7 +6,6 @@ import argparse
 import json
 
 import exts.fs
-import exts.func
 import exts.archive
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 from devtools.ya.test import const

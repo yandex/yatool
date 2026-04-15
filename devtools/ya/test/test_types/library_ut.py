@@ -6,7 +6,7 @@ from typing import List  # noqa: F401
 from typing import Optional  # noqa: F401
 from typing import Union  # noqa: F401
 
-import exts.windows
+from library.python import windows
 import devtools.ya.test.common as test_common
 import devtools.ya.test.const
 from devtools.ya.test.system import process
@@ -126,7 +126,7 @@ class UnitTestSuite(common_types.AbstractTestSuite):
             '--verbose',
         ]
 
-        if not exts.windows.on_win():
+        if not windows.on_win():
             cmd += ["--gdb-path", os.path.join("$(GDB)", "gdb", "bin", "gdb")]
 
         if devtools.ya.test.const.YaTestTags.SequentialRun in self.tags:

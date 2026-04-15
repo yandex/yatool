@@ -28,7 +28,7 @@ import library.python.cores as cores
 from yatest.common import process
 from yatest_lib import test_splitter
 import exts.fs
-import exts.tmp
+from library.python import tmp, windows
 from devtools.ya.test.util import tools, shared
 from devtools.ya.test.common import get_test_log_file_path
 from devtools.ya.test import facility
@@ -249,7 +249,7 @@ def _list_tests_from_binary(
     on_timeout = _make_list_timeout_handler(gdb_path)
 
     try:
-        with exts.tmp.temp_file() as filename:
+        with tmp.temp_file() as filename:
             cmd, cwd, stdin = _build_list_cmd(binary, wine_path, filename)
             process.execute(
                 cmd,
@@ -594,7 +594,7 @@ def shorten_wine_paths(wine_path, cmd):
             tmpdir=tmpdir,
         )
 
-        bat_script_file = exts.tmp.temp_file()
+        bat_script_file = tmp.temp_file()
 
         with open(bat_script_file.path, "w") as f:
             f.write(bat_script)
@@ -673,7 +673,7 @@ def execute_ut(
             join_threads = []
 
             # Each platform provides own implementation of read_stderr_chunk
-            if exts.windows.on_win():
+            if windows.on_win():
                 proc = subprocess.Popen(
                     cmd,
                     stdout=stdout,
@@ -916,7 +916,7 @@ def launch_tests(
     # Dump intermediate status in case postprocessing takes too much time and wrapper get killed (out of smooth shutdown timeout)
     update_trace_file(tracefile, suite, post_process_suite(performed_suite, res.logs, res.rc))
 
-    if res.rc < 0 and not exts.windows.on_win():
+    if res.rc < 0 and not windows.on_win():
         if res.last_test_name:
             entry_name = res.last_test_name
             logger.debug("Trying to recover dump core file for '%s' test", entry_name)

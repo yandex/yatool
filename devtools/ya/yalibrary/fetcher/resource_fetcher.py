@@ -7,7 +7,9 @@ import shutil
 
 import six
 
-from exts import uniq_id, http_client, func
+from exts import http_client
+
+from library.python import unique_id, func
 from exts.hashing import md5_value
 from yalibrary import guards
 from yalibrary import platform_matcher
@@ -241,7 +243,7 @@ def _do_fetch_resource_if_need(
 ):
     def do_install():
         guards.update_guard(guards.GuardTypes.FETCH)
-        filename = 'resource.' + uniq_id.gen8()
+        filename = 'resource.' + unique_id.gen8()
         download_to = os.path.join(result_dir, filename)
         resource_info = downloader(download_to)
         deployer(download_to, resource_info)

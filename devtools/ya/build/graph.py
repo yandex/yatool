@@ -19,16 +19,13 @@ import typing as tp  # noqa
 from itertools import chain
 
 import exts.fs
-import exts.func
 import exts.path2
 import exts.asyncthread as core_async
 import exts.timer
 import exts.yjson as json
 import exts.hashing as hashing
-import exts.func
 from exts.strtobool import strtobool
-import exts.uniq_id
-
+from library.python import unique_id
 import app_config
 import yalibrary.fetcher.tool_chain_fetcher as fetcher
 import yalibrary.tools as tools
@@ -2865,7 +2862,7 @@ def _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver: "_HostTool
         },
     ]
 
-    uid: graph_descr.GraphNodeUid = 'yy-yndex-{}'.format(exts.uniq_id.gen16())
+    uid: graph_descr.GraphNodeUid = 'yy-yndex-{}'.format(unique_id.gen16())
     yndexing_node = {
         'cmds': cmds,
         'kv': {'p': 'YY', 'pc': 'magenta'},

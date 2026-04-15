@@ -4,7 +4,7 @@ import devtools.ya.core.yarg
 import devtools.ya.core.respawn
 import devtools.ya.core.config
 import logging
-from exts.windows import win_path_fix
+from library.python.windows import win_path_fix
 
 logger = logging.getLogger(__name__)
 

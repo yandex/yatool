@@ -9,7 +9,7 @@ import devtools.libs.universal_fetcher.py as universal_fetcher
 import devtools.ya.core.report
 import exts.archive
 import exts.deepget as deepget
-import exts.windows as windows
+from library.python import windows
 import exts.http_client
 import app_config
 

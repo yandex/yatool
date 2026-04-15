@@ -6,7 +6,7 @@ import six
 import sys
 import typing as tp  # noqa
 
-from exts import func
+from library.python import func
 
 logger = logging.getLogger(__name__)
 

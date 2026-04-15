@@ -11,10 +11,8 @@ PY_SRCS(
     decompress.py
     detect_recursive_dict.py
     deepget.py
-    filelock.py
     flatten.py
     fs.py
-    func.py
     hashing.py
     http_client.py
     http_server.py
@@ -22,17 +20,12 @@ PY_SRCS(
     log.py
     os2.py
     path2.py
-    plocker.py
     process.py
     retry.py
     shlex2.py
-    strings.py
     strtobool.py
     timer.py
-    tmp.py
-    uniq_id.py
     which.py
-    windows.py
     yjdump.py
     yjson.py
 )

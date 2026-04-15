@@ -8,10 +8,9 @@ import threading
 import six
 
 import exts.fs
-import exts.func
 import exts.yjson as json
-import exts.windows
-
+import library.python.func as func
+import library.python.windows as windows
 import app_config
 import yalibrary.guards as guards
 import yalibrary.platform_matcher as pm
@@ -33,7 +32,7 @@ class FailedGenerationScript(Exception):
     retriable = False
 
 
-@exts.func.memoize()
+@func.memoize()
 def resolve_system_cxx(cxx_compiler, host, target, c_compiler=None):
     params = {'type': 'system_cxx'}
     if cxx_compiler is not None:
@@ -68,7 +67,7 @@ def is_system(tc):
 def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode_version=False):
     if c_compiler or cxx_compiler:
         res = resolve_system_cxx(cxx_compiler, host, target, c_compiler)
-    elif devtools.ya.core.config.has_mapping() and exts.windows.on_win():
+    elif devtools.ya.core.config.has_mapping() and windows.on_win():
         # XXX for small ya, TODO move to proper place
         res = resolve_system_cxx("cl.exe", host, target)
     else:
@@ -448,11 +447,11 @@ def gen_conf(
     return second_conf, second_conf_digest
 
 
-@exts.func.lazy
+@func.lazy
 def ymake_build_dir():
     return os.path.join('build')
 
 
-@exts.func.lazy
+@func.lazy
 def ymake_build_internal_dir():
     return os.path.join(ymake_build_dir(), 'internal')

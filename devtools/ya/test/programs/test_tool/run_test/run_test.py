@@ -49,12 +49,12 @@ from devtools.ya.test.dependency import sandbox_storage
 
 import exts.archive
 import exts.fs
-import exts.uniq_id
 import devtools.ya.test.common
 import devtools.ya.test.reports
 import devtools.ya.test.result
 import devtools.ya.test.test_types.common
 import devtools.ya.test.util.shared
+from library.python import windows
 
 logger = logging.getLogger(__name__)
 
@@ -1245,7 +1245,7 @@ def main():
     )
 
     startup_delay = get_time_from_node_startup()
-    if options.node_timeout and not exts.windows.on_win():
+    if options.node_timeout and not windows.on_win():
         timeout = options.node_timeout - 10
         if startup_delay:
             stages.set("startup_delay", startup_delay)
@@ -1358,7 +1358,7 @@ def main():
 
         secret.start_test_tool_secret_server(env)
 
-        if options.ram_limit_gb and not exts.windows.on_win():
+        if options.ram_limit_gb and not windows.on_win():
             target_pid = os.getppid() if is_subreaper_set else os.getpid()
             precise_limit = options.ram_limit_gb * 1024**3
             # Take into account tmpfs
@@ -1552,7 +1552,7 @@ def main():
         test_run_dirs = []
         timeout_callback = None
 
-        if options.smooth_shutdown_signals and not exts.windows.on_win():
+        if options.smooth_shutdown_signals and not windows.on_win():
             logger.debug("Wrapper supports %s smooth shutdown signals", options.smooth_shutdown_signals)
 
             def timeout_callback(exec_obj, timeout):  # noqa: F811
@@ -1927,7 +1927,7 @@ def main():
             logger.debug(strip_markup(msg))
         elif exit_code != 0:
             suite_error_status = const.Status.FAIL
-            if exit_code > 0 or exts.windows.on_win():
+            if exit_code > 0 or windows.on_win():
                 suite.add_chunk_error(
                     "[[bad]]Test failed with [[imp]]{}[[bad]] exit code. See logs for more info".format(exit_code),
                     suite_error_status,

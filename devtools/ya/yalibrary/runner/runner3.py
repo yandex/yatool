@@ -17,7 +17,7 @@ import devtools.ya.core.error
 import devtools.ya.core.report
 import exts.yjson as json
 import exts.timer
-import exts.windows
+from library.python import windows
 import devtools.ya.test.const
 import devtools.ya.yalibrary.runner.schedule_strategy as schedule_strategy
 
@@ -580,30 +580,30 @@ class TaskContext(object):
 
     def _init_patterns(self):
         patterns = ptn.Patterns()
-        patterns['SOURCE_ROOT'] = exts.windows.win_path_fix(self._ctx.src_dir)
-        patterns['TOOL_ROOT'] = exts.windows.win_path_fix(self._ctx.res_dir)
-        patterns['RESOURCE_ROOT'] = exts.windows.win_path_fix(self._transient_resource_dir)
+        patterns['SOURCE_ROOT'] = windows.win_path_fix(self._ctx.src_dir)
+        patterns['TOOL_ROOT'] = windows.win_path_fix(self._ctx.res_dir)
+        patterns['RESOURCE_ROOT'] = windows.win_path_fix(self._transient_resource_dir)
 
         if self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path:
             token_path = self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path
-            patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(token_path)
+            patterns['YA_TOKEN_PATH'] = windows.win_path_fix(token_path)
         elif (self.opts.oauth_token or self.opts.sandbox_oauth_token) and self.opts.store_oauth_token:
             token = self.opts.oauth_token or self.opts.sandbox_oauth_token
-            patterns['YA_TOKEN_PATH'] = exts.windows.win_path_fix(
+            patterns['YA_TOKEN_PATH'] = windows.win_path_fix(
                 self._exit_stack.enter_context(self._token_context(token, '.ya_token'))
             )
 
         is_ya_token_present = self.opts.oauth_token_path or (self.opts.oauth_token and self.opts.store_oauth_token)
         if self.opts.docker_config_path:
-            patterns['DOCKER_CONFIG_PATH'] = exts.windows.win_path_fix(self.opts.docker_config_path)
+            patterns['DOCKER_CONFIG_PATH'] = windows.win_path_fix(self.opts.docker_config_path)
         elif is_ya_token_present and 'YA_TOKEN_PATH' in patterns:
             payload = self._get_docker_auth_json_payload(self._read_token_from_file(patterns['YA_TOKEN_PATH']))
-            patterns['DOCKER_CONFIG_PATH'] = exts.windows.win_path_fix(
+            patterns['DOCKER_CONFIG_PATH'] = windows.win_path_fix(
                 self._exit_stack.enter_context(self._token_context(payload, '.docker_auth.json'))
             )
 
         if self.opts.frepkage_root:
-            patterns['FREPKAGE_ROOT'] = exts.windows.win_path_fix(self.opts.frepkage_root)
+            patterns['FREPKAGE_ROOT'] = windows.win_path_fix(self.opts.frepkage_root)
         self.patterns = patterns
 
     @staticmethod
@@ -847,7 +847,7 @@ class Node:
         if self.custom_commands:
             return self.custom_commands(build_root)
         p = self._task_context.patterns.sub()
-        p['BUILD_ROOT'] = exts.windows.win_path_fix(build_root)
+        p['BUILD_ROOT'] = windows.win_path_fix(build_root)
         return self.command_args(build_root, p)
 
     def __str__(self):

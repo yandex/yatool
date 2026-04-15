@@ -6,11 +6,11 @@ import logging
 
 import exts.archive
 import exts.fs
-import exts.tmp
 import exts.os2
 import exts.path2
 import exts.retry
 
+from library.python import tmp
 import devtools.ya.core.yarg
 import package
 import package.debian_uploader as uploader
@@ -121,7 +121,7 @@ def create_debian_package(
     package_version = package_context.version
     full_package_name = '_'.join([package_name, str(package_version)])
 
-    with exts.tmp.temp_dir() as temp_dir:
+    with tmp.temp_dir() as temp_dir:
         new_result_dir = os.path.join(temp_dir, 'result_dir')
 
         # Temporally move prepared_data inside temp_dir

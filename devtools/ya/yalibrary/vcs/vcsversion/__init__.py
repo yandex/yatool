@@ -35,7 +35,7 @@ VCS_INFO_TIMEOUT = 5
 
 
 try:
-    from exts.windows import on_win
+    from library.python.windows import on_win
 except ImportError:
 
     def on_win():

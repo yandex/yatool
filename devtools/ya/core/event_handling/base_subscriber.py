@@ -4,7 +4,7 @@ from abc import ABCMeta
 import logging
 import threading
 
-import exts.func as func
+from library.python import func
 
 logger = logging.getLogger(__name__)
 

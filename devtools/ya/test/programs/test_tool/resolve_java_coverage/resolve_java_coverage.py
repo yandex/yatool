@@ -10,7 +10,7 @@ import collections
 
 import ujson as json
 
-from exts import func
+from library.python import func
 from devtools.ya.test.programs.test_tool.lib import runtime
 from devtools.ya.test.util import shared
 from library.python.testing import coverage_utils as coverage_utils_library

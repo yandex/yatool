@@ -12,12 +12,6 @@ import time
 
 import six
 
-import exts.func
-import exts.fs
-import exts.path2
-import exts.log
-import exts.windows
-import exts.tmp
 import exts.hashing as hashing
 import devtools.ya.test.util.shared
 from devtools.ya.test import facility
@@ -29,6 +23,8 @@ from yatest_lib import external
 import devtools.ya.test.const
 import devtools.ya.test.util.tools
 import build.plugins.lib._metric_resolvers as mr
+import library.python.func as func
+import library.python.windows as windows
 
 ATTRS_TO_STATE_HASH = [
     '_modulo',
@@ -221,7 +217,7 @@ class AbstractTestSuite(facility.Suite):
         """
         raise NotImplementedError
 
-    @exts.func.memoize()
+    @func.memoize()
     def get_suite_id(self):
         """
         Should be used to distinguish suites
@@ -288,7 +284,7 @@ class AbstractTestSuite(facility.Suite):
         else:
             # is binary_path always present here?
             binary = os.path.join(root, self.meta.binary_path)
-        if exts.windows.on_win():
+        if windows.on_win():
             if not binary.endswith('.exe'):
                 yatest_logger.debug('Missed binary .exe suffix')
                 binary += '.exe'
@@ -806,7 +802,7 @@ class AbstractTestSuite(facility.Suite):
     def get_split_params(self):
         return self._modulo, self._modulo_index, self._split_file_name
 
-    @exts.func.memoize()
+    @func.memoize()
     def get_parallel_tests_within_node_workers(self):
         if self.meta.parallel_tests_within_node_workers == "auto":
             return self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 1)

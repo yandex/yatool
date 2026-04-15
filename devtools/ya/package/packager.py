@@ -25,11 +25,12 @@ import devtools.ya.core.stage_tracer as stage_tracer
 import devtools.ya.core.yarg
 import devtools.ya.handlers.package.opts as package_opts
 import devtools.ya.test.opts as test_opts
+import library.python.tmp as tmp
+import library.python.windows as windows
 import exts.fs
 import exts.hashing
 import exts.os2
 import exts.path2
-import exts.tmp
 import exts.yjson as json
 import package
 import package.aar
@@ -463,7 +464,7 @@ def prepare_package(
 
             source_elements.append(element)
     if 'postprocess' in parsed_package:
-        with exts.tmp.temp_dir('ya-package-postprocess') as workspace:
+        with tmp.temp_dir('ya-package-postprocess') as workspace:
             for element in parsed_package['postprocess']:
                 element_type_name = element['source']['type']
                 if element_type_name in POSTPROCESS_ELEMENTS:
@@ -525,7 +526,7 @@ def get_tool_path(name, tool_platform=None):
         )
         return name
 
-    if exts.windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
+    if windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
         logger.debug('Rename tool for win: %s', tool_path)
         tool_path += '.exe'
     return tool_path
@@ -752,7 +753,7 @@ def create_package(package_context, output_root, builds):
 
     files_comparator = package.source.FilesComparator()
 
-    with exts.tmp.temp_dir() as temp_work_dir:
+    with tmp.temp_dir() as temp_work_dir:
         try:
             content_dir = exts.fs.create_dirs(os.path.join(temp_work_dir, '.content'))
 
@@ -1545,7 +1546,7 @@ def do_package(params):
                         package.fs_util.copy_tree(output_root, build_temp, symlinks=True)
                         package.display.emit_message(f'Build temp directory: [[imp]]{build_temp}')
 
-            with exts.tmp.temp_dir() as output_root:
+            with tmp.temp_dir() as output_root:
                 try:
                     is_package_skipped = build_package(package_params, output_root)
                 except YaPackageTestException:

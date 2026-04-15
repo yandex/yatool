@@ -7,8 +7,7 @@ import struct
 import tempfile
 import threading
 
-import exts.uniq_id
-import library.python.windows
+from library.python import unique_id, windows
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ def get_cmdline(pid):
 
 def start_server(mount_point, secrets):
     assert secrets
-    assert not library.python.windows.on_win()
+    assert not windows.on_win()
     assert os.path.exists(os.path.dirname(mount_point)), mount_point
 
     if os.path.exists(mount_point):
@@ -86,7 +85,7 @@ def stop_server(mount_point):
 
 
 def get_secret(mount_point, name):
-    assert not library.python.windows.on_win()
+    assert not windows.on_win()
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, SO_PASSCRED, 1)
@@ -122,7 +121,7 @@ def start_test_tool_secret_server(env):
         logger.debug("No secrets found")
         return
 
-    if library.python.windows.on_win():
+    if windows.on_win():
         logger.debug("No secret server for windows")
         return
 
@@ -130,7 +129,7 @@ def start_test_tool_secret_server(env):
         for func in [
             lambda: os.path.abspath('cred'),
             lambda: tempfile.NamedTemporaryFile(delete=False).name,
-            lambda: '/tmp/{}'.format(exts.uniq_id.gen32()),
+            lambda: '/tmp/{}'.format(unique_id.gen32()),
         ]:
             path = func()
             if len(path) <= 104 and os.path.exists(os.path.dirname(path)):

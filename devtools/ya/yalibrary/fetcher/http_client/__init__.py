@@ -5,7 +5,8 @@ import collections
 
 import exts
 import exts.http_client
-import exts.uniq_id
+import library.python.unique_id as unique_id
+import library.python.func as func
 
 try:
     import devtools.libs.universal_fetcher.py as universal_fetcher
@@ -24,7 +25,7 @@ FetchResponse = collections.namedtuple(
 )
 
 
-@exts.func.memoize(thread_safe=False)
+@func.memoize(thread_safe=False)
 def _get_ufetcher():
     if universal_fetcher is None:
         return None
@@ -53,7 +54,7 @@ def _get_ufetcher():
 
 
 def _download_file_by_ufetcher(url, path, additional_file_perms=0, expected_md5=None, headers=None, raise_err=False):
-    temp_path = "{}.{}.part".format(path, exts.uniq_id.gen8())
+    temp_path = "{}.{}.part".format(path, unique_id.gen8())
 
     ufetcher = _get_ufetcher()
 

@@ -2,7 +2,7 @@
 
 import os
 
-import exts.windows
+from library.python import windows
 
 import devtools.ya.test.const
 from devtools.ya.test.util import tools, shared
@@ -57,7 +57,7 @@ class FuzzTestSuite(common_types.AbstractTestSuite):
             '--verbose',
         ]
 
-        if not exts.windows.on_win():
+        if not windows.on_win():
             cmd += ["--gdb-path", os.path.join("$(GDB)", "gdb", "bin", "gdb")]
 
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:

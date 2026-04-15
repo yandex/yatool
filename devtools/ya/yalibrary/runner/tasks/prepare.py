@@ -3,7 +3,7 @@ import sys
 import logging
 
 import devtools.ya.core.error
-import exts.uniq_id
+from library.python import unique_id
 import yalibrary.worker_threads as worker_threads
 from yalibrary.runner import topo
 from yalibrary.runner.tasks.enums import WorkerPoolType
@@ -47,7 +47,7 @@ class UniqueTask(object):
         raise ImportError('Missing __str__ implementation')
 
     def uid(self):
-        return '{}-{}'.format(str(self), exts.uniq_id.gen16())
+        return '{}-{}'.format(str(self), unique_id.gen16())
 
 
 class PrepareAllNodesTask(UniqueTask):

@@ -12,15 +12,13 @@ import sys
 import time
 import tempfile
 
-from exts import tmp
 import exts.process
-import exts.strings
 import exts.archive
 import exts.fs
-import exts.windows
-
 import app_config
 import yalibrary.tools as tools
+import library.python.tmp as tmp
+import library.python.strings as strings
 
 import devtools.ya.core.error as core_error
 import devtools.ya.core.yarg as yarg
@@ -736,7 +734,7 @@ def _run_ymake(**kwargs):
         _run_info['exception'] = {
             'type': type(e).__name__,
             'msg': str(e),
-            'args': list(map(exts.strings.to_str, e.args)),
+            'args': list(map(strings.to_str, e.args)),
         }
         raise
     finally:

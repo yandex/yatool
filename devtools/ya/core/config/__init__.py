@@ -11,8 +11,8 @@ import yalibrary.find_root
 
 import devtools.ya.core.resource
 from exts import fs
-from exts import func
 from exts import strtobool
+from library.python import func
 
 logger = logging.getLogger(__name__)
 

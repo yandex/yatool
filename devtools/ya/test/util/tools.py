@@ -7,7 +7,7 @@ import io
 import logging
 
 import exts.fs
-import exts.windows
+from library.python import windows
 from devtools.ya.test import const
 
 from yalibrary.loggers.file_log import TokenFilterFormatter
@@ -54,7 +54,7 @@ def link_dir(src, dst):
     Links directory, choosing the best platform approach
     """
 
-    if exts.windows.on_win():
+    if windows.on_win():
         return exts.fs.hardlink_tree(src, dst)
     return exts.fs.symlink(src, dst)
 
@@ -63,7 +63,7 @@ def link_file(src, dst):
     """
     Links directory, choosing the best platform approach
     """
-    if exts.windows.on_win():
+    if windows.on_win():
         return exts.fs.hardlink_or_copy(src, dst)
     return exts.fs.symlink(src, dst)
 

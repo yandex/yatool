@@ -16,11 +16,11 @@ import devtools.ya.test.util.tools as test_tools
 import devtools.ya.test.const as test_const
 import devtools.ya.test.system.process
 import exts.fs
-import exts.func
-import exts.uniq_id
 import exts.hashing
+import exts.log
 import yalibrary.tools as tools
-from exts import tmp
+import library.python.func as func
+import library.python.tmp as tmp
 import yalibrary.upload.consts
 from yalibrary.display import strip_markup
 from yatest_lib import external
@@ -383,7 +383,7 @@ class CanonicalData(object):
         else:
             return None
 
-    @exts.func.memoize()
+    @func.memoize()
     def _get_canonical_file(self, filename):
         with open(filename) as results_file:
             return common.strings_to_utf8(json.load(results_file))

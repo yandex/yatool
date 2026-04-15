@@ -30,13 +30,10 @@ import devtools.ya.core.event_handling as event_handling
 import devtools.ya.core.profiler as cp
 import devtools.ya.core.yarg
 import exts.asyncthread as core_async
-import exts.filelock
 import exts.fs
 import exts.hashing as hashing
 import exts.path2
 import exts.timer
-import exts.tmp
-import exts.windows
 import exts.yjson as json
 import devtools.ya.test.util.tools as test_tools
 from devtools.ya.build import build_facade
@@ -50,7 +47,10 @@ from devtools.ya.build.reports import configure_error as ce
 from devtools.ya.build.reports import results_report
 from devtools.ya.core import stage_tracer
 from devtools.ya.yalibrary import sjson
-from exts import func
+import library.python.filelock as filelock
+import library.python.tmp as tmp
+import library.python.windows as windows
+import library.python.func as func
 from exts.decompress import udopen
 from exts.compress import zcopen
 from yalibrary import tools
@@ -308,7 +308,7 @@ def _build_graph_and_tests(opts, app_ctx, ymake_stats):
 
 
 def _advanced_lock_available(opts):
-    return not exts.windows.on_win() and getattr(opts, 'new_store', False)
+    return not windows.on_win() and getattr(opts, 'new_store', False)
 
 
 def make_lock(opts, garbage_dir, write_lock=False, non_blocking=False):
@@ -316,12 +316,12 @@ def make_lock(opts, garbage_dir, write_lock=False, non_blocking=False):
     lock_file = os.path.join(garbage_dir, '.lock')
 
     if _advanced_lock_available(opts):
-        from exts.plocker import Lock, LOCK_EX, LOCK_NB, LOCK_SH
+        from portalocker import Lock, LOCK_EX, LOCK_NB, LOCK_SH
 
         timeout = 2 if non_blocking else 1000000000
         return Lock(lock_file, mode='w', timeout=timeout, flags=LOCK_EX | LOCK_NB if write_lock else LOCK_SH | LOCK_NB)
 
-    return exts.filelock.FileLock(lock_file)
+    return filelock.FileLock(lock_file)
 
 
 class CacheFactory:
@@ -335,7 +335,7 @@ class CacheFactory:
         return cache_instance
 
     def get_local_cache_instance(self, garbage_dir):
-        if exts.windows.on_win():
+        if windows.on_win():
             return uid_store.UidStore(os.path.join(garbage_dir, 'cache', CACHE_GENERATION))
 
         if getattr(self._opts, 'build_cache', False):
@@ -898,7 +898,7 @@ class Context:
         self.threads = self.opts.build_threads
 
         self.create_output = self.opts.output_root is not None
-        self.create_symlinks = getattr(self.opts, 'create_symlinks', True) and not exts.windows.on_win()
+        self.create_symlinks = getattr(self.opts, 'create_symlinks', True) and not windows.on_win()
 
         def get_suppression_conf():
             suppress_outputs = getattr(self.opts, 'suppress_outputs', [])
@@ -1178,7 +1178,7 @@ class Context:
 
     def clear_cache_tray(self, opts):
         if _advanced_lock_available(opts):
-            from exts.plocker import LockException
+            from portalocker import LockException
 
             try:
                 with make_lock(opts, self.garbage_dir, write_lock=True, non_blocking=True):
@@ -1529,7 +1529,7 @@ class YaMake:
         if (
             getattr(self.opts, "multiplex_ssh", False)
             and getattr(self.opts, "checkout", False)
-            and not exts.windows.on_win()
+            and not windows.on_win()
         ):
             # https://stackoverflow.com/questions/34829600/why-is-the-maximal-path-length-allowed-for-unix-sockets-on-linux-108
             dirname = None
@@ -1559,7 +1559,7 @@ class YaMake:
 
                     svn_env = os.environ.copy()
                     svn_env['LC_ALL'] = 'C'
-                    with exts.tmp.environment(svn_env):
+                    with tmp.environment(svn_env):
                         try:
                             root_info = yalibrary.svn.svn_info(self.arc_root)
                         except yalibrary.svn.SvnRuntimeError as e:
@@ -1741,7 +1741,7 @@ class YaMake:
 
             return self._calc_exit_code()
 
-        if exts.windows.on_win() and self.opts.create_symlinks and not self.opts.output_root:
+        if windows.on_win() and self.opts.create_symlinks and not self.opts.output_root:
             logger.warning(
                 "Symlinks for the outputs are disabled on Windows. Use -o/--output option to explicitly specify the directory for the outputs"
             )

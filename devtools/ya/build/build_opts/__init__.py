@@ -7,8 +7,7 @@ from humanfriendly import parse_size, parse_timespan, InvalidSize, InvalidTimesp
 
 import app_config
 import exts.path2
-import exts.func
-
+from library.python import func
 import yalibrary.upload.consts as upload_consts
 from devtools.ya.core.yarg.groups import (
     OPERATIONAL_CONTROL_GROUP,
@@ -149,7 +148,7 @@ def make_opt_consumers(opt_name, help=None, arg_opts=None, env_opts=None, cfg_op
     return result
 
 
-@exts.func.lazy
+@func.lazy
 def get_cpu_count():
     return multiprocessing.cpu_count()
 

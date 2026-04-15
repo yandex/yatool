@@ -15,12 +15,12 @@ import devtools.ya.core.report
 import exts.process as extp
 
 from devtools.ya.core.config import tool_root, misc_root, build_root
-from exts.windows import on_win
 from exts import fs
-from exts import func
 from exts import retry
 from exts.timer import AccumulateTime
 
+from library.python.windows import on_win
+from library.python import func
 from devtools.libs.acdigest.python import get_file_digest
 from yalibrary.evlog import _LOG_DIR_NAME_FMT, _LOG_FILE_NAME_FMT
 

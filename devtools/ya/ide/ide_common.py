@@ -17,9 +17,8 @@ import devtools.ya.build.makelist
 import devtools.ya.core.common_opts
 import devtools.ya.core.config
 import devtools.ya.core.yarg as yarg
-import exts.filelock
+import library.python.filelock as filelock
 import exts.fs
-import exts.func
 import exts.os2
 import exts.path2
 import exts.process
@@ -367,7 +366,7 @@ class IdeProjectStorage:
         logger.debug('Loaded project stored data: %s', json.dumps(self.data, sort_keys=True, indent=2))
 
     def save(self):
-        with exts.filelock.FileLock(self.path + '.lock'):
+        with filelock.FileLock(self.path + '.lock'):
             data = self._load(self.path)
             data[self.project_info.title] = self.data
             data['_last'] = self.project_info.title

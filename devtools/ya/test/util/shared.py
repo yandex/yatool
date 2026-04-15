@@ -16,7 +16,7 @@ import time
 
 import six
 
-import exts.tmp
+from library.python import tmp, func
 from devtools.ya.test import const
 from devtools.ya.test.util import tools
 from devtools.ya.test.system import process
@@ -621,7 +621,7 @@ def extract_py_programs_sources(binaries, outdir, pattern='.*'):
     for binary in binaries:
         assert os.path.exists(binary), binary
 
-    script_path = exts.tmp.create_temp_file()
+    script_path = tmp.create_temp_file()
     with open(script_path, 'w') as afile:
         afile.write(PY_SOURCES_EXTRACTOR.format(output=outdir, pattern=pattern))
 
@@ -665,7 +665,7 @@ def create_cython_include_map(binaries, filename):
     for binary in binaries:
         assert os.path.exists(binary), binary
 
-    script_path = exts.tmp.create_temp_file()
+    script_path = tmp.create_temp_file()
     with open(script_path, 'w') as afile:
         afile.write(CYTHON_INCLUDE_MAP_EXTRACTOR.format(output=filename))
 
@@ -702,7 +702,7 @@ def archive_postprocess_unlink_files(src, dst, st_mode):
             logger.debug("Failed to unlink %s: %s", src, e)
 
 
-@exts.func.lazy
+@func.lazy
 def setup_coredump_filter():
     # XXX reduce noise from core_dumpfilter
     logging.getLogger("sandbox.sdk2.helpers.coredump_filter").setLevel(logging.ERROR)

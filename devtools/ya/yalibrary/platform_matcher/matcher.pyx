@@ -7,8 +7,7 @@ import logging
 import re
 import six
 
-import exts.func
-
+from library.python import func
 logger = logging.getLogger(__name__)
 
 
@@ -111,26 +110,26 @@ def canonize_full_platform(full_platform):
 
     return canonize_platform(platform_ + platform_suffix)
 
-@exts.func.lazy
+@func.lazy
 def is_windows():
     return IsWindows()
 
-@exts.func.lazy
+@func.lazy
 def is_darwin_arm64():
     return IsDarwinArm64()
 
 
-@exts.func.lazy
+@func.lazy
 def is_darwin_rosetta():
     return my_platform() == 'darwin' and is_darwin_arm64()
 
 
-@exts.func.lazy
+@func.lazy
 def my_platform():
     return _canonized_platform_to_str(MyPlatform())
 
 
-@exts.func.lazy
+@func.lazy
 def _default_platform_replacements():
     replacements = {}
     cdef TPlatformReplacements def_pr = DefaultPlatformReplacements()
@@ -163,12 +162,12 @@ def match_platform(expect: str, platforms: list[str], custom_platform_replacemen
     return None if matched.empty() else six.ensure_str(matched)
 
 
-@exts.func.lazy
+@func.lazy
 def current_architecture():
     return six.ensure_str(CurrentArchitecture())
 
 
-@exts.func.lazy
+@func.lazy
 def current_os():
     return six.ensure_str(CurrentOs())
 
@@ -177,7 +176,7 @@ def current_platform():
     return {'os': current_os(), 'arch': current_architecture()}
 
 
-@exts.func.lazy
+@func.lazy
 def current_toolchain():
     res = current_platform().copy()
 

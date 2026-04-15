@@ -5,12 +5,12 @@ import os
 import six
 
 import cityhash
-import exts.func
+import library.python.func as func
 
 logger = logging.getLogger(__name__)
 
 
-@exts.func.memoize()
+@func.memoize()
 def get_top_level2_dirs(source_root):
     try:
         l1_dirs = next(os.walk(source_root))[1]
@@ -25,7 +25,7 @@ def get_top_level2_dirs(source_root):
     return res
 
 
-@exts.func.memoize()
+@func.memoize()
 def normalize_path(filename, source_root):
     top_level2 = get_top_level2_dirs(source_root)
     parts = filename.split(os.sep)
@@ -86,7 +86,7 @@ def guess_llvm_coverage_filename(covtype, data):
     return data[pos + len(pattern) : end]
 
 
-@exts.func.memoize()
+@func.memoize()
 def should_skip(filename, source_root, include_generated=False):
     if include_generated:
         return False

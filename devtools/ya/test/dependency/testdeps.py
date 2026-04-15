@@ -1,7 +1,7 @@
 import logging
 import os
 
-import exts.func
+from library.python import func
 from .sandbox_resource import Reference
 from devtools.ya.test.util import path as util_path
 from yalibrary.large_files import ExternalFile
@@ -53,7 +53,7 @@ def remove_redundant_paths(paths):
     # Sorted canonized paths would give [a-b, a, a/b]
     # which is expected by following algorithm
     paths = sorted(canon_path_map)
-    cur = exts.func.first(paths)
+    cur = func.first(paths)
     res = [canon_path_map[cur]]
 
     for path in paths:

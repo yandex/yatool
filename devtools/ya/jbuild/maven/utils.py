@@ -14,7 +14,7 @@ import library.python.resource as rs
 
 import exts.fs as fs
 import exts.hashing as hashing
-import exts.tmp as tmp
+import library.python.tmp as tmp
 import exts.yjson as json
 import yalibrary.makelists.macro_definitions as md
 

@@ -4,8 +4,7 @@ from __future__ import print_function
 import codecs
 import threading
 
-import exts.strings
-import exts.windows
+from library.python import strings, windows
 import yalibrary.formatter
 
 import six
@@ -32,20 +31,20 @@ class CompositeDisplay(object):
 
 class Display(object):
     def __init__(self, stream, formatter, text_encoding=None):
-        if exts.windows.on_win():
+        if windows.on_win():
             import colorama
 
             colorama.init(wrap=False)
             stream = colorama.AnsiToWin32(stream).stream
 
-        self._text_encoding = text_encoding or exts.strings.DEFAULT_ENCODING
+        self._text_encoding = text_encoding or strings.DEFAULT_ENCODING
         if hasattr(stream, 'encoding'):
-            self._stream_encoding = exts.strings.get_stream_encoding(stream)
+            self._stream_encoding = strings.get_stream_encoding(stream)
         else:
-            self._stream_encoding = exts.strings.DEFAULT_ENCODING
+            self._stream_encoding = strings.DEFAULT_ENCODING
         if six.PY2:
             writer = codecs.getwriter(self._stream_encoding)
-            self._stream = writer(stream, errors=exts.strings.ENCODING_ERRORS_POLICY)
+            self._stream = writer(stream, errors=strings.ENCODING_ERRORS_POLICY)
         else:
             self._stream = stream
         self._formatter = formatter
@@ -69,7 +68,7 @@ class Display(object):
 
     def _write(self, text):
         if six.PY2:
-            text = exts.strings.to_unicode(text, self._text_encoding)
+            text = strings.to_unicode(text, self._text_encoding)
 
         with self._lock:
             self._stream.write(text)

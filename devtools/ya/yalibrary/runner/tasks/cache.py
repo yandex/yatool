@@ -81,7 +81,7 @@ class CleanSymresTask(object):
 
         start_time = time.time()
         try:
-            from exts.plocker import Lock, LOCK_EX, LOCK_SH, LOCK_NB, LockException
+            from portalocker import Lock, LOCK_EX, LOCK_SH, LOCK_NB, LockException
 
             if self._opts.strip_symlinks or self._opts.auto_clean_results_cache:
                 # Blocking only in non-automatic mode.

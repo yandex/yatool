@@ -9,7 +9,9 @@ from pytz import UTC
 import datetime as dt
 import exts.yjson as json
 
-from exts import fs, filelock, uniq_id
+from exts import fs
+
+from library.python import unique_id, filelock
 
 try:
     from pathlib import Path
@@ -25,7 +27,7 @@ ConsumerType = tp.Callable[[tp.List[tp.Any]], None]
 
 
 def uniq_name():
-    return "{}_{}".format(dt.datetime.now(tz=UTC).strftime('%Y_%m_%d_%H_%M_%S'), uniq_id.gen8())
+    return "{}_{}".format(dt.datetime.now(tz=UTC).strftime('%Y_%m_%d_%H_%M_%S'), unique_id.gen8())
 
 
 class FileChunk(object):

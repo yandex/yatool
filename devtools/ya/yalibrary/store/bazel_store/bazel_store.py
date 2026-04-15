@@ -10,7 +10,7 @@ import threading
 from exts import hashing
 from six.moves.urllib import parse
 from yalibrary.store.dist_store import DistStore
-import exts.func
+from library.python import func
 import library.python.retry as retry
 import requests
 import requests.adapters
@@ -83,11 +83,11 @@ class _RetryPolicy:
             .upto_retries(retries)
         )
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def read_conf(self):
         return self._build_conf(self._READ_RETRIES_COUNT)
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def write_conf(self):
         return self._build_conf(self._WRITE_RETRIES_COUNT)
 

@@ -2,9 +2,9 @@ import os
 import shutil
 
 import library.python.compress
+import library.python.tmp as tmp
 
 import multiprocessing
-import exts.tmp
 import exts.archive
 
 
@@ -31,7 +31,7 @@ def create_tarball_package(
     if codec:
         threads = threads or multiprocessing.cpu_count()
 
-    with exts.tmp.temp_dir() as temp_dir:
+    with tmp.temp_dir() as temp_dir:
         tar_archive = os.path.join(temp_dir, archive_file)
         if compress and not codec:
             compression_filter = compression_filter or exts.archive.GZIP

@@ -9,19 +9,19 @@ import yaml
 from typing import Callable, Optional
 
 import devtools.ya.test.const
-import exts.func
+from library.python import func
 
 import devtools.ya.test.test_types.common as common_suites
 
 logger = logging.getLogger(__name__)
 
 
-@exts.func.lazy
+@func.lazy
 def get_tag_regex():
     return re.compile(r"([+\-]?[\w:]*)")
 
 
-@exts.func.lazy
+@func.lazy
 def get_test_type_regex():
     return re.compile(r"([+\-]?[\w\.]*)")
 

@@ -2,8 +2,7 @@ import logging
 import os
 import time
 
-import exts.windows
-import exts.tmp
+from library.python import windows, tmp
 import exts.yjson as json
 
 from yalibrary.store import new_store
@@ -49,19 +48,19 @@ class AgeFilter:
 
 class StatusStore:
     def __init__(self, store_path: str) -> None:
-        if exts.windows.on_win():
+        if windows.on_win():
             self.store = uid_store.UidStore(store_path)
         else:
             self.store = new_store.NewStore(store_path)
 
     def put(self, uid: str, content: TestsStatuses) -> None:
-        with exts.tmp.temp_file() as temp_file:
+        with tmp.temp_file() as temp_file:
             with open(temp_file, 'w', encoding='utf8') as afile:
                 json.dump(content, afile)
             self.store.put(uid, os.path.split(temp_file)[0], [temp_file])
 
     def get(self, uid: str) -> TestsStatuses | None:
-        with exts.tmp.temp_dir() as tmp_dir:
+        with tmp.temp_dir() as tmp_dir:
             if self.store.try_restore(uid, tmp_dir):
                 with open(os.path.join(tmp_dir, os.listdir(tmp_dir)[0]), encoding='utf-8') as afile:
                     return json.load(afile)

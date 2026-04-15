@@ -18,7 +18,7 @@ from devtools.ya.test.util import shared
 import devtools.ya.core.config
 import exts.archive
 import exts.fs
-import exts.func
+from library.python import func
 import yt.yson as yson
 
 from devtools.ya.test.programs.test_tool.run_test import run_test
@@ -647,7 +647,7 @@ def print_file(filename):
         logger.warning("{} file is not found after ytexec run".format(os.path.basename(filename)))
 
 
-@exts.func.memoize()
+@func.memoize()
 def load_prepared_info(output_dir):
     prepared_path = os.path.join(output_dir, "prepared.json")
     if os.path.exists(prepared_path):

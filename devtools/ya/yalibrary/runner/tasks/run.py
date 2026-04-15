@@ -9,7 +9,6 @@ import typing as tp
 
 import exts.process
 import exts.shlex2
-import exts.windows
 import six
 
 import devtools.libs.acdigest.python as acdigest
@@ -19,7 +18,7 @@ import yalibrary.runner
 import yalibrary.worker_threads as worker_threads
 
 from devtools.libs.parse_number.python import parse_number
-from exts import strings
+from library.python import strings, windows
 from exts.fs import create_dirs, ensure_removed, hardlink_tree, remove_tree_with_perm_update
 from yalibrary import formatter
 from yalibrary.runner.build_root import BuildRootError
@@ -171,7 +170,7 @@ class ExecutorBase(object):
 
 
 class PopenExecutor(ExecutorBase):
-    _close_fds = not exts.windows.on_win()
+    _close_fds = not windows.on_win()
 
     def run(self, **kwargs):
         retries = self.text_file_busy_retries
@@ -201,7 +200,7 @@ class PopenExecutor(ExecutorBase):
 
         def set_nice():
             try:
-                if not exts.windows.on_win():
+                if not windows.on_win():
                     return os.nice(nice)
             except OSError:
                 pass

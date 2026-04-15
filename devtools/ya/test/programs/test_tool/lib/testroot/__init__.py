@@ -8,7 +8,7 @@ from devtools.ya.test.dependency import testdeps, sandbox_resource
 from devtools.ya.test.util import tools
 from devtools.ya.test import const as constants
 import exts.fs
-import exts.windows
+from library.python import windows
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ def create_environment(
     if os.path.exists(test_env_root):
         shutil.rmtree(test_env_root)
 
-    if exts.windows.on_win():
+    if windows.on_win():
         env_arcadia_root = source_root
     else:
         env_arcadia_root = os.path.join(test_env_root, "arcadia")

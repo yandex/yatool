@@ -8,8 +8,8 @@ import logging
 import re
 
 import exts.fs as fs
-import exts.tmp as tmp
 import exts.hashing as hashing
+from library.python import tmp
 import yalibrary.makelists as ml
 import yalibrary.makelists.macro_definitions as md
 

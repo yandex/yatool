@@ -1,12 +1,11 @@
 import atexit
-import exts.func
 import grpc
 import threading
 
 from devtools.local_cache.toolscache.proto import tools_pb2, tools_pb2_grpc
 from devtools.local_cache.psingleton.proto import known_service_pb2, known_service_pb2_grpc
 from devtools.local_cache.psingleton.python.systemptr import get_my_name
-
+from library.python import func
 
 class _State:
     _STUB = None
@@ -38,7 +37,7 @@ def _cleanup():
         _State._CHANNEL.close()
 
 
-@exts.func.memoize()
+@func.memoize()
 def _memoize_my_name():
     pid, stime = get_my_name()
     return known_service_pb2.TProc(Pid=pid, StartTime=stime)

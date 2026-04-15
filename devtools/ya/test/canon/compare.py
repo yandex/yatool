@@ -9,16 +9,14 @@ from devtools.ya.test import const
 from devtools.ya.test.common import ytest_common_tools
 from yatest_lib import external
 import diff_match_patch
-import exts.func
 import exts.hashing
 import exts.os2
-import exts.tmp
-import exts.windows
 import devtools.ya.test.common
 import devtools.ya.test.system.process
 import yalibrary.display
 import yalibrary.formatter
 import yalibrary.tools
+from library.python import func, tmp, windows
 
 MAX_PREVIEW_LENGTH = 64
 SANDBOX_RESOURCE_FILE_NAME = "canonical.data"
@@ -359,13 +357,13 @@ class ResultsComparer(object):
     def _get_system_diff_tool_path(self):
         return "/usr/bin/diff"
 
-    @exts.func.memoize()
+    @func.memoize()
     def _get_diff_tool(self):
         system_diff = self._get_system_diff_tool_path()
         if os.path.exists(system_diff):
             return [system_diff, "-U1"]
         fast_diff = os.path.join(yalibrary.tools.tool("fast_diff"), "fast_diff")
-        if exts.windows.on_win():
+        if windows.on_win():
             fast_diff += ".exe"
         if (
             os.path.exists(fast_diff)
@@ -428,7 +426,7 @@ class ResultsComparer(object):
 
     def _get_text_diffs(self, given, expected):
         if any([len(text) > self._max_len_for_difflib_method for text in [given, expected]]):
-            with exts.tmp.temp_file() as given_file_path, exts.tmp.temp_file() as expected_file_path:
+            with tmp.temp_file() as given_file_path, tmp.temp_file() as expected_file_path:
                 with open(given_file_path, "w") as given_fd, open(expected_file_path, "w") as expected_fd:
                     given_fd.write(six.ensure_str(given))
                     expected_fd.write(six.ensure_str(expected))

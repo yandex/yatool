@@ -16,8 +16,8 @@ from datetime import datetime
 
 import exts.archive
 import exts.fs
-import exts.uniq_id
-import exts.tmp as yatemp
+from library.python import unique_id
+from library.python import tmp as yatemp
 import devtools.ya.test.const
 from devtools.ya.test.util import shared
 from devtools.ya.test.programs.test_tool.lib import coverage
@@ -138,7 +138,7 @@ def merge_archives(args, archives, dst, truncate, level=0):
     with yatemp.temp_dir() as tempdir:
         target_dirs = []
         for filename in archives:
-            dirname = os.path.join(tempdir, exts.uniq_id.gen8())
+            dirname = os.path.join(tempdir, unique_id.gen8())
             target_dirs.append(dirname)
             try:
                 exts.archive.extract_from_tar(filename, dirname)
@@ -148,7 +148,7 @@ def merge_archives(args, archives, dst, truncate, level=0):
                     exts.fs.move(a, dst + ".{}".format(i))
                 return
 
-        resultdir = os.path.join(tempdir, exts.uniq_id.gen8())
+        resultdir = os.path.join(tempdir, unique_id.gen8())
         exts.fs.create_dirs(resultdir)
         merge_dirs(args, target_dirs, resultdir, truncate, level=level)
 

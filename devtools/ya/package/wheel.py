@@ -6,8 +6,6 @@ import exts.fs
 import exts.os2
 import exts.path2
 import exts.archive
-import exts.tmp
-import exts.func
 
 import package
 

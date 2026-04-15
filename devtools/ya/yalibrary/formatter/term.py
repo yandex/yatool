@@ -4,7 +4,7 @@ import threading
 
 from . import palette
 from . import formatter
-from exts import func
+from library.python import func
 
 CLEAR_TILL_END = '\033[K'
 

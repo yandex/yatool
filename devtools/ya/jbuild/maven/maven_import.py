@@ -2,7 +2,7 @@ import os
 import exts.yjson as json
 import logging
 
-import exts.tmp as tmp
+from library.python import tmp
 import yalibrary.makelists as ml
 
 import devtools.ya.build.build_handler

@@ -13,13 +13,11 @@ import time
 import six
 
 import exts.fs
-import exts.func
-import exts.uniq_id
-import exts.windows
 
 import grpc
 import psutil
 from devtools.executor.proto import runner_pb2, runner_pb2_grpc
+from library.python import func, unique_id, windows
 
 
 cdef extern from "devtools/executor/lib/server.h":
@@ -32,7 +30,7 @@ class ShutdownException(Exception):
 
 def terminate_process(pid):
     try:
-        if exts.windows.on_win():
+        if windows.on_win():
             proc = psutil.Process(pid)
             proc.terminate()
             proc.wait()
@@ -59,7 +57,7 @@ def _get_free_port():
 def _get_mount_point():
     for func in [
         lambda: tempfile.NamedTemporaryFile(delete=False, prefix=str(os.getpid())).name,
-        lambda: '/tmp/{}{}'.format(os.getpid(), exts.uniq_id.gen32()),
+        lambda: '/tmp/{}{}'.format(os.getpid(), unique_id.gen32()),
     ]:
         path = func()
         if len(path) < 104 and os.path.exists(os.path.dirname(path)):
@@ -72,7 +70,7 @@ def _get_mount_point():
 
 
 def _get_address():
-    if exts.windows.on_win():
+    if windows.on_win():
         return "localhost:{}".format(_get_free_port())
     else:
         return "unix:{}".format(_get_mount_point())
@@ -225,7 +223,7 @@ class Result(object):
             self.returncode = 0
 
 
-@exts.func.memoize()
+@func.memoize()
 def _get_channel(address):
     channel = grpc.insecure_channel(address)
     def close_channel():
@@ -234,7 +232,7 @@ def _get_channel(address):
     return channel
 
 
-@exts.func.memoize()
+@func.memoize()
 def _get_client(address):
     return runner_pb2_grpc.RunnerStub(_get_channel(address))
 

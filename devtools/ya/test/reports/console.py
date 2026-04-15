@@ -5,7 +5,7 @@ import os
 import re
 
 from . import trace_comment
-from exts import func
+from library.python import func
 from devtools.ya.test import common
 from devtools.ya.test import const
 

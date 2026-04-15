@@ -1,4 +1,4 @@
-import exts.func
+from library.python import func
 from devtools.ya.core.yarg.handler import BaseHandler
 
 
@@ -22,15 +22,15 @@ class LazyCommand(BaseHandler):
         self.name = name
         self.loader = loader
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def command(self):
         return extract_command(self.loader(), self.name)
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def description(self):
         return self.command().description
 
-    @exts.func.lazy_property
+    @func.lazy_property
     def visible(self):
         return self.command().visible
 

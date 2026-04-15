@@ -3,7 +3,6 @@ import os
 
 import exts.yjson as json
 from exts.strtobool import strtobool
-from exts.tmp import temp_file
 
 import devtools.ya.core.config
 import devtools.ya.core.yarg
@@ -13,6 +12,7 @@ import devtools.ya.build.gen_plan
 import devtools.ya.build.genconf
 import devtools.ya.build.targets
 import devtools.ya.build.ymake2
+from library.python.tmp import temp_file
 
 logger = logging.getLogger(__name__)
 

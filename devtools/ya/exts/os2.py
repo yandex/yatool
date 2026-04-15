@@ -1,7 +1,7 @@
 import os
 import sys
 
-from exts import func
+from library.python import func
 
 
 @func.lazy

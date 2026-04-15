@@ -4,7 +4,7 @@ import logging
 
 from devtools.ya.build.graph_description import GraphNodeUid
 from exts.fs import get_file_size
-from exts.windows import on_win, RETRIABLE_FILE_ERRORS
+from library.python.windows import on_win, RETRIABLE_FILE_ERRORS
 import exts.archive
 
 import yalibrary.worker_threads as worker_threads

@@ -4,8 +4,8 @@ import subprocess
 import sys
 import threading
 
-from exts.strings import ensure_str_deep
-import exts.windows
+from library.python.strings import ensure_str_deep
+from library.python import windows
 import six
 
 
@@ -19,18 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 # Wrapper for Popen with some fixes and improvements
-@exts.windows.errorfix
+@windows.errorfix
 def popen(*args, **kwargs):
-    if exts.windows.on_win():
-        exts.windows.disable_error_dialogs()
+    if windows.on_win():
+        windows.disable_error_dialogs()
         if 'creationflags' not in kwargs:
-            kwargs['creationflags'] = exts.windows.default_process_creation_flags()
+            kwargs['creationflags'] = windows.default_process_creation_flags()
     return subprocess.Popen(*args, **kwargs)
 
 
 # function below uses special code for win instead of os.execve because of: https://bugs.python.org/issue9148
 def execve(exec_path, args=[], env=None, cwd=None):
-    from exts import tmp
+    from library.python import tmp
 
     tmp.remove_tmp_dirs(env)
 
@@ -39,7 +39,7 @@ def execve(exec_path, args=[], env=None, cwd=None):
     if env is None:
         env = os.environ
 
-    if not exts.windows.on_win():
+    if not windows.on_win():
         if cwd:
             os.chdir(cwd)
         os.execve(exec_path, [exec_path] + args, env)  # after this call no return in current process
@@ -68,15 +68,15 @@ def run_process(exec_path, args=[], env=None, cwd=None, check=False, pipe_stdout
 
 # Legacy, use exts.process.popen wrapper
 def subprocess_flags():
-    if exts.windows.on_win():
-        exts.windows.disable_error_dialogs()
-        return exts.windows.default_process_creation_flags()
+    if windows.on_win():
+        windows.disable_error_dialogs()
+        return windows.default_process_creation_flags()
     return 0
 
 
 def set_close_on_exec(stream):
-    if exts.windows.on_win():
-        exts.windows.set_handle_information(stream, inherit=False)
+    if windows.on_win():
+        windows.set_handle_information(stream, inherit=False)
     else:
         import fcntl
 

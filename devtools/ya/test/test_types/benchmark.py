@@ -1,11 +1,11 @@
 import os
 
-import exts
 import devtools.ya.test.const
 import devtools.ya.test.util.tools
 from devtools.ya.test import common as test_common
 import devtools.ya.test.system.process as process
 from devtools.ya.test.test_types import common as common_types
+import library.python.windows as windows
 
 GBENCHMARK_TEST_TYPE = "g_benchmark"
 YBENCHMARK_TEST_TYPE = "benchmark"
@@ -98,7 +98,7 @@ class GBenchmarkSuite(AbstractBenchmarkSuite):
         for flt in self._additional_filters:
             cmd += ['--test-filter', flt]
 
-        if not exts.windows.on_win():
+        if not windows.on_win():
             cmd += ["--gdb-path", os.path.join("$(GDB)", "gdb", "bin", "gdb")]
 
         if for_dist_build and not getattr(opts, 'keep_full_test_logs', False):
@@ -148,7 +148,7 @@ class YBenchmarkSuite(AbstractBenchmarkSuite):
             '--verbose',
         ]
 
-        if not exts.windows.on_win():
+        if not windows.on_win():
             cmd += ["--gdb-path", os.path.join("$(GDB)", "gdb", "bin", "gdb")]
 
         if for_dist_build and not getattr(opts, 'keep_full_test_logs', False):

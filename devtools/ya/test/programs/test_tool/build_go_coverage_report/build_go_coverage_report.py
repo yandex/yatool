@@ -6,7 +6,6 @@ import sys
 import six
 
 import exts.archive
-import exts.tmp
 import re
 from yatest.common import process
 from library.python.testing import coverage_utils as coverage_utils_library

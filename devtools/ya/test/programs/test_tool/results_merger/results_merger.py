@@ -16,8 +16,7 @@ from devtools.ya.test import reports
 from devtools.ya.test.util import shared
 import exts.archive
 import exts.fs
-import exts.tmp as yatemp
-import exts.uniq_id
+import library.python.tmp as yatemp
 from devtools.ya.test import const
 import devtools.ya.test.result
 import devtools.ya.test.test_types.common as types_common

@@ -5,12 +5,12 @@ import logging
 import sys
 import signal
 
-import exts
 from devtools.ya.test import const
 from devtools.ya.test import facility
 from devtools.ya.test.programs.test_tool.lib import benchmark
 from devtools.ya.test.util import shared
 from devtools.ya.test.system import process
+import library.python.windows as windows
 
 logger = logging.getLogger(__name__)
 BENCH_STDOUT = "benchmark.out"
@@ -97,7 +97,7 @@ def dump_test_info(
                 "[[bad]]Test crashed with exit_code: {}[[rst]]".format(exit_code), status=const.Status.CRASHED
             )
 
-    if res and res.returncode < 0 and not exts.windows.on_win():
+    if res and res.returncode < 0 and not windows.on_win():
         filename = os.path.basename(binary)
         shared.postprocess_coredump(
             binary, os.getcwd(), res.pid, suite.chunk.logs, gdb_path, need_core, filename, output_path

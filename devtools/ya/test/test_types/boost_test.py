@@ -1,6 +1,6 @@
 import os
 
-import exts.windows
+from library.python import windows
 
 import devtools.ya.test.const
 import devtools.ya.test.util.tools
@@ -42,7 +42,7 @@ class BoostTestSuite(common_types.AbstractTestSuite):
             cmd += ['--test-filter', flt]
         if opts.gdb:
             cmd += ["--gdb-debug"]
-        if not exts.windows.on_win():
+        if not windows.on_win():
             cmd += ["--gdb-path", os.path.join("$(GDB)", "gdb", "bin", "gdb")]
 
         return cmd

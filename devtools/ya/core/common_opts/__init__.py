@@ -42,7 +42,7 @@ from devtools.ya.core.yarg import (
 # TODO: Fix imports everywhere
 from devtools.ya.core.yarg import ShowHelpOptions  # noqa: F401
 
-import exts.func
+from library.python import func
 import exts.path2
 
 import devtools.ya.test.const
@@ -655,7 +655,7 @@ class CrossCompilationOptions(Options):
         }
 
     @staticmethod
-    @exts.func.lazy
+    @func.lazy
     def generate_target_platforms_cxx():
         import yalibrary.platform_matcher as pm
         import yalibrary.tools

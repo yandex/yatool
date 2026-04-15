@@ -3,7 +3,9 @@ import os
 import threading
 from contextlib2 import ExitStack
 
-from exts import filelock, fs, hashing, windows
+from exts import fs, hashing
+
+from library.python import filelock, windows
 from yalibrary import toolscache
 
 from .common import clean_dir

@@ -4,9 +4,8 @@ import os
 
 from exts import fs
 from exts import hashing
-from exts import uniq_id
 
-from library.python import compress
+from library.python import compress, unique_id
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class Store(object):
         return os.path.join(self._data_store, h[0], h[1], h)
 
     def _gen_tmp_path(self):
-        return os.path.join(self._tray_path, uniq_id.gen32())
+        return os.path.join(self._tray_path, unique_id.gen32())
 
     @staticmethod
     def remove_internal(in_store_path):

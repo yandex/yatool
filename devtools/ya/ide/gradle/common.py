@@ -1,6 +1,6 @@
 from devtools.ya.core import stage_tracer
 from pathlib import Path
-import exts.filelock
+from library.python import filelock
 
 tracer = stage_tracer.get_tracer("gradle")
 
@@ -11,7 +11,7 @@ class YaIdeGradleException(Exception):
 
 class ExclusiveLock:
     def __init__(self, path: Path):
-        self.lock = exts.filelock.FileLock(str(path.parent / (path.name + '.lock')))
+        self.lock = filelock.FileLock(str(path.parent / (path.name + '.lock')))
 
     def acquire(self) -> bool:
         return self.lock.acquire()

@@ -3,7 +3,9 @@ import logging
 
 import six
 
-from exts import func, os2, hashing
+from exts import os2, hashing
+
+from library.python import func
 from devtools.ya.core.config import misc_root, find_root
 
 # from yalibrary.monitoring import YaMonEvent
