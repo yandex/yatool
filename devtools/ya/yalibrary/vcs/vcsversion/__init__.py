@@ -129,7 +129,7 @@ class ArcInfo(VCSData):
     info_output_string: str = ''
     revision: int = DEFAULT_VCS_REVISION
     patch_number: int = DEFAULT_VCS_PATCH_NUMBER
-    dirty: bool = False
+    dirty: bool = True  # Pessimistacally assume that working copy has changes
 
     @classmethod
     @exts.retry.retrying(
@@ -829,7 +829,7 @@ def get_default_revision_info() -> ArcRevisionInfo:
     return ArcRevisionInfo(
         revision=DEFAULT_VCS_REVISION,
         patch_number=DEFAULT_VCS_PATCH_NUMBER,
-        dirty=False,
+        dirty=True,
     )
 
 
