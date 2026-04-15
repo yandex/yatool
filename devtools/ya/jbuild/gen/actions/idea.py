@@ -427,6 +427,8 @@ def create_iml(path, by_path, project_root, ctx):
 
     if ctx.opts.exclude_dirs:
         exclude_dirs += [i for i in ctx.opts.exclude_dirs if i not in exclude_dirs]
+    if 'test-results' not in exclude_dirs:
+        exclude_dirs += 'test-results'
 
     if ctx.opts.auto_exclude_symlinks:
         module_root = os.path.join(ctx.opts.arc_root, path)
