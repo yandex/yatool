@@ -1220,6 +1220,7 @@ def do_dump_vcs_info(params):
             params.bld_root,
             fake_data,
             fake_build_info,
+            require_slow=True,
         )
         + '\n'
     )

@@ -1037,13 +1037,14 @@ def get_version_info(
     fake_build_info: bool = False,
     custom_version: str = '',
     release_version: str = '',
+    require_slow: bool = False,
 ) -> str:
     if fake_data:
         vcs_info_data = _get_default_dictionary()
         vcs_root = ''
     else:
         vcs_info = VcsInfo(arc_root)
-        vcs_info_data = vcs_info.get_info(require_slow=False)
+        vcs_info_data = vcs_info.get_info(require_slow=require_slow)
         vcs_root = vcs_info.get_vcs_root()
 
     return dump_vcs_json(
