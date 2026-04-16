@@ -376,6 +376,7 @@ class GradleOptions(yarg.Options):
     OPT_GRADLE_JDK_VERSION = '--gradle-jdk-version'
     OPT_REMOVE = '--remove'
     OPT_EXCLUDE = '--exclude'
+    OPT_EXCLUDE_PROTO = '--exclude-proto'  # exclude all PROTO_... vjdules during export
     OPT_GRADLE_DAEMON_JVMARGS = '--gradle-daemon-jvmargs'
     OPT_KOTLIN_DAEMON_JVMARGS = '--kotlin-daemon-jvmargs'
     OPT_SETTINGS_ROOT_AS_HASH_BASE = '--settings-root-as-hash-base'  # IGNORED IN CODE, only for backward compatibility
@@ -408,6 +409,7 @@ class GradleOptions(yarg.Options):
         self.gradle_jdk_version: str = None
         self.remove: bool = False
         self.exclude: list[str] = []
+        self.exclude_proto: bool = False
         self.gradle_daemon_jvmargs: str = None
         self.kotlin_daemon_jvmargs: str = None
         self.settings_root_as_hash_base: bool = True  # IGNORED IN CODE, only for backward compatibility
@@ -484,6 +486,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_EXCLUDE],
                 help='Exclude module and submodules from gradle project',
                 hook=yarg.SetAppendHook('exclude'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_EXCLUDE_PROTO],
+                help='Exclude module and submodules from gradle project',
+                hook=yarg.SetConstValueHook('exclude_proto', True),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(

@@ -103,9 +103,9 @@ class _JavaSemGraph(SemGraph):
 
             # FIXME(dimdim11) - all semgraph calls save cache to one point, without exclusive lock make semgraph may fail
             start = datetime.now()
-            self.logger.info("Getting lock for semgraph...")
+            self.logger.debug("Getting lock for semgraph...")
             with ExclusiveLock(self.config.export_root.parent / 'semgraph'):
-                self.logger.info("Got lock for semgraph [ %.4fs ]", (datetime.now() - start).total_seconds())
+                self.logger.debug("Got lock for semgraph [ %.4fs ]", (datetime.now() - start).total_seconds())
                 super().make(
                     **kwargs,
                     dump_raw_graph=(
@@ -536,15 +536,23 @@ class _JavaSemGraph(SemGraph):
 
     def _patch_exclude_targets(self) -> None:
         """Patch excluded targets in graph"""
-        if not self.config.rel_exclude_targets:
+        if not self.config.rel_exclude_targets and not self.config.params.exclude_proto:
             return
         self._before_any_patch()
+        excluded_protos: list[str] = []
         for node in self._graph_data:
             if not isinstance(node, SemNode) or not node.has_semantics():
                 continue
             rel_target = Path(node.name.replace(self._BUILD_ROOT, '')).parent
             if not self.config.is_exclude_target(rel_target):
-                continue
+                if self.config.params.exclude_proto:
+                    if node.semantics[0].sems[0] == self.JAR_PROTO_SEM and self.config.in_rel_targets(rel_target):
+                        self.config.rel_exclude_targets.append(str(rel_target))
+                        excluded_protos.append(str(rel_target))
+                    else:
+                        continue
+                else:
+                    continue
             has_ignored = False
             has_consumer_type = False
             for s in node.semantics:
@@ -559,6 +567,8 @@ class _JavaSemGraph(SemGraph):
             if not has_ignored:
                 node.semantics.append(Semantic({Semantic.SEM: [self._IGNORED_SEM]}))
                 self._graph_patched = True
+        if excluded_protos:
+            self.logger.info("Excluded proto: %s", ', '.join(excluded_protos))
 
     def _patch_run_java_programs(self) -> None:
         self._before_any_patch()
