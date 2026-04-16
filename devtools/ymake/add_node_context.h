@@ -235,6 +235,8 @@ public:
 };
 
 struct TAddDepContext {
+    using TPropsSearchFunction = std::function<const TVector<TDepsCacheId>*(TPropertyType type)>;
+
     TAddDepContext(TAddDepAdaptor& node, TModule& module, TDepGraph& graph, TYMake& ymake, TUpdIter& iter, const TIndDepsRule* rule)
         : Node(node)
         , Module(module)
@@ -256,6 +258,8 @@ struct TAddDepContext {
         , UpdateReresolveCache(updateReresolveCache)
     {
     }
+
+    void InduceDeps(const TPropsSearchFunction& searchProps);
 
     TAddDepAdaptor& Node;
     TModule& Module;
