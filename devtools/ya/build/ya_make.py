@@ -857,6 +857,29 @@ def replace_yt_results(graph, opts, dist_cache):
     return new_results, cached_results
 
 
+def _distbuild_trace_context_from_json(trace_context_json):
+    """Return a ``trace_context`` payload for DistBuild, or ``None`` if unset/unparsed/unsampled."""
+    if not trace_context_json:
+        return None
+    try:
+        carrier = json.loads(trace_context_json)
+        traceparent = carrier['traceparent']
+        __, trace_id, span_id, trace_flags = traceparent.split('-')
+        if not int(trace_flags):
+            return None
+        return {
+            'project': 'distbuild',
+            'trace_id': trace_id,
+            'span_id': span_id,
+        }
+    except Exception as exc:
+        logger.warning(
+            'Failed to load the provided trace context and propagate it to DistBuild.',
+            exc_info=exc,
+        )
+        return None
+
+
 class Context:
     RELEASED = {}  # sentinel to mark released full graph
 
@@ -1258,41 +1281,31 @@ class Context:
         graph_conf = self.graph['conf']
         graph_conf['keepon'] = self.opts.continue_on_fail
         graph_conf.update(gp.gen_description())
+
         if self.opts.default_node_requirements:
             graph_conf['default_node_requirements'] = self.opts.default_node_requirements
-        if self.opts.use_distbuild:
-            if self.opts.distbuild_pool:
-                graph_conf['pool'] = self.opts.distbuild_pool
-            if self.opts.dist_priority:
-                graph_conf['priority'] = self.opts.dist_priority
-            elif self.opts.coordinators_filter:
-                graph_conf['coordinator'] = self.opts.coordinators_filter
-            if self.opts.cache_namespace:
-                graph_conf['namespace'] = self.opts.cache_namespace
 
-            if self.opts.trace_context_json:
-                # Trace context should be extracted earlier but since `ya` doesn't use OTEL tracing
-                # we extract it here and pass it directly to DistBuild.
-                try:
-                    carrier = json.loads(self.opts.trace_context_json)
-                    # The below logic should be implemented with OpenTelemetry Python API
-                    # but to avoid extra dependencies we do simplified parsing ourselves
-                    traceparent = carrier['traceparent']
-                    __, trace_id, span_id, trace_flags = traceparent.split('-')
-                    # Check if this trace branch is sampled
-                    if int(trace_flags):
-                        # Ideally we should just pass trace context's fields/headers ('traceparent', 'tracestate')
-                        # through but we need to agree this protocol change with the DistBuild team first
-                        self.graph['conf']['trace_context'] = {
-                            'project': 'distbuild',
-                            'trace_id': trace_id,
-                            'span_id': span_id,
-                        }
-                except Exception as exc:
-                    logger.warning(
-                        'Failed to load the provided trace context and propagate it to DistBuild.',
-                        exc_info=exc,
-                    )
+        if not self.opts.use_distbuild:
+            return
+
+        self._merge_distbuild_client_config(graph_conf)
+        trace_context = _distbuild_trace_context_from_json(self.opts.trace_context_json)
+        if trace_context is not None:
+            graph_conf['trace_context'] = trace_context
+
+    def _merge_distbuild_client_config(self, graph_conf):
+        """Refresh distbuild-facing keys in ``graph_conf`` from current CLI opts (e.g. custom graph reload)."""
+        opts = self.opts
+        if opts.distbuild_pool:
+            graph_conf['pool'] = opts.distbuild_pool
+        if opts.dist_priority:
+            graph_conf['priority'] = opts.dist_priority
+        elif opts.coordinators_filter:
+            graph_conf['coordinator'] = opts.coordinators_filter
+        if opts.cache_namespace:
+            graph_conf['namespace'] = opts.cache_namespace
+        if opts.build_execution_time:
+            graph_conf['max_execution_time'] = opts.build_execution_time
 
     def _dump_graph_if_needed(self):
         if not self.opts.dump_graph:
