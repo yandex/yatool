@@ -20,6 +20,8 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
+
 namespace {
 
 TString AllActions() {
@@ -75,21 +77,19 @@ public:
             Rule_.Actions.push_back(std::make_pair(TPropertyType{symbols, EVI_InducedDeps, type}, action));
         }
         Rule_.PassInducedIncludesThroughFiles = Parser_->GetPassInducedIncludes();
+
+        if (auto* base = BaseParser()) {
+            const auto baseRules = base->DepsTransferRules();
+            if (Rule_.PassInducedIncludesThroughFiles != baseRules.PassInducedIncludesThroughFiles)
+                YConfErr(Conf) << "Attempt to register user parser specialization conflicting with base parser rule of propagation through include dependencies!" << Endl;
+            Rule_.PassNoInducedDeps = baseRules.PassNoInducedDeps;
+            std::ranges::copy(baseRules.Actions, std::back_inserter(Rule_.Actions));
+        }
     }
 
     ~TParserAdapter() noexcept override = default;
 
-    bool ProcessOutputIncludes(TAddDepAdaptor&,
-                               TModuleWrapper&,
-                               TFileView incFileName,
-                               const TVector<TString>&) const override {
-        //TODO(DEVTOOLS-5291): add proper support of OUTPUT_INCLUDES here
-        YConfErr(MacroUse) << "OUTPUT_INCLUDES are not supported for this type of file: "
-                           << incFileName << Endl;
-        return false;
-    }
-
-    bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) override {
+    bool DoParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) override {
         TVector<TString> includes;
         TPyDictReflection inducedDeps;
         Parser_->Execute(TString(incFile.GetAbsoluteName()), module, includes, inducedDeps);
@@ -114,7 +114,7 @@ public:
         return true;
     }
 
-    bool HasIncludeChanges(TFileContentHolder&) const override {
+    bool DoHasIncludeChanges(TFileContentHolder&) const override {
         return true;
     }
 

@@ -93,9 +93,9 @@ public:
     virtual bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) = 0;
     virtual bool HasIncludeChanges(TFileContentHolder& incFile) const = 0;
     virtual const TIndDepsRule& DepsTransferRules() const = 0;
-    virtual void SetLanguageId(TLangId) {};
-    virtual void SetParserType(EIncludesParserType) {};
-    virtual ~TParserBase() = default;
+    virtual void SetLanguageId(TLangId) {}
+    virtual void SetParserType(EIncludesParserType) {}
+    virtual ~TParserBase() noexcept = default;
 
     TParserId GetParserId() const { return ParserId; }
 
@@ -114,7 +114,38 @@ private:
 // customization points.
 class TUserParserBase: public TParserBase {
 public:
+    // limitation enforcements by base parser iface methods final implementations
+    bool ProcessOutputIncludes(TAddDepAdaptor&, TModuleWrapper&, TFileView incFileName, const TVector<TString>&) const final;
+    void SetLanguageId(TLangId) final {}
+    void SetParserType(EIncludesParserType) final {}
+
+    bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) final {
+        auto res = true;
+        if (BaseParser_)
+            res = res && BaseParser_->ParseIncludes(node, module, incFile);
+        res = res && DoParseIncludes(node, module, incFile);
+        return res;
+    }
+
+    bool HasIncludeChanges(TFileContentHolder& incFile) const final {
+        auto res = false;
+        if (BaseParser_)
+            res = res || BaseParser_->HasIncludeChanges(incFile);
+        res = res || DoHasIncludeChanges(incFile);
+        return res;
+    }
+
+    // User parser iface extensions
     virtual void RegisterIndDepsRule(TSymbols&) = 0;
+    void SetBaseParser(TParserBase* base) {BaseParser_ = base;}
+    const TParserBase* BaseParser() const noexcept {return BaseParser_;}
+
+protected:
+    virtual bool DoParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) = 0;
+    virtual bool DoHasIncludeChanges(TFileContentHolder& incFile) const = 0;
+
+private:
+    TParserBase* BaseParser_ = nullptr;
 };
 
 using TParserBaseRef = TSimpleSharedPtr<TParserBase>;

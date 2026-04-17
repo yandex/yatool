@@ -334,14 +334,30 @@ void TIncParserManager::AddParser(TParserBaseRef parser, const TVector<TString>&
     parser->SetParserType(type);
     ParsersByType_[static_cast<ui32>(type)] = parser;
     for (const auto& ext : extensions) {
-        Ext2Parser_[ext] = parser;
+        Ext2Parser_[ext].Parser = parser;
+    }
+}
+
+void TIncParserManager::AddParser(TUserParserBaseRef parser, const TVector<TString>& extensions) {
+    parser->SetLanguageId(NLanguages::GetLanguageIdByParserType(EIncludesParserType::EmptyParser));
+    parser->SetParserType(EIncludesParserType::EmptyParser);
+    ParsersByType_[static_cast<ui32>(EIncludesParserType::EmptyParser)] = parser;
+    for (const auto& ext : extensions) {
+        const auto lastExt = NPath::Extension(ext);
+        if (lastExt != ext) {
+            auto& baseRecord = Ext2Parser_[lastExt];
+            baseRecord.HasSpecializations = true;
+            parser->SetBaseParser(baseRecord.Parser.Get());
+        }
+        auto& record = Ext2Parser_[ext];
+        record.Parser = parser;
     }
 }
 
 void TIncParserManager::AddParsers(const TUserParsersList& parsersList) {
     for (const auto& [parser, extensions] : parsersList) {
+        AddParser(parser, extensions);
         parser->RegisterIndDepsRule(Names_);
-        AddParser(parser, extensions, EIncludesParserType::EmptyParser);
     }
 }
 
@@ -399,9 +415,13 @@ const TIndDepsRule* TIncParserManager::IndDepsRuleByPath(TFileView path) const {
 }
 
 TParserBase* TIncParserManager::FindParser(TStringBuf path) const {
-    const auto ext = NPath::Extension(path);
-    if (const TParserBaseRef* p = Ext2Parser_.FindPtr(ext)) {
-        return p->Get();
-    }
-    return nullptr;
+    const auto* record = Ext2Parser_.FindPtr(NPath::Extension(path));
+    if (!record)
+        return nullptr;
+
+    if (!record->HasSpecializations)
+        return record->Parser.Get();
+
+    const auto* specialization = Ext2Parser_.FindPtr(NPath::AllExtensions(path));
+    return specialization ? specialization->Parser.Get() : record->Parser.Get();
 }

@@ -86,14 +86,20 @@ public:
 
 private:
     void AddParser(TParserBaseRef parser, const TVector<TString>& extensions, EIncludesParserType type);
+    void AddParser(TUserParserBaseRef parser, const TVector<TString>& extensions);
     TParserBase* GetParserFor(TStringBuf fileName) const;
     TParserBase* FindOrInheritParser(TStringBuf path, const TSymbols& names, const TAddIterStack& stack) const;
     TParserBase* FindParser(TStringBuf path) const;
 
 private:
+    struct TParserRecord {
+        TParserBaseRef Parser;
+        bool HasSpecializations = false;
+    };
+
     TParsersCache Cache_;
     mutable NStats::TIncParserManagerStats Stats_{"Parsing stats"};
-    THashMap<TString, TParserBaseRef> Ext2Parser_;
+    THashMap<TString, TParserRecord> Ext2Parser_;
     TVector<TParserBaseRef> ParsersByType_;
     const TBuildConfiguration& Conf_;
     TSymbols& Names_;

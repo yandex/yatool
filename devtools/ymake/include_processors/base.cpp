@@ -68,6 +68,21 @@ void TNoInducedIncludeProcessor::ProcessIncludes(TAddDepAdaptor& node,
     ResolveAndAddLocalIncludes(node, module, incFileName, includes, {}, LanguageId);
 }
 
+bool TUserParserBase::ProcessOutputIncludes(
+    TAddDepAdaptor& node,
+    TModuleWrapper& module,
+    TFileView incFileName,
+    const TVector<TString>& includes
+) const {
+    if (BaseParser_)
+        return BaseParser_->ProcessOutputIncludes(node, module, incFileName, includes);
+
+    //TODO(DEVTOOLS-5291): add proper support of OUTPUT_INCLUDES here
+    YConfErr(MacroUse) << "OUTPUT_INCLUDES are not supported for this type of file: "
+                        << incFileName << Endl;
+    return false;
+}
+
 void AddIncludesToNode(TAddDepAdaptor& node, TVector<TString>& includes) {
     for (const auto& include : includes) {
         YDIAG(DG) << "Incl dep: " << include << Endl;
