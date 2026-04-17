@@ -101,6 +101,23 @@ namespace {
         UpdateReresolveCache(ctx, outputIncludePropType, *outputIncludes);
     }
 
+    inline TVector<TDepsCacheId> MapProps(TAddDepContext& ctx, TPropertyType type, const TVector<TDepsCacheId>& values) {
+        TVector<TDepsCacheId> res;
+        if (auto* parser = ctx.YMake.IncParserManager.GetParserFor(ctx.Graph.GetFileName(ctx.Node.ElemId))) {
+            TVector<TStringBuf> inProps;
+            inProps.reserve(values.size());
+            for (auto id: values) {
+                if (IsFile(id))
+                    inProps.push_back(ctx.Graph.GetFileName(ElemId(id)).GetTargetStr());
+            }
+
+            res.reserve(inProps.size());
+            for (auto file: parser->MapProps(ctx.Graph.Names(), type, inProps))
+                res.push_back(MakeDepFileCacheId(ctx.Graph.Names().AddName(EMNT_MissingFile, file)));
+        }
+        return res;
+    }
+
     inline void ApplyDepRules(TAddDepContext& ctx, const TAddDepContext::TPropsSearchFunction& searchProps) {
         if (!ctx.DepsRule)
             return;
@@ -113,15 +130,23 @@ namespace {
                 " deps to " << to.NodeType << " " <<
                 ctx.Graph.ToString(ctx.Graph.GetNodeById(to.NodeType, to.ElemId)) << ":" << Endl;
 
-            if (action != TIndDepsRule::EAction::Use)
-                continue;
-            const auto* values = searchProps(type);
-            if (!values) {
-                continue;
+            switch (action) {
+                case TIndDepsRule::Pass:
+                    break;
+                case TIndDepsRule::Map:
+                    if (const auto* values = searchProps(type)) {
+                        const auto mapped = MapProps(ctx, type, *values);
+                        AddInducedDepsToNode(ctx, mapped);
+                        UpdateReresolveCache(ctx, type, mapped);
+                    }
+                    break;
+                case TIndDepsRule::Use:
+                    if (const auto* values = searchProps(type)) {
+                        AddInducedDepsToNode(ctx, *values);
+                        UpdateReresolveCache(ctx, type, *values);
+                    }
+                    break;
             }
-
-            AddInducedDepsToNode(ctx, *values);
-            UpdateReresolveCache(ctx, type, *values);
         }
     }
 }

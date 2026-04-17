@@ -51,7 +51,11 @@ public:
     }
 
     TStringBuf GetName(const TDepGraph& graph) const {
-        return graph.Names().CommandConf.GetName(Repr_ >> 16).GetStr();
+        return GetName(graph.Names());
+    }
+
+    TStringBuf GetName(const TSymbols& symbols) const {
+        return symbols.CommandConf.GetName(Repr_ >> 16).GetStr();
     }
 
     TString Dump(const TDepGraph& graph) const {
@@ -75,8 +79,10 @@ struct THash<TPropertyType> {
 struct TIndDepsRule {
     enum class EAction {
         Use,
-        Pass
+        Pass,
+        Map
     };
+    using enum EAction;
     using TActions = std::vector<std::pair<TPropertyType, EAction>>;
 
     TActions Actions;

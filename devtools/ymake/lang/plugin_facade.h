@@ -84,6 +84,7 @@ class TParser {
 public:
     virtual void Execute(const TString& path, TPluginUnit& unit, TVector<TString>& includes, TPyDictReflection& inducedDeps) = 0;
     virtual const std::map<TString, TString>& GetIndDepsRule() const = 0;
+    virtual TVector<TString> MapProps(TStringBuf propType, const TVector<TStringBuf>& props) const = 0;
     virtual bool GetPassInducedIncludes() const = 0;
 
     virtual ~TParser() {

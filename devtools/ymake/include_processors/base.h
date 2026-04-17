@@ -90,6 +90,7 @@ public:
                                        TModuleWrapper& module,
                                        TFileView incFileName,
                                        const TVector<TString>& includes) const = 0;
+    virtual TVector<TString> MapProps(TSymbols&, TPropertyType, const TVector<TStringBuf>& props[[maybe_unused]]) const {return {};}
     virtual bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) = 0;
     virtual bool HasIncludeChanges(TFileContentHolder& incFile) const = 0;
     virtual const TIndDepsRule& DepsTransferRules() const = 0;

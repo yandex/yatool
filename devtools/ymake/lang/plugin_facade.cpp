@@ -89,6 +89,10 @@ public:
 
     ~TParserAdapter() noexcept override = default;
 
+    TVector<TString> MapProps(TSymbols& symbols, TPropertyType type, const TVector<TStringBuf>& props) const override {
+        return Parser_->MapProps(type.GetName(symbols), props);
+    }
+
     bool DoParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) override {
         TVector<TString> includes;
         TPyDictReflection inducedDeps;

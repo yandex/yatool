@@ -51,6 +51,32 @@ namespace {
             }
         }
 
+        TVector<TString> MapProps(TStringBuf propType, const TVector<TStringBuf>& props) const override {
+            TVector<TString> res;
+            if (props.empty())
+                return res;
+
+            NYMake::NPy::OwnedRef mapFunc{PyObject_GetAttrString(Obj_.get(), "map_includes")};
+            CheckForError();
+            NYMake::NPy::OwnedRef ptype{PyUnicode_FromStringAndSize(propType.data(), propType.size())};
+            CheckForError();
+            NYMake::NPy::OwnedRef values{PyList_New(props.size())};
+            CheckForError();
+            int i = 0;
+            for (auto prop: props) {
+                NYMake::NPy::OwnedRef item{PyUnicode_FromStringAndSize(prop.data(), prop.size())};
+                CheckForError();
+                PyList_SET_ITEM(values.get(), i++, item.Release());
+                CheckForError();
+            }
+
+            NYMake::NPy::OwnedRef mappedIncludes{PyObject_CallMethod(Obj_.get(), "map_includes", "(OO)", ptype.get(), values.get())};
+            CheckForError();
+            Flatten(mappedIncludes.get(), res);
+
+            return res;
+        }
+
         bool GetPassInducedIncludes() const override {
             return PassInducedIncludes_;
         }
