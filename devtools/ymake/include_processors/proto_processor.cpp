@@ -77,5 +77,11 @@ void TProtoIncludeProcessor::ParseProtoIncludes(TAddDepAdaptor& node,
         AddIncludesToNode(node, nativeIncludes, module);
     }
 
+    TVector<TResolveFile> rawParsedImports;
+    rawParsedImports.reserve(parsedIncludes.size());
+    for (const TString& import: parsedIncludes)
+        rawParsedImports.push_back(module.MakeUnresolved(import));
+
+    node.AddParsedIncls("raw_proto_deps", rawParsedImports);
     node.AddParsedIncls("h+cpp", hIncludes);
 }
