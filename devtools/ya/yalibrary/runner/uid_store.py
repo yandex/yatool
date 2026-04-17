@@ -141,3 +141,7 @@ class UidStore(object):
                 self._file_store.remove_uid(file_uid)
 
         self._lru_store.remove_uid(uid)
+
+    def close(self):
+        # for the sake of the interface
+        pass
