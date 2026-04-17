@@ -34,6 +34,19 @@ def main():
     return run(args)
 
 
+def get_test_env() -> dict[str, str]:
+    if "YA_TEST_CONTEXT_FILE" not in os.environ:
+        return {}
+    with open(os.environ["YA_TEST_CONTEXT_FILE"]) as f:
+        context = json.load(f)
+    env_file = context.get("internal", {}).get("env_file")
+    if not env_file or not os.path.exists(env_file):
+        return {}
+    with open(env_file) as f:
+        env = json.load(f)
+    return env
+
+
 def get_env(args: CliArgs, report_path: str):
     build_dir = os.path.join(args.build_root, args.target_path)
     bindir_node_modules_path = os.path.join(build_dir, pm_const.NODE_MODULES_DIRNAME)
@@ -45,12 +58,26 @@ def get_env(args: CliArgs, report_path: str):
         os.path.join(build_dir, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
     ]
 
-    return {
-        "PATH": args.nodejs,
-        "NODE_PATH": os.pathsep.join(node_path),
-        "NODE_OPTIONS": "--max-old-space-size=4096",
-        "YA_TEST_REPORT_PATH": report_path,
-    }
+    test_env = get_test_env()
+
+    if "NODE_PATH" in test_env:
+        node_path.append(test_env["NODE_PATH"])
+
+    node_options = test_env.get("NODE_OPTIONS", "").strip()
+    if not node_options:
+        test_env["NODE_OPTIONS"] = "--max-old-space-size=4096"
+    elif "--max-old-space-size" not in node_options:
+        test_env["NODE_OPTIONS"] = node_options + " --max-old-space-size=4096"
+
+    test_env.update(
+        {
+            "PATH": args.nodejs,
+            "NODE_PATH": os.pathsep.join(node_path),
+            "YA_TEST_REPORT_PATH": report_path,
+        }
+    )
+
+    return test_env
 
 
 def copy_files(src_dir: str, build_dir: str, files: list[str]):
