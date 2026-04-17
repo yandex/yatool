@@ -241,26 +241,16 @@ def do_cache(opts):
 
 
 def _do_collect_cache(cache, build_root, opts):
-    logger.debug('Cleaning tmp root')
-    fs.remove_tree_safe(cc.tmp_path())
-
-    logger.debug('Cleaning pycache root')
-    fs.remove_tree_safe(cc.pycache_path())
-
-    logger.debug('Cleaning snowden root')
-    fs.remove_tree_safe(os.path.join(cc.misc_root(), 'snowden'))
-
-    logger.debug('Cleaning build root')
-    fs.remove_tree_safe(os.path.join(build_root, 'build_root'))
-
-    logger.debug('Cleaning conf root')
-    fs.remove_tree_safe(os.path.join(build_root, 'conf'))
-    fs.remove_tree_safe(os.path.join(cc.misc_root(), 'conf'))
+    _rm_tree('Cleaning tmp root', cc.tmp_path())
+    _rm_tree('Cleaning pycache root', cc.pycache_path())
+    _rm_tree('Cleaning snowden root', os.path.join(cc.misc_root(), 'snowden'))
+    _rm_tree('Cleaning build root', os.path.join(build_root, 'build_root'))
+    _rm_tree('Cleaning conf root', os.path.join(build_root, 'conf'))
+    _rm_tree('Cleaning misc conf root', os.path.join(cc.misc_root(), 'conf'))
 
     errors = _clean_tools()
 
-    logger.debug('Cleaning tmp root')
-    fs.remove_tree_safe(os.path.join(cc.misc_root(), 'tmp'))
+    _rm_tree('Cleaning tmp root', os.path.join(cc.misc_root(), 'tmp'))
 
     _clean_logs()
     _clean_evlogs()
@@ -276,8 +266,8 @@ def _do_collect_cache(cache, build_root, opts):
             )
 
     if hasattr(cache, '_store_path'):
-        for dir in os.listdir(os.path.join(build_root, 'cache')):
-            full_path = os.path.join(build_root, 'cache', dir)
+        for build_dir in os.listdir(os.path.join(build_root, 'cache')):
+            full_path = os.path.join(build_root, 'cache', build_dir)
             if cache._store_path == full_path:
                 if len(glob.glob(os.path.join(full_path, '*.corrupted'))) == 0:
                     continue
@@ -312,3 +302,8 @@ def _do_collect_cache(cache, build_root, opts):
             cache.strip_max_age(opts.age_limit)
 
     return errors
+
+
+def _rm_tree(desc: str, path: str) -> None:
+    logger.debug(f'{desc} {path}')
+    fs.remove_tree_safe(path)
