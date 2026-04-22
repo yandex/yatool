@@ -85,15 +85,11 @@ importStmt:
     ;
 
 propStmt:
-    '.' propName SP? assignOp propValue
+    '.' propName SP? assignOp rvalue
     ;
 
 propName:
     ident
-    ;
-
-propValue:
-    ( ~'\n' )*
     ;
 
 comment:
