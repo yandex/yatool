@@ -523,7 +523,7 @@ namespace NYa {
         REGISTER_REDUCER(TOrphanHashesExtractReducer);
 
         bool IsYtError(const yexception& e) noexcept {
-            return dynamic_cast<const NYT::TErrorResponse*>(&e) || dynamic_cast<const NYT::TTransportError*>(&e);
+            return dynamic_cast<const NYT::TErrorResponse*>(&e);
         }
 
         bool IsYtAuthError(const yexception& e) noexcept {
