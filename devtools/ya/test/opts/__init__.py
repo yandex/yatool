@@ -1274,7 +1274,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.enable_java_contrib_coverage = False
         self.fast_clang_coverage_merge = False
         self.go_coverage = False
-        self.go_coverage_per_pkg = True  # Enabling Go 1.25 new coverage pipeline per package instead per file
+        self.go_coverage_per_pkg = False  # Enabling Go 1.25 new coverage pipeline per package instead per file
         self.java_coverage = False
         self.merge_coverage = False
         self.nlg_coverage = False
