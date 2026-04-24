@@ -157,10 +157,6 @@ class TsCheckSuite(BaseFrontendSuite):
         # by convention style tests are cached by default
         return self.class_type == test_const.SuiteClassType.STYLE
 
-    @property
-    def test_run_cwd(self):
-        return self.test_for_path
-
     def _abs_source_path(self, path, arc_root=yalibrary.graph.const.SOURCE_ROOT):
         prefix = os.path.join(arc_root, self.target_path)
         return path if path.startswith(prefix) else os.path.normpath(os.path.join(prefix, path))

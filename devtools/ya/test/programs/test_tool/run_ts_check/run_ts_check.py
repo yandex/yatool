@@ -42,8 +42,12 @@ def get_test_env() -> dict[str, str]:
     env_file = context.get("internal", {}).get("env_file")
     if not env_file or not os.path.exists(env_file):
         return {}
+    env = {}
     with open(env_file) as f:
-        env = json.load(f)
+        for line in f:
+            line = line.strip()
+            if line:
+                env.update(json.loads(line))
     return env
 
 
