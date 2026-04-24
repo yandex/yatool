@@ -103,7 +103,8 @@ namespace {
 
     inline TVector<TDepsCacheId> MapProps(TAddDepContext& ctx, TPropertyType type, const TVector<TDepsCacheId>& values) {
         TVector<TDepsCacheId> res;
-        if (auto* parser = ctx.YMake.IncParserManager.GetParserFor(ctx.Graph.GetFileName(ctx.Node.ElemId))) {
+        TFileView tgtFile = ctx.Graph.GetFileName(ctx.Node.ElemId);
+        if (auto* parser = ctx.YMake.IncParserManager.GetParserFor(tgtFile)) {
             TVector<TStringBuf> inProps;
             inProps.reserve(values.size());
             for (auto id: values) {
@@ -112,7 +113,7 @@ namespace {
             }
 
             res.reserve(inProps.size());
-            for (auto file: parser->MapProps(ctx.Graph.Names(), type, inProps))
+            for (auto file: parser->MapProps(ctx.Graph.Names(), tgtFile, type, inProps))
                 res.push_back(MakeDepFileCacheId(ctx.Graph.Names().AddName(EMNT_MissingFile, file)));
         }
         return res;

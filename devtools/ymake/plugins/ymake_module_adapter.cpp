@@ -51,7 +51,7 @@ namespace {
             }
         }
 
-        TVector<TString> MapProps(TStringBuf propType, const TVector<TStringBuf>& props) const override {
+        TVector<TString> MapProps(TStringBuf path, TStringBuf propType, const TVector<TStringBuf>& props) const override {
             TVector<TString> res;
             if (props.empty())
                 return res;
@@ -59,6 +59,8 @@ namespace {
             NYMake::NPy::OwnedRef mapFunc{PyObject_GetAttrString(Obj_.get(), "map_includes")};
             CheckForError();
             NYMake::NPy::OwnedRef ptype{PyUnicode_FromStringAndSize(propType.data(), propType.size())};
+            CheckForError();
+            NYMake::NPy::OwnedRef pypath{PyUnicode_FromStringAndSize(path.data(), path.size())};
             CheckForError();
             NYMake::NPy::OwnedRef values{PyList_New(props.size())};
             CheckForError();
@@ -70,7 +72,7 @@ namespace {
                 CheckForError();
             }
 
-            NYMake::NPy::OwnedRef mappedIncludes{PyObject_CallMethod(Obj_.get(), "map_includes", "(OO)", ptype.get(), values.get())};
+            NYMake::NPy::OwnedRef mappedIncludes{PyObject_CallMethod(Obj_.get(), "map_includes", "(OOO)", pypath.get(), ptype.get(), values.get())};
             CheckForError();
             Flatten(mappedIncludes.get(), res);
 
