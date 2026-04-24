@@ -217,6 +217,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
             raise YaPackageException(
                 "Cannot choose target platforms between passed via ya package --target-platform and specified in json"
             )
+        # target-platform-ids will go here as a list of ids corresponding to platforms
+        # ensure that build-type is also in build_info otherwise ignore id or raise (because match is unreliable)
     else:
         target_platforms = params.target_platforms
 

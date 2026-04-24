@@ -11,6 +11,9 @@ from .platform_params_core import (  # noqa: F401
 
 
 def stringize_toolchain(tc):
+    if tc.get('platform_id'):
+        return tc['platform_id']
+
     platform = []
     platform.append(stringize_platform(tc['platform']['target']).lower())
     if tc.get('build_type'):

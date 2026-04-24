@@ -37,6 +37,7 @@ def build_graph_cache_dirname(target_tc_orig: dict, cache_dir_root: str, platfor
     target_tc.pop("targets", None)
     target_tc.pop("executable_path", None)
     target_tc.pop("tool_var", None)
+    target_tc.pop("platform_id", None)
 
     json_str = json.dumps(target_tc, sort_keys=True)
 

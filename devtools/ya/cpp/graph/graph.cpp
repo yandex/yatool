@@ -39,6 +39,15 @@ namespace NYa::NGraph {
         }
     }
 
+    void TGraph::SetPlatformId(const TGraphString platformId) {
+        if (!platformId) {
+            return;
+        }
+        for (TNodePtr node : Graph) {
+            node->PlatformId = platformId;
+        }
+    }
+
     void TGraph::AddHostMark(bool sandboxing) {
         for (TNodePtr node : Graph) {
             node->HostPlatform = true;
@@ -167,6 +176,8 @@ namespace NYa::NGraph {
         }
         mvNode->Tags = old->Tags;
         mvNode->HostPlatform = old->HostPlatform;
+        mvNode->Platform = old->Platform;
+        mvNode->PlatformId = old->PlatformId;
 
         return mvNode;
     }

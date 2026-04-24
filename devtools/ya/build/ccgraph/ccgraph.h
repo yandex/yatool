@@ -48,6 +48,10 @@ namespace NYa::NCCGraph {
         graph->SetPlatform(platform);
     }
 
+    inline void SetPlatformId(TGraphPtr graph, NYa::NGraph::TGraphString platformId) {
+        graph->SetPlatformId(platformId);
+    }
+
     inline void AddHostMark(TGraphPtr graph, bool sandboxing) {
         graph->AddHostMark(sandboxing);
     }

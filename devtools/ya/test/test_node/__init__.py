@@ -333,7 +333,7 @@ class TestFramer(object):
             ctx_str = json.dumps(context, indent=2, sort_keys=True, separators=(",", ": "))
             uid = uid_gen.get_uid([output, ctx_str], 'test-ctx-gen')
 
-            tags, platform = gen_plan.prepare_tags(self.platform, {}, self.opts)
+            tags, platform, platform_id = gen_plan.prepare_tags(self.platform, {}, self.opts)
 
             node = {
                 "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
@@ -359,6 +359,8 @@ class TestFramer(object):
                 'tags': tags,
                 'platform': platform,
             }
+            if platform_id:
+                node['platform_id'] = platform_id
 
             self.graph.append_node(node, add_to_result=False)
             self.context_generator_cache[platform_descriptor] = uid
@@ -942,6 +944,10 @@ def create_test_node(
     platform = platform_descriptor.get('platform_name', '').lower()
     if platform:
         node["platform"] = platform
+
+    platform_id = platform_descriptor.get('platform_id')
+    if platform_id:
+        node["platform_id"] = platform_id
 
     build_tags = [t for _, d in suite.get_build_deps() for t in d.get('tags')]
     if build_tags:

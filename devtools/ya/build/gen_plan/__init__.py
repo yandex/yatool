@@ -28,6 +28,10 @@ TRUNK_PATH = '/arc/trunk/arcadia'
 DISTBUILD_API_VERSION = 2
 
 
+class PlatformNameError(Exception):
+    pass
+
+
 def gen_plan(opts):
     return _gen_arc_graph_file(opts)
 
@@ -603,22 +607,26 @@ def _fmt_tag(k, v):
 
 
 # See build_graph_and_tests::iter_target_flags
-def prepare_tags(tc, extra_flags, opts):
+def prepare_tags(tc, extra_flags, opts, validate_platform_id=False):
     tags = []
 
     flags = copy.deepcopy(tc.get('flags', {}))
 
     flags.update({k: v for k, v in extra_flags.items() if k in PLATFORM_FLAGS})
 
-    platform = pm.stringize_platform(tc['platform']['target']).lower()
+    tags.append(platform := pm.stringize_platform(tc['platform']['target']).lower())
+    tags.append(build_type := real_build_type(tc, opts))
 
-    tags.append(platform)
-    tags.append(real_build_type(tc, opts))
+    if platform_id := tc.get('platform_id'):
+        if validate_platform_id and not platform_id.startswith(f'{platform}-{build_type}'):
+            raise PlatformNameError(
+                f'Platform id {platform_id} must start with base platform "{platform}-{build_type}" ({tc})'
+            )
 
     if flags:
         tags.extend(sorted([_f for _f in [_fmt_tag(k, v) for k, v in flags.items()] if _f]))
 
-    return tags, platform
+    return tags, platform, platform_id
 
 
 def _calculate_stats_uid(node):

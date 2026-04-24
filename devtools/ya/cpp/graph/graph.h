@@ -116,6 +116,7 @@ namespace NYa::NGraph {
             ((TTinyMap<TGraphString, NJson::TJsonValue>) Kv, "", NYa::NEdl::EMemberExportPolicy::ALWAYS),
             ((TGraphString) NodeType, "node-type"),
             ((TGraphString) Platform),
+            ((TGraphString) PlatformId),
             ((TGraphString) Tag),
             ((TNodeResources) Resources),
             ((TOutputs) DirOutputs),
@@ -167,6 +168,7 @@ namespace NYa::NGraph {
         void AddGlobalResources(const TVector<TGlobalResource>& resources);
         void SetTags(const TVector<TGraphString>& tags);
         void SetPlatform(const TGraphString platform);
+        void SetPlatformId(const TGraphString platformId);
         void AddHostMark(bool sandboxing);
         void AddToolDeps();
         void AddSandboxingMark();

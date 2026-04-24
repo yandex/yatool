@@ -46,6 +46,7 @@ cdef extern from "devtools/ya/build/ccgraph/ccgraph.h" namespace "NYa::NCCGraph"
     TVector[TGlobalResource] GetGlobalResources(TGraphPtr graph) except+
     void SetTags(TGraphPtr graph, const TVector[TGraphString]& tags) except+
     void SetPlatform(TGraphPtr graph, TGraphString platform) except+
+    void SetPlatformId(TGraphPtr graph, TGraphString platformId) except+
     void AddHostMark(TGraphPtr graph, bool sandboxing) except+
     void AddToolDeps(TGraphPtr graph) except+
     void AddSandboxingMark(TGraphPtr graph) except+
@@ -99,6 +100,11 @@ cdef class Graph:
         cdef TGraphString ccplatform
         FromPyObject(platform, ccplatform)
         SetPlatform(self.graph, ccplatform)
+
+    def set_platform_id(self, platform_id):
+        cdef TGraphString cc_platform_id
+        FromPyObject(platform_id, cc_platform_id)
+        SetPlatformId(self.graph, cc_platform_id)
 
     def add_host_mark(self, sandboxing):
         AddHostMark(self.graph, sandboxing)

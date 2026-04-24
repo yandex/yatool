@@ -58,6 +58,7 @@ GraphNode = TypedDict(
         'kv': dict[str, str],
         'node-type': str,
         'platform': str,
+        'platform_id': NotRequired[str],
         'uid': GraphNodeUid,
         'deps': list[GraphNodeUid],
         'outputs': list[str],

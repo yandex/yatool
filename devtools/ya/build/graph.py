@@ -207,13 +207,16 @@ class _NodeGen:
         }
         if tared_outputs:
             ret['tared_outputs'] = tared_outputs
-        self.extra_nodes.append(self.copy_tags(node, ret))
+        self.extra_nodes.append(self.copy_platform_and_tags(node, ret))
         return ret['uid']
 
-    def copy_tags(self, fr, to):
-        tags = fr.get('tags', None)
-        if tags:
+    def copy_platform_and_tags(self, fr, to):
+        if tags := fr.get('tags', None):
             to['tags'] = tags
+        if platform := fr.get('platform'):
+            to['platform'] = platform
+        if platform_id := fr.get('platform_id'):
+            to['platform_id'] = platform_id
         return to
 
     def gen_and_save_graph_node(self, uid, deps, inputs, outputs, cmd, tags):
@@ -273,7 +276,7 @@ def _merge_nodes(x, y):
         'cmds': list(_iter_cmds(y)) + list(_iter_cmds(x)),
     }
 
-    for k in ('cache', 'target_properties', 'platform', 'priority', 'kv'):
+    for k in ('cache', 'target_properties', 'platform', 'platform_id', 'priority', 'kv'):
         if k in x:
             ret[k] = x[k]
 
@@ -368,10 +371,12 @@ def _gen_rename_nodes(graph: graph_descr.DictGraph, host_tool_resolver: "_HostTo
         for u in uids_to_rename:
             node = uid_map[u]
 
-            # We would like to preserve resaonably-sized prefixes, but trim longer ones
-            prefix = '-'.join(node.get('tags', [u]))
-            if len(prefix) > 64:
-                prefix = '{}..{}'.format(prefix[:54], hashing.md5_value(prefix)[:8])
+            prefix = node.get('platform_id')
+            if not prefix:
+                # We would like to preserve resaonably-sized prefixes, but trim longer ones
+                prefix = '-'.join(node.get('tags', [u]))
+                if len(prefix) > 64:
+                    prefix = '{}..{}'.format(prefix[:54], hashing.md5_value(prefix)[:8])
 
             yield node_gen.gen_rename_node(node, '.' + prefix)
 
@@ -1501,6 +1506,7 @@ class _GraphMaker:
 
         assert to_build_pic or to_build_no_pic
 
+        pic_only = to_build_pic and not to_build_no_pic
         platform_id = self._make_debug_id(debug_id, None)
         pic = None
         no_pic = None
@@ -1625,6 +1631,7 @@ class _GraphMaker:
                         no_ymake_retry=self._opts.no_ymake_retry,
                         tool_targets_queue_putter=pic_queue_putter,
                         ymake_opts=ymake_opts_pic,
+                        pic_only=pic_only,
                     )
                 except Exception:
                     # this is merely a workaround to stop multiconfig if there is an error in ymake command generation
@@ -1666,6 +1673,7 @@ class _GraphMaker:
         no_ymake_retry=False,
         tool_targets_queue_putter=None,
         ymake_opts=None,
+        pic_only=False,
     ):
         return self._prepare_graph(
             flags,
@@ -1681,6 +1689,7 @@ class _GraphMaker:
             no_ymake_retry=no_ymake_retry,
             tool_targets_queue_putter=tool_targets_queue_putter,
             ymake_opts=ymake_opts,
+            pic_only=pic_only,
         )
 
     def _build_no_pic(
@@ -1734,12 +1743,13 @@ class _GraphMaker:
         tool_targets_queue_putter=None,
         pic_queue_putter=None,
         ymake_opts=None,
+        pic_only=False,
     ):
         cache_subdir = None
         if cache_dir:
             cache_subdir = cache_dir if extra_tag is None else os.path.join(cache_dir, extra_tag)
             exts.fs.ensure_dir(cache_subdir)
-        tags, platform = gen_plan.prepare_tags(target_tc, flags, self._opts)
+        tags, platform, platform_id_base = gen_plan.prepare_tags(target_tc, flags, self._opts)
         with stager.scope("gen-graph-{}".format(_shorten_debug_id(debug_id))):
             result = self._gen_graph(
                 flags,
@@ -1758,6 +1768,11 @@ class _GraphMaker:
             )
         result.graph.set_tags(tags + ([extra_tag] if extra_tag else []))
         result.graph.set_platform(platform)
+        if platform_id := platform_id_base:
+            # don't apply pic tag in pic-only cases
+            if extra_tag and (extra_tag != 'pic' or not pic_only):
+                platform_id = f"{platform_id}-{extra_tag}"
+            result.graph.set_platform_id(platform_id)
         return result
 
     def _gen_graph(
@@ -2238,6 +2253,7 @@ def _build_graph_and_tests(
     logger.debug('host toolchain: %s', json.dumps(host_tc, indent=4, sort_keys=True))
 
     for tc in target_tcs:
+        _validate_platform_id(tc, opts)
         logger.debug('target toolchain: %s', json.dumps(tc, indent=4, sort_keys=True))
 
     platforms_info = {
@@ -2610,9 +2626,20 @@ def _needs_wine_for_tests(test_target_platforms, archs=None):
     return False
 
 
+def _validate_platform_id(tc, opts):
+    if not tc.get('platform_id'):
+        return
+    try:
+        gen_plan.prepare_tags(tc, {}, opts, validate_platform_id=True)
+    except gen_plan.PlatformNameError as e:
+        raise devtools.ya.core.yarg.ArgsBindingException(e)
+
+
 # See build_graph_and_tests::iter_target_flags
 def _get_target_platform_descriptor(target_tc, opts):
-    tags, platform = gen_plan.prepare_tags(target_tc, {}, opts)
+    tags, platform, platform_id = gen_plan.prepare_tags(target_tc, {}, opts)
+    if platform_id:
+        return platform_id
     return "-".join(tags) if tags else platform
 
 
@@ -3045,6 +3072,10 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
 
     graph_tools.add_host_mark(strtobool(host_tc['flags'].get('SANDBOXING', "no")))
     graph_tools.add_tool_deps()
+
+    hid = getattr(opts, 'host_platform_id', None)
+    if hid:
+        graph_tools.set_platform_id(hid)
 
     return graph_tools
 
@@ -3543,6 +3574,8 @@ def build_lite_graph(graph):
             'uid',
             'target_properties',
             'node-type',
+            'platform',
+            'platform_id',
             'tags',
             'java_tags',
             'inputs',

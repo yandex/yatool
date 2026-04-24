@@ -20,6 +20,8 @@ def make_platform_params(pl):
     Example input: 'default-linux-x86_64,relwithdebinfo,tests,AUTOCHECK=yes'
     Example output: ['--target-platform', 'default-linux-x86_64', '--target-platform-build-type',
                      'relwithdebinfo', '--target-platform-tests', '--target-platform-flag', 'AUTOCHECK=yes']
+
+    Use ``id=myname`` for ``--target-platform-id myname``.
     """
 
     def _make_platform_param(p):
@@ -29,6 +31,8 @@ def make_platform_params(pl):
             return ['--target-platform-regular-tests']
         elif p in BUILD_TYPES:
             return ['--target-platform-build-type', p]
+        elif p.startswith('id='):
+            return ['--target-platform-id', p.split('=', 1)[1]]
         else:
             return ['--target-platform-flag', p]
 

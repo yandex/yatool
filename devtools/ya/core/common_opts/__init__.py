@@ -1,6 +1,6 @@
 import logging
 import os
-
+import re
 import six
 
 
@@ -626,6 +626,7 @@ class CrossCompilationOptions(Options):
         self.cxx_compiler = None
         self.host_platform = None
         self.host_platform_flags = {}
+        self.host_platform_id = None
         self.host_build_type = 'release'
         self.target_platforms = []
         self.platform_schema_validation = False
@@ -640,6 +641,7 @@ class CrossCompilationOptions(Options):
             'flags': {},
             'c_compiler': None,
             'cxx_compiler': None,
+            'platform_id': None,
         }
 
     @staticmethod
@@ -693,6 +695,7 @@ class CrossCompilationOptions(Options):
             'test_size_filters',
             'test_class_filters',
             'ignore_recurses',
+            'platform_id',
         }
 
         wrong_keys = set(data.keys()) - valid_keys
@@ -707,7 +710,7 @@ class CrossCompilationOptions(Options):
 
         platform_name = data.get('platform_name', "UNSET")
 
-        for str_attr in ('platform_name', 'build_type'):
+        for str_attr in ('platform_name', 'build_type', 'platform_id'):
             if data.get(str_attr) is None:
                 continue
 
@@ -789,6 +792,14 @@ class CrossCompilationOptions(Options):
             ),
             ConfigConsumer('host_platform_flags', hook=DictUpdateHook('host_platform_flags')),
             ArgConsumer(
+                ['--host-platform-id'],
+                help='User-defined platform name for reports etc.; all --target-platform-id values must be distinct in one run',
+                hook=SetValueHook('host_platform_id'),
+                group=PLATFORM_CONFIGURATION_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            ConfigConsumer('host_platform_id'),
+            ArgConsumer(
                 ['--c-compiler'],
                 help='Specifies path to the custom compiler for the host and target platforms',
                 hook=SetValueHook('c_compiler'),
@@ -812,6 +823,13 @@ class CrossCompilationOptions(Options):
                 ),
                 group=PLATFORM_CONFIGURATION_GROUP,
                 visible=HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--target-platform-id'],
+                help='Stable id for this target platform (build/test reports, graph tags); must be unique per run',
+                hook=CrossCompilationOptions.PlatformsSetExtraParamHook('target_platform_id', 'platform_id'),
+                group=PLATFORM_CONFIGURATION_GROUP,
+                visible=HelpLevel.EXPERT,
             ),
             ArgConsumer(
                 ['--target-platform-build-type'],
@@ -939,8 +957,52 @@ class CrossCompilationOptions(Options):
 
         return consumers
 
+    @staticmethod
+    def _normalize_single_platform_id(raw, field_label):
+        if not isinstance(raw, six.string_types):
+            raise ArgsValidatingException('{} must be a string, not {}'.format(field_label, type(raw)))
+        pid = raw.strip()
+        if not pid:
+            raise ArgsValidatingException('{} must not be empty'.format(field_label))
+        if not re.fullmatch(r'[\w-]+', pid):
+            raise ArgsValidatingException(
+                '{} must contain only alphanumeric characters, hyphens and underscores: {}'.format(
+                    field_label, repr(pid)
+                )
+            )
+        return pid
+
+    def _normalize_and_validate_platform_ids(self):
+        # Always enforced; not part of _validate_platform_list (that path is optional when schema validation is off).
+        seen_platform_ids = set()
+
+        for pl in self.target_platforms:
+            raw = pl.get('platform_id')
+            if raw is None:
+                continue
+            if raw == '':
+                # Allow to override platform_id set elsewhere
+                del pl['platform_id']
+                continue
+            pid = self._normalize_single_platform_id(raw, 'platform_id')
+            if pid in seen_platform_ids:
+                raise ArgsValidatingException('Duplicate --target-platform-id: {}'.format(pid))
+            seen_platform_ids.add(pid)
+            pl['platform_id'] = pid
+
+        hid_raw = self.host_platform_id
+        if hid_raw is None:
+            return
+        hid = self._normalize_single_platform_id(hid_raw, 'host_platform_id')
+        if hid in seen_platform_ids:
+            raise ArgsValidatingException(
+                'Duplicate platform_id between --host-platform-id and a target: {}'.format(repr(hid))
+            )
+        self.host_platform_id = hid
+
     def postprocess(self):
         self._validate_platform_list(self.target_platforms)
+        self._normalize_and_validate_platform_ids()
 
         # for pl in self.target_platforms:
         #     if pl.get('run_tests'):

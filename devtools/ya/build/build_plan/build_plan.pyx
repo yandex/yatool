@@ -47,7 +47,7 @@ class BuildPlan(object):
 
     @staticmethod
     def node_platform(item):
-        return '-'.join(item.get('tags', [])) or cp.my_platform()
+        return item.get('platform_id') or '-'.join(item.get('tags', [])) or cp.my_platform()
 
     def get_project_uids(self, project):
         project = os.path.normpath(project)
