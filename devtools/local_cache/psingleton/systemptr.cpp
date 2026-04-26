@@ -19,7 +19,7 @@
 #include <util/stream/file.h>
 #include <util/string/cast.h>
 
-#include <contrib/libs/grpc/src/proto/grpc/health/v1/health.grpc.pb.h>
+#include <contrib/proto/grpc/grpc/health/v1/health.grpc.pb.h>
 #include <contrib/libs/grpc/include/grpcpp/create_channel.h>
 #include <contrib/libs/grpc/include/grpcpp/resource_quota.h>
 #include <contrib/libs/grpc/include/grpcpp/security/credentials.h>

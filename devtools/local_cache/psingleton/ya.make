@@ -4,7 +4,7 @@ PEERDIR(
     devtools/local_cache/common/logger-utils
     library/cpp/logger/global
     contrib/libs/grpc
-    contrib/libs/grpc/src/proto/grpc/health/v1
+    contrib/proto/grpc/grpc/health/v1
 )
 
 SRCS(

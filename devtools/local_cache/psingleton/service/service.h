@@ -2,7 +2,7 @@
 
 #include "devtools/local_cache/psingleton/proto/known_service.grpc.pb.h"
 
-#include <contrib/libs/grpc/src/proto/grpc/health/v1/health.grpc.pb.h>
+#include <contrib/proto/grpc/grpc/health/v1/health.grpc.pb.h>
 
 #include <library/cpp/logger/log.h>
 
