@@ -14,6 +14,7 @@ import devtools.ya.test.common as test_common
 import yalibrary.term.console as term_console
 from devtools.ya.build.reports import configure_error as ce
 from exts.fs import create_dirs, ensure_removed
+from exts.hashing import md5_value
 import devtools.ya.build.owners as ow
 from devtools.ya.test import const as constants
 from devtools.ya.test.const import Status, TestSize
@@ -298,7 +299,14 @@ def make_target_entry(
         entry['name'] = module_tag
 
     if errors:
-        messages_file = os.path.join(messages_dir, target_name, "{}-{}.txt".format(message_type, toolchain))
+        extension = '.txt'
+        filename = f"{message_type}-{toolchain}{extension}"
+        if len(filename) > 255:
+            # Because OSError: Filename too long
+            name_hash = md5_value(filename)
+            safe_length = 255 - 5 - len(name_hash) - len(extension)  # -5 just in case
+            filename = f"{filename[:safe_length]}_{name_hash}{extension}"
+        messages_file = os.path.join(messages_dir, target_name, filename)
         create_dirs(os.path.dirname(messages_file))
 
         errors_text = test_common.to_utf8("\n\n".join(get_error_message(error) for error in errors))
