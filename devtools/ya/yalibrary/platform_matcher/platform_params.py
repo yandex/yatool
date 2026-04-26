@@ -7,13 +7,11 @@ from .platform_params_core import (  # noqa: F401
     make_yamake_options,
     transform_toolchain,
     get_target_platform_alias,
+    get_platform_id_from_string,
 )
 
 
 def stringize_toolchain(tc):
-    if tc.get('platform_id'):
-        return tc['platform_id']
-
     platform = []
     platform.append(stringize_platform(tc['platform']['target']).lower())
     if tc.get('build_type'):
@@ -32,5 +30,7 @@ def stringize_toolchain(tc):
     flags = tc.get('flags', {})
     for k in sorted(flags):
         platform.append('{}={}'.format(k, flags[k]))
+    if tc.get('platform_id'):
+        platform.append('id={}'.format(tc['platform_id']))
 
     return ','.join(platform)

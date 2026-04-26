@@ -66,6 +66,7 @@ from yalibrary.toolscache import (
     post_local_cache_report,
     tc_force_gc,
 )
+import yalibrary.platform_matcher as pm
 from devtools.ya.build.cache_kind import CacheKind
 from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 
@@ -164,7 +165,11 @@ class DisplayMessageSubscriber(event_handling.SubscriberSpecifiedTopics):
         where = 'in [[imp]]{}[[rst]]'.format(event['Where']) if 'Where' in event else ''
         if len(where):
             where += ':{}:{}: '.format(event['Row'], event['Column']) if 'Row' in event and 'Column' in event else ': '
-        platform = '{{{}}} '.format(event['Platform']) if 'Platform' in event else ''
+        platform = (
+            '{{{}}} '.format(pm.get_platform_id_from_string(event['Platform']) or event['Platform'])
+            if 'Platform' in event
+            else ''
+        )
 
         msg = '{}[[{}]]{}{}[[rst]]: {}{}'.format(platform, event['Mod'], severity, sub, where, data)
         if msg not in self._printed and (self._opts.be_verbose or severity != 'Debug'):
@@ -192,7 +197,11 @@ class PrintMessageSubscriber(event_handling.SubscriberLoggable):
     def _action(self, event):
         # type: (dict) -> None
         if event['_typename'] == 'NEvent.TDisplayMessage' and event['Type'] == 'Error' and 'Where' in event:
-            platform = '{{{}}}: '.format(event['Platform']) if 'Platform' in event else ''
+            platform = (
+                '{{{}}}: '.format(pm.get_platform_id_from_string(event['Platform']) or event['Platform'])
+                if 'Platform' in event
+                else ''
+            )
             self.errors[event['Where']].add(
                 ce.ConfigureError(platform + event['Message'].strip(), event.get('Row', 0), event.get('Column', 0))
             )

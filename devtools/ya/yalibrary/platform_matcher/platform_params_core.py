@@ -67,6 +67,22 @@ def make_yamake_options(platforms=None, build_vars=None, host_platform_flags=Non
     return result
 
 
+def get_platform_id_from_string(toolchain_string):
+    """
+    Extract the explicit platform id from a toolchain string if present.
+
+    Returns the value of the ``id=`` token if found, otherwise ``None``.
+
+    Example:
+        'default-linux-x86_64,relwithdebinfo,id=default-linux-x86_64-relwithdebinfo-autocheck' -> 'default-linux-x86_64-relwithdebinfo-autocheck'
+        'default-linux-x86_64,relwithdebinfo'                                                  -> None
+    """
+    for token in toolchain_string.split(',')[1:]:
+        if token.startswith('id='):
+            return token.split('=', 1)[1]
+    return None
+
+
 def transform_toolchain(alias, target_platforms, toolchain_transforms):
     """
     Find the matching target platform params for a given alias.
@@ -80,6 +96,15 @@ def transform_toolchain(alias, target_platforms, toolchain_transforms):
         List of platform params or None if not found
     """
     # XXX: remove after DEVTOOLS-6216
+
+    # Fast path: platform with an explicit id=<alias> token.
+    # Also handles the -pic variant: alias 'my-alias-pic' matches a platform with id=my-alias.
+    base_alias = alias[:-4] if alias.endswith('-pic') else None
+    for target_platform in target_platforms:
+        platform_id = get_platform_id_from_string(target_platform)
+        if platform_id == alias or (base_alias and platform_id == base_alias):
+            logger.debug('Found platform by id for alias %s: %s', alias, target_platform)
+            return make_platform_params(target_platform)
 
     platforms_params = {}
     for target_platform in target_platforms:
@@ -172,9 +197,15 @@ def get_target_platform_alias(toolchain_string, toolchain_transforms):
     Returns:
         Alias string or None if not found
     """
+    # Fast path: toolchain string carries an explicit id= token
+    platform_id = get_platform_id_from_string(toolchain_string)
+    if platform_id:
+        logger.debug('Found platform id directly from toolchain string: %s', platform_id)
+        return platform_id
+
     toolchain_chunks = []
     for chunk in toolchain_string.split(','):
-        if not chunk.startswith(('test', 'regular-tests')):
+        if not chunk.startswith(('test', 'regular-tests', 'id=')):
             toolchain_chunks.append(chunk)
 
     if len(toolchain_chunks) == 1 or toolchain_chunks[1] not in ('release', 'debug', 'relwithdebinfo', 'minsizerel'):
