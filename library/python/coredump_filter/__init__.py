@@ -19,13 +19,19 @@ if six.PY3:
 else:
     from cgi import escape as html_escape
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
-class CoredumpMode(enum.Enum):
+class CoredumpMode(str, enum.Enum):
     GDB = "gdb"
     LLDB = "lldb"
     SDC_ASSERT = "sdc_assert"
+
+
+class BadFramePolicy(str, enum.Enum):
+    WARN = "warn"
+    RAISE = "error"
+    KEEP_AS_RAW = "keep_as_raw"
 
 
 ARCADIA_ROOT_LINK = "https://a.yandex-team.ru/arc/trunk/arcadia/"
@@ -398,7 +404,7 @@ class FrameBase(object):
         )
         return six.text_type(template).format(
             frame=self.frame_no,
-            func=highlight_func(self.func.replace("&", "&amp;").replace("<", "&lt;")),
+            func=highlight_func(html_escape(self.func)),
             source=source,
             source_fmt=source_fmt,
         )
@@ -416,6 +422,37 @@ class FrameBase(object):
             link = link + "#L{line_no}".format(line_no=self.source_no)
 
         return link
+
+
+class RawFrame(FrameBase):
+    """
+    Frame that represents unparsed line from stack trace.
+    Used when line doesn't match any standard patterns but we still want to keep it.
+    """
+
+    def __init__(self, raw_line):
+        super(RawFrame, self).__init__(
+            frame_no=None,
+            addr="",
+            func=raw_line,  # Store raw line in func field
+            source="",
+            source_no="",
+            func_name="",
+        )
+        self.raw_line = raw_line
+
+    def __str__(self):
+        return "[RAW] {}".format(self.raw_line)
+
+    def fingerprint(self):
+        # Raw frames don't contribute to fingerprint
+        return ""
+
+    def raw(self):
+        return self.raw_line
+
+    def html(self):
+        return '<span class="frame-raw" style="color: #999;">{}</span>\n'.format(html_escape(self.raw_line))
 
 
 class LLDBFrame(FrameBase):
@@ -660,6 +697,7 @@ class SDCAssertFrame(LLDBFrame):
 
 
 class Stack(object):
+    REGEXPS = []  # type: list[re.Pattern]
     # priority classes
     LOW_IMPORTANT = 25
     DEFAULT_IMPORTANT = 50
@@ -733,7 +771,7 @@ class Stack(object):
         fingerprint_hash=None,
         stream=None,
         mode=None,  # type: CoredumpMode
-        ignore_bad_frames=True,
+        bad_frame_policy=BadFramePolicy.WARN,  # type: BadFramePolicy
         commit_hash=None,  # type: str | None
     ):
         self.lines = lines
@@ -752,7 +790,7 @@ class Stack(object):
         self.fingerprint_hash = fingerprint_hash
         self.stack_fp = stack_fp
         self.stream = stream
-        self.ignore_bad_frames = ignore_bad_frames
+        self.bad_frame_policy = bad_frame_policy
         self.commit_hash = commit_hash
 
     def to_json(self):
@@ -844,19 +882,25 @@ class Stack(object):
                     break
 
             if not match_found:
-                self.bad_frame(line)
+                self.process_bad_frame(line)
 
-    def bad_frame(self, line):
-        if self.ignore_bad_frames:
-            logger.warning("Bad frame: %s", line)
+    def process_bad_frame(self, line):  # type: (str) -> None
+        if self.bad_frame_policy == BadFramePolicy.KEEP_AS_RAW:
+            frame = RawFrame(line)
+            self.frames.append(frame)
             return
 
-        raise Exception(
-            "Bad frame: `{}`, frame `{}`".format(
-                line,
-                self.debug(return_result=True),
+        if self.bad_frame_policy == BadFramePolicy.WARN:
+            LOGGER.warning("Bad frame: %s", line)
+            return
+
+        if self.bad_frame_policy == BadFramePolicy.RAISE:
+            raise Exception(
+                "Bad frame: `{}`, frame `{}`".format(
+                    line,
+                    self.debug(return_result=True),
+                )
             )
-        )
 
     def debug(self, return_result=False):
         if self.low_important():
@@ -1136,7 +1180,7 @@ def parse_python_traceback_2(
         in_function_name = m.group("func_name")
         error_line_no = m.group("error_line_no")
         error_column_selector = ""
-        if not PythonFrame.SOURCE_RE.match(trace[line_index + 1].strip()):
+        if line_index + 1 < len(trace) and not PythonFrame.SOURCE_RE.match(trace[line_index + 1].strip()):
             error_line = trace[line_index + 1]
             next_index = line_index + 2
             if next_index < len(trace) and trace[next_index].strip().startswith("^"):
@@ -1236,8 +1280,8 @@ def filter_stack_dump(
     sandbox_failed_task_id=None,
     output_stream=None,
     timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    ignore_bad_frames=True,
-    commit_hash=None,
+    bad_frame_policy=BadFramePolicy.WARN,  # type: BadFramePolicy
+    commit_hash=None,  # type: str | None
 ):
     """New interface for stacktrace filtering. Preferred to use."""
     if not core_text and not stack_file_name:
@@ -1255,7 +1299,7 @@ def filter_stack_dump(
 
     return filter_stackdump(
         file_lines=core_lines,
-        ignore_bad_frames=ignore_bad_frames,
+        bad_frame_policy=bad_frame_policy,
         mode=mode,
         sandbox_failed_task_id=sandbox_failed_task_id,
         stream=output_stream,
@@ -1280,8 +1324,8 @@ class StackDumperBase(object):
         timestamp,
         mode,
         file_name=None,
-        ignore_bad_frames=True,
-        commit_hash=None,
+        bad_frame_policy=BadFramePolicy.WARN,  # type: BadFramePolicy
+        commit_hash=None,  # type: str | None
     ):
         self.source_root = SourceRoot()
         self.use_fingerprint = use_fingerprint
@@ -1292,7 +1336,7 @@ class StackDumperBase(object):
         self.file_name = file_name
         self.file_lines = file_lines
         self.timestamp = timestamp
-        self.ignore_bad_frames = ignore_bad_frames
+        self.bad_frame_policy = bad_frame_policy
         self.stack_class = self.get_stack_class(mode)
         self.commit_hash = commit_hash
 
@@ -1336,7 +1380,7 @@ class StackDumperBase(object):
             source_root=self.source_root,
             thread_id=thread_id,
             stream=self.stream,
-            ignore_bad_frames=self.ignore_bad_frames,
+            bad_frame_policy=self.bad_frame_policy,
             commit_hash=self.commit_hash,
         )
         self.stacks.append(stack)
@@ -1380,7 +1424,7 @@ class StackDumperBase(object):
                 pre_class = ""
                 self.stream.write('<pre class="{0}">\n'.format(pre_class))
                 for line in self._main_info:
-                    self.stream.write(line.replace("&", "&amp;").replace("<", "&lt;") + "\n")
+                    self.stream.write(html_escape(line) + "\n")
                 self.stream.write("</pre>\n")
 
         sorted_stacks = sorted(self.stacks, key=lambda x: (x.important, x.fingerprint()), reverse=True)
@@ -1577,9 +1621,9 @@ def filter_stackdump(
     file_lines=None,
     use_stream=True,
     timestamp=None,
-    ignore_bad_frames=True,
-    mode=None,
-    commit_hash=None,
+    bad_frame_policy=BadFramePolicy.WARN,  # type: BadFramePolicy
+    mode=None,  # type: CoredumpMode | None
+    commit_hash=None,  # type: str | None
 ):
     if mode is None and file_name is not None:
         mode = detect_coredump_mode(_read_file(file_name))
@@ -1600,7 +1644,7 @@ def filter_stackdump(
         use_stream=use_stream,
         file_lines=file_lines,
         timestamp=timestamp,
-        ignore_bad_frames=ignore_bad_frames,
+        bad_frame_policy=bad_frame_policy,
         mode=mode,
         commit_hash=commit_hash,
     )
@@ -1620,39 +1664,6 @@ def get_parsable_gdb_text(core_text):
     )
 
     return core_text.split("\n")
-
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.stderr.write(
-            """Traceback filter "Tri Korochki"
-https://wiki.yandex-team.ru/cores-aggregation/
-Usage:
-    core_proc.py <traceback.txt> [-f|--fingerprint]
-    core_proc.py -v|--version
-"""
-        )
-        sys.exit(1)
-
-    if sys.argv[1] == "--version" or sys.argv[1] == "-v":
-        if os.system("svn info 2>/dev/null | grep '^Revision'") != 0:
-            print(CORE_PROC_VERSION)
-        sys.exit(0)
-
-    sandbox_failed_task_id = None
-
-    use_fingerprint = False
-    if len(sys.argv) >= 3:
-        if sys.argv[2] == "-f" or sys.argv[2] == "--fingerprint":
-            use_fingerprint = True
-        sandbox_failed_task_id = sys.argv[2]
-
-    filter_stack_dump(
-        core_text=_read_file(sys.argv[1]),
-        use_fingerprint=use_fingerprint,
-        sandbox_failed_task_id=sandbox_failed_task_id,
-        output_stream=sys.stdout,
-    )
 
 
 """

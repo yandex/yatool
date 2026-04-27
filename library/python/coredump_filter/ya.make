@@ -25,5 +25,6 @@ ENDIF()
 END()
 
 RECURSE(
+    traceback_tool
     tests
 )
