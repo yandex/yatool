@@ -149,9 +149,8 @@ class WorkerThreads(object):
         thread_num = 0
         for worker_pool_type, threads_num in worker_pools.items():
             for _ in range(threads_num):
-                exec_thr = threading.Thread(
-                    target=exec_target, args=(worker_pool_type,), name="Worker-{:03d}".format(thread_num + 1)
-                )
+                thread_name = "Worker-{}-{}".format(worker_pool_type.title(), thread_num + 1)
+                exec_thr = threading.Thread(target=exec_target, args=(worker_pool_type,), name=thread_name)
                 exec_thr.start()
                 self._all_threads.append(exec_thr)
                 thread_num += 1

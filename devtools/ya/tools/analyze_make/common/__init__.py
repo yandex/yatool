@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-
+import re
 import zstandard as zstd
 
 import devtools.ya.core.config as core_config
@@ -13,9 +13,26 @@ import typing as tp
 
 logger = logging.getLogger(__name__)
 
+UID_IN_NAME_RE = re.compile(r'^[A-Za-z]+\(([A-Za-z0-9_\-]+)(?:\$\(BUILD_ROOT\)|\))')
+FAILED_NODE_INFO_NAMESPACE = 'devtools.ya.build.reports.failed_node_info'
+FAILED_NODE_EVENT = 'node-failed'
+
 
 class Node(object):
-    def __init__(self, name, tag, start, end, color, thread_name, is_critical, event=None, has_detailed=False):
+    def __init__(
+        self,
+        name,
+        tag,
+        start,
+        end,
+        color,
+        thread_name,
+        is_critical,
+        event=None,
+        has_detailed=False,
+        is_failed=False,
+        exit_code=None,
+    ):
         self.name = name
         self.tag = tag
         self.start = start
@@ -25,6 +42,21 @@ class Node(object):
         self.is_critical = is_critical
         self.event = event
         self.has_detailed = has_detailed
+        self.is_failed = is_failed
+        self.exit_code = exit_code
+
+
+def trace_event_args(name: str, tag: str) -> dict[str, tp.Any]:
+    exec_cmd_prefix = 'exec_cmd - '
+    args = {'name': name}
+    if tag != 'exec_cmd' or not name.startswith(exec_cmd_prefix):
+        return args
+
+    full_cmd = name[len(exec_cmd_prefix) :]
+    formatted_cmd = '\n'.join(full_cmd.split())
+    return {
+        'cmd': formatted_cmd,
+    }
 
 
 def get_cmd_from_evlog(filename: str) -> str:
@@ -108,7 +140,8 @@ def load_from_evlog(evlog_reader, detailed=False):
         events_to_check.append('node-detailed')
 
     nodes = []
-    critical_uids = {}
+    critical_uids = set()
+    failed_results = {}
 
     opened_ymake_stages = {}
     ymake_nodes = []
@@ -118,8 +151,23 @@ def load_from_evlog(evlog_reader, detailed=False):
             tm = v['value']['time']
             if tm:
                 nodes.append(v)
+
         if v['event'] == 'critical_path':
-            critical_uids = set(x['uid'] for x in v['value']['nodes'])
+            critical_uids.update(x['uid'] for x in v['value'].get('nodes', []))
+
+        if v.get('namespace') == FAILED_NODE_INFO_NAMESPACE and v.get('event') == FAILED_NODE_EVENT:
+            uid = v['value'].get('uid')
+            if uid:
+                failed_results[uid] = v['value'].get('exit_code')
+
+        if v.get("namespace") == 'dump_debug' and v.get('event') == 'log':
+            payload = v.get('value') or {}
+            if payload.get('key') == 'stats':
+                stats = payload.get('value') or {}
+                for item in stats.get('critical_path') or []:
+                    uid = item.get('uid')
+                    if uid:
+                        critical_uids.add(uid)
 
         if v['namespace'] == 'ymake':
             if v['event'] == ymake_stage_started:
@@ -141,6 +189,7 @@ def load_from_evlog(evlog_reader, detailed=False):
     for x in nodes:
         timing = x['value']['time']
         short_name = x['value'].get('tag', '??')
+        node_uid = _extract_node_uid(x['value'])
         yield Node(
             name=x['value']['name'],
             tag=short_name,
@@ -148,9 +197,11 @@ def load_from_evlog(evlog_reader, detailed=False):
             end=timing[1],
             color=short_name,
             thread_name=x['thread_name'],
-            is_critical=x['value'].get('uid') in critical_uids,
+            is_critical=node_uid in critical_uids,
             event=x['event'],
             has_detailed=x['value']['name'].startswith('Run'),
+            is_failed=node_uid in failed_results,
+            exit_code=failed_results.get(node_uid),
         )
 
 
@@ -197,3 +248,12 @@ def load_evlog(opts, display: yalibrary.display.Display, check_for_distbuild=Fal
 def get_display(stream: tp.IO) -> yalibrary.display.Display:
     formatter = yalibrary.formatter.new_formatter(is_tty=stream.isatty())
     return yalibrary.display.Display(stream, formatter)
+
+
+def _extract_node_uid(value: dict) -> str | None:
+    uid = value.get("uid")
+    if uid:
+        return uid
+    name = value.get("name") or ""
+    match_uid = UID_IN_NAME_RE.match(name)
+    return match_uid.group(1) if match_uid else None

@@ -421,7 +421,14 @@ class RunNodeTask(object):
         errs = []
         exit_code = 0
         pid = -1
-        for cmd in self._node.commands(self._build_root.path):
+
+        full_commands = None
+        if self._ctx.opts.detailed_args:
+            commands, full_commands = self._node.commands_pair(self._build_root.path)
+        else:
+            commands = self._node.commands(self._build_root.path)
+
+        for index, cmd in enumerate(commands):
             args = cmd['cmd_args']
             stdout = open(os.devnull, "w") if cmd['stdout'] is None else open(cmd['stdout'], 'w')
 
@@ -453,8 +460,8 @@ class RunNodeTask(object):
 
                 tmp_dir = prepare_tmp_dir()
                 full_cmd = None
-                if self._ctx.opts.detailed_args:
-                    full_cmd = ' '.join(map(six.ensure_str, args))
+                if full_commands is not None:
+                    full_cmd = ' '.join(map(six.ensure_str, full_commands[index]['cmd_args']))
                 self._detailed_timings.start_stage(DetailedStages.EXECUTE_COMMAND, time.time(), cmd=full_cmd)
                 stderr, exit_code, pid = self._executor.run(
                     args=args,

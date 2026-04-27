@@ -740,6 +740,7 @@ class Node:
         'content_uid',
         'output_digests',
         'custom_commands',
+        'custom_commands_pair',
         '__dep_nodes',
     )
 
@@ -753,6 +754,7 @@ class Node:
         self.content_uid: ContentUid = None
         self.output_digests: build_root.OutputDigests | None = None
         self.custom_commands: Callable | None = None
+        self.custom_commands_pair: Callable | None = None
         self.__dep_nodes: list[tp.Self] | None = None
 
     @property
@@ -843,12 +845,24 @@ class Node:
         args = cf.CommandArgsPacker(build_root).apply(args, 'cmd_args')
         return args
 
+    def command_args_pair(self, build_root, patterns_sub):
+        full_commands = patterns_sub.fill(self._commands())
+        packed_commands = cf.CommandArgsPacker(build_root).apply(full_commands, 'cmd_args')
+        return packed_commands, full_commands
+
     def commands(self, build_root: str):
         if self.custom_commands:
             return self.custom_commands(build_root)
         p = self._task_context.patterns.sub()
         p['BUILD_ROOT'] = windows.win_path_fix(build_root)
         return self.command_args(build_root, p)
+
+    def commands_pair(self, build_root: str):
+        if self.custom_commands_pair:
+            return self.custom_commands_pair(build_root)
+        p = self._task_context.patterns.sub()
+        p['BUILD_ROOT'] = windows.win_path_fix(build_root)
+        return self.command_args_pair(build_root, p)
 
     def __str__(self):
         lim = 6
