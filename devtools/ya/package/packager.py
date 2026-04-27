@@ -169,6 +169,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.use_afl = build_info.get("use_afl", params.use_afl)
     build_options.race = build_info.get("race", params.race)
 
+    build_options.pgo_add = build_info.get("pgo_add", params.pgo_add)
     build_options.pgo_user_path = build_info.get("pgo_use", params.pgo_user_path)
 
     # Build graph cache options
