@@ -38,6 +38,7 @@ RUN_ANTLR4_CPP_SPLIT(
 
 SRCS(
     cmd_parser.cpp
+    call_args_parser.cpp
     call_signature.cpp
     config_conditions.cpp
     confreader.cpp
@@ -52,6 +53,7 @@ SRCS(
     value_storage.cpp
 )
 
+GENERATE_ENUM_SERIALIZATION(call_args_parser.h)
 GENERATE_ENUM_SERIALIZATION(confreader_cache.h)
 GENERATE_ENUM_SERIALIZATION(macro_values.h)
 
