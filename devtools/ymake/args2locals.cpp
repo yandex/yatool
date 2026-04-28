@@ -3,6 +3,7 @@
 #include "vars.h"
 
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/lang/call_args_parser.h>
 #include <devtools/ymake/lang/call_signature.h>
 #include <devtools/ymake/options/static_options.h>
 
@@ -128,15 +129,6 @@ TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector
     return {};
 }
 
-template<std::convertible_to<TStringBuf> TStr>
-TStringBuf TakeArg(std::span<const TStr>& args) noexcept {
-    if (args.empty())
-        return  {};
-    TStringBuf res = args.front();
-    args = args.subspan(1);
-    return res;
-}
-
 void VarAppend(TYVar& var, TStringBuf val) {
     var.push_back(TVarStr(val, false, false));
     if (IsPropertyVarName(var.back().Name)) {
@@ -152,79 +144,6 @@ void VarAppend(TYVar& var, std::span<const TStringBuf> vals) {
 void VarAppend(TYVar& var, std::span<const TString> vals) {
     for (auto val: vals)
         VarAppend(var, val);
-}
-
-class TKWArgs {
-public:
-    static std::pair<std::span<const TStringBuf>, TKWArgs> Find(const TSignature &props, std::span<const TStringBuf> args) {
-        TKWArgs tail{props, args};
-        const auto nonKw = tail.TakeUntilKeyword();
-        return {nonKw, tail};
-    }
-
-    struct TKeywordVals {
-        const TKeyword& Kw;
-        std::span<const TStringBuf> Args;
-    };
-    std::optional<TKeywordVals> TakeNext() {
-        if (!NextKW_)
-            return std::nullopt;
-        auto* lastKw = NextKW_;
-        return TKeywordVals{*lastKw, TakeUntilKeyword()};
-    }
-
-    TStringBuf KeywordName(const TKeyword& kw) const {
-        return Sign_->GetKeyword(kw.Pos);
-    }
-
-private:
-    TKWArgs(const TSignature& sign, std::span<const TStringBuf> args)
-        : RemainingArgs_{args}
-        , Sign_{&sign}
-    {}
-
-    std::span<const TStringBuf> TakeUntilKeyword() {
-        for (size_t i = 0; i < RemainingArgs_.size(); ++i) {
-            if (NextKW_ = Sign_->GetKeywordData(RemainingArgs_[i])) {
-                const auto res = RemainingArgs_.subspan(0, i);
-                RemainingArgs_ = RemainingArgs_.subspan(i + 1);
-                return res;
-            }
-        }
-        NextKW_ = nullptr;
-        return std::exchange(RemainingArgs_, {});
-    }
-
-private:
-    std::span<const TStringBuf> RemainingArgs_;
-    const TKeyword* NextKW_ = nullptr;
-    const TSignature* Sign_ = nullptr;
-};
-
-TMapMacroVarsResult ConsumePositionals(
-    std::span<const TStringBuf> args,
-    std::span<const TString>& unsetScalars,
-    TStringBuf vararg,
-    TVars& locals
-) {
-    while (!unsetScalars.empty()) {
-        if (args.empty())
-            return {};
-
-        const auto scalar = TakeArg(unsetScalars);
-        const auto arg = TakeArg(args);
-        VarAppend(locals[scalar], arg);
-    }
-
-    if (args.empty())
-        return {};
-    if (vararg.empty()) {
-        return std::unexpected(TMapMacroVarsErr{
-            .Message = fmt::format("More positional arguments passed then expected. Can't handle args '{}'", fmt::join(args, ", "))
-        });
-    }
-    VarAppend(locals[vararg], args);
-    return {};
 }
 
 void SetDefaultsForMissingKw(const TSignature& sign, TVars& locals) {
@@ -249,69 +168,23 @@ void TMapMacroVarsErr::Report(TStringBuf macroName, TStringBuf argsStr) const {
 TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals) {
     TMapMacroVarsResult res;
 
-    const TStringBuf vararg = sign.GetVarargName();
-    auto positionalScalars = sign.ScalarPositionalArgs();
-
-    auto [frontPosArgs, kwArgs] = TKWArgs::Find(sign, args);
-    res = ConsumePositionals(frontPosArgs, positionalScalars, vararg, locals);
-    if (!res)
-        return res;
-    TStringBuf lastArr = {};
-    while (auto kwVal = kwArgs.TakeNext()) {
-        if (kwVal->Kw.Kind == TKeyword::Scalar && kwVal->Args.empty()) {
-            return std::unexpected(TMapMacroVarsErr{
-                .Message = fmt::format("Missing value for scalar keyword {}", kwArgs.KeywordName(kwVal->Kw))
-            });
-        }
-
-        const bool isArr = kwVal->Kw.Kind == TKeyword::Array;
-
-        // TODO(svidyuk) better deduplication please!!!
-        if (!isArr && locals.contains(kwArgs.KeywordName(kwVal->Kw))) {
-            return std::unexpected(TMapMacroVarsErr{
-                .Message = fmt::format(
-                    "Keyword {} appears more than once and is not an array",
-                    kwArgs.KeywordName(kwVal->Kw)
-                )
-            });
-        }
-        if (isArr)
-            lastArr = kwArgs.KeywordName(kwVal->Kw);
-
-        const size_t arity = kwVal->Kw.Arity();
-        if (kwVal->Args.size() > arity) {
-            const auto posArgs = kwVal->Args.subspan(arity);
-            if (!lastArr.empty()) {
-                return std::unexpected(TMapMacroVarsErr{
-                    .Message = fmt::format(
-                        "Mixing positional arguments with named arrays is error prone and forbidden.\n"
-                        "Got positional args '{}' after named array {} have been started",
-                        fmt::join(posArgs, ", "),
-                        lastArr
-                    )
-                });
-            }
-            res = ConsumePositionals(posArgs, positionalScalars, vararg, locals);
-            if (!res)
-                return res;
-            kwVal->Args = kwVal->Args.subspan(0, arity);
-        }
-
-        if (kwVal->Args.empty() && !kwVal->Kw.OnKwPresent.empty()) {
-            VarAppend(locals[kwArgs.KeywordName(kwVal->Kw)], kwVal->Kw.OnKwPresent);
+    for (const auto& arg: TParsedCallArgs{sign, args}) {
+        if (!arg)
+            return std::unexpected(TMapMacroVarsErr{.Message = arg.error().Message(sign, args)});
+        if (arg->first == VarargIdx)
+            VarAppend(locals[sign.GetVarargName()], arg->second);
+        else if (auto kw = KeywordData(sign, arg->first)) {
+            if (kw->Kind == TKeyword::Flag)
+                VarAppend(locals[ArgDefName(sign, arg->first)], kw->OnKwPresent);
+            else
+                VarAppend(locals[ArgDefName(sign, arg->first)], arg->second);
         } else
-            VarAppend(locals[kwArgs.KeywordName(kwVal->Kw)], kwVal->Args);
-    }
-
-    if (!positionalScalars.empty()) {
-        return std::unexpected(TMapMacroVarsErr{
-            .Message = fmt::format("Value for '{}' argument is missing", positionalScalars.front())
-        });
+            VarAppend(locals[ArgDefName(sign, arg->first)], arg->second);
     }
 
     SetDefaultsForMissingKw(sign, locals);
-    if (!vararg.empty() && !locals.contains(vararg))
-        locals[vararg] = {};
+    if (sign.HasVararg())
+        locals[sign.GetVarargName()];
 
     return res;
 }

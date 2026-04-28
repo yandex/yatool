@@ -11,6 +11,9 @@ inline TArgDefIdx KWIdx(const TKeyword& key) noexcept {
 }
 constexpr TArgDefIdx VarargIdx = static_cast<TArgDefIdx>(std::numeric_limits<int>::max());
 
+TStringBuf ArgDefName(const TSignature& sign, TArgDefIdx idx) noexcept;
+const TKeyword* KeywordData(const TSignature& sign, TArgDefIdx idx) noexcept;
+
 class TArgsParseError {
 public:
     enum class ECase {

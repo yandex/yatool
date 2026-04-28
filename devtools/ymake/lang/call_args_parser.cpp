@@ -36,6 +36,8 @@ inline TParsedCallArgs::TResult<TArgsSpan> TakeScalarKwValue(TArgDefIdx defIdx, 
     return UnsafeTakeN(args, 1);
 }
 
+}
+
 TStringBuf ArgDefName(const TSignature& sign, TArgDefIdx idx) noexcept {
     if (idx == VarargIdx) {
         return sign.GetVarargName();
@@ -49,6 +51,11 @@ TStringBuf ArgDefName(const TSignature& sign, TArgDefIdx idx) noexcept {
     return sign.ScalarPositionalArgs()[rawIdx];
 }
 
+const TKeyword* KeywordData(const TSignature& sign, TArgDefIdx idx) noexcept {
+    const auto rawIdx = ToUnderlying(idx);
+    if (rawIdx < 0)
+        return &sign.GetKeywordData(-rawIdx - 1);
+    return nullptr;
 }
 
 TString TArgsParseError::Message(const TSignature& sign, std::span<const TStringBuf> args) const {
