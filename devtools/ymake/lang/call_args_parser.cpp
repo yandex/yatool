@@ -53,9 +53,7 @@ TStringBuf ArgDefName(const TSignature& sign, TArgDefIdx idx) noexcept {
 
 const TKeyword* KeywordData(const TSignature& sign, TArgDefIdx idx) noexcept {
     const auto rawIdx = ToUnderlying(idx);
-    if (rawIdx < 0)
-        return &sign.GetKeywordData(-rawIdx - 1);
-    return nullptr;
+    return rawIdx < 0 ? &sign.GetKeywordData(-rawIdx - 1) : nullptr;
 }
 
 TString TArgsParseError::Message(const TSignature& sign, std::span<const TStringBuf> args) const {
@@ -117,8 +115,9 @@ TParsedCallArgs::value_type TParsedCallArgs::ParseNext() noexcept {
         });
     }
 
-    if (!res)
+    if (!res) {
         Clear();
+    }
     return res;
 }
 
