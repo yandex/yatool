@@ -179,7 +179,14 @@ class TsCheckSuite(BaseFrontendSuite):
     def get_test_related_paths(self, arc_root, opts):
         # these files are used to actually calculate test node UID
         # see: https://a.yandex-team.ru/arcadia/devtools/ya/test/dependency/uid.py?rev=r18941132#L46
-        all_files = ["package.json"] + self._files
+
+        extra_source_files = [
+            # we need it to copy to BINDIR
+            "package.json",
+            # we don't use it for `pnpm install`, but we read it in _restore_original_lockfile
+            "pnpm-lock.yaml",
+        ]
+        all_files = extra_source_files + self._files
         return sorted(set([self._abs_source_path(f, arc_root) for f in all_files]))
 
     def get_run_cmd_inputs(self, opts):
