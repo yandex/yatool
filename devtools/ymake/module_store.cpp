@@ -15,6 +15,7 @@ namespace {
         NVariableDefs::VAR_MANAGED_PEERS_CLOSURE,
         NVariableDefs::VAR_DART_CLASSPATH,
         NVariableDefs::VAR_UNITTEST_MOD,
+        NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_TAGS_EXCLUDE,
     };
 }
 

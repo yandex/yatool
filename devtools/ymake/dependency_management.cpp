@@ -880,12 +880,30 @@ namespace {
             TStateItem& parentItem
         ) {
             parent.Set(MANAGED_PEERS, ToPeerListVar(peersRecord.Direct, EPathType::Moddir));
-            const auto managedPeers = PreorderSort(
+            auto managedPeers = PreorderSort(
                 peersRecord.Direct,
                 ResolveConflicts(TConflictResolver{rules, ContribsDict, RestoreContext.Graph.Names().FileConf}, peersRecord.Direct, peersRecord.Closure));
             auto& listsStore = RestoreContext.Modules.GetNodeListStore();
             auto& parentPeerIds = RestoreContext.Modules.GetModuleNodeIds(parent.GetId());
-            for (const auto& peer: managedPeers) {
+            // filter managed peers by dependency management tags
+            const auto& dependencyManagementTags = parent.Vars.EvalValue(NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_TAGS_EXCLUDE);
+            TVector<TString> excludedTags = StringSplitter(dependencyManagementTags).Split(' ').SkipEmpty();
+            if (!excludedTags.empty()) {
+                const auto shouldExclude = [&](TNodeId peerId) {
+                    const auto* peerModule = GetModule(peerId);
+                    Y_ASSERT(peerModule);
+                    const TStringBuf peerTag = peerModule->GetTag();
+                    const bool tagMatched = AnyOf(excludedTags, [peerTag](const TString& tag) { return tag == peerTag; });
+                    if (!tagMatched) {
+                        return false;
+                    }
+                    const bool isDirectPeer = FindIf(peersRecord.Direct, [peerId](const TResolvedPeer& peer) { return peer.Id == peerId; }) != peersRecord.Direct.end();
+                    return !isDirectPeer;
+                };
+                managedPeers.erase(std::ranges::remove_if(managedPeers, shouldExclude).begin(), managedPeers.end());
+            }
+            parentPeerIds.UniqPeers = listsStore.CreateList();
+            for (const auto& peer : managedPeers) {
                 listsStore.AddToList(parentPeerIds.UniqPeers, peer);
             }
             for (const auto& peer: peersRecord.Direct) {

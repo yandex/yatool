@@ -302,12 +302,14 @@ void TSubst2Json::OnCmdFinished(const TVector<TSingleCmd>& commands, TCommandInf
 
     for (const auto& dep : DumpInfo.Deps) {
         auto nodeIt = JSONVisitor.Nodes.find(dep);
+        Y_ASSERT(nodeIt != JSONVisitor.Nodes.end());
         auto nodeUid = nodeIt->second.GetNodeUid();
         makeNode.Deps.push_back(std::move(nodeUid));
     }
 
     for (const auto& dep : DumpInfo.ToolDeps) {
         auto nodeIt = JSONVisitor.Nodes.find(dep);
+        Y_ASSERT(nodeIt != JSONVisitor.Nodes.end());
         auto nodeUid = nodeIt->second.GetNodeUid();
         makeNode.ToolDeps.push_back(std::move(nodeUid));
     }
