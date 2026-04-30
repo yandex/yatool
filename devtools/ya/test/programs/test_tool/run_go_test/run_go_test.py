@@ -65,6 +65,8 @@ def parse_args():
     parser.add_argument("--list-tracefile", help="Path to the output list trace log")
     parser.add_argument("--need-list-trace", action="store_true", help="enable trace file mode when listing")
     parser.add_argument("--test-list", action="store_true", help="List of tests")
+    parser.add_argument("--source-root", help="Path to the arcadia source root")
+    parser.add_argument("--go-tool", help="Path to the go binary for go list", default=None)
     parser.add_argument("--bench-run", action="store_true", help="run only benchmarks")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--test-mode", action="store_true")
@@ -162,7 +164,49 @@ def gen_suite(project_path):
     return suite
 
 
-def list_tests(opts):
+def get_go_test_files(go_tool: str, source_root: str, project_path: str) -> list[str]:
+    cmd = [go_tool, 'list', '-json', '-test', '.' + os.sep + project_path]
+    env = os.environ.copy()
+    env['GOPATH'] = source_root
+    env['GO111MODULE'] = 'off'
+    result = process.execute(cmd, check_exit_code=False, cwd=source_root, env=env)
+    if result.exit_code != 0:
+        logger.debug("go list failed: %s", result.std_err)
+        return []
+
+    test_files = set()
+    parsed = _parse_go_list_json(result.std_out)
+    for data in parsed:
+        for key in ('TestGoFiles', 'XTestGoFiles'):
+            for fname in data.get(key, []):
+                test_files.add(os.path.join(project_path, fname))
+    return sorted(test_files)
+
+
+def _parse_go_list_json(stdout: str) -> list[dict]:
+    # go list -json outputs multiple JSON objects concatenated (not JSONL):
+    #  each object is multi-line, separated by newline between } and {
+    result = []
+    decoder = json.JSONDecoder()
+    s = stdout.strip()
+    idx = 0
+    while idx < len(s):
+        # skip whitespace between objects
+        while idx < len(s) and s[idx] in ' \t\n\r':
+            idx += 1
+        if idx >= len(s):
+            break
+        try:
+            obj, end = decoder.raw_decode(s, idx)
+            result.append(obj)
+            idx = end
+        except json.JSONDecodeError as e:
+            logger.debug("Failed to parse go list output at pos %d: %s", idx, e)
+            break
+    return result
+
+
+def list_tests(opts: argparse.Namespace) -> None:
     suite_name = get_default_suite_name(opts.binary)
     list_suite = gen_suite(opts.project_path)
 
@@ -685,6 +729,20 @@ def main():
         else:
             tests, _ = get_tests(args, args.wine_path)
             sys.stderr.write("\n".join(tests))
+            logger.debug(
+                "test-list: binary=%s go_tool=%s source_root=%s project_path=%s",
+                args.binary,
+                args.go_tool,
+                args.source_root,
+                args.project_path,
+            )
+            test_files = (
+                get_go_test_files(args.go_tool, args.source_root, args.project_path)
+                if args.go_tool and args.source_root and args.project_path
+                else []
+            )
+            sys.stdout.write(json.dumps({"test-files": test_files}) + "\n")
+            sys.stdout.flush()
         return 0
 
     run_tests(args)

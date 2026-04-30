@@ -228,24 +228,24 @@ def main():
         with open(options.test_list_path, 'w') as afile:
             json.dump(tests_chunks, afile)
     else:
-        dump_tests(options, [t.to_json() for t in tests], error)
+        test_files = getattr(tests, 'test_files', None)
+        dump_tests(options, [t.to_json() for t in tests], error, test_files=test_files)
 
 
-def dump_tests(options, tests, error=None):
+def dump_tests(options, tests: list, error: str | None = None, test_files: list[str] | None = None) -> None:
+    data = {
+        "project-path": options.project_path,
+        "tests": tests,
+        "test-size": options.test_size,
+        "test-tags": options.test_tags,
+        "test-type": options.test_type,
+        "target-platform-descriptor": options.target_platform_descriptor,
+        "error": error,
+    }
+    if test_files is not None:
+        data["test-files"] = test_files
     with open(options.test_info_path, "w") as res_file:
-        json.dump(
-            {
-                "project-path": options.project_path,
-                "tests": tests,
-                "test-size": options.test_size,
-                "test-tags": options.test_tags,
-                "test-type": options.test_type,
-                "target-platform-descriptor": options.target_platform_descriptor,
-                "error": error,
-            },
-            res_file,
-            ensure_ascii=False,
-        )
+        json.dump(data, res_file, ensure_ascii=False)
 
 
 if __name__ == '__main__':

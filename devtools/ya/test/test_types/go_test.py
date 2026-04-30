@@ -1,5 +1,6 @@
 import os
 import six
+import json
 
 import devtools.ya.test.const
 import devtools.ya.test.util.tools
@@ -9,6 +10,46 @@ from devtools.ya.test.test_types import common as common_types
 
 GO_TEST_TYPE = "go_test"
 GO_BENCH_TEST_TYPE = "go_bench"
+
+
+class GoSubtestInfo(test_common.SubtestInfo):
+    @classmethod
+    def from_json(cls, d):
+        # type: (dict) -> GoSubtestInfo
+        return cls(
+            d["test"],
+            d.get("subtest", ""),
+            skipped=d.get("skipped", False),
+            tags=d.get("tags", []),
+            path=d.get("path"),
+        )
+
+    def __init__(self, test, subtest="", skipped=False, tags=None, path=None):
+        # type: (str, str, bool, list, str) -> None
+        super(GoSubtestInfo, self).__init__(test, subtest, skipped=skipped, tags=tags)
+        self.path = path
+
+    def to_json(self):
+        # type: () -> dict
+        return {
+            "test": self.test,
+            "subtest": self.subtest,
+            "skipped": self.skipped,
+            "tags": getattr(self, "tags", None) or [],
+            "nodeid": None,  # Go tests don't have pytest-style nodeid
+            "path": getattr(self, "path", None),
+            "line": None,  # Go tests don't expose line numbers
+            "params": None,  # Go tests don't have parametrization
+        }
+
+
+class GoTestListResult(list):
+    def __init__(self, subtests, test_files):
+        # type: (list, list) -> None
+        super(GoTestListResult, self).__init__(subtests)
+        # in golang we can't determine relationship between test name and test file, so we had to
+        #  store both test names and test files as separate lists
+        self.test_files = test_files
 
 
 class GoTestSuite(common_types.AbstractTestSuite):
@@ -122,22 +163,47 @@ class GoTestSuite(common_types.AbstractTestSuite):
         return devtools.ya.test.const.SuiteClassType.REGULAR
 
     def get_list_cmd(self, arc_root, build_root, opts):
-        return self.get_run_cmd(opts) + ['--test-list']
+        # type: (str, str, object) -> list
+        cmd = self.get_run_cmd(opts) + ['--test-list', '--source-root', arc_root]
+        go_tools = self.global_resources[devtools.ya.test.const.GO_TOOLS_RESOURCE]
+        cmd += ['--go-tool', os.path.join(go_tools, 'bin', 'go')]
+
+        return cmd
 
     @classmethod
     def list(cls, cmd, cwd):
-        return cls._get_subtests_info(process.execute(cmd, check_exit_code=False, cwd=cwd))
+        # type: (list, str) -> GoTestListResult
+        result = process.execute(cmd, check_exit_code=False, cwd=cwd)
+        subtests = cls._get_subtests_info(result)
+        test_files = cls._parse_test_files_from_stdout(result.std_out)
+        return GoTestListResult(subtests, test_files)
 
     @classmethod
     def _get_subtests_info(cls, list_cmd_result):
+        # type: (object) -> list
+        if list_cmd_result.exit_code != 0:
+            raise Exception(list_cmd_result.std_err)
         result = []
-        if list_cmd_result.exit_code == 0:
-            for x in list_cmd_result.std_err.split():
-                if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR in x:
-                    testname, subtest = x.split(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1)
-                    result.append(test_common.SubtestInfo(testname, subtest))
-            return result
-        raise Exception(list_cmd_result.std_err)
+        for x in list_cmd_result.std_err.split():
+            if devtools.ya.test.const.TEST_SUBTEST_SEPARATOR in x:
+                testname, subtest = x.split(devtools.ya.test.const.TEST_SUBTEST_SEPARATOR, 1)
+                result.append(GoSubtestInfo(testname, subtest))
+        return result
+
+    @classmethod
+    def _parse_test_files_from_stdout(cls, stdout):
+        # type: (str) -> list
+        for line in stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+                if 'test-files' in data:
+                    return data['test-files']
+            except (ValueError, KeyError):
+                continue
+        return []
 
     @property
     def smooth_shutdown_signals(self):
