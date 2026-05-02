@@ -304,6 +304,8 @@ void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
     Id = id;
 
     Attrs.RequireDepManagement = Get(NVariableDefs::VAR_HAS_MANAGEABLE_PEERS) == "yes";
+    Attrs.DepManagementTransparent =
+        Attrs.RequireDepManagement && Get(NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_TRANSPARENT) == "yes";
     Attrs.ConsumeNonManageablePeers = Get(NVariableDefs::VAR_CONSUME_NON_MANAGEABLE_PEERS) == "yes";
     Attrs.DynamicLink = Get(NVariableDefs::VAR_DYNAMIC_LINK) == "yes";
     Attrs.DontResolveIncludes = Vars.Contains(NVariableDefs::VAR_DONT_RESOLVE_INCLUDES) && Get(NVariableDefs::VAR_DONT_RESOLVE_INCLUDES) != "no";

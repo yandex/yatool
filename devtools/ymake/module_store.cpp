@@ -16,6 +16,7 @@ namespace {
         NVariableDefs::VAR_DART_CLASSPATH,
         NVariableDefs::VAR_UNITTEST_MOD,
         NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_TAGS_EXCLUDE,
+        NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_TRANSPARENT,
     };
 }
 

@@ -211,9 +211,24 @@ namespace {
                     managedPeersClosure = &RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers().Data();
                     const auto& managedDirectPeers = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).ManagedDirectPeers();
                     for (TNodeId peer: *managedPeersClosure) {
-                        if (!managedDirectPeers.has(peer)) {
-                            transitiveOnlyPeersUnderDM.insert(peer);
+                        // Transparent (SkipLocalDepManagement) modules such as IJAR interface-jar wrappers
+                        // are IGNORED in the SEM graph. Instead of linking the IJAR node, add its
+                        // ManagedDirectPeers (e.g. FULL_JAR_COMPILATION siblings) so that yexport sees
+                        // the real jar nodes with consumer-classpath semantics. This applies whether the
+                        // IJAR is a direct peer or a transitive one.
+                        const TModule* peerMod = RestoreContext.Modules.Get(RestoreContext.Graph[peer]->ElemId);
+                        if (peerMod && peerMod->GetAttrs().DepManagementTransparent) {
+                            for (TNodeId ijarDirectPeer : RestoreContext.Modules.GetModuleNodeLists(peerMod->GetId()).ManagedDirectPeers()) {
+                                if (!managedDirectPeers.has(ijarDirectPeer)) {
+                                    transitiveOnlyPeersUnderDM.insert(ijarDirectPeer);
+                                }
+                            }
+                            continue;
                         }
+                        if (managedDirectPeers.has(peer)) {
+                            continue;
+                        }
+                        transitiveOnlyPeersUnderDM.insert(peer);
                     }
                 }
                 ModulesStack.push({

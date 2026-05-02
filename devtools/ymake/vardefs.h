@@ -35,6 +35,7 @@ VARIABLE(DART_CLASSPATH, "")
 VARIABLE(DEFAULT_MODULE_LICENSE, "Default license for modules that do not set the LICENSE explicitly")
 VARIABLE(DEPENDENCY_MANAGEMENT_VALUE, "")
 VARIABLE(DEPENDENCY_MANAGEMENT_TAGS_EXCLUDE, "Module tags to exclude from managed peers closure for current module but propagate further")
+VARIABLE(DEPENDENCY_MANAGEMENT_TRANSPARENT, "If yes: module does not apply local DEPENDENCY_MANAGEMENT/EXCLUDE rules; its own MANAGED_PEERS_CLOSURE lists only direct PEERDIR module nodes. Upstream closure still expands through those directs' full managed closures. Requires HAS_MANAGEABLE_PEERS=yes")
 VARIABLE(DONT_RESOLVE_INCLUDES, "")
 VARIABLE(DYNAMIC_LINK, "")
 VARIABLE(EV_HEADER_EXTS, "")
@@ -123,6 +124,7 @@ constexpr TVariableDefiniton ALL_VARIABLES[]{
     VAR_DEFAULT_MODULE_LICENSE,
     VAR_DEPENDENCY_MANAGEMENT_VALUE,
     VAR_DEPENDENCY_MANAGEMENT_TAGS_EXCLUDE,
+    VAR_DEPENDENCY_MANAGEMENT_TRANSPARENT,
     VAR_DONT_RESOLVE_INCLUDES,
     VAR_DYNAMIC_LINK,
     VAR_EV_HEADER_EXTS,

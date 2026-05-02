@@ -62,7 +62,7 @@ void InitModuleVars(TVars& vars, TVars& commandConf, ui32 makeFileId, TFileView 
 
 union TModuleAttrs {
     ui32 AllBits = 0;
-    struct { // 23 bits used
+    struct { // 24 bits used
         ui32 DontResolveIncludes : 1;  // Avoid includes resolution in any form
         ui32 FromMultimodule     : 1;  // This module is created from multimodule
         ui32 UsePeers            : 1;
@@ -87,6 +87,7 @@ union TModuleAttrs {
         ui32 IgnoreDupSrc        : 1; // ignore DupSrc errors for REPORT_ALL_DUPSRC
         ui32 UseAllSrcs          : 1; // module uses ALL_SRCS variable
         ui32 SemForeign          : 1; // Foreign target for sem graph
+        ui32 DepManagementTransparent : 1; // DEPENDENCY_MANAGEMENT_TRANSPARENT: closure propagation without local DEPENDENCY_MANAGEMENT/EXCLUDE rules
     };
 };
 

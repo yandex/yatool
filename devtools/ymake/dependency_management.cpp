@@ -368,6 +368,9 @@ namespace {
             if (!module.GetAttrs().RequireDepManagement) {
                 return;
             }
+            if (module.GetAttrs().DepManagementTransparent) {
+                return;
+            }
             TScopedContext diagContext{module.GetName()};
 
             // Read user dependence management
@@ -713,25 +716,52 @@ namespace {
 
             TScopedContext diagContext{parent->GetName()};
 
-            if (DMConf.IsContribWithVer(*parent)) {
+            if (!parent->GetAttrs().DepManagementTransparent && DMConf.IsContribWithVer(*parent)) {
                 ContribsDict.emplace(parent->GetDir().CutAllTypes(), parentItem.Node().Id());
             }
 
             auto rules = DMConf.GetRules(*parent, DMConfErrors);
-            auto& record = PrepareManagedPeersRecord(rules, parentItem.Node().Id(), *parent, parentItem.Peers);
-            // Copy direct unmanageable peers to record, for use in AddUnmanageablePeersToClosure later
-            for (auto unpeer : parentItem.UnmanageablePeers) {
-                record.UnmanageablePeers.emplace_back(unpeer);
+
+            TManagedPeers* record = nullptr;
+            if (parent->GetAttrs().DepManagementTransparent) {
+                const auto [pos, inserted] = ManagedPeers.emplace(parentItem.Node().Id(), TManagedPeers{});
+                Y_ASSERT(inserted);
+                record = &pos->second;
+                for (TNodeId peerId : parentItem.Peers) {
+                    const TModule* peer = GetModule(peerId);
+                    Y_ASSERT(peer);
+                    if (IsGhost(*parent, *peer)) {
+                        continue;
+                    }
+                    record->Direct.push_back({peerId, EPeerResolution::Unversioned});
+                }
+                for (auto unpeer : parentItem.UnmanageablePeers) {
+                    record->UnmanageablePeers.emplace_back(unpeer);
+                }
+                // DEPENDENCY_MANAGEMENT_TRANSPARENT: do not merge transitive ManagedPeers.Closure from peers (unlike MergeClosure).
+                // Otherwise tool modules (e.g. IJAR) inherit the full classpath of every direct PEERDIR.
+                static const NDetail::TPeersClosure EmptyPeersClosure;
+                record->Closure = NDetail::TPeersClosure{};
+                for (const auto& resolved : record->Direct) {
+                    record->Closure.Merge(resolved.Id, EmptyPeersClosure, 1);
+                }
+            } else {
+                record = &PrepareManagedPeersRecord(rules, parentItem.Node().Id(), *parent, parentItem.Peers);
+                for (auto unpeer : parentItem.UnmanageablePeers) {
+                    record->UnmanageablePeers.emplace_back(unpeer);
+                }
             }
+
             if (parentItem.UseExcludes) {
                 auto& appliedExcludes = RestoreContext.Modules.GetExtraDependencyManagementInfo(parent->GetId()).AppliedExcludes;
-                for (const auto* itemStats: record.Closure.GetStableOrderStats()) {
+                for (const auto* itemStats: record->Closure.GetStableOrderStats()) {
                     if (itemStats->second.Excluded) {
                         appliedExcludes.push_back(itemStats->first);
                     }
                 }
             }
-            ManagePeersClosure(rules, record, *parent, parentItem);
+
+            ManagePeersClosure(rules, *record, *parent, parentItem);
 
             // If finished start module, print all DM configuration errors
             if ((parentItem.IsStart) && (!DMConfErrors.empty())) {
@@ -759,7 +789,7 @@ namespace {
 
             // DEPRECATED, used only for fill DART_CLASSPATH_DEPS
             // Real add unmanageable peers to peers closure moved to AddUnmanageablePeersToClosure
-            record.UnmanageablePeersClosure = HandleUnmanageables(parentItem, *parent);
+            record->UnmanageablePeersClosure = HandleUnmanageables(parentItem, *parent);
 
             if (parent->GetAttrs().ConsumeNonManageablePeers) {
                 AddUnmanageablePeersToClosure(parentItem, *parent);
@@ -805,8 +835,7 @@ namespace {
 
             // Search unmanageable peers in all closure peers
             for (auto peer : parentPeersClosure) {
-                const auto& peerUnmanageablePeers = ManagedPeers.at(peer).UnmanageablePeers;
-                for (auto unpeer : peerUnmanageablePeers) {
+                for (auto unpeer : ManagedPeers.at(peer).UnmanageablePeers) {
                     unmanageablePeers.Push(unpeer);
                 }
             }
@@ -998,12 +1027,67 @@ namespace {
             return managedPeers;
         }
 
+        /// DEPENDENCY_MANAGEMENT_TRANSPARENT stores a thin Closure on the tool module (direct PEERDIR nodes only).
+        /// When a consumer merges that module in MergeClosure, expand through its Direct peers' full
+        /// ManagedPeers.Closure (e.g. IJAR -> FULL_JAR_COMPILATION classpath) without bloating the
+        /// tool's own MANAGED_PEERS_CLOSURE / ResolveConflicts graph.
+        NDetail::TPeersClosure BuildExpandedTransparentClosure(
+            const TManagedPeers& transparentRecord,
+            const TDependencyManagementRules& rules) const {
+            static const NDetail::TPeersClosure EmptyPeersClosure;
+            NDetail::TPeersClosure expanded;
+            const auto excludePred = [&](TNodeId id) {
+                return rules.IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph[id]->ElemId));
+            };
+            const auto excludeLookup = [&](TNodeId id) -> const NDetail::TPeersClosure& {
+                const auto it = ManagedPeers.find(id);
+                return it != ManagedPeers.end() ? it->second.Closure : EmptyPeersClosure;
+            };
+            // Collect the direct child ids so we can exempt them from exclusion below.
+            THashSet<TNodeId> directChildIds;
+            for (const auto& resolved : transparentRecord.Direct) {
+                directChildIds.insert(resolved.Id);
+            }
+            for (const auto& resolved : transparentRecord.Direct) {
+                const auto depIt = ManagedPeers.find(resolved.Id);
+                if (depIt == ManagedPeers.end()) {
+                    expanded.Merge(resolved.Id, EmptyPeersClosure, 1);
+                } else {
+                    // The direct children of a DEPENDENCY_MANAGEMENT_TRANSPARENT node are logically
+                    // direct peers of the caller (the transparent module itself was a direct peer).
+                    // Direct peers must not be filtered by EXCLUDE rules — only their
+                    // transitive sub-closures are subject to exclusion.
+                    const auto excludePredSkipDirect = [&](TNodeId id) {
+                        return !directChildIds.contains(id) && excludePred(id);
+                    };
+                    expanded.Merge(resolved.Id, depIt->second.Closure.Exclude(excludePredSkipDirect, excludeLookup));
+                }
+            }
+            return expanded;
+        }
+
         NDetail::TPeersClosure MergeClosure(const TVector<TResolvedPeer>& directPeers, const TDependencyManagementRules& rules) const {
+            static const NDetail::TPeersClosure EmptyPeersClosure;
             NDetail::TPeersClosure closure;
+            const auto excludePred = [&](TNodeId id) {
+                return rules.IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph[id]->ElemId));
+            };
+            const auto excludeLookup = [&](TNodeId id) -> const NDetail::TPeersClosure& {
+                const auto it = ManagedPeers.find(id);
+                return it != ManagedPeers.end() ? it->second.Closure : EmptyPeersClosure;
+            };
             for (auto [peerId, _] : directPeers) {
-                closure.Merge(peerId, ManagedPeers.at(peerId).Closure.Exclude(
-                    [&](TNodeId id) { return rules.IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph[id]->ElemId)); },
-                    [&](TNodeId id) -> const NDetail::TPeersClosure& { return ManagedPeers.at(id).Closure; }));
+                const auto& peerRecord = ManagedPeers.at(peerId);
+                const TModule* peerModule = GetModule(peerId);
+                if (peerModule && peerModule->GetAttrs().DepManagementTransparent) {
+                    // Exclusion is applied inside BuildExpandedTransparentClosure: direct
+                    // children of the transparent node are treated as direct peers of the
+                    // caller and are exempt from EXCLUDE rules; only their sub-closures
+                    // are filtered.  Do not apply a second Exclude() pass here.
+                    closure.Merge(peerId, BuildExpandedTransparentClosure(peerRecord, rules));
+                    continue;
+                }
+                closure.Merge(peerId, peerRecord.Closure.Exclude(excludePred, excludeLookup));
             }
 
             return closure;
@@ -1050,12 +1134,34 @@ namespace {
 
             TQueue<TResolvedPeer> searchQueue;
             THashSet<TNodeId> visited;
-            auto enqueDeps = [&] (const TVector<TResolvedPeer>& peers) mutable {
-                for (auto peer: peers) {
+
+            // Wraps enqueDeps to also inline DEPENDENCY_MANAGEMENT_TRANSPARENT nodes' children at the
+            // same BFS depth level.  When we enqueue a DEPENDENCY_MANAGEMENT_TRANSPARENT node, we additionally
+            // enqueue its Direct children (FULL_JAR_COMPILATION) into the same batch.  The
+            // transparent node itself is still enqueued (for PreorderSort / AccumulatedPeers)
+            // but its children join the queue at the same level so they do not add an extra
+            // BFS depth compared to the non-ijar traversal path.
+            auto enqueDepsWithTransparentInlining = [&](const TVector<TResolvedPeer>& peers) {
+                for (auto peer : peers) {
                     if (!visited.insert(peer.Id).second || (!closure.Contains(peer.Id) && !explicitResolvesClosure.Contains(peer.Id))) {
                         continue;
                     }
                     searchQueue.push(peer);
+                    // If peer is DEPENDENCY_MANAGEMENT_TRANSPARENT, also enqueue its Direct children at
+                    // the same BFS level so they compete at the same depth as peers reached
+                    // without the transparent hop.
+                    const TModule* peerMod = GetModule(peer.Id);
+                    if (peerMod && peerMod->GetAttrs().DepManagementTransparent) {
+                        const auto peerIt = ManagedPeers.find(peer.Id);
+                        if (peerIt != ManagedPeers.end()) {
+                            for (auto child : peerIt->second.Direct) {
+                                if (!visited.insert(child.Id).second || (!closure.Contains(child.Id) && !explicitResolvesClosure.Contains(child.Id))) {
+                                    continue;
+                                }
+                                searchQueue.push(child);
+                            }
+                        }
+                    }
                 }
             };
 
@@ -1064,9 +1170,11 @@ namespace {
             size_t nodesVisited = 0;
             TResolvedPeer cur = {TNodeId::Invalid, EPeerResolution::Direct};
             for (
-                enqueDeps(managedPeers);
+                enqueDepsWithTransparentInlining(managedPeers);
                 !searchQueue.empty();
-                enqueDeps(cur.Id != TNodeId::Invalid ? ManagedPeers.at(cur.Id).Direct : TVector<TResolvedPeer>{}), searchQueue.pop(), ++nodesVisited
+                enqueDepsWithTransparentInlining(cur.Id != TNodeId::Invalid ? ManagedPeers.at(cur.Id).Direct : TVector<TResolvedPeer>{}),
+                searchQueue.pop(),
+                ++nodesVisited
             ) {
                 cur = searchQueue.front();
                 if (nodesVisited == currDepthEnd) {
@@ -1085,11 +1193,18 @@ namespace {
                 }
                 visited.insert(resolved); // mark replacement as visited
 
-                auto resolveClosure = ManagedPeers.at(resolved).Closure.Exclude(
-                    [&](TNodeId id) { return resolver.GetRules().IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph.Get(id))); },
-                    [&](TNodeId id) -> const NDetail::TPeersClosure& { return ManagedPeers.at(id).Closure; }
-                );
-                explicitResolvesClosure.Merge(resolved, resolveClosure);
+                const auto resolvedIt = ManagedPeers.find(resolved);
+                if (resolvedIt != ManagedPeers.end()) {
+                    static const NDetail::TPeersClosure EmptyPeersClosure;
+                    auto resolveClosure = resolvedIt->second.Closure.Exclude(
+                        [&](TNodeId id) { return resolver.GetRules().IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph.Get(id))); },
+                        [&](TNodeId id) -> const NDetail::TPeersClosure& {
+                            const auto it = ManagedPeers.find(id);
+                            return it != ManagedPeers.end() ? it->second.Closure : EmptyPeersClosure;
+                        }
+                    );
+                    explicitResolvesClosure.Merge(resolved, resolveClosure);
+                }
             }
 
             return resolver.Finalize();

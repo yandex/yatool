@@ -182,18 +182,22 @@ namespace {
             }
 
             // Check if constraints are satisfied
-            TProvidesChecker providesChecker{RestoreContext, module, node};
-            for (TNodeId peer : EffectivePeersClosure(RestoreContext, module)) {
-                TModule* peerModule = RestoreContext.Modules.Get(RestoreContext.Graph[peer]->ElemId);
-                Y_ASSERT(peerModule);
-                if (module.GetAttrs().RequireDepManagement && module.MatchPeer(*peerModule, checkPoliciesRequest) == EPeerSearchStatus::DeprecatedByRules) {
-                    YConfErr(BadDir) << "Transitive [[alt1]]PEERDIR[[rst]] from [[imp]]"
-                                     << module.GetDir()
-                                     << "[[rst]] to [[imp]]"
-                                     << peerModule->GetDir() << "[[rst]] is prohibited by peerdir policy. Use EXCLUDE or DEPENDENCY_MANAGEMENT to avoid this dependency."
-                                     << Endl;
+            // DEPENDENCY_MANAGEMENT_TRANSPARENT modules have a thin closure that is an internal
+            // implementation detail of the multimodule split; skip peer-level checks for them.
+            if (!module.GetAttrs().DepManagementTransparent) {
+                TProvidesChecker providesChecker{RestoreContext, module, node};
+                for (TNodeId peer : EffectivePeersClosure(RestoreContext, module)) {
+                    TModule* peerModule = RestoreContext.Modules.Get(RestoreContext.Graph[peer]->ElemId);
+                    Y_ASSERT(peerModule);
+                    if (module.GetAttrs().RequireDepManagement && module.MatchPeer(*peerModule, checkPoliciesRequest) == EPeerSearchStatus::DeprecatedByRules) {
+                        YConfErr(BadDir) << "Transitive [[alt1]]PEERDIR[[rst]] from [[imp]]"
+                                         << module.GetDir()
+                                         << "[[rst]] to [[imp]]"
+                                         << peerModule->GetDir() << "[[rst]] is prohibited by peerdir policy. Use EXCLUDE or DEPENDENCY_MANAGEMENT to avoid this dependency."
+                                         << Endl;
+                    }
+                    providesChecker.CheckProvides(*peerModule, peer);
                 }
-                providesChecker.CheckProvides(*peerModule, peer);
             }
         }
 
