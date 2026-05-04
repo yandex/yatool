@@ -104,7 +104,7 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_
 
         atexit.register(shutdown)
 
-    def wait_till_initialized(connect_timeout=15):
+    def wait_till_initialized(connect_timeout=60):
         tries = 0
         last_error = ''
         deadline = time.time() + connect_timeout
