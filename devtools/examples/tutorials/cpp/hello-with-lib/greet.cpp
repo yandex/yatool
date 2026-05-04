@@ -4,5 +4,5 @@
 #include <util/stream/output.h>
 
 void greet(IOutputStream& dest, TStringBuf name) {
-    dest << "Halo " << name << Endl;
+    dest << "Hello " << name << Endl;
 }
