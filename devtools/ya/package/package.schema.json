@@ -80,6 +80,13 @@
                         "uniqueItems": true
                     }
                 },
+                "target-platform-ids": {
+                    "description": "User-defined IDs (names) for each entry in target-platforms. Requires 'build_type' to be set. Use empty string to skip an entry.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "force_build_depends": {
                     "description": "Build targets reachable by RECURSE_FOR_TESTS and DEPENDS macros",
                     "type": "boolean"

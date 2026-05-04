@@ -128,6 +128,39 @@ TYPES_FOR_BUILDING = ["program", "package"]
 DEFAULT_BUILD_KEY = None
 
 
+def _apply_platform_ids(build_info, target_platforms, host_platform_id=None):
+    platform_ids = build_info.get("target-platform-ids")
+    if platform_ids is None:
+        return
+
+    if not build_info.get("build_type"):
+        raise YaPackageException(
+            "'target-platform-ids' requires explicit 'build_type' in the build section of package.json, "
+            "because platform_id prefix must include build_type and so have to be fixed"
+        )
+    if len(platform_ids) != len(target_platforms):
+        raise YaPackageException(
+            "'target-platform-ids' length ({}) must match 'target-platforms' length ({})".format(
+                len(platform_ids), len(target_platforms)
+            )
+        )
+
+    seen = set()
+    if host_platform_id:
+        seen.add(host_platform_id)
+
+    for i, (tp, raw_pid) in enumerate(zip(target_platforms, platform_ids)):
+        if raw_pid == '' or raw_pid is None:
+            continue
+        pid = devtools.ya.core.common_opts.CrossCompilationOptions.normalize_platform_id(
+            raw_pid, 'target-platform-ids[{}]'.format(i)
+        )
+        if pid in seen:
+            raise YaPackageException("Duplicate target-platform-id: '{}'".format(pid))
+        seen.add(pid)
+        tp['platform_id'] = pid
+
+
 @timeit
 def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatters):
     targets = [t.format(**formatters) for t in build_info['targets']]
@@ -218,8 +251,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
             raise YaPackageException(
                 "Cannot choose target platforms between passed via ya package --target-platform and specified in json"
             )
-        # target-platform-ids will go here as a list of ids corresponding to platforms
-        # ensure that build-type is also in build_info otherwise ignore id or raise (because match is unreliable)
+        _apply_platform_ids(build_info, target_platforms, host_platform_id=params.host_platform_id)
     else:
         target_platforms = params.target_platforms
 

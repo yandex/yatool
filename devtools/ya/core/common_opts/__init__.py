@@ -958,7 +958,7 @@ class CrossCompilationOptions(Options):
         return consumers
 
     @staticmethod
-    def _normalize_single_platform_id(raw, field_label):
+    def normalize_platform_id(raw, field_label):
         if not isinstance(raw, six.string_types):
             raise ArgsValidatingException('{} must be a string, not {}'.format(field_label, type(raw)))
         pid = raw.strip()
@@ -984,7 +984,7 @@ class CrossCompilationOptions(Options):
                 # Allow to override platform_id set elsewhere
                 del pl['platform_id']
                 continue
-            pid = self._normalize_single_platform_id(raw, 'platform_id')
+            pid = self.normalize_platform_id(raw, 'platform_id')
             if pid in seen_platform_ids:
                 raise ArgsValidatingException('Duplicate --target-platform-id: {}'.format(pid))
             seen_platform_ids.add(pid)
@@ -993,7 +993,7 @@ class CrossCompilationOptions(Options):
         hid_raw = self.host_platform_id
         if hid_raw is None:
             return
-        hid = self._normalize_single_platform_id(hid_raw, 'host_platform_id')
+        hid = self.normalize_platform_id(hid_raw, 'host_platform_id')
         if hid in seen_platform_ids:
             raise ArgsValidatingException(
                 'Duplicate platform_id between --host-platform-id and a target: {}'.format(repr(hid))
