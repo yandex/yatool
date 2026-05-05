@@ -201,7 +201,6 @@ bool IsInternalReservedVar(const TStringBuf& cur) {
         VAR_ARCADIA_BUILD_ROOT,
         VAR_ARCADIA_ROOT,
         VAR_SRCS_GLOBAL,
-        VAR_YMAKE_BIN,
         VAR_TARGET,
         VAR_MANAGED_PEERS,
         VAR_MANAGED_PEERS_CLOSURE,
