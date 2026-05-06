@@ -108,13 +108,20 @@ namespace {
             TVector<TStringBuf> inProps;
             inProps.reserve(values.size());
             for (auto id: values) {
-                if (IsFile(id))
-                    inProps.push_back(ctx.Graph.GetFileName(ElemId(id)).GetTargetStr());
+                if (!IsFile(id)) {
+                    continue;
+                }
+                const auto prop = ctx.Graph.GetFileName(ElemId(id)).GetTargetStr();
+                if (prop != DUMMY_FILE) {
+                    inProps.push_back(prop);
+                }
             }
 
-            res.reserve(inProps.size());
-            for (auto file: parser->MapProps(ctx.Graph.Names(), tgtFile, type, inProps))
-                res.push_back(MakeDepFileCacheId(ctx.Graph.Names().AddName(EMNT_MissingFile, file)));
+            if (!inProps.empty()) {
+                res.reserve(inProps.size());
+                for (auto file: parser->MapProps(ctx.Graph.Names(), tgtFile, type, inProps))
+                    res.push_back(MakeDepFileCacheId(ctx.Graph.Names().AddName(EMNT_MissingFile, file)));
+            }
         }
         return res;
     }
