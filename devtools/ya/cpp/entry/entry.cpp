@@ -1,4 +1,3 @@
-#include <cstddef>
 #include <devtools/ya/cpp/lib/class_registry.h>
 #include <devtools/ya/cpp/lib/config.h>
 #include <devtools/ya/cpp/lib/ya_handler.h>
@@ -6,13 +5,8 @@
 #include <devtools/ya/cpp/lib/pgroup.h>
 #include <devtools/ya/cpp/entry/watchdog.h>
 
-#include <util/folder/path.h>
-#include "util/generic/fwd.h"
 #include <util/generic/hash.h>
-#include <util/generic/vector.h>
-#include <util/stream/file.h>
 #include <util/system/env.h>
-#include <utility>
 
 namespace NYa {
     __attribute__((weak)) void InitYt(int, char**) {
@@ -27,79 +21,7 @@ namespace NYa {
         extern "C" TMain mainptr;
         TMain prevMainPtr;
 
-        bool CanBeResponseFile(const TString& s) {
-            return s.length() > 1 && s[0] == '@' && s[1] != '@';
-        }
-
-        bool IsEscaped(const TString& s) {
-            return s.length() > 1 && s[0] == '@' && s[1] == '@';
-        }
-
-        bool CanBeHandler(const TString& s) {
-            return !s.empty() && s[0] != '-' && !CanBeResponseFile(s);
-        }
-
-        TString GetHandlerName(const TVector<TString>& args) {
-            for (auto& arg : args) {
-                // Also check against response files but that's ok.
-                // We'll unlikely ever have a handler that starts with @
-                if (CanBeHandler(arg)) {
-                    return arg;
-                }
-            }
-            return "";
-        }
-
-        constexpr size_t MaxExpandedArgs = 100000;
-
-        bool ExpandResponseFiles(TVector<TString>& result, const TVector<TString>& args, TString& handler) {
-            bool halt{false};
-            for (size_t i = 0; i < args.size(); ++i) {
-                if (result.size() > MaxExpandedArgs) {
-                    Cerr << "Too many arguments after expanding response files (limit: " << MaxExpandedArgs << ").\n";
-                    exit(1);
-                }
-                auto arg{args[i]};
-                if (!handler && CanBeHandler(arg)) {
-                    // first arg that can be handler is a handler
-                    handler = arg;
-                    // stop expansion if `tool` or `run` handler is met
-                    halt = handler == "tool" || handler == "run";
-                }
-                if (halt) {
-                    for (int j = i; j < static_cast<int>(args.size()); ++j) {
-                        result.emplace_back(args[j]);
-                    }
-                    return halt;
-                } else if (CanBeResponseFile(arg)) {
-                    TString filePath(arg.substr(1));
-                    TFsPath path(filePath);
-
-                    if (path.Exists()) {
-                        TFileInput input(filePath);
-                        TString line;
-                        TVector<TString> content;
-                        while (input.ReadLine(line)) {
-                            if (!line.empty()) {
-                                content.push_back(std::move(line));
-                            }
-                        }
-                        halt = ExpandResponseFiles(result, content, handler);
-                    } else {
-                        Cerr << "Response file '" << filePath << "' doesn't exist.\nDocumentation on response files in ya: https://docs.yandex-team.ru/yatool/usage/options\n";
-                        exit(1);
-                    }
-                } else if (IsEscaped(arg)) {
-                    // Escaping: @@username -> @username
-                    result.emplace_back(arg.substr(1));
-                } else {
-                    result.emplace_back(arg);
-                }
-            }
-            return halt;
-        }
-
-        bool allowLogging(const IYaHandler* handlerPtr, const TVector<TStringBuf> args) {
+        bool allowLogging(const IYaHandler *handlerPtr, const TVector<TStringBuf> args) {
             if (!handlerPtr->AllowLogging()) {
                 return false;
             }
@@ -124,11 +46,12 @@ namespace NYa {
         }
 
         void InitLoggerRespectConfig(
-            const TFsPath& miscRoot,
-            const IYaHandler* handlerPtr,
-            const TVector<TStringBuf>& args,
+            const TFsPath &miscRoot,
+            const IYaHandler *handlerPtr,
+            const TVector<TStringBuf> &args,
             ELogPriority priority,
-            bool verbose) {
+            bool verbose
+        ) {
             if (allowLogging(handlerPtr, args)) {
                 InitLogger(miscRoot, args, priority, verbose);
             } else {
@@ -137,44 +60,29 @@ namespace NYa {
         }
 
         int Entry(int argc, char** argv) {
-            TVector<TString> expandedArgs;
-            TVector<TString> rawArgs;
-            for (int i = 1; i < argc; ++i) {
-                rawArgs.emplace_back(argv[i]);
-            }
-            TString handlerName;
-            if (GetEnv("DISABLE_YA_RESPONSE_FILES")) {
-                handlerName = GetHandlerName(rawArgs);
-                expandedArgs = std::move(rawArgs);
-            } else {
-                ExpandResponseFiles(expandedArgs, rawArgs, handlerName);
-            }
-            expandedArgs.insert(expandedArgs.begin(), TString{argv[0]});
-            TVector<char*> expandedArgv;
-            expandedArgv.reserve(expandedArgs.size());
-            for (auto& arg : expandedArgs) {
-                expandedArgv.push_back(const_cast<char*>(arg.data()));
-            }
-            int expandedArgc = static_cast<int>(expandedArgv.size());
-            char** expandedArgvPtr = expandedArgv.data();
-
-            ::NYa::InitYt(expandedArgc, expandedArgvPtr);
-            auto newPgid = SetOwnProcessGroupId(expandedArgc, expandedArgvPtr);
+            ::NYa::InitYt(argc, argv);
+            auto newPgid = SetOwnProcessGroupId(argc, argv);
             InitWatchdogFromEnv();
 
             const auto factory = TSingletonClassFactory<IYaHandler>::Get();
+            // Find tool name (first non-flag arg)
+            const char* handlerName = nullptr;
             bool verbose = false;
-            for (int i = 1; i < expandedArgc; ++i) {
-                if (expandedArgs[i] == "-v" || expandedArgs[i] == "--verbose") {
+            for (int i = 1; i < argc; ++i) {
+                if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
                     verbose = true;
+                }
+                if (argv[i][0] != '-') {
+                    handlerName = argv[i];
+                    break;
                 }
             }
             if (handlerName) {
                 if (IYaHandler* handlerPtr = factory->GetObjectPtr(handlerName)) {
                     TVector<TStringBuf> args;
-                    args.reserve(expandedArgc);
-                    for (int i = 0; i < expandedArgc; ++i) {
-                        args.push_back(expandedArgvPtr[i]);
+                    args.reserve(argc);
+                    for (int i = 0; i < argc; ++i) {
+                        args.push_back(argv[i]);
                     }
                     const IConfig& config = GetConfig();
                     InitLoggerRespectConfig(config.MiscRoot(), handlerPtr, args, TLOG_DEBUG, verbose);
@@ -189,15 +97,18 @@ namespace NYa {
                     DEBUG_LOG << "Fallback to python\n";
                 }
             }
-            return prevMainPtr(expandedArgc, expandedArgvPtr);
+            return prevMainPtr(argc, argv);
         }
 
         int InitEntry() {
+            if (GetEnv("DISABLE_YA_CPP_HANDLERS")) {
+                return 0;
+            }
             prevMainPtr = mainptr;
             mainptr = Entry;
             return 0;
         }
 
         int initEntry = InitEntry();
-    } // namespace
-} // namespace NYa
+    }
+}
