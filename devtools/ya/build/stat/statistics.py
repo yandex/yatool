@@ -24,6 +24,7 @@ from devtools.ya.build.stat.graph import (
     create_graph_with_local_log,
 )
 from devtools.ya.core import profiler, stage_tracer
+from devtools.ya.build.stat.changelist_stats import get_changelist_stats
 
 
 class TaskType(enum.Enum):
@@ -893,6 +894,10 @@ def print_graph_statistics(
     stats['graph_lang_usage'], stats['graph_lang'] = _get_lang_statistics(graph)
 
     add_external_program_fetcher_metrics(graph)
+
+    cl_stats = get_changelist_stats()
+    if cl_stats is not None:
+        stats['changelist'] = cl_stats
 
     return stats
 

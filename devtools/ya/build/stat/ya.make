@@ -6,6 +6,7 @@ PY_SRCS(
     graph.py
     graph_metrics.py
     statistics.py
+    changelist_stats.py
 )
 
 PEERDIR(
