@@ -271,6 +271,9 @@ class PyTestSuite(common.PythonTestSuite):
         if opts and getattr(opts, 'pytest_args') and opts.pytest_args:
             cmd += opts.pytest_args
 
+        elif opts and getattr(opts, 'inline_diff', False):
+            cmd += ["--max-test-comment-size", "0"]
+
         return cmd
 
     def get_list_cmd(self, arc_root, build_root, opts):
