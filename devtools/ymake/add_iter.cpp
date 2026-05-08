@@ -1631,13 +1631,6 @@ inline void TUpdIter::Left(TState& state) {
     if (TNodeAddCtx* node = st.Add.Get()) {
         TAddDepIter& dep = st.Dep;
         if (node->IsModule && !node->NeedInit2) {
-            if (st.AtEnd()) {
-                if (!node->Module->IsInputsComplete()) {
-                    AssertEx(node->ModuleBldr != nullptr, "Module was not processed");
-                    node->ModuleBldr->RecursiveAddInputs();
-                }
-            }
-
             if (IsPeerdirDep(st.Node.NodeType, dep.DepType, dep.DepNode.NodeType)) {
                 if (IsInvalidDir(LastType)) {
                     YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] to " << (LastType == EMNT_NonProjDir ? "directory without ya.make: " : "missing directory: ") << "[[imp]]"
@@ -1674,6 +1667,13 @@ inline void TUpdIter::Left(TState& state) {
                         break;
                     default:
                         break;
+                }
+            }
+
+            if (st.AtEnd()) {
+                if (!node->Module->IsInputsComplete()) {
+                    AssertEx(node->ModuleBldr != nullptr, "Module was not processed");
+                    node->ModuleBldr->RecursiveAddInputs();
                 }
             }
         } else if (st.Node.NodeType == EMNT_BuildCommand && dep.DepType == EDT_Include && (state.size() < 2 || state[state.size() - 2].Dep.DepType != EDT_Property)) { // TOOL dep or InnerCommandDep
