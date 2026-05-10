@@ -67,14 +67,31 @@ public:
         TKeywords(TKeywords&&) noexcept = default;
         TKeywords& operator=(TKeywords&&) noexcept = default;
 
-        void AddArrayKeyword(const TString& word, const TString& deepReplaceTo) {
+        // TODO use explicit object parameters (when available) to reduce duplication
+
+        TKeywords& AddArrayKeyword(const TString& word, const TString& deepReplaceTo) & {
             AddKeyword(word, TKeyword::Array, deepReplaceTo);
+            return *this;
         }
-        void AddScalarKeyword(const TString& word, const TStringBuf& defaultVal, const TString& deepReplaceTo) {
+        TKeywords&& AddArrayKeyword(const TString& word, const TString& deepReplaceTo) && {
+            AddKeyword(word, TKeyword::Array, deepReplaceTo);
+            return std::move(*this);
+        }
+        TKeywords& AddScalarKeyword(const TString& word, const TStringBuf& defaultVal, const TString& deepReplaceTo) & {
             AddKeyword(word, TKeyword::Scalar, deepReplaceTo, nullptr, defaultVal);
+            return *this;
         }
-        void AddFlagKeyword(const TString& word, const TStringBuf& setVal, const TStringBuf& unsetVal) {
+        TKeywords&& AddScalarKeyword(const TString& word, const TStringBuf& defaultVal, const TString& deepReplaceTo) && {
+            AddKeyword(word, TKeyword::Scalar, deepReplaceTo, nullptr, defaultVal);
+            return std::move(*this);
+        }
+        TKeywords& AddFlagKeyword(const TString& word, const TStringBuf& setVal, const TStringBuf& unsetVal) & {
             AddKeyword(word, TKeyword::Flag, {}, setVal, unsetVal);
+            return *this;
+        }
+        TKeywords&& AddFlagKeyword(const TString& word, const TStringBuf& setVal, const TStringBuf& unsetVal) && {
+            AddKeyword(word, TKeyword::Flag, {}, setVal, unsetVal);
+            return std::move(*this);
         }
 
         bool Empty() const noexcept {
@@ -92,7 +109,7 @@ public:
     };
 
     TSignature() noexcept = default;
-    TSignature(const TVector<TString>& cmd, TSignature::TKeywords&& kw);
+    TSignature(const TVector<TString>& cmd, TSignature::TKeywords kw);
 
     const TVector<TString>& ArgNames() const noexcept {
         return ArgNames_;

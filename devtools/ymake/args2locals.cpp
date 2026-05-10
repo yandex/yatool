@@ -18,7 +18,7 @@ std::string FormatWrongNumberOfArgumentsErr(size_t numberOfFormals, size_t numbe
     return fmt::format("Wrong number of arguments: {} != {}", ToString(numberOfFormals), ToString(numberOfActuals));
 }
 
-TMapMacroVarsResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector<TStringBuf>& argNames, TVars& vars) {
+TMapMacroDiagResult MapMacroVars(TArrayRef<const TStringBuf> args, const TVector<TStringBuf>& argNames, TVars& vars) {
     if (args.empty() && argNames.empty()) {
         return {};
     }
@@ -165,8 +165,8 @@ void TMapMacroVarsErr::Report(TStringBuf macroName, TStringBuf argsStr) const {
     YConfErr(Syntax) << what << Endl;
 }
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals) {
-    TMapMacroVarsResult res;
+TMapMacroDiagResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals) {
+    TMapMacroDiagResult res;
 
     for (const auto& arg: TParsedCallArgs{sign, args}) {
         if (!arg)
@@ -189,7 +189,13 @@ TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const
     return res;
 }
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TSignature* sign, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals) {
+TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args) {
+    TVars locals;
+    return AddMacroArgsToLocals(sign, args, locals)
+        .and_then([&]() -> TMapMacroVarsResult {return std::move(locals);});
+}
+
+TMapMacroDiagResult AddMacroArgsToLocals(const TSignature* sign, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals) {
     if (sign && sign->IsNonPositional()) {
         return AddMacroArgsToLocals(*sign, args, locals);
     }

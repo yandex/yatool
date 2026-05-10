@@ -5,7 +5,7 @@
 
 #include <ranges>
 
-TSignature::TSignature(const TVector<TString>& cmd, TSignature::TKeywords&& kw)
+TSignature::TSignature(const TVector<TString>& cmd, TSignature::TKeywords kw)
     : Keywords_{std::move(kw).Take()}
     , NumUsrArgs_{cmd.size()}
 {

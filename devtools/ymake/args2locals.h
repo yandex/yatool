@@ -13,7 +13,9 @@ struct TMapMacroVarsErr {
     void Report(TStringBuf macroName, TStringBuf argsStr) const;
 };
 
-using TMapMacroVarsResult = std::expected<void, TMapMacroVarsErr>;
+using TMapMacroDiagResult = std::expected<void, TMapMacroVarsErr>;
+using TMapMacroVarsResult = std::expected<TVars, TMapMacroVarsErr>;
 
-TMapMacroVarsResult AddMacroArgsToLocals(const TSignature* sign, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals);
-TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals);
+TMapMacroDiagResult AddMacroArgsToLocals(const TSignature* sign, const TVector<TStringBuf>& argNames, TVector<TStringBuf>& args, TVars& locals);
+TMapMacroDiagResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args, TVars& locals);
+TMapMacroVarsResult AddMacroArgsToLocals(const TSignature& sign, TArrayRef<const TStringBuf> args);
