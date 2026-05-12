@@ -195,6 +195,7 @@ class DumpReportOptions(Options):
         self.build_report_type = build_report_type
         self.build_results_resource_id = None
         self.build_results_report_tests_only = False
+        self.build_results_report_no_configure = False
         self.report_skipped_suites = False
         self.report_skipped_suites_only = False
         self.use_links_in_report = False
@@ -218,6 +219,13 @@ class DumpReportOptions(Options):
                 ['--build-results-report-tests-only'],
                 help='Report only test results in the report',
                 hook=SetConstValueHook('build_results_report_tests_only', True),
+                group=AUTOCHECK_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--build-results-report-no-configure'],
+                help='Report only build and test results in the report, not configure',
+                hook=SetConstValueHook('build_results_report_no_configure', True),
                 group=AUTOCHECK_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
@@ -284,6 +292,11 @@ class DumpReportOptions(Options):
                 'YA_BUILD_RESULTS_TESTS_ONLY',
                 help='Report only test results in the report',
                 hook=SetConstValueHook('build_results_report_tests_only', True),
+            ),
+            EnvConsumer(
+                'YA_BUILD_RESULTS_NO_CONFIGURE',
+                help='Report only build and test results in the report, not configure',
+                hook=SetConstValueHook('build_results_report_no_configure', True),
             ),
             EnvConsumer('YA_DUMP_RAW_RESULTS', hook=SetConstValueHook('dump_raw_results', True)),
             ArgConsumer(

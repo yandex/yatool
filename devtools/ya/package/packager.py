@@ -281,6 +281,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.build_report_type = params.build_report_type
     build_options.build_results_resource_id = params.build_results_resource_id
     build_options.build_results_report_tests_only = params.build_results_report_tests_only
+    build_options.build_results_report_no_configure = params.build_results_report_no_configure
     if params.json_line_report_file:
         base, ext = os.path.splitext(params.json_line_report_file)
         build_options.json_line_report_file = '{base}_{name}{hash}{ext}'.format(

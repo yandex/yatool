@@ -54,6 +54,10 @@ def filter_nontest_node(entry):
     return False
 
 
+def is_configure_node(entry):
+    return entry.get("type") == "configure"
+
+
 def _fix_link_prefix_and_quote(link, fix_from, fix_to):
     assert link, locals()
     if link.startswith(fix_from):
@@ -495,6 +499,11 @@ class ReportGenerator:
         if (
             self._opts.build_results_report_tests_only or self._report_config.get('report_tests_only')
         ) and not filter_nontest_node(entry):
+            return None
+        if (
+            getattr(self._opts, 'build_results_report_no_configure', False)
+            or self._report_config.get('report_no_configure')
+        ) and is_configure_node(entry):
             return None
         entry["rich-snippet"] = formatter.ansi_codes_to_markup(entry.get("rich-snippet", ""))
         entry = remove_empty_field(entry)
