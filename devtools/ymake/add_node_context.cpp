@@ -638,7 +638,7 @@ void TNodeAddCtx::UpdCmdStampForNewCmdNode(TNameDataStore<TCommandData, TCmdView
     }
 }
 
-bool TMaybeNodeUpdater::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
+bool TMaybeNodeUpdater::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
     if (Deps.Push({depType, elemNodeType, elemId})) {
         SavedRequests.push_back(ERequestType::SingleDep);
     }

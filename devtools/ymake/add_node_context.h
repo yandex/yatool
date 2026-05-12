@@ -84,13 +84,13 @@ struct TNodeAddCtx : public TAddDepAdaptor {
 public:
     // these are in add_node_context_inline.h
     void AddDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName);
-    void AddDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId);
+    void AddDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
 
     void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
-    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) final;
+    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
 
     bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
-    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) final;
+    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
 
     void AddDeps(const TDeps& deps) final {
         Deps.Add(deps);
@@ -130,7 +130,7 @@ public:
         return Entry.get();
     }
 
-    inline TAddDepAdaptor& AddOutput(ui64 fileId, EMakeNodeType defaultType, bool addToOwn = true) final;
+    inline TAddDepAdaptor& AddOutput(ui32 fileId, EMakeNodeType defaultType, bool addToOwn = true) final;
 
     void UpdCmdStamp(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
     void UpdCmdStampForNewCmdNode(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
@@ -186,7 +186,7 @@ public:
     {
     }
 
-    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) final;
+    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
     bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
     bool HasAnyDeps() const final;
     void AddParsedIncls(TStringBuf type, const TVector<TResolveFile>& files) final;
@@ -198,7 +198,7 @@ public:
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
-    TDepRef AddDep(EDepType, EMakeNodeType, ui64) {
+    TDepRef AddDep(EDepType, EMakeNodeType, ui32) {
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
@@ -206,7 +206,7 @@ public:
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
-    void AddDepIface(EDepType, EMakeNodeType, ui64) final {
+    void AddDepIface(EDepType, EMakeNodeType, ui32) final {
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
@@ -214,7 +214,7 @@ public:
         ythrow TNotImplemented() << "AddDeps: Not implemented in TMaybeNodeUpdater";
     }
 
-    TAddDepAdaptor& AddOutput(ui64, EMakeNodeType, bool) final {
+    TAddDepAdaptor& AddOutput(ui32, EMakeNodeType, bool) final {
         ythrow TNotImplemented() << "AddOutput: Not implemented in TMaybeNodeUpdater";
     }
 

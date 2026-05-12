@@ -27,12 +27,12 @@ public:
     }
 
     TDepRef AddDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName);
-    TDepRef AddDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId);
+    TDepRef AddDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
 
     void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
-    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) final;
+    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
 
-    bool AddUniqueDep(EDepType, EMakeNodeType, ui64) final;
+    bool AddUniqueDep(EDepType, EMakeNodeType, ui32) final;
     bool AddUniqueDep(EDepType, EMakeNodeType, TStringBuf) final;
 
     bool HasAnyDeps() const final {
@@ -51,7 +51,7 @@ public:
     void AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propName) final;
     void AddDirsToProps(const TPropsNodeList& props, TStringBuf propName) final;
 
-    TNodeBuilder& AddOutput(ui64, EMakeNodeType, bool = true) final {
+    TNodeBuilder& AddOutput(ui32, EMakeNodeType, bool = true) final {
         ythrow yexception() << "AddOutput: Not implemented yet for a new graph";
 
         /* TODO(spreis) implement

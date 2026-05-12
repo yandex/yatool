@@ -12,7 +12,7 @@ TDepRef TNodeBuilder::AddDep(EDepType depType, EMakeNodeType elemNodeType, TStri
     return AddDep(depType, elemNodeType, Names.AddName(elemNodeType, elemName));
 }
 
-TDepRef TNodeBuilder::AddDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
+TDepRef TNodeBuilder::AddDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
     auto& graph = TDepGraph::Graph(Node);
     TDepNodeRef newNode = graph.GetNodeById(elemNodeType, elemId);
     if (newNode.IsValid()) {
@@ -27,7 +27,7 @@ void TNodeBuilder::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TSt
     AddDep(depType, elemNodeType, elemName);
 }
 
-void TNodeBuilder::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
+void TNodeBuilder::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
     AddDep(depType, elemNodeType, elemId);
 }
 
@@ -36,7 +36,7 @@ bool TNodeBuilder::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TS
     return true;
 }
 
-bool TNodeBuilder::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
+bool TNodeBuilder::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
     auto& graph = TDepGraph::Graph(Node);
     TDepNodeRef newNode = graph.GetNodeById(elemNodeType, elemId);
     if (newNode.IsValid()) {

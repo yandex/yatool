@@ -120,13 +120,13 @@ Y_FORCE_INLINE constexpr ui32 ElemId(TDepsCacheId cacheId) noexcept {
 struct TAddDepDescr {
     EDepType DepType;
     EMakeNodeType NodeType;
-    ui64 ElemId;    // FileId
+    ui32 ElemId;    // FileId
 
     TAddDepDescr() {
         // leave garbage
     }
 
-    TAddDepDescr(EDepType depType, EMakeNodeType nodeType, ui64 elemId)
+    TAddDepDescr(EDepType depType, EMakeNodeType nodeType, ui32 elemId)
         : DepType(depType)
         , NodeType(nodeType)
         , ElemId(elemId)
@@ -169,11 +169,11 @@ struct TDeps {
         Locked = true;
     }
 
-    void Add(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId);
+    void Add(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
     void Add(const TDeps& what);
-    bool AddUnique(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId);
+    bool AddUnique(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
 
-    void Replace(size_t idx, EDepType depType, EMakeNodeType elemNodeType, ui64 elemId);
+    void Replace(size_t idx, EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
 
     // Proxy collection interface
 

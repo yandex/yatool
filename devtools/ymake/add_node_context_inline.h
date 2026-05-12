@@ -6,7 +6,7 @@ Y_FORCE_INLINE void TNodeAddCtx::AddDep(EDepType depType, EMakeNodeType elemNode
     AddDep(depType, elemNodeType, Graph.Names().AddName(elemNodeType, elemName));
 }
 
-Y_FORCE_INLINE void TNodeAddCtx::AddDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
+Y_FORCE_INLINE void TNodeAddCtx::AddDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
     Y_ASSERT(elemId);
     Deps.Add(depType, elemNodeType, elemId);
 }
@@ -15,7 +15,7 @@ Y_FORCE_INLINE void TNodeAddCtx::AddDepIface(EDepType depType, EMakeNodeType ele
     AddDep(depType, elemNodeType, elemName);
 }
 
-Y_FORCE_INLINE void TNodeAddCtx::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
+Y_FORCE_INLINE void TNodeAddCtx::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
     AddDep(depType, elemNodeType, elemId);
 }
 
@@ -23,7 +23,7 @@ Y_FORCE_INLINE bool TNodeAddCtx::AddUniqueDep(EDepType depType, EMakeNodeType el
     return AddUniqueDep(depType, elemNodeType, Graph.Names().AddName(elemNodeType, elemName));
 }
 
-Y_FORCE_INLINE bool TNodeAddCtx::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui64 elemId) {
+Y_FORCE_INLINE bool TNodeAddCtx::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
     Y_ASSERT(elemId);
     return Deps.AddUnique(depType, elemNodeType, elemId);
 }
@@ -34,7 +34,7 @@ Y_FORCE_INLINE void TNodeAddCtx::AddDepsUnique(const TPropsNodeList& what, EDepT
     }
 }
 
-Y_FORCE_INLINE TAddDepAdaptor& TNodeAddCtx::AddOutput(ui64 elemId, EMakeNodeType defaultType, bool addToOwn) {
+Y_FORCE_INLINE TAddDepAdaptor& TNodeAddCtx::AddOutput(ui32 elemId, EMakeNodeType defaultType, bool addToOwn) {
     auto i = UpdIter.Nodes.Insert(MakeDepsCacheId(defaultType, elemId), &YMake, Module);
     TUpdEntryStats& nodeData = i->second;
 
