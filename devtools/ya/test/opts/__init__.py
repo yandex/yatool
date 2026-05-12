@@ -1534,6 +1534,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 ),
             ),
             devtools.ya.core.yarg.ConfigConsumer('clang_mcdc_coverage'),
+            devtools.ya.core.yarg.ConfigConsumer('go_coverage_per_pkg'),
         ]
 
     def postprocess(self):
