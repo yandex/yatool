@@ -332,7 +332,7 @@ class GraphStats:
             self.run_tasks[uid] = RunTask(uid, self.abstract_tasks[uid], host)
         return self.run_tasks[uid]
 
-    def get_copy_task(self, dep_uid: GraphNodeUid, uid: GeneratorExit, destination_host: _Hostname) -> CopyTask:
+    def get_copy_task(self, dep_uid: GraphNodeUid, uid: GraphNodeUid, destination_host: _Hostname) -> CopyTask:
         key = (dep_uid, uid)
         if key not in self._incomplete_copy_tasks:
             task = CopyTask(dep_uid, uid, destination_host)
