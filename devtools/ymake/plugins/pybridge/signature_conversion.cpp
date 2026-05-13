@@ -1,17 +1,11 @@
 #include "signature_conversion.h"
 
 #include "raii.h"
+#include "str.h"
 
 #include <devtools/ymake/options/static_options.h>
 
 namespace {
-
-TStringBuf StrContent(PyObject* pystr) noexcept {
-    Y_ASSERT(PyUnicode_Check(pystr));
-    Py_ssize_t size = 0;
-    const char *data = PyUnicode_AsUTF8AndSize(pystr, &size);
-    return {data, static_cast<size_t>(size)};
-}
 
 inline bool IsUnitTypeAnnotation(const PyObject& annotation, const PyTypeObject& unitType) noexcept {
     return &annotation == reinterpret_cast<const PyObject*>(&unitType);
@@ -73,11 +67,11 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
             if (IsFlagArgTypeAnnotation(*val)) {
                 if (Py_IsTrue(defaultVal))
                     return std::unexpected(ESignatureDeductionError::WrongFlagDefault);
-                keywords.AddFlagKeyword(TString{StrContent(key)}, {}, {});
+                keywords.AddFlagKeyword(TString{StrContent(*key)}, {}, {});
             } else if (IsScalarArgTypeAnnotation(*val))
-                keywords.AddScalarKeyword(TString{StrContent(key)}, StrContent(defaultVal), {});
+                keywords.AddScalarKeyword(TString{StrContent(*key)}, StrContent(*defaultVal), {});
             else if (IsArrayArgTypeAnnotation(*val))
-                keywords.AddArrayKeyword(TString{StrContent(key)}, {});
+                keywords.AddArrayKeyword(TString{StrContent(*key)}, {});
             else
                 return std::unexpected(ESignatureDeductionError::WrongArgType);
             continue;
@@ -86,9 +80,9 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
         if (IsScalarArgTypeAnnotation(*val)) {
             if (varargFound)
                 return std::unexpected(ESignatureDeductionError::PositionalAfterVararg);
-            positionals.push_back(TString{StrContent(key)});
+            positionals.push_back(TString{StrContent(*key)});
         } else if (IsArrayArgTypeAnnotation(*val)) {
-            positionals.push_back(TString{StrContent(key)} + NStaticConf::ARRAY_SUFFIX);
+            positionals.push_back(TString{StrContent(*key)} + NStaticConf::ARRAY_SUFFIX);
             varargFound = true;
         } else
             return std::unexpected(ESignatureDeductionError::WrongArgType);

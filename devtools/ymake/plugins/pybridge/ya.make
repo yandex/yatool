@@ -1,6 +1,7 @@
 LIBRARY()
 
 SRCS(
+    ffi_macro.cpp
     raii.cpp
     signature_conversion.cpp
 )
