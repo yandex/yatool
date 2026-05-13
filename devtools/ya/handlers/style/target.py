@@ -123,8 +123,8 @@ def _mine_targets_smart(paths: Sequence[Path], only_staged: bool = False) -> Gen
 
 
 def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
-    # read stdin if not tty
-    if not mine_opts.tty:
+    # read stdin if not tty and no explicit targets provided
+    if not mine_opts.tty and not mine_opts.targets:
         yield Target(PurePath(mine_opts.stdin_filename), sys.stdin.buffer.read, stdin=True)
 
     # read cwd if target is not specified
