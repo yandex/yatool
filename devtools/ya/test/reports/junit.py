@@ -51,6 +51,11 @@ class JUnitReportGenerator(object):
             },
         )
 
+        if suite.requirements:
+            requirements_element = self.create_element(doc, suite_element, "requirements")
+            for key, value in suite.requirements.items():
+                self.create_element(doc, requirements_element, "requirement", {"name": key, "value": value})
+
         properties_element = self.create_element(doc, suite_element, "properties")
         self.create_element(
             doc, properties_element, "property", {"name": "result-type", "value": suite.get_ci_type_name()}

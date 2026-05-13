@@ -60,12 +60,16 @@ def generate_results_report(builder):
         if builder.opts.continue_on_fail or builder.exit_code in [0, devtools.ya.core.error.ExitCodes.TEST_FAILED]:
             instance = devtools.ya.test.reports.JUnitReportGenerator()
 
+            junit_path = builder.opts.junit_path
+            if not os.path.isabs(junit_path):
+                junit_path = os.path.join(output_dir, junit_path)
+
             instance.create(
-                builder.opts.junit_path,
+                junit_path,
                 suites,
                 lambda link: ar2._fix_link_prefix_and_quote(link, output_dir, results_root),
             )
-            logger.info('Dump junit report to %s', builder.opts.junit_path)
+            logger.info('Dump junit report to %s', junit_path)
 
     if builder.opts.build_results_report_file:
         results = ar2.fix_links(

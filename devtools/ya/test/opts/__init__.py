@@ -996,6 +996,8 @@ class FileReportsOptions(devtools.ya.core.yarg.Options):
     def postprocess(self):
         if self.allure_report is not None:
             self.allure_report = path2.abspath(self.allure_report, expand_user=True)
+        if self.junit_path is not None:
+            self.junit_path = os.path.expanduser(self.junit_path)
 
 
 class OutputOptions(devtools.ya.core.yarg.Options):
