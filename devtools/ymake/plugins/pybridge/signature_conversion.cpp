@@ -47,7 +47,7 @@ bool IsArrayArgTypeAnnotation(PyObject& annotation) noexcept {
 
 namespace NYMake::NPy {
 
-std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject& func, PyTypeObject& unitType) noexcept {
+std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject& func, PyTypeObject& unitType) {
     PyObject* signature = PyFunction_GetAnnotations(&func);
     if (!signature)
         return std::unexpected(ESignatureDeductionError::MissingTypeHints);

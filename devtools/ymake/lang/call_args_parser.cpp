@@ -122,14 +122,14 @@ TParsedCallArgs::value_type TParsedCallArgs::ParseNext() noexcept {
 }
 
 TParsedCallArgs::TResult<TArgDefIdx> TParsedCallArgs::DeduplicateKeyword(const TKeyword& kw) noexcept {
-    if (KWSet_.test(kw.Pos) && kw.Kind != TKeyword::Array) {
+    if (KWSet_[kw.Pos] && kw.Kind != TKeyword::Array) {
         return MakeError(TArgsParseError::DuplicatedKeyword, KWIdx(kw), CurrentArgPos());
     }
 
     if (kw.Kind == TKeyword::Array) {
         LastArr_ = KWIdx(kw);
     }
-    KWSet_.set(kw.Pos);
+    KWSet_[kw.Pos] = true;
     return KWIdx(kw);
 }
 

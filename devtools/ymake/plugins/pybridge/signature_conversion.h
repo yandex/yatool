@@ -18,6 +18,6 @@ enum class ESignatureDeductionError {
     IndistinguishableKwArg,
 };
 
-std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject& func, PyTypeObject& unitType) noexcept;
+std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject& func, PyTypeObject& unitType);
 
 }
