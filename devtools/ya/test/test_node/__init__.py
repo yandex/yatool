@@ -82,7 +82,7 @@ def add_list_node(opts, suite):
 def inject_download_docker_image_node(graph, image, opts):
     link, tag = image
 
-    fake_id = 5
+    fake_id = opts.flags.get('FAKEID', '5')
     uid = "docker-image-{}-{}".format(imprint.combine_imprints(link, tag), fake_id)
     output_dir = os.path.join("images", imprint.combine_imprints(tag))
     output_image_path = os.path.join("$(BUILD_ROOT)", output_dir, 'image.tar')
