@@ -28,6 +28,10 @@ public:
     OwnedRef<> Call(PyObject& unit, std::span<const TStringBuf> args);
 
     TStringBuf Name() const noexcept;
+    TString DocText() const;
+    PyObject* Impl() const noexcept {
+        return Func_.get();
+    }
 
 private:
     TFFIMacro(OwnedRef<>&& func, TSignature&& sign) noexcept

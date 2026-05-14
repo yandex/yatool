@@ -11,6 +11,8 @@
 #include <devtools/ymake/lang/plugin_facade.h>
 #include <devtools/ymake/plugins/pybridge/lambda.h>
 #include <devtools/ymake/plugins/pybridge/raii.h>
+#include <devtools/ymake/plugins/pybridge/str.h>
+#include <devtools/ymake/plugins/pybridge/ffi_macro.h>
 
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -86,7 +88,7 @@ namespace {
     };
 
     PyType_Spec ContextTypeSpec = {
-        .name = "ymake.Context",
+        .name = "ymake.Unit",
         .basicsize = sizeof(Context),
         .flags = Py_TPFLAGS_DEFAULT,
         .slots = YMakeContextTypeSlots,
@@ -465,27 +467,36 @@ namespace {
                 return nullptr;
             }
 
-            TString macroName;
-            {
-                NYMake::NPy::OwnedRef name{PyObject_GetAttrString(args[0], "__name__")};
-                Y_ASSERT(PyUnicode_Check(name.Get()));
-                Py_ssize_t size;
-                const char *data = PyUnicode_AsUTF8AndSize(name.get(), &size);
-                if (!data) {
-                    Y_ASSERT(PyErr_Occurred());
-                    return nullptr;
+            auto macro = NYMake::NPy::TFFIMacro::Wrap(NYMake::NPy::FromBorrowedRef(args[0]), *ContextType);
+            if (!macro.has_value()) {
+                using enum NYMake::NPy::ESignatureDeductionError;
+                switch (macro.error()) {
+                    case MissingTypeHints:
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro requires type hints on decorated function.");
+                        break;
+                    case MissingUnitArg:
+                        PyErr_Format(PyExc_RuntimeError, "ymake.macro: first argument type must be '%N'.", ContextType.get());
+                        break;
+                    case WrongArgType:
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only bool, str or tuple[str, ...] types are allowed for macro arguments.");
+                        break;
+                    case WrongFlagDefault:
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only False is allowed as default value of a flag (bool) KW argument.");
+                        break;
+                    case PositionalAfterVararg:
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only last (vararg) positional argument can be a tuple.");
+                        break;
+                    case IndistinguishableKwArg:
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro: non kw-only arguments are not allowed to have default values.");
+                        break;
+                    case PyException:
+                        break;
                 }
-                macroName = ToUpperUTF8(TStringBuf{data, static_cast<size_t>(size)});
-            }
-
-            PyObject* signature = PyFunction_GetAnnotations(args[0]);
-            if (!signature) {
-                PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator requires type hint annotations on decorated function");
                 return nullptr;
             }
 
             if (Conf) {
-                NYMake::NPlugins::RegisterMacro(*Conf, macroName, NYMake::NPy::FromBorrowedRef(args[0]));
+                NYMake::NPlugins::RegisterMacro(*Conf, std::move(macro.value()));
             } else {
                 // Using YErr() here since it will fail build for case when this error happens inside ymake application but will not
                 // fail python code which tries to import plugins with ymake module being used as regular python module.

@@ -131,4 +131,12 @@ TStringBuf TFFIMacro::Name() const noexcept {
     return StrContent(*name);
 }
 
+TString TFFIMacro::DocText() const {
+    PyObject* doc = ((PyFunctionObject*)Func_.get())->func_doc;
+    if (!doc || !PyUnicode_Check(doc)) {
+        return {};
+    }
+    return TString{StrContent(*doc)};
+}
+
 }
