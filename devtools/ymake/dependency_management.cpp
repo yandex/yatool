@@ -738,6 +738,17 @@ namespace {
                 for (auto unpeer : parentItem.UnmanageablePeers) {
                     record->UnmanageablePeers.emplace_back(unpeer);
                 }
+                // transparent modules must propagate unmanageable peers same as managed ones
+                for (const auto& direct : record->Direct) {
+                    const auto childIt = ManagedPeers.find(direct.Id);
+                    if (childIt == ManagedPeers.end()) {
+                        continue;
+                    }
+                    record->UnmanageablePeers.insert(
+                        record->UnmanageablePeers.end(),
+                        childIt->second.UnmanageablePeers.begin(),
+                        childIt->second.UnmanageablePeers.end());
+                }
                 // DEPENDENCY_MANAGEMENT_TRANSPARENT: do not merge transitive ManagedPeers.Closure from peers (unlike MergeClosure).
                 // Otherwise tool modules (e.g. IJAR) inherit the full classpath of every direct PEERDIR.
                 static const NDetail::TPeersClosure EmptyPeersClosure;
