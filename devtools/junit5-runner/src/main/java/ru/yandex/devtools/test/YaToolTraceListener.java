@@ -133,7 +133,7 @@ public class YaToolTraceListener implements TestExecutionListener {
                 boolean exists = expectedTests.remove(testIdentifier);
                 logger.info("testSkipped [%s], %s",
                         testIdentifier.getDisplayName(), exists ? "expected" : "unexpected");
-                listener.reportPartiallyFinished(testIdentifier, TestStatus.skipped);
+                listener.reportPartiallyFinished(testIdentifier, TestStatus.skipped, reason);
             } else if (testIdentifier.getType() == TestDescriptor.Type.CONTAINER) {
                 skippedContainers.put(testIdentifier, reason);
             }

@@ -4,6 +4,8 @@ import org.junit.jupiter.api.extension.ConditionEvaluationResult;
 import org.junit.jupiter.api.extension.ExecutionCondition;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
+import ru.yandex.devtools.test.annotations.YaIgnore;
+
 public class YaIgnoreCondition implements ExecutionCondition {
 
     /**
@@ -12,7 +14,12 @@ public class YaIgnoreCondition implements ExecutionCondition {
      */
     @Override
     public ConditionEvaluationResult evaluateExecutionCondition(ExtensionContext context) {
-        return ConditionEvaluationResult.disabled("Disabled by @YaIgnore");
+        String reason = "Disabled by @YaIgnore" + context.getElement()
+                .map(element -> element.getAnnotation(YaIgnore.class))
+                .map(YaIgnore::value)
+                .filter(s -> !s.isEmpty())
+                .map(value -> ": " + value)
+                .orElse("");
+        return ConditionEvaluationResult.disabled(reason);
     }
-
 }

@@ -13,4 +13,5 @@ import ru.yandex.devtools.test.YaIgnoreCondition;
 @Target({ElementType.METHOD, ElementType.TYPE})
 @ExtendWith(YaIgnoreCondition.class)
 public @interface YaIgnore {
+    String value() default "";
 }
