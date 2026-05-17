@@ -143,11 +143,6 @@ public:
     void DeleteDep(size_t idx);
 
     TModAddData& GetModuleData() final;
-private:
-    void SetDepsRule(const TIndDepsRule* rule) {
-        DepsRule = rule;
-        DepsRuleSet = true;
-    }
 };
 
 // This pseudo-node stores all incoming information and can be later:

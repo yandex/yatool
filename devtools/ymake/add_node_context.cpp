@@ -362,8 +362,9 @@ void TNodeAddCtx::InitDepsRule() {
 }
 
 const TIndDepsRule* TNodeAddCtx::SetDepsRuleByName(TStringBuf name) {
-     SetDepsRule(YMake.IncParserManager.IndDepsRuleByPath(name));
-     return DepsRule;
+    DepsRule = YMake.IncParserManager.IndDepsRuleByPath(name);
+    DepsRuleSet = true;
+    return DepsRule;
 }
 
 void TNodeAddCtx::LeaveModule() {
