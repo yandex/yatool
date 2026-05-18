@@ -40,14 +40,12 @@ def combine_cov_files(cov_files, merge_dir, new_cov_filename, prefix_filter, exc
 def get_options():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output")
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--coverage-tars", default=[], action='append')  # deprecated
-    group.add_argument('--merged-coverage-tar')  # , required=True Already merged coverage at input
+    parser.add_argument("--coverage-tars", default=[], action='append')
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--source-root", required=True)
     parser.add_argument('--gotools-path', required=True)
-    parser.add_argument("--exclude-regexp")  # deprecated, moved to merge_go_coverage
-    parser.add_argument("--prefix-filter")  # deprecated, moved to merge_go_coverage
+    parser.add_argument("--exclude-regexp")
+    parser.add_argument("--prefix-filter")
     return parser.parse_args()
 
 
@@ -76,16 +74,12 @@ def build_report(args):
     os.symlink(args.source_root, os.path.join(cwd, "src"))
     os.environ["GOCACHE"] = os.path.join(cwd, tmpdir, ".gocache")
 
-    if args.merged_coverage_tar:
-        exts.archive.extract_from_tar(args.merged_coverage_tar, tmpdir)
-        merged_coverage_file = os.path.join(tmpdir, "cov")
-    else:
-        mergedir = 'merge'
-        os.mkdir(mergedir)
-        for cov_tar in args.coverage_tars:
-            exts.archive.extract_from_tar(cov_tar, tmpdir)
-        cov_files = [os.path.join(tmpdir, fn) for fn in os.listdir(tmpdir)]
-        merged_coverage_file = combine_cov_files(cov_files, mergedir, 'cov', args.prefix_filter, args.exclude_regexp)
+    mergedir = 'merge'
+    os.mkdir(mergedir)
+    for cov_tar in args.coverage_tars:
+        exts.archive.extract_from_tar(cov_tar, tmpdir)
+    cov_files = [os.path.join(tmpdir, fn) for fn in os.listdir(tmpdir)]
+    merged_coverage_file = combine_cov_files(cov_files, mergedir, 'cov', args.prefix_filter, args.exclude_regexp)
 
     result_dir = "go.coverage.report"
     os.mkdir(result_dir)

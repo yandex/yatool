@@ -1409,7 +1409,12 @@ def main():
         logger.debug("Changing roots in the test command %s: %s -> %s", cmd, source_root, new_source_root)
         for old_root, new_root in [(source_root, new_source_root)]:
             cmd = devtools.ya.test.util.shared.change_cmd_root(
-                cmd, old_root, new_root, build_root, skip_list=[sys.argv[0]], skip_args=["--test-param"]
+                cmd,
+                old_root,
+                new_root,
+                build_root,
+                skip_list=[sys.argv[0]],
+                skip_args=["--test-param", "--arcadia-root"],
             )
         logger.debug("Changed command: %s", cmd)
 

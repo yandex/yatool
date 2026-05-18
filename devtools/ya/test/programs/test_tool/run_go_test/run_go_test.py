@@ -87,7 +87,10 @@ def parse_args():
         "--test-binary-args", default=[], action="append", help="Transfer additional parameters to test binary"
     )
     parser.add_argument("--allure", action="store_true")
-    parser.add_argument("--go-coverage-per-pkg", action="store_true")
+
+    parser.add_argument("--go-coverage-per-pkg", action="store_true", help="Enable Go >= 1.25 coverage per package")
+    parser.add_argument("--go-toolchain", help="Path to the go toolchain")
+    parser.add_argument("--arcadia-root", help="Path to the arcadia root")
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -99,6 +102,10 @@ def parse_args():
         parser.error("--gdb-debug and --dlv-debug are mutually exclusive")
     if args.dlv_args:
         args.dlv_args = shlex.split(args.dlv_args)
+    if args.go_coverage_per_pkg and not args.go_toolchain:
+        parser.error("--go-coverage-per-pkg requires --go-toolchain")
+    if args.go_coverage_per_pkg and not args.arcadia_root:
+        parser.error("--go-coverage-per-pkg requires --arcadia-root")
     return args
 
 
@@ -522,6 +529,71 @@ def terminate(proc):
         return proc.returncode
 
 
+def resolve_go_tool(path, binname):
+    path = os.path.join(path, "pkg/tool")
+    names = os.listdir(path)
+    # go toolchain contains only one platform
+    assert len(names) == 1, names
+    return os.path.join(path, names[0], binname)
+
+
+# Convert Go 1.25 binary coverage data to text format
+def covdata_textfmt(opts, cov_path):
+    gocover_dir = os.path.dirname(cov_path)
+    covdata = resolve_go_tool(opts.go_toolchain, 'covdata')
+    if not os.path.exists(covdata):
+        logger.error("Not found Go tool covdata in Go toolchain at %s", covdata)
+        return const.TestRunExitCode.InfrastructureError
+    cov_path_txt = cov_path + '.txt'
+    try:
+        # Convert Go binary coverage data to text format by covdata tool
+        covdata_stderr = os.path.join(gocover_dir, 'covdata.err')
+        covdata_stdout = os.path.join(gocover_dir, 'covdata.out')
+        textfmt_cmd = [
+            covdata,
+            "textfmt",
+            "-i",
+            gocover_dir,
+            "-o",
+            cov_path_txt,
+        ]
+        logger.debug("cmd: %s", textfmt_cmd)
+        res = shared.tee_execute(
+            textfmt_cmd, covdata_stdout, covdata_stderr, strip_ansi_codes=False, on_timeout=terminate
+        )
+        if res.returncode != 0:
+            logger.error(
+                "Failed with return code %d convert Go coverage data to text format by cmd: %s",
+                res.returncode,
+                textfmt_cmd,
+            )
+            return res.returncode
+        # Here cov_path_txt has text format coverage, BUT with full paths for all sources
+    except process.SignalInterruptionError:
+        return const.TestRunExitCode.TimeOut
+    except Exception as e:
+        logger.error("Fail convert Go coverage to text format: %s", str(e))
+        return const.TestRunExitCode.InfrastructureError
+    try:
+        # Move binary Go coverage data to *.raw directory
+        gocover_dir_raw = gocover_dir + '.raw'
+        os.rename(gocover_dir, gocover_dir_raw)
+        cov_path_txt = os.path.join(gocover_dir_raw, os.path.basename(cov_path_txt))
+        os.makedirs(gocover_dir)
+    except Exception as e:
+        logger.error("Failed move Go coverage directory '%s' -> '%s': %s", gocover_dir, gocover_dir_raw, str(e))
+        return const.TestRunExitCode.InfrastructureError
+    try:
+        # Replace in text format coverage path to arcadia by a.yandex-team.ru
+        with open(cov_path_txt, "r") as fr:
+            with open(cov_path, "w") as fw:  # Put patched coverage data to original cov_path
+                fw.write(fr.read().replace(opts.arcadia_root, 'a.yandex-team.ru'))
+        return 0
+    except Exception as e:
+        logger.error("Failed replace paths in Go coverage text format: %s", str(e))
+        return const.TestRunExitCode.InfrastructureError
+
+
 def run_tests(opts):
     if opts.tracefile:
         open(opts.tracefile, "w").close()
@@ -677,6 +749,9 @@ def run_tests(opts):
             )
             suite.chunk.tests.append(test_case)
     shared.dump_trace_file(empty_suite, opts.tracefile)
+
+    if exit_code == 0 and cov_path and opts.go_coverage_per_pkg and opts.go_toolchain:
+        exit_code = covdata_textfmt(opts, cov_path)  # inplace convert Go 1.25 binary coverage data to text format
 
     if exit_code not in [0, const.TestRunExitCode.TimeOut]:
         if cov_path and (

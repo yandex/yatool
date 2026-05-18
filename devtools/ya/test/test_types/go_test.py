@@ -113,7 +113,17 @@ class GoTestSuite(common_types.AbstractTestSuite):
                 str(self.timeout),
                 '--verbose',
             ]
-            + (['--go-coverage-per-pkg'] if opts.go_coverage_per_pkg else [])
+            + (
+                [
+                    '--go-coverage-per-pkg',
+                    '--go-toolchain',
+                    self.global_resources.get(devtools.ya.test.const.GO_TOOLS_RESOURCE),
+                    '--arcadia-root',
+                    "$(SOURCE_ROOT)",
+                ]
+                if opts.go_coverage_per_pkg
+                else []
+            )
         )
 
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:

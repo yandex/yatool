@@ -42,17 +42,13 @@ def combine_cov_files(cov_files, merge_dir, new_cov_filename, prefix_filter, exc
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', required=True)
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--coverage-path')  # , required=True deprecated
-    group.add_argument('--merged-coverage-tar')  # , required=True Already merged coverage at input
+    parser.add_argument('--coverage-path', required=True)
     parser.add_argument('--log-path')
     parser.add_argument('--log-level', default='INFO')
-    parser.add_argument("--exclude-regexp")  # deprecated, moved to merge_go_coverage
-    parser.add_argument("--prefix-filter")  # deprecated, moved to merge_go_coverage
+    parser.add_argument("--exclude-regexp")
+    parser.add_argument("--prefix-filter")
 
     args = parser.parse_args()
-    if not args.coverage_path and not args.merged_coverage_tar:
-        raise ValueError("Either --coverage-path or --merged-coverage-tar must be provided")
     return args
 
 
@@ -114,13 +110,10 @@ def resolve_coverage(cov_path, output):
 def main():
     args = parse_args()
     setup_env(args)
-    if args.merged_coverage_tar:
-        merged_coverage_file = extract(args.merged_coverage_tar)[0]
-    else:  # deprecated
-        dir_files = extract(args.coverage_path)
-        merge_dir = 'merge'
-        os.mkdir(merge_dir)
-        merged_coverage_file = combine_cov_files(dir_files, merge_dir, 'cov', args.prefix_filter, args.exclude_regexp)
+    dir_files = extract(args.coverage_path)
+    merge_dir = 'merge'
+    os.mkdir(merge_dir)
+    merged_coverage_file = combine_cov_files(dir_files, merge_dir, 'cov', args.prefix_filter, args.exclude_regexp)
     resolve_coverage(merged_coverage_file, args.output)
 
     logger.debug('maxrss: %d', runtime.get_maxrss())
