@@ -260,7 +260,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
         if target_platforms:
             for tp in target_platforms:
                 if 'flags' in tp:
-                    flags_list.append(tp['flags'])
+                    # Use a copy to avoid mutation
+                    flags_list.append(dict(tp['flags']))
         else:
             flags_list.append(build_options.flags)
 
