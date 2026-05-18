@@ -1059,6 +1059,10 @@ namespace {
             for (const auto& resolved : transparentRecord.Direct) {
                 directChildIds.insert(resolved.Id);
             }
+            const auto skipPropagation = [this](TNodeId id) {
+                const auto* m = GetModule(id);
+                return m && m->GetAttrs().DepManagementTransparent;
+            };
             for (const auto& resolved : transparentRecord.Direct) {
                 const auto depIt = ManagedPeers.find(resolved.Id);
                 if (depIt == ManagedPeers.end()) {
@@ -1071,7 +1075,7 @@ namespace {
                     const auto excludePredSkipDirect = [&](TNodeId id) {
                         return !directChildIds.contains(id) && excludePred(id);
                     };
-                    expanded.Merge(resolved.Id, depIt->second.Closure.Exclude(excludePredSkipDirect, excludeLookup));
+                    expanded.Merge(resolved.Id, depIt->second.Closure.Exclude(excludePredSkipDirect, excludeLookup, skipPropagation));
                 }
             }
             return expanded;
@@ -1087,6 +1091,10 @@ namespace {
                 const auto it = ManagedPeers.find(id);
                 return it != ManagedPeers.end() ? it->second.Closure : EmptyPeersClosure;
             };
+            const auto skipPropagation = [this](TNodeId id) {
+                const auto* m = GetModule(id);
+                return m && m->GetAttrs().DepManagementTransparent;
+            };
             for (auto [peerId, _] : directPeers) {
                 const auto& peerRecord = ManagedPeers.at(peerId);
                 const TModule* peerModule = GetModule(peerId);
@@ -1098,7 +1106,7 @@ namespace {
                     closure.Merge(peerId, BuildExpandedTransparentClosure(peerRecord, rules));
                     continue;
                 }
-                closure.Merge(peerId, peerRecord.Closure.Exclude(excludePred, excludeLookup));
+                closure.Merge(peerId, peerRecord.Closure.Exclude(excludePred, excludeLookup, skipPropagation));
             }
 
             return closure;
@@ -1609,7 +1617,11 @@ namespace NDetail {
         }
     }
 
-    TPeersClosure TPeersClosure::Exclude(const std::function<bool(TNodeId)>& predicate, const std::function<const TPeersClosure&(TNodeId)>& nodeClosure) const {
+    TPeersClosure TPeersClosure::Exclude(
+        const std::function<bool(TNodeId)>& predicate,
+        const std::function<const TPeersClosure&(TNodeId)>& nodeClosure,
+        const std::function<bool(TNodeId)>& skipPropagation
+    ) const {
         TPeersClosure res;
         res.TopSort.reserve(TopSort.size());
 
@@ -1630,6 +1642,18 @@ namespace NDetail {
                 continue;
             }
             idExcludes->second = stat.PathCount;
+
+            // When a transparent module has a non-transparent peer with the same path
+            // (like another submodule in the same multimodule),
+            // propagating excludedPaths from transparent would pre-fill excludedPaths
+            // for non-transparent.
+            // Non-transparent — visited next in reverse-topo order — would
+            // then observe newExcludes==0 and skip iteration of its own much richer
+            // sub-closure, leaving transitive peers unmarked even though dir-prefix
+            // EXCLUDE rules logically cover them.
+            if (skipPropagation && skipPropagation(id)) {
+                continue;
+            }
 
             for (auto [peer, peerStat]: nodeClosure(id).Stats) {
                 auto peerExcldes = excludedPaths.emplace(peer, 0).first;

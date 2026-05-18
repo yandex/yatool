@@ -49,7 +49,11 @@ namespace NDetail {
         TPeersClosure& operator=(TPeersClosure&&) = default;
 
         void Merge(TNodeId node, const TPeersClosure& closure, ui32 pathsCount = 1);
-        TPeersClosure Exclude(const std::function<bool(TNodeId)>& predicate, const std::function<const TPeersClosure&(TNodeId)>& nodeClosure) const;
+        TPeersClosure Exclude(
+            const std::function<bool(TNodeId)>& predicate,
+            const std::function<const TPeersClosure&(TNodeId)>& nodeClosure,
+            const std::function<bool(TNodeId)>& skipPropagation = {}
+        ) const;
 
         const THashMap<TNodeId, TClosureStats>& GetStats() const noexcept {
             return Stats;
