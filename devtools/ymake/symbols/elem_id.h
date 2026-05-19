@@ -6,7 +6,7 @@
 
 using TElemId_Underlying = ui32;
 
-//#define ELEMID_PROPER
+#define ELEMID_PROPER
 #if !defined(ELEMID_PROPER)
 
 using TElemId = TElemId_Underlying;

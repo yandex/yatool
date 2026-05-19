@@ -63,9 +63,9 @@ public:
         : Table(table), Id(elemId)
     {}
 
-    // TCmdView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
-    //     : Table(table), Id(TCmdElemId(elemId))
-    // {}
+    TCmdView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
+        : Table(table), Id(TCmdElemId(elemId))
+    {}
 
     TStringBuf GetStr() const;
 

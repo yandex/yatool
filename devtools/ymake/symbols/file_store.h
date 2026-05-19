@@ -258,10 +258,10 @@ public:
         , Table(table)
     {}
 
-    // TFileView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
-    //     : TFileId(TFileElemId(elemId))
-    //     , Table(table)
-    // {}
+    TFileView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
+        : TFileId(TFileElemId(elemId))
+        , Table(table)
+    {}
 
     void GetStr(TString& name) const;
     TStringBuf GetTargetStr() const;
