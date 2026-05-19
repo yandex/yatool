@@ -102,6 +102,13 @@ def get_options():
     parser.add_option(
         "--no-src-changes", dest="no_src_changes", help="Don't apply changes to repo", action='store_true'
     )
+    parser.add_option(
+        "--no-stage-canonized",
+        dest="stage_canonized",
+        default=True,
+        help="Disable adding canonized data to VCS stage area",
+        action='store_false',
+    )
     return parser.parse_args()
 
 
@@ -157,6 +164,7 @@ def main():
         oauth_token=oauth_token,
         no_src_changes=options.no_src_changes,
         backend=options.backend,
+        stage_canonized=options.stage_canonized,
     )
 
     ok = True

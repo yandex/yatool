@@ -256,6 +256,7 @@ class CanonicalData(object):
         oauth_token=None,
         no_src_changes=False,
         backend=None,
+        stage_canonized=True,
     ):
         self._arc_path = arc_path
         self._max_str_len = max_str_len
@@ -278,6 +279,7 @@ class CanonicalData(object):
         self._mds = mds
         self._sub_path = sub_path
         self._backend = backend
+        self._stage_canonized = stage_canonized
 
     def repo(self):
         if not self._repo:
@@ -569,7 +571,7 @@ class CanonicalData(object):
                     )
                     result_file.write('\n')
 
-                self._apply_changes(self.get_suite_canon_dir(suite.project_path), results_root)
+                self._apply_changes(self.get_suite_canon_dir(suite.project_path), results_root, self._stage_canonized)
         return res
 
     def save(self, suite):
@@ -869,7 +871,7 @@ class CanonicalData(object):
 
         return saved
 
-    def _apply_changes(self, test_canonical_dir, temp_canonical_dir):
+    def _apply_changes(self, test_canonical_dir, temp_canonical_dir, stage_canonized):
         if os.path.exists(test_canonical_dir):
             yatest_logger.debug("Deleting old canonical dir %s", test_canonical_dir)
             shutil.rmtree(test_canonical_dir)
@@ -877,7 +879,8 @@ class CanonicalData(object):
         if temp_canonical_dir and os.path.exists(temp_canonical_dir):
             exts.fs.copy_tree(temp_canonical_dir, test_canonical_dir)
 
-        return self.repo().apply(test_canonical_dir)
+        if stage_canonized:
+            self.repo().apply(test_canonical_dir)
 
     def _get_test_full_name(self, project_path, test_name):
         return "[{} in {}]".format(test_name, project_path)

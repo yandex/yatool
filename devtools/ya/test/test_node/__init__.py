@@ -2333,6 +2333,9 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
     if opts.no_src_changes:
         node_cmd += ["--no-src-changes"]
 
+    if not opts.stage_canonized:
+        node_cmd += ["--no-stage-canonized"]
+
     if opts.canonization_backend:
         node_cmd += ["--backend", opts.canonization_backend]
 

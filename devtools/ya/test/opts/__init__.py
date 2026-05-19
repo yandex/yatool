@@ -544,6 +544,7 @@ class CanonizationOptions(devtools.ya.core.yarg.Options):
         self.canonization_backend = None
         self.canonization_scheme = "https"
         self.custom_canondata_path = None
+        self.stage_canonized = True
 
     def consumer(self):
         return [
@@ -610,6 +611,14 @@ class CanonizationOptions(devtools.ya.core.yarg.Options):
                 'YA_CANONIZATION_SCHEME',
                 hook=devtools.ya.core.yarg.SetValueHook('canonization_scheme'),
             ),
+            TestArgConsumer(
+                ['--no-stage-canonized'],
+                help='Disable adding canonized data to VCS stage area',
+                hook=devtools.ya.core.yarg.SetConstValueHook('stage_canonized', False),
+                subgroup=CANONIZATION_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('stage_canonized'),
         ]
 
     def postprocess2(self, params):
