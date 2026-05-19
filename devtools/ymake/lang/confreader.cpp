@@ -1536,7 +1536,7 @@ namespace {
 
         antlrcpp::Any visitPropStmt(TConfParser::PropStmtContext *ctx) override {
             TString propName(ctx->propName()->getText());
-            TString propValue(ctx->rvalue()->getText());
+            TString propValue(NormalizeRval(ctx->rvalue()->getText(), Builder.GetLeftTrim()));
             antlr4::Token* token = ctx->propName()->getStart();
             TSourceRange range {
                 token->getLine(),
