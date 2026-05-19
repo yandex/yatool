@@ -59,7 +59,7 @@ protected:
 class TPrefixConstraint: public TDependencyConstraint<TPrefixConstraint> {
 public:
     TPrefixConstraint(TDepGraph& graph, TStringBuf peerPrefix, TRequrementScopes scope);
-    TPrefixConstraint(TSymbols& symbols, ui32 dirId, TRequrementScopes scope);
+    TPrefixConstraint(TSymbols& symbols, TFileElemId dirId, TRequrementScopes scope);
 
     TFileView GetPeerPrefix() const noexcept {
         return PeerPrefix;

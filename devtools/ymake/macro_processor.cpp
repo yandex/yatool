@@ -341,7 +341,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
             knownOutputs = &specFiles->Output;
         }
         auto compiled = CommandSink->Compile(command, *Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
-        const ui32 cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
+        const TCmdElemId cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
         GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled, false, ownVars);
         auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
         return TString(res);
@@ -397,8 +397,8 @@ THashMap<TString, TString> TCommandInfo::TakeRequirements() {
     return THashMap<TString, TString>();
 }
 
-ui64 TCommandInfo::InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role) {
-    const ui64 elemId = Graph->Names().AddName(EMNT_BuildCommand, Get1(&var));
+TCmdElemId TCommandInfo::InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role) {
+    const TCmdElemId elemId = AssumeCmd(Graph->Names().AddName(EMNT_BuildCommand, Get1(&var)));
     // we can have duplicate command entries even within a single Makefile
     // e.g. SRCS(foo/a.cpp bar/a.cpp) may turn into `SRCScxx cpp cc=(a.cpp)' for both files
     if (var.EntryPtr) {
@@ -408,7 +408,7 @@ ui64 TCommandInfo::InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole
     return elemId;
 }
 
-void TCommandInfo::AddCmdNode(const TYVar& var, ui64 elemId, EStructCmd structCmd, EExprRole role) {
+void TCommandInfo::AddCmdNode(const TYVar& var, TCmdElemId elemId, EStructCmd structCmd, EExprRole role) {
     Y_ENSURE(UpdIter != nullptr);
 
     if (Conf->ValidateCmdNodes) {
@@ -459,7 +459,7 @@ void TCommandInfo::AddCmdNode(const TYVar& var, ui64 elemId, EStructCmd structCm
     }
 }
 
-void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources) {
+void TCommandInfo::CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources) {
 
     //
     // srcExpr (an elemId) points to an "S:123" build command element,
@@ -494,7 +494,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         // that do _not_ have directly corresponding nodes
         // (and are linked as "0:VARNAME=S:123" instead)
         auto cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
-        return std::make_tuple(cmdName, Graph->Names().CmdNameById(cmdElemId).GetStr(), id, cmdElemId);
+        return std::make_tuple(cmdName, Graph->Names().CmdNameById(cmdElemId).GetStr(), TElemId(id), cmdElemId);
     };
 
     auto exprVars = commands.GetCommandVars(srcExpr);
@@ -527,7 +527,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
                     continue;
                 auto& subBinding = it->second;
                 auto [cmdName, value, id, elemId] = mkCmd(exprVarName);
-                const ui32 subExpr = elemId;
+                const TCmdElemId subExpr = elemId;
                 subBinding.SetSingleVal(cmdName, value, id);
                 if (TVersionedCmdId(Graph->Names().CommandConf.GetId(value)).IsNewFormat())
                     subBinding[0].StructCmdForVars = true;
@@ -549,10 +549,10 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
         } catch (const std::exception& e) {
             compiled = compilationFallback(e, exprVarName, EvalAll(var));
         }
-        const ui32 subExpr = commands.Add(*Graph, std::move(compiled.Expression));
+        const TCmdElemId subExpr = commands.Add(*Graph, std::move(compiled.Expression));
         auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
 
-        subBinding.SetSingleVal(exprVarName, subExprRef, 0);
+        subBinding.SetSingleVal(exprVarName, subExprRef, TElemId());
         subBinding[0].StructCmdForVars = true;
         InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
         CollectVarsDeep(commands, subExpr, subBinding, varDefinitionSources);
@@ -563,7 +563,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVa
 
 bool TCommandInfo::GetCommandInfoFromStructCmd(
     TCommands& commands,
-    ui32 cmdElemId,
+    TCmdElemId cmdElemId,
     NCommands::TCompiledCommand& compiled,
     bool skipMainOutput,
     const TVars& vars
@@ -635,8 +635,8 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
 }
 
 bool TCommandInfo::GetCommandInfoFromStructVar(
-    ui32 varElemId,
-    ui32 cmdElemId,
+    TCmdElemId varElemId,
+    TCmdElemId cmdElemId,
     TCommands& commands,
     const TVars& vars
 ) {
@@ -652,7 +652,7 @@ bool TCommandInfo::GetCommandInfoFromStructVar(
     return true;
 }
 
-bool TCommandInfo::GetCommandInfoFromMacro(const TStringBuf& realMacroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id) {
+bool TCommandInfo::GetCommandInfoFromMacro(const TStringBuf& realMacroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, TElemId id) {
     // Take appropriate macro specialization
     const TStringBuf& macroName = Conf->GetSpecMacroName(realMacroName, args);
     const TYVar* macroVar = vars.Lookup(macroName);
@@ -661,7 +661,7 @@ bool TCommandInfo::GetCommandInfoFromMacro(const TStringBuf& realMacroName, EMac
         YConfErr(BadMacro) << "Trying to use undefined macro " << macroName << " in a command" << Endl;
         return false;
     }
-    const ui64 jElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Cmd);
+    const TCmdElemId jElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Cmd);
     SBDIAG << "GetCommandInfoFromMacro " << macroName << " " << pattern << "\n";
 
     if (type == EMT_Usual) {
@@ -883,7 +883,7 @@ TCommandInfo::ECmdInfoState TCommandInfo::CheckInputs(TModuleBuilder& modBuilder
 
         modBuilder.SaveInputResolution(input, origInput, InputDir);
 
-        TAddDepAdaptor& node = inputNode.AddOutput(input.ElemId, inputType, false);
+        TAddDepAdaptor& node = inputNode.AddOutput(AssumeFile(input.ElemId), inputType, false);
 
         if (!input.ByExtFailed) {
             auto& modData = node.GetModuleData();
@@ -934,14 +934,14 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     const size_t startCountOuts = finalTargetCmd ? 0 : 1;
     size_t numRealOut = finalTargetCmd ? 1 : 0;
 
-    TVersionedCmdId curCmdId(Cmd.EntryPtr ? ElemId(Cmd.EntryPtr->first) : 0);
+    TVersionedCmdId curCmdId(Cmd.EntryPtr ? AssumeCmd(ElemId(Cmd.EntryPtr->first)) : TCmdElemId());
     TStringBuf curCmdName = Get1(&Cmd);
     YDIAG(Dev) << "Process command: " << curCmdName << Endl;
 
     TFileConf& fileConf = Graph->Names().FileConf;
 
-    Y_ASSERT(!fileConf.GetName(inputNode.ElemId).IsLink());
-    TStringBuf inputNodeName = fileConf.GetName(inputNode.ElemId).GetTargetStr();
+    Y_ASSERT(!fileConf.GetName(AssumeFile(inputNode.ElemId)).IsLink());
+    TStringBuf inputNodeName = fileConf.GetName(AssumeFile(inputNode.ElemId)).GetTargetStr();
 
     const auto& ownEntries = mod.GetOwnEntries();
     for (auto& output : GetOutput()) {
@@ -953,7 +953,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
         YDIAG(Dev) << "Process: AddName " << output.Name << Endl;
 
         if (const auto fid = fileConf.GetIdNx(output.Name)) {
-            if (ownEntries.has(fid)) {
+            if (ownEntries.has(RawElemId(fid))) {
                 YConfErr(DupSrc) << output.Name << " was already added in this project. Skip command: "
                                  << SkipId(curCmdName) << Endl;
                 return false;
@@ -961,7 +961,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 
             // We do not consider outputs of module command that macth main module output as a DupSrc issue
             if (!mod.IgnoreDupSrc() && !(finalTargetCmd && fid == mod.GetId())) {
-                if (UpdIter->CheckNodeStatus({EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready && !mod.GetSharedEntries().has(fid)) {
+                if (UpdIter->CheckNodeStatus({EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready && !mod.GetSharedEntries().has(RawElemId(fid))) {
                     ConfMsgManager()->AddDupSrcLink(fid, mod.GetId());
                 }
             }
@@ -1007,7 +1007,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
         }
 
         if (output.AddToModOutputs) {
-            mod.ExtraOuts.push_back(output.ElemId);
+            mod.ExtraOuts.push_back(AssumeFile(output.ElemId));
         }
 
         // This IncDir should basically enable only resolving of the exact output marked by `addincl` modifier
@@ -1031,20 +1031,20 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     }
 
     // Determining the main output.
-    ui64 mainOutId = 0;
+    TFileElemId mainOutId = TFileElemId();
     EMakeNodeType mainOutType = EMNT_NonParsedFile;
     if (finalTargetCmd) {
-        mainOutId = inputNode.ElemId;
+        mainOutId = AssumeFile(inputNode.ElemId);
         mainOutType = inputNode.NodeType;
     } else {
         Y_ASSERT(!MainOutput);
         MainOutput = FindMainElemOrDefault(GetOutput(), 0);
         Y_ASSERT(MainOutput);
         MainOutput->IsGlobal = MainOutput->IsGlobal || HasGlobalInput;
-        mainOutId = MainOutput->ElemId;
+        mainOutId = AssumeFile(MainOutput->ElemId);
     }
 
-    ui64 cmdElemId = Graph->Names().AddName(EMNT_BuildCommand, curCmdName);
+    TCmdElemId cmdElemId = AssumeCmd(Graph->Names().AddName(EMNT_BuildCommand, curCmdName));
 
     // 0. Prepare OUTPUT_INCLUDES nodes (ParsedIncls.*)
     THashMap<TStringBuf, TCreateParsedInclsResult> outputIncludeForType;
@@ -1094,7 +1094,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             moduleType = mainOutType;
 
             static constexpr TStringBuf modulePrefix = "$L/MODULE/"sv;
-            ui32 moduleId = fileConf.Add(TString::Join(modulePrefix, mainOutName));
+            TFileElemId moduleId = fileConf.Add(TString::Join(modulePrefix, mainOutName));
             moduleNode = &inputNode.AddOutput(moduleId, mainOutType);
         }
 
@@ -1103,7 +1103,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 
             // Это пока очень временный способ пометить специальный узел, в котором будут общие свойства команды.
             static constexpr TStringBuf actionPrefix = "$L/ACTION/"sv;
-            ui32 actionId = fileConf.Add(TString::Join(actionPrefix, mainOutName));
+            TFileElemId actionId = fileConf.Add(TString::Join(actionPrefix, mainOutName));
 
             TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, EMNT_NonParsedFile, !finalTargetCmd);
             TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, fileNodeType, !finalTargetCmd);
@@ -1122,7 +1122,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     outs.push_back({mainOutNode, MainOutput});
 
     // 1. Inputs
-    const ui64 groupId = Graph->Names().AddName(EMNT_Property, NStaticConf::INPUTS_MARKER);
+    const TCmdElemId groupId = AssumeCmd(Graph->Names().AddName(EMNT_Property, NStaticConf::INPUTS_MARKER));
     for (auto& input : GetInput()) {
         YDIAG(DG) << "Input dep: " << input.Name << Endl;
 
@@ -1149,8 +1149,8 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
                 nodeType = EMNT_NonParsedFile;
             }
 
-            if (nodeType == EMNT_NonParsedFile && TFileConf::IsLink(input.ElemId)) {
-                ui32 targetId = TFileConf::GetTargetId(input.ElemId);
+            if (nodeType == EMNT_NonParsedFile && TFileConf::IsLink(AssumeFile(input.ElemId))) {
+                TFileElemId targetId = TFileConf::GetTargetId(AssumeFile(input.ElemId));
                 auto inputNode = Graph->GetFileNodeById(targetId);
                 if (inputNode.IsValid() && IsModuleType(inputNode->NodeType)) {
                     input.Name = NPath::GetTargetFromLink(input.Name);
@@ -1160,8 +1160,8 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             }
             actionNode.AddDepIface(EDT_BuildFrom, nodeType, input.ElemId);
         }
-        if (TFileConf::IsLink(input.ElemId) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
-            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(input.ElemId));
+        if (TFileConf::IsLink(AssumeFile(input.ElemId)) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
+            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(RawElemId(TFileConf::GetTargetId(AssumeFile(input.ElemId))));
         }
     }
 
@@ -1174,7 +1174,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
                 continue;
             }
 
-            TAddDepAdaptor& extraOutNode = inputNode.AddOutput(out.ElemId, EMNT_NonParsedFile);
+            TAddDepAdaptor& extraOutNode = inputNode.AddOutput(AssumeFile(out.ElemId), EMNT_NonParsedFile);
             outs.push_back({extraOutNode, &out});
 
             out.IsGlobal = out.IsGlobal || HasGlobalInput;
@@ -1209,7 +1209,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
                 }
 
                 if (setPassFlags) {
-                    auto setFlags = [&](ui32 elemId) {
+                    auto setFlags = [&](TElemId elemId) {
                         TNodeData& nodeData = Graph->GetFileNodeData(elemId);
                         rule ? rule->ApplyNodeFlags(nodeData) : TIndDepsRule::ResetNodeFlags(nodeData);
                     };
@@ -1239,10 +1239,10 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     if (finalTargetCmd) {
         for (const auto id : ownEntries) {
             Y_ENSURE(UpdIter != nullptr);
-            auto modInfo = UpdIter->GetAddedModuleInfo(MakeDepsCacheId(EMNT_NonParsedFile, id));
+            auto modInfo = UpdIter->GetAddedModuleInfo(MakeDepsCacheId(EMNT_NonParsedFile, TElemId(id)));
             Y_ASSERT(modInfo != nullptr);
             if (modInfo != nullptr && modInfo->AdditionalOutput) {
-                actionNode.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, id);
+                actionNode.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, TElemId(id));
             }
         }
     }
@@ -1310,16 +1310,16 @@ void TCommandInfo::ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr) {
         TUniqVector<ui32> matches;
         TGlobPattern glob(Graph->Names().FileConf, globStr, Module->GetDir());
         for (const auto& result : glob.Apply(excludeMatcher)) {
-            matches.Push(Graph->Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
+            matches.Push(RawElemId(Graph->Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId()));
         }
         const TString globCmd = FormatCmd(Module->GetName().GetElemId(), NProps::LATE_GLOB, globStr);
         TModuleGlobInfo globInfo = {
-            .GlobPatternId = Graph->Names().AddName(EMNT_BuildCommand, globCmd),
-            .GlobPatternHash = Graph->Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash())),
+            .GlobPatternId = AssumeCmd(Graph->Names().AddName(EMNT_BuildCommand, globCmd)),
+            .GlobPatternHash = AssumeCmd(Graph->Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()))),
             .WatchedDirs = glob.GetWatchDirs().Data(),
             .MatchedFiles = matches.Take(),
             .Excludes = {},
-            .ReferencedByVar = 0,
+            .ReferencedByVar = TCmdElemId(),
         };
         CreateGlobNode(globInfo);
     } catch (const yexception& error){
@@ -1339,8 +1339,8 @@ bool TCommandInfo::ProcessVar(TModuleBuilder& modBuilder, TAddDepAdaptor& inputN
     for (auto& input : GetInput()) {
         modBuilder.AddInputVarDep(input, inputNode);
 
-        if (TFileConf::IsLink(input.ElemId) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
-            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(input.ElemId));
+        if (TFileConf::IsLink(AssumeFile(input.ElemId)) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
+            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(RawElemId(TFileConf::GetTargetId(AssumeFile(input.ElemId))));
         }
     }
 
@@ -1366,7 +1366,7 @@ void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, TNodeAddCtx
     auto subExpr = UpdIter->YMake.Commands.Add(*Graph, std::move(compiled.Expression));
     auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
     auto subBinding = TYVar();
-    subBinding.SetSingleVal("CFG_VARS", subExprRef, 0);
+    subBinding.SetSingleVal("CFG_VARS", subExprRef, TElemId());
     auto cmdElemId = InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
     dst.AddDep(EDT_BuildCommand, EMNT_BuildVariable, cmdElemId);
 }
@@ -1431,15 +1431,15 @@ void TCommandInfo::FillCoords(
             Y_ASSERT(macroVar->size() == 1); // not implemented yet
             if (GetAddCtx(Cmd)) { // as a flag of graph construction mode
                 Y_ASSERT(GetId(Get1(macroVar)) == macroVar->Id);
-                const ui64 macroVarElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Var);
+                const TCmdElemId macroVarElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Var);
                 const TYVar* addMacroDataTo = origin;
-                if (macroVar->GenFromFile || localVars.IsIdDeeper(origin->Id, macroVar->Id)) {
+                if (macroVar->GenFromFile || localVars.IsIdDeeper(AssumeFile(origin->Id), AssumeFile(macroVar->Id))) {
                     addMacroDataTo = &Cmd;
                     if (!macroVar->GenFromFile) {
-                        const TVars* baseVars = localVars.GetBase(origin->Id);
+                        const TVars* baseVars = localVars.GetBase(AssumeFile(origin->Id));
                         const TYVar* macroVarFromBaseVars = baseVars->Lookup(macroData.Name);
                         if (macroVarFromBaseVars && !origin->AddCtxFilled) {
-                            const ui64 macroVarFromBaseVarsElemId = InitCmdNode(*macroVarFromBaseVars, EStructCmd::No, EExprRole::Var);
+                            const TCmdElemId macroVarFromBaseVarsElemId = InitCmdNode(*macroVarFromBaseVars, EStructCmd::No, EExprRole::Var);
                             GetAddCtx(*origin)->AddUniqueDep(EDT_Include, EMNT_BuildCommand, macroVarFromBaseVarsElemId);
 
                             if (!macroVarFromBaseVars->AddCtxFilled) {
@@ -1624,7 +1624,7 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
             }
         } else {
             const TStringBuf cmdStr = Get1(cmd);
-            const ui64 cmdElemId = InitCmdNode(*cmd, EStructCmd::No, EExprRole::Var);
+            const TCmdElemId cmdElemId = InitCmdNode(*cmd, EStructCmd::No, EExprRole::Var);
             if (GetAddCtx(var)->AddUniqueDep(EDT_Include, EMNT_BuildCommand, cmdElemId)) {
                 SBDIAG << "Command dep: " << cmdStr << Endl;
                 if (!cmd->AddCtxFilled) {

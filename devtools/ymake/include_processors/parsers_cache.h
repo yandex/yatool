@@ -61,8 +61,8 @@ namespace NParsersCache {
         return result;
     }
 
-    ui64 GetResultId(TParserId parserId, ui32 fileId);
-    ui32 GetFileIdFromResultId(ui64 resultId);
+    ui64 GetResultId(TParserId parserId, TFileElemId fileId);
+    TFileElemId GetFileIdFromResultId(ui64 resultId);
     TParserId GetParserIdFromResultId(ui64 resultId);
 }
 
@@ -127,7 +127,7 @@ public:
         return true;
     }
 
-    EIncludesParserType GetParserType(ui32 fileId) const;
+    EIncludesParserType GetParserType(TFileElemId fileId) const;
 
     void SetParserTypeToParserIdMapper(std::function<TParserId(EIncludesParserType)>&& mapper) {
         ParserTypeToParserIdMapper = std::move(mapper);

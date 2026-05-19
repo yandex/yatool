@@ -23,15 +23,15 @@ public:
     {
     }
 
-    TFileView FileNameById(ui32 id) const;
-    TCmdView CmdNameById(ui32 id) const;
+    TFileView FileNameById(TFileElemId id) const;
+    TCmdView CmdNameById(TCmdElemId id) const;
 
     TFileView FileNameByCacheId(TDepsCacheId cacheId) const;
     TCmdView CmdNameByCacheId(TDepsCacheId cacheId) const;
 
-    ui32 IdByName(EMakeNodeType type, TStringBuf name) const;
+    TElemId IdByName(EMakeNodeType type, TStringBuf name) const;
 
-    ui32 AddName(EMakeNodeType type, TStringBuf name);
+    TElemId AddName(EMakeNodeType type, TStringBuf name);
 
     void Save(TMultiBlobBuilder& builder);
 

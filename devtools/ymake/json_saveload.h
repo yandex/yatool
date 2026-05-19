@@ -35,7 +35,7 @@ public:
         auto node = graph.Get(nodeId);
         ui8 useFileId = UseFileId(node->NodeType) ? 1 : 0;
         Save<ui8>(useFileId);
-        Save<ui32>(node->ElemId);
+        Save<TElemId>(node->ElemId);
     }
 
     void SaveElemIds(const THolder<TUniqVector<TNodeId>>& nodeIdsHolder, const TDepGraph& graph) noexcept {
@@ -63,12 +63,12 @@ private:
         size_t namePrefixSize;
     };
 
-    ui32 FindUsedReservedVar(TURVScratchpad& scratchpad, TStringBuf varName, const TDepGraph& graph) {
+    TCmdElemId FindUsedReservedVar(TURVScratchpad& scratchpad, TStringBuf varName, const TDepGraph& graph) {
         // "USED_RESERVED_VAR=" + varName
         scratchpad.varNodeName.replace(scratchpad.namePrefixSize, scratchpad.varNodeName.size() - scratchpad.namePrefixSize, varName);
 
-        ui32 varElemId = graph.Names().CommandConf.GetIdNx(scratchpad.varNodeName);
-        Y_ASSERT(varElemId != 0); // guaranteed by TModuleBuilder::AddGlobalVarDep
+        auto varElemId = graph.Names().CommandConf.GetIdNx(scratchpad.varNodeName);
+        Y_ASSERT(varElemId != TCmdElemId()); // guaranteed by TModuleBuilder::AddGlobalVarDep
         return varElemId;
     }
 
@@ -82,7 +82,7 @@ public:
         Save<ui32>(usedReservedVars->size());
         TURVScratchpad scratchpad;
         for (const auto& varName : *usedReservedVars) {
-            Save<ui32>(FindUsedReservedVar(scratchpad, varName, graph));
+            Save<TCmdElemId>(FindUsedReservedVar(scratchpad, varName, graph));
         }
     }
 
@@ -95,10 +95,10 @@ public:
         Save<ui32>(usedReservedVarsTotals->size());
         TURVScratchpad scratchpad;
         for (const auto& usedReservedVars : *usedReservedVarsTotals) {
-            Save<ui32>(FindUsedReservedVar(scratchpad, usedReservedVars.first, graph));
+            Save<TCmdElemId>(FindUsedReservedVar(scratchpad, usedReservedVars.first, graph));
             Save<ui32>(usedReservedVars.second.size());
             for (const auto& varName : usedReservedVars.second) {
-                Save<ui32>(FindUsedReservedVar(scratchpad, varName, graph));
+                Save<TCmdElemId>(FindUsedReservedVar(scratchpad, varName, graph));
             }
         }
     }
@@ -113,7 +113,7 @@ public:
         auto nodeRef = graph.Get(nodeId);
 
         ui8 useFileId = UseFileId(nodeRef->NodeType) ? 1 : 0;
-        ui32 elemId = nodeRef->ElemId;
+        auto elemId = nodeRef->ElemId;
         output->Write(&useFileId, sizeof(useFileId));
         output->Write(&elemId, sizeof(elemId));
         SaveToStream(output);
@@ -167,7 +167,7 @@ public:
 
     ELoadResult LoadUnchangedNodeDataFromStream(IInputStream* input, TNodeId& nodeId, const TDepGraph& graph, size_t onSkipHeaderSize = 0) {
         ui8 useFileId = LoadFromStream<ui8>(input);
-        ui32 elemId = LoadFromStream<ui32>(input);
+        auto elemId = LoadFromStream<TElemId>(input);
         ui32 size = LoadFromStream<ui32>(input);
 
         auto nodeRef = graph.GetNodeById(useFileId ? EMNT_File : EMNT_BuildCommand, elemId);
@@ -233,9 +233,9 @@ public:
 
     inline bool LoadElemId(TNodeId* nodeId, const TDepGraph& graph) {
         ui8 useFileId = Load<ui8>();
-        ui32 elemId = Load<ui32>();
+        auto elemId = Load<TElemId>();
 
-        if (useFileId == 0 && elemId == 0) {
+        if (useFileId == 0 && elemId == TElemId()) {
             *nodeId = TNodeId::Invalid;
             return true;
         }
@@ -279,7 +279,7 @@ private:
         size_t prefixSize;
     };
 
-    TMaybe<TString> FindUsedReservedVar(const TURVHelpers& helpers, ui32 elemId, const TDepGraph& graph) {
+    TMaybe<TString> FindUsedReservedVar(const TURVHelpers& helpers, TCmdElemId elemId, const TDepGraph& graph) {
         auto cmdView = graph.Names().CommandConf.GetName(elemId);
         if (!cmdView.IsValid())
             return {};
@@ -307,7 +307,7 @@ public:
         TURVHelpers helpers;
 
         for (size_t i = 0; i < count; ++i) {
-            ui32 elemId = Load<ui32>();
+            auto elemId = Load<TCmdElemId>();
             auto var = FindUsedReservedVar(helpers, elemId, graph);
             if (!var)
                 return false;
@@ -331,14 +331,14 @@ public:
         TURVHelpers helpers;
 
         for (size_t i = 0; i < count; ++i) {
-            ui32 elemId = Load<ui32>();
+            auto elemId = Load<TCmdElemId>();
             auto var = FindUsedReservedVar(helpers, elemId, graph);
             if (!var)
                 return false;
             auto varInserted = vars->insert({*var, {}});
             ui32 subCount = Load<ui32>();
             for (size_t j = 0; j < subCount; ++j) {
-                ui32 subElemId = Load<ui32>();
+                auto subElemId = Load<TCmdElemId>();
                 auto subVar = FindUsedReservedVar(helpers, subElemId, graph);
                 if (!subVar)
                     return false;

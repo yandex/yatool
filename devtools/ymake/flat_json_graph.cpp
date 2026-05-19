@@ -4,13 +4,13 @@
 
 namespace {
 
-TString CreateComplexId(EMakeNodeType type, ui32 id) {
-    ui32 targetId = TFileConf::GetTargetId(id);
+TString CreateComplexId(EMakeNodeType type, TFileElemId id) {
+    TFileElemId targetId = TFileConf::GetTargetId(id);
     TStringBuf nodeContext = "n";
     if (UseFileId(type) && targetId != id) {
         nodeContext = TFileConf::GetContextStr(id);
     }
-    return fmt::format("{}:{}:{}", UseFileId(type) ? "f" : "c", nodeContext, targetId);
+    return fmt::format("{}:{}:{}", UseFileId(type) ? "f" : "c", nodeContext, RawElemId(targetId));
 }
 
 }
@@ -37,15 +37,15 @@ namespace NFlatJsonGraph {
         return AddNode(node->NodeType, node->ElemId, TDepGraph::Graph(node).ToTargetStringBuf(node));
     }
 
-    TNodeWriter TWriter::AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name) {
+    TNodeWriter TWriter::AddNode(const EMakeNodeType type, const TElemId id, const TStringBuf name) {
         FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
         JsonWriter.WriteString("Node");
         JsonWriter.WriteKey("Id");
         switch (Format) {
-            case EIDFormat::Simple: JsonWriter.WriteInt(id); break;
-            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(type, id)); break;
+            case EIDFormat::Simple: JsonWriter.WriteInt(RawElemId(id)); break;
+            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(type, AssumeFile(id))); break;
         }
         JsonWriter.WriteKey("Name");
         JsonWriter.WriteString(name);
@@ -63,20 +63,20 @@ namespace NFlatJsonGraph {
         return AddLink(from->ElemId, from->NodeType, to->ElemId, to->NodeType, type);
     }
 
-    TNodeWriter TWriter::AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const ELogicalDepType logicalDepType) {
+    TNodeWriter TWriter::AddLink(const TElemId fromId, const EMakeNodeType fromType, const TElemId toId, const EMakeNodeType toType, const EDepType depType, const ELogicalDepType logicalDepType) {
         FinishNode(true);
         JsonWriter.BeginObject();
         JsonWriter.WriteKey("DataType");
         JsonWriter.WriteString("Dep");
         JsonWriter.WriteKey("FromId");
         switch (Format) {
-            case EIDFormat::Simple: JsonWriter.WriteInt(fromId); break;
-            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(fromType, fromId)); break;
+            case EIDFormat::Simple: JsonWriter.WriteInt(RawElemId(fromId)); break;
+            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(fromType, AssumeFile(fromId))); break;
         }
         JsonWriter.WriteKey("ToId");
         switch (Format) {
-            case EIDFormat::Simple: JsonWriter.WriteInt(toId); break;
-            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(toType, toId)); break;
+            case EIDFormat::Simple: JsonWriter.WriteInt(RawElemId(toId)); break;
+            case EIDFormat::Complex: JsonWriter.WriteString(CreateComplexId(toType, AssumeFile(toId))); break;
         }
         JsonWriter.WriteKey("DepType");
         if (logicalDepType == ELDT_FromDepType) {

@@ -215,7 +215,7 @@ struct TIncFixer: public TDirectPeerdirsVisitor<TIFixEntryStats, TIFixStData> {
         if (IsModuleType(stateData.Node().Value().NodeType)) {
             Y_ASSERT(DontResolveIncludesForModules.size() > 1u);
             DontResolveIncludesForModules.pop();
-            UpdIter.ResolveCaches.Drop(state.TopNode()->ElemId);
+            UpdIter.ResolveCaches.Drop(AssumeFile(state.TopNode()->ElemId));
         }
 
         if (UnlinkLastNode) {

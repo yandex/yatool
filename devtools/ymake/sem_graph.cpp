@@ -54,7 +54,7 @@ namespace {
                 return;
             }
 
-            const auto* mod = RestoreContext.Modules.Get(Node->ElemId);
+            const auto* mod = RestoreContext.Modules.Get(AssumeFile(Node->ElemId));
             Y_ASSERT(mod);
 
             vars.SetValue("FAKE_MODULE", mod->IsFakeModule() ? "yes" : "no");
@@ -151,7 +151,7 @@ namespace {
     private:
         struct ModInfo {
             TNodeId ModNodeId;
-            ui32 GlobalLibId;
+            TFileElemId GlobalLibId;
             THashSet<TNodeId> TransitiveOnlyPeersUnderDM;
         };
 
@@ -192,8 +192,8 @@ namespace {
                 return true;
             }
             // Check IsLink and resolve it only if ready return false
-            return TFileId::Create(dep.From()->ElemId).IsLink()
-                && NPath::GetType(RestoreContext.Graph.GetFileName(dep.From()->ElemId).GetTargetStr()) == NPath::ERoot::Build;
+            return TFileId::Create(AssumeFile(dep.From()->ElemId)).IsLink()
+                && NPath::GetType(RestoreContext.Graph.GetFileName(AssumeFile(dep.From()->ElemId)).GetTargetStr()) == NPath::ERoot::Build;
         }
 
         bool Enter(TState& state) {
@@ -203,7 +203,7 @@ namespace {
             const auto& topNode = state.TopNode();
             TModule* mod = nullptr;
             if (IsModuleType(topNode->NodeType)) {
-                mod = RestoreContext.Modules.Get(topNode->ElemId);
+                mod = RestoreContext.Modules.Get(AssumeFile(topNode->ElemId));
                 Y_ASSERT(mod);
                 const TVector<TNodeId>* managedPeersClosure = nullptr;
                 THashSet<TNodeId> transitiveOnlyPeersUnderDM;
@@ -216,7 +216,7 @@ namespace {
                         // ManagedDirectPeers (e.g. FULL_JAR_COMPILATION siblings) so that yexport sees
                         // the real jar nodes with consumer-classpath semantics. This applies whether the
                         // IJAR is a direct peer or a transitive one.
-                        const TModule* peerMod = RestoreContext.Modules.Get(RestoreContext.Graph[peer]->ElemId);
+                        const TModule* peerMod = RestoreContext.Modules.Get(AssumeFile(RestoreContext.Graph[peer]->ElemId));
                         if (peerMod && peerMod->GetAttrs().DepManagementTransparent) {
                             for (TNodeId ijarDirectPeer : RestoreContext.Modules.GetModuleNodeLists(peerMod->GetId()).ManagedDirectPeers()) {
                                 if (!managedDirectPeers.has(ijarDirectPeer)) {
@@ -233,7 +233,7 @@ namespace {
                 }
                 ModulesStack.push({
                     .ModNodeId = topNode.Id(),
-                    .GlobalLibId = mod->GetAttrs().UseGlobalCmd ? mod->GetGlobalLibId() : 0,
+                    .GlobalLibId = mod->GetAttrs().UseGlobalCmd ? mod->GetGlobalLibId() : TFileElemId(),
                     .TransitiveOnlyPeersUnderDM = std::move(transitiveOnlyPeersUnderDM),
                 });
                 if (managedPeersClosure && !managedPeersClosure->empty()) {
@@ -250,7 +250,7 @@ namespace {
                 }
                 if (IsOutputType(topNode->NodeType) && !AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_OutTogether;})
                     // Some link may has no commands, skip render semantics for it, else "No pattern for node" error
-                    && (!TFileConf::IsLink(topNode->ElemId) || AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_BuildFrom || dep.To()->NodeType == EMNT_BuildCommand;}))
+                    && (!TFileConf::IsLink(AssumeFile(topNode->ElemId)) || AnyOf(topNode.Edges(), [](const auto& dep) {return *dep == EDT_BuildFrom || dep.To()->NodeType == EMNT_BuildCommand;}))
                 ) {
                     Y_ASSERT(!ModulesStack.empty());
                     const auto& modinfo = ModulesStack.top();
@@ -327,7 +327,7 @@ namespace {
                 }
                 for (const auto &testdep: dep.To().Edges()) {
                     if (IsSearchDirDep(testdep)) {
-                        res.push_back(testdep.To()->ElemId);
+                        res.push_back(RawElemId(testdep.To()->ElemId));
                     }
                 }
             }
@@ -355,8 +355,8 @@ namespace {
             if (!isDirectPeerdirDep) {
                 return {};
             }
-            const TModule* fromMod = RestoreContext.Modules.Get(fromNode->ElemId);
-            const TModule* toMod = RestoreContext.Modules.Get(toNode->ElemId);
+            const TModule* fromMod = RestoreContext.Modules.Get(AssumeFile(fromNode->ElemId));
+            const TModule* toMod = RestoreContext.Modules.Get(AssumeFile(toNode->ElemId));
             if (!fromMod->IsDependencyManagementApplied() || !toMod->IsDependencyManagementApplied()) {
                 // Excludes can compute only if both modules under DM
                 return {};

@@ -80,9 +80,9 @@ namespace {
         if (state.Size() < 2) {
             YConfErr(KnownBug)
                 << "Print dependnencies path called on independent modues: from='"
-                << path.RestoreContext.Modules.Get(path.RestoreContext.Graph[path.From]->ElemId)->GetName()
+                << path.RestoreContext.Modules.Get(AssumeFile(path.RestoreContext.Graph[path.From]->ElemId))->GetName()
                 << "' to='"
-                << path.RestoreContext.Modules.Get(path.RestoreContext.Graph[path.To]->ElemId)->GetName()
+                << path.RestoreContext.Modules.Get(AssumeFile(path.RestoreContext.Graph[path.To]->ElemId))->GetName()
                 << "'. Transitive dependencies check is probably broken." << Endl;
             return out;
         } else if (path.IndirectDepsOnly && state.Size() == 2) {
@@ -93,8 +93,8 @@ namespace {
             if (!IsModule(*next)) {
                 continue;
             }
-            TModule* prevMod = path.RestoreContext.Modules.Get(prev->Node()->ElemId);
-            TModule* nextMod = path.RestoreContext.Modules.Get(next->Node()->ElemId);
+            TModule* prevMod = path.RestoreContext.Modules.Get(AssumeFile(prev->Node()->ElemId));
+            TModule* nextMod = path.RestoreContext.Modules.Get(AssumeFile(next->Node()->ElemId));
             Y_ASSERT(prevMod && nextMod);
             out << Endl << "    " << prevMod->GetName() << " -> " << nextMod->GetName();
             prev = next;
@@ -187,7 +187,7 @@ namespace {
             if (!module.GetAttrs().DepManagementTransparent) {
                 TProvidesChecker providesChecker{RestoreContext, module, node};
                 for (TNodeId peer : EffectivePeersClosure(RestoreContext, module)) {
-                    TModule* peerModule = RestoreContext.Modules.Get(RestoreContext.Graph[peer]->ElemId);
+                    TModule* peerModule = RestoreContext.Modules.Get(AssumeFile(RestoreContext.Graph[peer]->ElemId));
                     Y_ASSERT(peerModule);
                     if (module.GetAttrs().RequireDepManagement && module.MatchPeer(*peerModule, checkPoliciesRequest) == EPeerSearchStatus::DeprecatedByRules) {
                         YConfErr(BadDir) << "Transitive [[alt1]]PEERDIR[[rst]] from [[imp]]"
@@ -360,7 +360,7 @@ namespace {
     private:
         void CheckModuleLicenses(TRestoreContext restoreContext, TNodeId modId, const TRestrictions& restrictions, TExceptions& exceptions, TScopeClosureRef closure) {
             for (TNodeId peer : closure.Closure) {
-                const auto* module = restoreContext.Modules.Get(restoreContext.Graph[peer]->ElemId);
+                const auto* module = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[peer]->ElemId));
                 Y_ASSERT(module);
                 if (const auto used = exceptions.Map.FindPtr(module->GetDir().CutType())) {
                     *used = true;
@@ -483,7 +483,7 @@ namespace {
         }
 
     private:
-        THashMap<ui32, TVector<NSPDX::TLicenseProps>> ModuleLicenseCache;
+        THashMap<TFileElemId, TVector<NSPDX::TLicenseProps>> ModuleLicenseCache;
         THashMap<TString, NSPDX::TLicenseProps> Licenses;
         TVector<TStringBuf> PropNames;
         TVector<NSPDX::TLicenseProps> DefaultLicense;
@@ -569,9 +569,9 @@ namespace {
             ) {
                 if (closure.Scope == ERequirementsScope::Peers) {
                     for (TNodeId peer : closure.Closure) {
-                        TModule* peerModule = restoreContext.Modules.Get(restoreContext.Graph[peer]->ElemId);
+                        TModule* peerModule = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[peer]->ElemId));
                         Y_ASSERT(peerModule);
-                        if (parent.GetDirId() == peerModule->GetDirId() && Find(parent.SelfPeers, peerModule->GetId()) != parent.SelfPeers.end()) {
+                        if (parent.GetDirId() == peerModule->GetDirId() && Find(parent.SelfPeers, RawElemId(peerModule->GetId())) != parent.SelfPeers.end()) {
                             continue;
                         }
                         if (!constraints.IsAllowed(peerModule->GetDir(), ERequirementsScope::Peers)
@@ -586,7 +586,7 @@ namespace {
                 if (closure.Scope == ERequirementsScope::Tools) {
                     THashSet<TNodeId> checkedToolPeers;
                     for (TNodeId tool : closure.Closure) {
-                        TModule* toolModule = restoreContext.Modules.Get(restoreContext.Graph[tool]->ElemId);
+                        TModule* toolModule = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[tool]->ElemId));
                         Y_ASSERT(toolModule);
                         if (!constraints.IsAllowed(toolModule->GetDir(), ERequirementsScope::Tools)
                             && (exceptions.Empty() || !exceptions.IsAllowed(toolModule->GetDir(), ERequirementsScope::Tools))) {
@@ -600,7 +600,7 @@ namespace {
                             if (!checkedToolPeers.insert(peer).second) {
                                 continue;
                             }
-                            TModule* peerModule = restoreContext.Modules.Get(restoreContext.Graph[peer]->ElemId);
+                            TModule* peerModule = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[peer]->ElemId));
                             Y_ASSERT(peerModule);
                             if (!constraints.IsAllowed(peerModule->GetDir(), ERequirementsScope::Tools)
                                 && (exceptions.Empty() || !exceptions.IsAllowed(peerModule->GetDir(), ERequirementsScope::Tools))) {
@@ -634,22 +634,22 @@ namespace {
 
             result.Scopes |= ERequirementsScope::Peers;
             result.Check = [requirements](TRestoreContext restoreContext, const TModule&, TNodeId, TScopeClosureRef closure) {
-                THashSet<ui32> unmetRequirements;
+                THashSet<TFileElemId> unmetRequirements;
                 for (TStringBuf dir : SplitBySpace(requirements)) {
                     const auto dirPath = NPath::ConstructPath(dir, NPath::ERoot::Source);
                     if (!restoreContext.Graph.Names().FileConf.CheckExistentDirectory(dirPath)) {
                         YConfErr(BadDir) << "[[alt1]]REQUIRES[[rst]] to non-directory [[imp]]" << dirPath << "[[rst]]" << Endl;
                     } else {
-                        unmetRequirements.insert(restoreContext.Graph.Names().IdByName(EMNT_File, dirPath));
+                        unmetRequirements.insert(AssumeFile(restoreContext.Graph.Names().IdByName(EMNT_File, dirPath)));
                     }
                 }
 
                 for (TNodeId peerId : closure.Closure) {
-                    TModule* peer = restoreContext.Modules.Get(restoreContext.Graph[peerId]->ElemId);
+                    TModule* peer = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[peerId]->ElemId));
                     Y_ASSERT(peer);
                     unmetRequirements.erase(peer->GetDirId());
                 }
-                for (ui32 rq : unmetRequirements) {
+                for (TFileElemId rq : unmetRequirements) {
                     YConfErr(BadDep)
                         << "missing indirect PEERDIR dependency to directory [[imp]]"
                         << restoreContext.Graph.Names().FileNameById(rq)
@@ -695,7 +695,7 @@ namespace {
             result.Scopes |= ERequirementsScope::Peers;
             result.Check = [moduleFeature2Versions, cache, &conf](TRestoreContext restoreContext, const TModule&, TNodeId, TScopeClosureRef closure) {
                 for (TNodeId peerId : closure.Closure) {
-                    TModule* peer = restoreContext.Modules.Get(restoreContext.Graph[peerId]->ElemId);
+                    TModule* peer = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[peerId]->ElemId));
                     Y_ASSERT(peer);
 
                     // Check feature versions exists in peer
@@ -724,7 +724,7 @@ namespace {
     private:
 
         using TFeature2Version = THashMap<TStringBuf, TStringBuf>;
-        using TModuleId = ui32;
+        using TModuleId = TFileElemId;
 
     public:
         class TCache {
@@ -837,11 +837,11 @@ void CheckGoTestIncorrectDep(TModule* module,const TRestoreContext& restoreConte
         return;
     auto testNode = restoreContext.Graph.GetFileNodeById(module->GetId());
 
-    const auto& selfPeers = restoreContext.Modules.GetModuleNodeLists(testNode->ElemId).LocalPeers();
+    const auto& selfPeers = restoreContext.Modules.GetModuleNodeLists(AssumeFile(testNode->ElemId)).LocalPeers();
     TNodeId target = TNodeId::Invalid;
 
     for (const auto& edge: testedNode.Edges()) {
-        if (IsModuleType(edge.To()->NodeType) && restoreContext.Modules.Get(edge.To()->ElemId)->IsGoModule()) {
+        if (IsModuleType(edge.To()->NodeType) && restoreContext.Modules.Get(AssumeFile(edge.To()->ElemId))->IsGoModule()) {
             Y_ASSERT(target == TNodeId::Invalid);
             target = edge.To().Id();
         }
@@ -853,7 +853,7 @@ void CheckGoTestIncorrectDep(TModule* module,const TRestoreContext& restoreConte
             continue;
         }
         for (TNodeId peer: EffectivePeersClosure(restoreContext, *restoreContext.Modules.Get(
-                restoreContext.Graph[selfPeer]->ElemId))) {
+                AssumeFile(restoreContext.Graph[selfPeer]->ElemId)))) {
             if (peer == target) {
                 YConfErr(BadDep)
                 << "go test issue: transitive dependencies on modules under test are prohibited in Arcadia due to scalability issues"
@@ -886,7 +886,7 @@ void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TV
 
         for (TNodeId peer : peers) {
             const auto node = restoreContext.Graph.Get(peer);
-            TModule* module = restoreContext.Modules.Get(node->ElemId);
+            TModule* module = restoreContext.Modules.Get(AssumeFile(node->ElemId));
             Y_ASSERT(module);
             if (!module->IsPeersComplete() && !module->GetAttrs().RequireDepManagement) {
                 TModuleRestorer peerRestorer{restoreContext, node};

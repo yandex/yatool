@@ -80,7 +80,7 @@ public:
 private:
     TVarStr& AddPath(TYVar& var, const TStringBuf& what);
 
-    bool IsFakeModule(ui32 elemId) const;
+    bool IsFakeModule(TFileElemId elemId) const;
 
 private:
     TRestoreContext Context;

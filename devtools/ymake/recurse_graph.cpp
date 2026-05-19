@@ -73,7 +73,7 @@ TFilterRecurseVisitor::TFilterRecurseVisitor(const TDepGraph& graph, const TVect
 {
     for (auto target : startTargets) {
         if (target.IsModuleTarget) {
-            ModuleStartTargets.insert(Graph.Get(target.Id)->ElemId);
+            ModuleStartTargets.insert(AssumeFile(Graph.Get(target.Id)->ElemId));
         }
     }
 }
@@ -83,7 +83,7 @@ bool TFilterRecurseVisitor::Enter(TState& state) {
     if (result) {
         auto topNode = state.TopNode();
         if (IsModuleType(topNode->NodeType)) {
-            if (ModuleStartTargets.contains(topNode->ElemId)) {
+            if (ModuleStartTargets.contains(AssumeFile(topNode->ElemId))) {
                 CurEnt->NotRemove = true;
             }
         }

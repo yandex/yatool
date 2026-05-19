@@ -119,16 +119,16 @@ public:
     // exact data type and semantics are determined by NodeType subsets (file-like, command-like);
     // uniqueness scope: a NodeType subset within a graph;
     // zero ids are reserved/invalid
-    ui32 ElemId;
+    TElemId ElemId;
 
-    TDepTreeNode(EMakeNodeType nodeType, ui32 elemId)
+    TDepTreeNode(EMakeNodeType nodeType, TElemId elemId)
         : NodeType(nodeType)
         , ElemId(elemId)
     {
     }
 
     TDepTreeNode()
-        : TDepTreeNode(EMNT_Deleted, 0)
+        : TDepTreeNode(EMNT_Deleted, TElemId())
     {
     }
 
@@ -176,7 +176,7 @@ inline TDepsCacheId MakeDepsCacheId(const TDepTreeNode& node) {
 template <>
 struct THash<TDepTreeNode> {
     size_t operator()(const TDepTreeNode& node) const {
-        return CombineHashes(node.ElemId, static_cast<ui32>(node.NodeType));
+        return CombineHashes(RawElemId(node.ElemId), static_cast<ui32>(node.NodeType));
     }
 };
 
@@ -216,11 +216,11 @@ class TDepGraph: public TCompactGraph<EDepType, TDepTreeNode, TCompactEdge<EDepT
 private:
     TSymbols& Names_;
 
-    using TId2NodeMap = THashMap<ui32, TNodeId, TIdentity>;
+    using TId2NodeMap = THashMap<TElemId_Underlying, TNodeId, TIdentity>;
     TId2NodeMap MainId2NodeMap;
     TId2NodeMap CmdId2NodeMap;
 
-    THashMap<ui32, TNodeData> NodeData; // TODO/FIXME: this is supposed to be file-only, but AddNode disagrees
+    THashMap<TElemId, TNodeData> NodeData; // TODO/FIXME: this is supposed to be file-only, but AddNode disagrees
 
 public:
     using TBase = TCompactGraph<EDepType, TDepTreeNode, TCompactEdge<EDepType, 28>>;
@@ -232,11 +232,11 @@ public:
         ResetId2NodeMaps();
     }
 
-    THashMap<ui32, TNodeData>& GetFileNodeData() {
+    THashMap<TElemId, TNodeData>& GetFileNodeData() {
         return NodeData;
     }
 
-    TNodeData& GetFileNodeData(ui32 elemId) {
+    TNodeData& GetFileNodeData(TElemId elemId) {
         return NodeData[elemId];
     }
 
@@ -249,10 +249,10 @@ public:
     }
 
     // we just know it's a file-type node, don't need specific type
-    TNodeRef GetFileNodeById(ui32 id) {
+    TNodeRef GetFileNodeById(TFileElemId id) {
         Y_ASSERT(HasId2NodeMaps());
 
-        const auto it = MainId2NodeMap.find(id);
+        const auto it = MainId2NodeMap.find(RawElemId(id));
         if (!it) {
             return GetInvalidNode();
         }
@@ -263,15 +263,15 @@ public:
             return ret;
         }
     }
-    TConstNodeRef GetFileNodeById(ui32 id) const {
+    TConstNodeRef GetFileNodeById(TFileElemId id) const {
         return const_cast<TDepGraph*>(this)->GetFileNodeById(id);
     }
 
     // we just know it's a command-type node, don't need specific type
-    TNodeRef GetCommandNodeById(ui32 id) {
+    TNodeRef GetCommandNodeById(TCmdElemId id) {
         Y_ASSERT(HasId2NodeMaps());
 
-        const auto it = CmdId2NodeMap.find(id);
+        const auto it = CmdId2NodeMap.find(RawElemId(id));
         if (!it) {
             return GetInvalidNode();
         }
@@ -282,20 +282,20 @@ public:
             return ret;
         }
     }
-    TConstNodeRef GetCommandNodeById(ui32 id) const {
+    TConstNodeRef GetCommandNodeById(TCmdElemId id) const {
         return const_cast<TDepGraph*>(this)->GetCommandNodeById(id);
     }
 
-    TNodeRef GetNodeById(EMakeNodeType type, ui32 id) {
+    TNodeRef GetNodeById(EMakeNodeType type, TElemId id) {
         if (type == EMNT_Deleted) {
             return GetInvalidNode();
         }
         Y_ASSERT(HasId2NodeMaps());
 
         if (UseFileId(type)) {
-            return GetFileNodeById(id);
+            return GetFileNodeById(AssumeFile(id));
         } else {
-            return GetCommandNodeById(id);
+            return GetCommandNodeById(AssumeCmd(id));
         }
     }
 
@@ -303,7 +303,7 @@ public:
         return GetNodeById(node.NodeType, node.ElemId);
     }
 
-    TConstNodeRef GetNodeById(EMakeNodeType type, ui32 id) const {
+    TConstNodeRef GetNodeById(EMakeNodeType type, TElemId id) const {
         return const_cast<TDepGraph*>(this)->GetNodeById(type, id);
     }
 
@@ -328,8 +328,8 @@ public:
     }
 
     TNodeRef GetCommandNode(TStringBuf cname) {
-        ui32 cid = Names().CommandConf.GetIdNx(cname);
-        if (cid != 0) {
+        TCmdElemId cid = Names().CommandConf.GetIdNx(cname);
+        if (cid != TCmdElemId()) {
             return GetCommandNodeById(cid);
         }
         return GetInvalidNode();
@@ -375,24 +375,24 @@ public:
         return res;
     }
 
-    const TFileView GetFileName(EMakeNodeType nodeType, ui32 elemId) const { // slow - for rare messages & debug
+    const TFileView GetFileName(EMakeNodeType nodeType, TFileElemId elemId) const { // slow - for rare messages & debug
         Y_ASSERT(UseFileId(nodeType));
         return Names().FileNameById(elemId);
     }
 
-    const TCmdView GetCmdName(EMakeNodeType nodeType, ui32 elemId) const { // slow - for rare messages & debug
+    const TCmdView GetCmdName(EMakeNodeType nodeType, TCmdElemId elemId) const { // slow - for rare messages & debug
         Y_ASSERT(!UseFileId(nodeType));
         return Names().CmdNameById(elemId);
     }
 
     const TFileView GetFileName(const TDepTreeNode& node) const { // slow - for rare messages & debug
         Y_ASSERT(UseFileId(node.NodeType));
-        return GetFileName(node.ElemId);
+        return GetFileName(AssumeFile(node.ElemId));
     }
 
     const TCmdView GetCmdName(const TDepTreeNode& node) const { // slow - for rare messages & debug
         Y_ASSERT(!UseFileId(node.NodeType));
-        return GetCmdName(node.ElemId);
+        return GetCmdName(AssumeCmd(node.ElemId));
     }
 
     TString ToString(const TDepTreeNode& node) const {
@@ -434,11 +434,11 @@ public:
         return out.Str();
     }
 
-    const TFileView GetFileName(ui32 elemId) const { // slow - for rare messages & debug
+    const TFileView GetFileName(TFileElemId elemId) const { // slow - for rare messages & debug
         return Names().FileNameById(elemId);
     }
 
-    const TCmdView GetCmdName(ui32 elemId) const { // slow - for rare messages & debug
+    const TCmdView GetCmdName(TCmdElemId elemId) const { // slow - for rare messages & debug
         return Names().CmdNameById(elemId);
     }
 
@@ -450,7 +450,7 @@ public:
         return Get(node)->NodeType;
     }
 
-    TNodeRef AddNode(EMakeNodeType type, ui32 elemId) {
+    TNodeRef AddNode(EMakeNodeType type, TElemId elemId) {
         auto foundNode = GetNodeById(type, elemId);
         if (foundNode.IsValid()) {
             Y_ASSERT(foundNode->NodeType == type);
@@ -465,7 +465,7 @@ public:
     }
 
     TNodeRef AddNode(EMakeNodeType type, TStringBuf name) {
-        ui32 elemId = Names().AddName(type, name);
+        TElemId elemId = Names().AddName(type, name);
         return AddNode(type, elemId);
     }
 
@@ -479,10 +479,10 @@ public:
 
             auto originalElemId = ElemId(relocation.first);
             auto newElemId = relocation.second.ElemId;
-            Y_ASSERT(id2NodeMap.contains(newElemId));
+            Y_ASSERT(id2NodeMap.contains(RawElemId(newElemId)));
 
-            if (const auto iit = id2NodeMap.find(originalElemId)) {
-                if (const auto nit = id2NodeMap.find(newElemId)) {
+            if (const auto iit = id2NodeMap.find(RawElemId(originalElemId))) {
+                if (const auto nit = id2NodeMap.find(RawElemId(newElemId))) {
                     replaces.insert({iit->second, nit->second});
                 }
             }
@@ -591,11 +591,11 @@ public:
 
     /// Converting to vector replacement NodeIds to ElemIds
     template<class TNodeIds>
-    static TVector<ui32> NodeToElemIds(const TDepGraph& graph, const TNodeIds& nodeIds) {
-        TVector<ui32> elemIds;
+    static TVector<TElemId_Underlying> NodeToElemIds(const TDepGraph& graph, const TNodeIds& nodeIds) {
+        TVector<TElemId_Underlying> elemIds;
         elemIds.reserve(nodeIds.size());
         for (const auto nodeId : nodeIds) {
-            elemIds.emplace_back(graph.Get(nodeId)->ElemId);
+            elemIds.emplace_back(RawElemId(graph.Get(nodeId)->ElemId));
         }
         return elemIds;
     }
@@ -626,13 +626,13 @@ private:
 
     /// @brief set NodeId reference in symbol
     void SyncNameId(const TNodeRef& node) {
-        if (node->NodeType == EMNT_Deleted || node->ElemId == 0) {
+        if (node->NodeType == EMNT_Deleted || node->ElemId == TElemId()) {
             return;
         }
         Y_ASSERT(HasId2NodeMaps());
 
         auto& idmap = MapByType(node->NodeType);
-        idmap[node->ElemId] = node.Id();
+        idmap[RawElemId(node->ElemId)] = node.Id();
     }
 
     /// @brief check that Id2Node maps are proeprly initialized
@@ -654,8 +654,8 @@ private:
         }
     }
 
-    TNodeRef GetFileNode(ui32 fid) {
-        if (fid != 0) {
+    TNodeRef GetFileNode(TFileElemId fid) {
+        if (fid != TElemId()) {
             return GetFileNodeById(fid);
         }
         return GetInvalidNode();

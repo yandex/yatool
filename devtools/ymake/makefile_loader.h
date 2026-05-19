@@ -87,7 +87,7 @@ private:
     void ReadMakeFile(const TString& makefile);
     void ReadMakeFile();
 
-    ui64 GetMakefileId() const;
+    TFileElemId GetMakefileId() const;
 
     void RefineSubModules(const TStringBuf& name, const TVector<TStringBuf>& args);
     void SetResourceXXXFromJson(const TStringBuf name, const TVector<TStringBuf>& args);

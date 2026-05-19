@@ -16,6 +16,6 @@ public:
     void IntoStrings(TVector<TString>& into) const;
     void IntoStrings(TVector<TStringBuf>& into) const;
 
-    TVector<ui32> SaveAsIds() const;
-    void RestoreFromsIds(const TVector<ui32>& ids, const TSymbols& names);
+    TVector<TFileElemId> SaveAsIds() const;
+    void RestoreFromsIds(const TVector<TFileElemId>& ids, const TSymbols& names);
 };

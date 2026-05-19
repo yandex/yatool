@@ -31,7 +31,7 @@ TString MineResults(const TModules& modules, const TBuildConfiguration& conf, TF
     for (auto dep : node.Edges()) {
         TConstDepNodeRef depNode = dep.To();
         if (IsModuleType(depNode->NodeType) && *dep == EDT_Include) {
-            const TModule* module = modules.Get(depNode->ElemId);
+            const TModule* module = modules.Get(AssumeFile(depNode->ElemId));
             Y_ASSERT(module != nullptr);
             if (module->IsFinalTarget()) {
                 return RealPath(depNode, conf);
@@ -87,7 +87,7 @@ void MineVariables(
         auto nodeType = nextNode->NodeType;
         auto depType = *dep;
         if (IsDirectToolDep(dep)) {
-            const auto* tool = modules.Get(dep.To()->ElemId);
+            const auto* tool = modules.Get(AssumeFile(dep.To()->ElemId));
             Y_ASSERT(tool);
             const auto toolPath = RealPath(dep.To(), conf);
             GetOrInit(toolPaths)[tool->GetDir().CutType()] = toolPath;

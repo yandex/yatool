@@ -15,7 +15,7 @@ void TModuleDirBuilder::UseModuleProps(TPropertyType propType, const TPropsNodeL
         for (auto d : propsValues) {
             Y_ASSERT(IsFile(d)); // `d' must not contain command cache id, GetName will fail or return garbage
             AddPeerdir(Graph.GetFileNameByCacheId(d).GetTargetStr());
-            parsedPeerdirs.insert(ElemId(d));
+            parsedPeerdirs.insert(AssumeFile(ElemId(d)));
         }
         return;
     }
@@ -31,7 +31,7 @@ void TModuleDirBuilder::UseModuleProps(TPropertyType propType, const TPropsNodeL
 
             auto const outputPaths = TTsImportProcessor::GenerateOutputPaths(sourcePath, cfg);
             for (auto& outputPath : outputPaths) {
-                auto outputPathElemId = Graph.Names().AddName(EMNT_NonParsedFile, outputPath);
+                auto outputPathElemId = AssumeFile(Graph.Names().AddName(EMNT_NonParsedFile, outputPath));
                 TAddDepAdaptor& addCtx = Node.AddOutput(outputPathElemId, EMNT_NonParsedFile);
                 addCtx.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, Node.ElemId);
                 Node.AddUniqueDep(EDT_OutTogetherBack, EMNT_NonParsedFile, outputPathElemId);

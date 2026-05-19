@@ -86,12 +86,12 @@ struct TResolveCache : TSimpleSharedPtr<TResolveCacheImpl> {
 };
 
 class TResolveCaches : TNonCopyable {
-    using TStore = THashMap<ui32, TResolveCache>;
+    using TStore = THashMap<TFileElemId, TResolveCache>;
 
 public:
     /// Get Cache for specified id
     /// If there were no cache already, it will be created
-    TResolveCache Get(ui32 id) {
+    TResolveCache Get(TFileElemId id) {
         return Store_[id];
     }
 
@@ -100,7 +100,7 @@ public:
     ///
     /// Impirtant! Don't call Drop until you absolutely sure that all resolvers for
     /// this module are already destroyed.
-    void Drop(ui32 id) {
+    void Drop(TFileElemId id) {
         Store_.erase(id);
     }
 

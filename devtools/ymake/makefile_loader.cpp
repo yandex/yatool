@@ -907,7 +907,7 @@ void TDirParser::ReadMakeFile() {
     ApplyDiscard();
 }
 
-ui64 TDirParser::GetMakefileId() const {
+TFileElemId TDirParser::GetMakefileId() const {
     return Names.FileConf.GetId(Makefile);
 }
 

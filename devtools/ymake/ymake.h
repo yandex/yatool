@@ -96,14 +96,14 @@ private:
     bool UidsCacheLoaded_{false};
     bool DependsToModulesClosureLoaded_{false};
 
-    TVector<ui32> PrevStartDirs_;
-    TVector<ui32> CurStartDirs_;
+    TVector<TFileElemId> PrevStartDirs_;
+    TVector<TFileElemId> CurStartDirs_;
     TVector<TTarget> PrevStartTargets_;
     bool HasGraphStructuralChanges_{false};
     TStringBuf ExportLang_{"?"};
 
-    TVector<ui32> PreserveStartTargets() const;
-    void FixStartTargets(const TVector<ui32>& elemIds);
+    TVector<TFileElemId> PreserveStartTargets() const;
+    void FixStartTargets(const TVector<TFileElemId>& elemIds);
     bool TryLoadUids(TUidsCachable* uidsCachable);
     void TransferStartDirs();
 

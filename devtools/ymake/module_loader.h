@@ -20,12 +20,12 @@ class TYMake;
 class TModules;
 
 struct TModuleGlobInfo {
-    ui32 GlobPatternId;
-    ui32 GlobPatternHash;
+    TCmdElemId GlobPatternId;
+    TCmdElemId GlobPatternHash;
     TVector<ui32> WatchedDirs;
     TVector<ui32> MatchedFiles;
     TVector<ui32> Excludes;
-    ui32 ReferencedByVar;
+    TCmdElemId ReferencedByVar;
 };
 
 /// @brief Encapsulate module definition in ya.make

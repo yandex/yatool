@@ -98,7 +98,7 @@ struct TResolveVariant {
         return Path == other.Path;
     }
     ui64 Hash() const {
-        return IntHash(Path.GetElemId());
+        return IntHash(RawElemId(Path.GetElemId()));
     }
 };
 

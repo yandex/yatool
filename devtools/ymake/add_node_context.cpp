@@ -7,11 +7,11 @@
 #include <util/generic/algorithm.h>
 
 namespace {
-    TVector<ui32> PropsListToDirsIds(const TPropsNodeList& props) {
-        TVector<ui32> dirIds;
+    TVector<TFileElemId> PropsListToDirsIds(const TPropsNodeList& props) {
+        TVector<TFileElemId> dirIds;
         for (const auto& cacheId : props) {
             Y_ASSERT(IsFile(cacheId));
-            dirIds.push_back(ElemId(cacheId));
+            dirIds.push_back(AssumeFile(ElemId(cacheId)));
         }
         return dirIds;
     }
@@ -21,11 +21,11 @@ namespace {
         const auto dummyFileElemId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
         TModule& module = ctx.Module;
         TModuleWrapper wrapper(module, ctx.YMake.Conf, ctx.YMake.GetModuleResolveContext(module));
-        TFileView srcFile = ctx.Graph.GetFileName(to.ElemId);
+        TFileView srcFile = ctx.Graph.GetFileName(AssumeFile(to.ElemId));
         TVector<TResolveFile> resolved;
         for (auto propNode : what) {
             const auto elemId = ElemId(propNode);
-            const TFileView elemName = ctx.Graph.GetFileName(elemId);
+            const TFileView elemName = ctx.Graph.GetFileName(AssumeFile(elemId));
             if (elemId == dummyFileElemId) {
                 YDIAG(IPRP) << "    [skip] " << elemName << Endl;
             } else {
@@ -46,7 +46,7 @@ namespace {
     inline void UpdateReresolveCache(TAddDepContext& ctx, TPropertyType type, const TVector<TDepsCacheId>& values) {
         if (!ctx.UpdateReresolveCache)
             return;
-        auto& rawIncludes = ctx.Module.RawIncludes[ctx.Node.ElemId][type];
+        auto& rawIncludes = ctx.Module.RawIncludes[AssumeFile(ctx.Node.ElemId)][type];
         for (auto id : values) {
             rawIncludes.Push(id);
         }
@@ -63,10 +63,10 @@ namespace {
 
         Y_ASSERT(UseFileId(to.NodeType));
         YDIAG(IPRP) << "Inducing OUTPUT_INCLUDE to " << to.NodeType << " " <<
-            ctx.Graph.GetFileName(to.ElemId) << ":" << Endl;
+            ctx.Graph.GetFileName(AssumeFile(to.ElemId)) << ":" << Endl;
 
         // 1. Process OUTPUT_INCLUDES via include processor
-        TFileView srcFile = ctx.Graph.GetFileName(to.ElemId);
+        TFileView srcFile = ctx.Graph.GetFileName(AssumeFile(to.ElemId));
         TVector<TString> includes(Reserve(outputIncludes->size()));
         const auto dummyFileElemId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
         for (const auto& cacheId : *outputIncludes) {
@@ -103,7 +103,7 @@ namespace {
 
     inline TVector<TDepsCacheId> MapProps(TAddDepContext& ctx, TPropertyType type, const TVector<TDepsCacheId>& values) {
         TVector<TDepsCacheId> res;
-        TFileView tgtFile = ctx.Graph.GetFileName(ctx.Node.ElemId);
+        TFileView tgtFile = ctx.Graph.GetFileName(AssumeFile(ctx.Node.ElemId));
         if (auto* parser = ctx.YMake.IncParserManager.GetParserFor(tgtFile)) {
             const auto DummyFileId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
             TVector<TStringBuf> inProps;
@@ -112,7 +112,7 @@ namespace {
                 if (!IsFile(id) || ElemId(id) == DummyFileId) {
                     continue;
                 }
-                inProps.push_back(ctx.Graph.GetFileName(ElemId(id)).GetTargetStr());
+                inProps.push_back(ctx.Graph.GetFileName(AssumeFile(ElemId(id))).GetTargetStr());
             }
 
             if (!inProps.empty()) {
@@ -159,7 +159,7 @@ namespace {
 }
 
 template <class V>
-size_t FindInStack(V& stack, EMakeNodeType type, ui64 elemId) {
+size_t FindInStack(V& stack, EMakeNodeType type, TElemId elemId) {
     bool fType = UseFileId(type);
     for (size_t n = 1; n < stack.size() - 1;  ++n)
         if (UseFileId(stack[n].Node.NodeType) == fType && stack[n].Node.ElemId == elemId)
@@ -210,7 +210,7 @@ void TNodeAddCtx::UseOldDeps() {
     TDeps oldDeps;
     GetOldDeps(oldDeps, 0, true);
 
-    auto& delayedDeps = UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({NodeType, static_cast<ui32>(ElemId)}, EDT_Search);
+    auto& delayedDeps = UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({NodeType, ElemId}, EDT_Search);
     Y_ASSERT(Deps.Empty());
     Y_ASSERT(delayedDeps.empty());
 
@@ -219,8 +219,8 @@ void TNodeAddCtx::UseOldDeps() {
             YDIAG(GUpd) << "Delaying old dep " << NodeType << " " << Graph.ToString(Graph.GetNodeById(NodeType, ElemId))
                         << " -" << dep.DepType << "> "
                         << dep.NodeType << " " << " " << dep.ElemId << " "
-                        << Graph.GetFileName(dep.NodeType, dep.ElemId) << Endl;
-            delayedDeps.Push(dep.ElemId);
+                        << Graph.GetFileName(dep.NodeType, AssumeFile(dep.ElemId)) << Endl;
+            delayedDeps.Push(RawElemId(dep.ElemId));
         } else {
             Deps.Add(dep.DepType, dep.NodeType, dep.ElemId);
         }
@@ -235,7 +235,7 @@ void TNodeAddCtx::AddInputs() {
         //YDIAG(Dev) << "IsModule: " << ElemId << Endl;
         if (ModuleDef == nullptr || &ModuleDef->GetModule() != Module) {
             // Retriable with -xx
-            ythrow TNotImplemented() << "Module was not loaded properly to Node: " <<  Graph.GetFileName(ElemId);
+            ythrow TNotImplemented() << "Module was not loaded properly to Node: " <<  Graph.GetFileName(AssumeFile(ElemId));
         }
         AssertEx(ModuleBldr == nullptr && !Module->IsInputsComplete(), "Module was already processed: " + Module->GetFileName());
 
@@ -245,12 +245,12 @@ void TNodeAddCtx::AddInputs() {
             THashSet<TString> ignoreSelfPeers;
             StringSplitter(GetCmdValue(Module->Vars.Get1("_IGNORE_PEERDIRSELF"))).Split(' ').SkipEmpty().Collect(&ignoreSelfPeers);
             for (const auto modId : Module->SelfPeers) {
-                const auto mod = YMake.Modules.Get(modId);
+                const auto mod = YMake.Modules.Get(TFileElemId(modId));
                 if (!mod || ignoreSelfPeers.contains(mod->GetTag())) {
                     continue;
                 }
                 const auto depType = Module->GetPeerdirType() == EPT_BuildFrom ? EDT_BuildFrom : EDT_Include;
-                AddUniqueDep(depType, mod->GetNodeType(), modId);
+                AddUniqueDep(depType, mod->GetNodeType(), TElemId(modId));
             }
         }
         NodeType = Module->GetNodeType();
@@ -259,13 +259,13 @@ void TNodeAddCtx::AddInputs() {
 }
 
 TCreateParsedInclsResult TNodeAddCtx::CreateParsedIncls(TStringBuf type, const TVector<TResolveFile>& files) {
-    return CreateParsedIncls(Module, Graph, UpdIter, UpdIter.YMake, NodeType, ElemId, type, files);
+    return CreateParsedIncls(Module, Graph, UpdIter, UpdIter.YMake, NodeType, AssumeCmd(ElemId), type, files);
 }
 
 // Note: This method does not add created node to own deps
 TCreateParsedInclsResult TNodeAddCtx::CreateParsedIncls(
     TModule* module, TDepGraph& graph, TUpdIter& updIter, TYMake& yMake,
-    EMakeNodeType cmdNodeType, ui64 cmdElemId,
+    EMakeNodeType cmdNodeType, TElemId cmdElemId /* TODO no, it's not "cmd" elem-id, see below */,
     TStringBuf type, const TVector<TResolveFile>& files
 ) {
     Y_ASSERT(module != nullptr);
@@ -284,7 +284,7 @@ TCreateParsedInclsResult TNodeAddCtx::CreateParsedIncls(
     TString propName = FormatCmd(cmdElemId, TString::Join("ParsedIncls.", type),
                                  UseFileId(cmdNodeType) ? "" : "cmdOrigin");
     EMakeNodeType propType = EMNT_BuildCommand;
-    ui32 propElemId = graph.Names().AddName(propType, propName);
+    TCmdElemId propElemId = AssumeCmd(graph.Names().AddName(propType, propName));
     const auto propCacheId = MakeDepsCacheId(propType, propElemId);
     auto pi = updIter.Nodes.Insert(propCacheId, &yMake, module);
     TCreateParsedInclsResult res = {pi->second.AddCtx, TCreateParsedInclsResult::Existing};
@@ -324,7 +324,7 @@ void TNodeAddCtx::AddDirsToProps(const TDirs& dirs, TStringBuf propName) {
     AddDirsToProps(dirs.SaveAsIds(), propName);
 }
 
-void TNodeAddCtx::AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propName) {
+void TNodeAddCtx::AddDirsToProps(const TVector<TFileElemId>& dirIds, TStringBuf propName) {
     if (dirIds.empty() && IntentByName(propName.Before('.'), false) == EVI_MaxId) {
         return;
     }
@@ -341,7 +341,7 @@ void TNodeAddCtx::AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propNam
     propNodeDelayedDeps.clear();
 
     for (const auto& dirId : dirIds) {
-        propNodeDelayedDeps.Push(dirId);
+        propNodeDelayedDeps.Push(RawElemId(dirId));
         YDIAG(GUpd) << "Delaying prop dir dep " << NodeType << " " << Graph.ToString(Graph.GetNodeById(NodeType, ElemId))
                     << " " << (ui64)propNodeCacheId << " -> " << dirId << " "
                     << Graph.GetFileName(dirId) << Endl;
@@ -354,7 +354,7 @@ void TNodeAddCtx::AddDirsToProps(const TPropsNodeList& props, TStringBuf propNam
 
 void TNodeAddCtx::InitDepsRule() {
     if (!DepsRuleSet) {
-        TFileView file = Graph.GetFileName(NodeType, ElemId);
+        TFileView file = Graph.GetFileName(NodeType, AssumeFile(ElemId));
         if (file.GetContextType() != ELT_Action) {
             SetDepsRuleByName(file.GetTargetStr());
         }
@@ -420,7 +420,7 @@ void TNodeAddCtx::Init2(TAddIterStack& stack, TFileHolder& fileContent, TModule*
 
     Y_ASSERT(UpdNode != TNodeId::Invalid || st.CurDep || Graph.GetNodeById(NodeType, ElemId).Id() == TNodeId::Invalid);
     if (Y_UNLIKELY(Diag()->FU) && UseFileId(NodeType) && UpdNode == TNodeId::Invalid) {
-        Cerr << "NEW: " << Graph.Names().FileNameById(ElemId) << Endl;
+        Cerr << "NEW: " << Graph.Names().FileNameById(AssumeFile(ElemId)) << Endl;
     }
     if (st.CurDep) {
         UseOldDeps();
@@ -428,7 +428,7 @@ void TNodeAddCtx::Init2(TAddIterStack& stack, TFileHolder& fileContent, TModule*
         st.CurDep = 0;
     }
     if (UseFileId(NodeType)) {
-        auto fileName = Graph.Names().FileNameById(ElemId);
+        auto fileName = Graph.Names().FileNameById(AssumeFile(ElemId));
         if (readMethod == EReadFileContentMethod::FORCED && IsFileType(NodeType)) {
             if (!fileContent) {
                 fileContent = Graph.Names().FileConf.GetFileById(fileName.GetElemId());
@@ -439,7 +439,7 @@ void TNodeAddCtx::Init2(TAddIterStack& stack, TFileHolder& fileContent, TModule*
         }
         YMake.Parser->ProcessFile(fileName, *this, stack, fileContent, mod);
     } else {
-        auto cmdName = Graph.Names().CmdNameById(ElemId);
+        auto cmdName = Graph.Names().CmdNameById(AssumeCmd(ElemId));
         YMake.Parser->ProcessCommand(cmdName, *this, stack);
     }
 }
@@ -455,7 +455,7 @@ void TNodeAddCtx::WriteHeader() {
         //        another fix for File reparsed as Makefile
         if (NodeType != node.NodeType) {
             YDIAG(Dev) << "WriteHeader: Node type mismatch for "
-                        << Graph.GetFileName(node.NodeType, node.ElemId)
+                        << Graph.GetFileName(node.NodeType, AssumeFile(node.ElemId))
                         << " new: " << NodeType << " != old: " << node.NodeType << Endl;
         }
         Y_ASSERT(NodeType == node.NodeType || (IsDirType(NodeType) && IsDirType(node.NodeType)) || (NodeType == EMNT_MakeFile && node.NodeType == EMNT_File) ||
@@ -510,7 +510,7 @@ void TFlushState::FinishFlush(TDepGraph& graph, TDepGraph::TNodeRef node) {
         // Y_ASSERT(graph.Names().FileConf.GetFileDataById(node->ElemId).Changed);
         // contentChanged = true
         if (ShouldCheckContentChanged(node->NodeType))
-            if (!graph.Names().FileConf.GetFileDataById(node->ElemId).Changed)
+            if (!graph.Names().FileConf.GetFileDataById(AssumeFile(node->ElemId)).Changed)
                 contentChanged = false;
     }
 
@@ -546,7 +546,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
     }
 
     YDIAG(Dev) << "Flush node " << (UseFileId(NodeType) ?
-        Graph.GetFileName(NodeType, ElemId).GetTargetStr() : Graph.GetCmdName(NodeType, ElemId).GetStr()) << Endl;
+        Graph.GetFileName(NodeType, AssumeFile(ElemId)).GetTargetStr() : Graph.GetCmdName(NodeType, AssumeCmd(ElemId)).GetStr()) << Endl;
 
     if (!FlushState) {
         FlushState.Reset(new TFlushState{Graph, UpdNode, NodeType});
@@ -572,7 +572,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
             if (!positionInStack) {
                 auto relocationIt = YMake.Parser->RelocatedNodes.find(MakeDepsCacheId(dep.NodeType, dep.ElemId));
                 if (relocationIt != YMake.Parser->RelocatedNodes.end()) {
-                    ui64 newId = relocationIt->second.ElemId;
+                    TElemId newId = relocationIt->second.ElemId;
                     EMakeNodeType newType = relocationIt->second.NodeType;
                     depNodeId = Graph.GetNodeById(newType, newId).Id();
                     if (depNodeId != TNodeId::Invalid) {
@@ -614,32 +614,32 @@ bool TNodeAddCtx::IsDepDeleted(const TAddDepDescr& dep) const {
     if (dep.DepType != EDT_Property || dep.NodeType != EMNT_Property) {
         return false;
     }
-    TStringBuf propName = GetPropertyName(Graph.GetCmdName(dep.NodeType, dep.ElemId).GetStr());
+    TStringBuf propName = GetPropertyName(Graph.GetCmdName(dep.NodeType, AssumeCmd(dep.ElemId)).GetStr());
     return propName == "DELETED";
 }
 
 void TNodeAddCtx::DeleteDep(size_t idx) {
     const auto& oldDep = Deps[idx];
-    TStringBuf oldName = Graph.GetCmdName(oldDep.NodeType, oldDep.ElemId).GetStr();
+    TStringBuf oldName = Graph.GetCmdName(oldDep.NodeType, AssumeCmd(oldDep.ElemId)).GetStr();
     auto propId = Graph.Names().AddName(EMNT_Property, FormatProperty("DELETED", oldName));
     Deps.Replace(idx, EDT_Property, EMNT_Property, propId);
 }
 
 void TNodeAddCtx::UpdCmdStamp(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed) {
-    auto& data = conf.GetById(ElemId);
+    auto& data = conf.GetById(RawElemId(ElemId));
     if (UpdNode == TNodeId::Invalid || changed) {
         data.CmdModStamp = stamps.CurStamp();
     }
 }
 
 void TNodeAddCtx::UpdCmdStampForNewCmdNode(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed) {
-    auto& data = conf.GetById(TVersionedCmdId(ElemId).CmdId());
+    auto& data = conf.GetById(TVersionedCmdId(AssumeCmd(ElemId)).CmdId());
     if (UpdNode == TNodeId::Invalid || changed) {
         data.CmdModStamp = stamps.CurStamp();
     }
 }
 
-bool TMaybeNodeUpdater::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
+bool TMaybeNodeUpdater::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     if (Deps.Push({depType, elemNodeType, elemId})) {
         SavedRequests.push_back(ERequestType::SingleDep);
     }
@@ -664,7 +664,7 @@ void TMaybeNodeUpdater::AddDirsToProps(const TDirs& dirs, TStringBuf propName) {
     AddDirsToProps(dirs.SaveAsIds(), propName);
 }
 
-void TMaybeNodeUpdater::AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propName) {
+void TMaybeNodeUpdater::AddDirsToProps(const TVector<TFileElemId>& dirIds, TStringBuf propName) {
     ParsedDirs.push_back({TString(propName), dirIds});
     SavedRequests.push_back(ERequestType::Dirs);
 }
@@ -688,7 +688,7 @@ bool TMaybeNodeUpdater::HasChangesInDeps(TConstDepNodeRef otherNode) const {
                 // Try to respect InclFixer changes to avoid false positive results.
                 if (IsIncludeFileDep(dep)) {
                     Y_ASSERT(UseFileId(dep.To()->NodeType));
-                    TFileView name = Names.FileNameById(dep.To()->ElemId);
+                    TFileView name = Names.FileNameById(AssumeFile(dep.To()->ElemId));
                     if (name.IsType(NPath::Source)) {
                         auto unsetElemId = Names.FileConf.GetIdNx(NPath::SetType(name.GetTargetStr(), NPath::Unset));
                         auto isFixedInclude = Deps.has(TAddDepDescr{dep.Value(), EMNT_MissingFile, unsetElemId});

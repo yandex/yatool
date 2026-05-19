@@ -102,7 +102,7 @@ void TModuleIncDirs::Add(TFileView dir, EIncDirScope scope, TLangId langId) {
 }
 
 void TModuleIncDirs::Add(TStringBuf dir, EIncDirScope scope, TLangId langId) {
-    ui32 id = Symbols.AddName(EMNT_File, dir);
+    auto id = AssumeFile(Symbols.AddName(EMNT_File, dir));
     Add(Symbols.FileNameById(id), scope, langId);
 }
 

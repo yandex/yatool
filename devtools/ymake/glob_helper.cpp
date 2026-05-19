@@ -7,7 +7,7 @@
 #include <util/generic/vector.h>
 #include <util/generic/string.h>
 
-static const TVector<ui32> EmptyElemIds;
+static const TVector<TCmdElemId> EmptyElemIds;
 static const TGlobRestrictions DefaultGlobRestrictions;
 static const TGlobStat EmptyGlobStat;
 
@@ -60,39 +60,39 @@ TGlobRestrictions TGlobHelper::ParseGlobRestrictions(const TArrayRef<const TStri
     return globRestrictions;
 }
 
-void TGlobHelper::SaveGlobPatternElemIds(TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId, TVector<ui32>&& globPatternElemIds) {
+void TGlobHelper::SaveGlobPatternElemIds(TModuleGlobsData& moduleGlobsData, const TCmdElemId globVarElemId, TVector<TCmdElemId>&& globPatternElemIds) {
     moduleGlobsData.GlobVars[globVarElemId].PatternElemIds = std::move(globPatternElemIds);
 }
 
-const TVector<ui32>& TGlobHelper::GetGlobPatternElemIds(const TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId) {
+const TVector<TCmdElemId>& TGlobHelper::GetGlobPatternElemIds(const TModuleGlobsData& moduleGlobsData, const TCmdElemId globVarElemId) {
     if (auto it = moduleGlobsData.GlobVars.find(globVarElemId); it != moduleGlobsData.GlobVars.end()) {
         return it->second.PatternElemIds;
     }
     return EmptyElemIds;
 }
 
-void TGlobHelper::SaveGlobRestrictions(TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId, TGlobRestrictions&& globRestrictions) {
+void TGlobHelper::SaveGlobRestrictions(TModuleGlobsData& moduleGlobsData, const TCmdElemId globVarElemId, TGlobRestrictions&& globRestrictions) {
     moduleGlobsData.GlobVars[globVarElemId].GlobRestrictions = std::move(globRestrictions);
 }
 
-const TGlobRestrictions& TGlobHelper::GetGlobRestrictions(const TModuleGlobsData& moduleGlobsData, const ui32 globVarElemId) {
+const TGlobRestrictions& TGlobHelper::GetGlobRestrictions(const TModuleGlobsData& moduleGlobsData, const TCmdElemId globVarElemId) {
     if (auto it = moduleGlobsData.GlobVars.find(globVarElemId); it != moduleGlobsData.GlobVars.end()) {
         return it->second.GlobRestrictions;
     }
     return DefaultGlobRestrictions;
 }
 
-void TGlobHelper::SaveGlobPatternStat(TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId, TGlobStat&& globPatternStat) {
+void TGlobHelper::SaveGlobPatternStat(TModuleGlobsData& moduleGlobsData, const TCmdElemId globPatternElemId, TGlobStat&& globPatternStat) {
     moduleGlobsData.GlobPatternStats[globPatternElemId] = std::move(globPatternStat);
 }
 
-const TGlobStat& TGlobHelper::GetGlobPatternStat(const TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId) {
+const TGlobStat& TGlobHelper::GetGlobPatternStat(const TModuleGlobsData& moduleGlobsData, const TCmdElemId globPatternElemId) {
     if (auto it = moduleGlobsData.GlobPatternStats.find(globPatternElemId); it != moduleGlobsData.GlobPatternStats.end()) {
         return it->second;
     }
     return EmptyGlobStat;
 }
 
-TGlobStat TGlobHelper::LoadGlobPatternStat(const TModuleGlobsData& moduleGlobsData, const ui32 globPatternElemId) {
+TGlobStat TGlobHelper::LoadGlobPatternStat(const TModuleGlobsData& moduleGlobsData, const TCmdElemId globPatternElemId) {
     return GetGlobPatternStat(moduleGlobsData, globPatternElemId);
 }

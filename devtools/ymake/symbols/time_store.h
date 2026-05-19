@@ -26,7 +26,7 @@ public:
         NeedNewSession = true;
     }
 
-    void InitSession(THashMap<ui32, TNodeData>& nodeData);
+    void InitSession(THashMap<TElemId, TNodeData>& nodeData);
 
     ui8 CurStamp() {
         Y_ASSERT(!NeedNewSession);
@@ -45,7 +45,7 @@ private:
     struct TCntForPos;
     struct TStampMoveDesc;
     struct TMoveMap;
-    void CompressTimes(THashMap<ui32, TNodeData>& nodeData);
+    void CompressTimes(THashMap<TElemId, TNodeData>& nodeData);
 
 private:
     TSymbols& Elems;

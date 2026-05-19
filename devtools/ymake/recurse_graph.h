@@ -45,6 +45,6 @@ public:
 private:
     const TDepGraph& Graph;
     TDepGraph& RecurseGraph;
-    THashSet<ui32> ModuleStartTargets;
+    THashSet<TFileElemId> ModuleStartTargets;
     THashSet<TNodeId> FilteredNodes;
 };

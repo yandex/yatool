@@ -22,7 +22,7 @@ TSortedReadDir::TDirItems& TSortedReadDir::ReadDir(const TString& fullPath, bool
             auto readUs = readTimer.GetUs();
             TCyclesTimerRestarter readTimerRestarter(readTimer);
             SumUsStat(stats, readUs, NStats::EFileConfStats::ReaddirCount, NStats::EFileConfStats::ReaddirSumUs, NStats::EFileConfStats::ReaddirMinUs, NStats::EFileConfStats::ReaddirMaxUs);
-            AddItem(filename, isDir, 0, stat);
+            AddItem(filename, isDir, TFileElemId(), stat);
         }
     } catch (const TReadDir::TError& error) {
         ReadFailedMessage_ = TStringBuilder() << "Can't read directory content: " << error.what();
@@ -43,7 +43,7 @@ TStringBuf TSortedReadDir::ReadFailedMessage() const {
     return ReadFailedMessage_;
 }
 
-void TSortedReadDir::AddItem(const TStringBuf basename, bool isDir, ui32 elemId, const TFileStat* stat) {
+void TSortedReadDir::AddItem(const TStringBuf basename, bool isDir, TFileElemId elemId, const TFileStat* stat) {
     auto basenameBeg = Basenames_.size();
     Basenames_.append(basename);
     DirItems_.emplace_back(TDirItem{

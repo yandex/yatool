@@ -108,7 +108,7 @@ static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
     TBuildConfiguration& conf = yMake->Conf;
     for (size_t i = 0; i < conf.StartDirs.size(); ++i) {
         TString curDir = NPath::ConstructPath(NPath::FromLocal(conf.StartDirs[i]), NPath::Source);
-        ui64 node = yMake->Graph.Names().FileConf.GetIdNx(curDir);
+        TFileElemId node = yMake->Graph.Names().FileConf.GetIdNx(curDir);
         if (!node)
             continue;
         const TNodeId offs = yMake->Graph.GetFileNodeById(node).Id();
@@ -167,13 +167,13 @@ bool TYMake::InitTargets() {
 namespace {
     // This now applies only to multimodules.
     // TODO(spreis): generalize to all cases
-    bool IsDependsFinalTarget(const TModules& Modules, ui32 modId) {
+    bool IsDependsFinalTarget(const TModules& Modules, TFileElemId modId) {
         const TModule* mod = Modules.Get(modId);
         Y_ASSERT(mod != nullptr);
         return mod && mod->IsFinalTarget(); // Shouldn't we allow also UNIONs here?
     }
 
-    bool IsFakeModule(const TModules& Modules, ui32 modId) {
+    bool IsFakeModule(const TModules& Modules, TFileElemId modId) {
         const TModule* mod = Modules.Get(modId);
         Y_ASSERT(mod != nullptr);
         return mod && mod->IsFakeModule();
@@ -200,7 +200,7 @@ namespace {
         const TDepGraph& Graph;
         const TModules& Modules;
 
-        THashMap<ui32, std::pair<ui32, ui32>> ModulesCountByDirId;
+        THashMap<TFileElemId, std::pair<ui32, ui32>> ModulesCountByDirId;
 
     public:
         TModulesInfo(const TDepGraph& graph, const TModules& modules)
@@ -210,7 +210,7 @@ namespace {
 
         std::pair<ui32, ui32> Get(const TDepTreeNode& node) {
             Y_ASSERT(IsDirType(node.NodeType));
-            auto it = ModulesCountByDirId.find(node.ElemId);
+            auto it = ModulesCountByDirId.find(AssumeFile(node.ElemId));
             if (it != ModulesCountByDirId.end()) {
                 return it->second;
             }
@@ -220,14 +220,14 @@ namespace {
             for (const auto& edge : nodeRef.Edges()) {
                 if (node.NodeType == EMNT_Directory && edge.Value() == EDT_Include && IsModuleType(edge.To()->NodeType)) {
                     ++count;
-                    if (IsDependsFinalTarget(Modules, edge.To()->ElemId)) {
+                    if (IsDependsFinalTarget(Modules, AssumeFile(edge.To()->ElemId))) {
                         // Should we also support UNION here?
                         ++allowedForDependsCount;
                     }
                 }
             }
             auto result = std::make_pair(count, allowedForDependsCount);
-            ModulesCountByDirId[node.ElemId] = result;
+            ModulesCountByDirId[AssumeFile(node.ElemId)] = result;
             return result;
         }
     };
@@ -276,14 +276,14 @@ void TYMake::AddRecursesToStartTargets() {
 
     // Deps tests are added after adding reachable node recurses intentionally
     // Deps tests should be added as requested targets but their recurses shouldn't.
-    THashSet<ui32> depsTests;
+    THashSet<TFileElemId> depsTests;
     if (Conf.ShouldTraverseDepsTests()) {
         for (const auto& node : UpdIter->RecurseQueue.GetAllNodes()) {
             if (const auto deps = UpdIter->RecurseQueue.GetDeps(node)) {
                 for (const auto& [depNode, depType] : *deps) {
                     if (IsTestRecurseDep(node.NodeType, depType, depNode.NodeType) && !pureRecursesQueue.IsReachable(depNode)) {
                         pureRecursesQueue.MarkReachable(depNode);
-                        depsTests.insert(depNode.ElemId);
+                        depsTests.insert(AssumeFile(depNode.ElemId));
                     }
                 }
             }
@@ -349,7 +349,7 @@ void TYMake::AddRecursesToStartTargets() {
         YDIAG(ShowRecurses) << "Recursed target " << Graph.GetFileName(Graph.Get(nodeId)) << Endl;
         StartTargets.push_back(nodeId);
         StartTargets.back().IsRecurseTarget = true;
-        if (depsTests.contains(node.ElemId)) {
+        if (depsTests.contains(AssumeFile(node.ElemId))) {
             StartTargets.back().IsDepTestTarget = true;
         }
         if (depends.has(node)) {
@@ -385,7 +385,7 @@ void TYMake::CreateRecurseGraph() {
             continue;
         }
 
-        ui32 targetElemId = Graph.Get(target.Id)->ElemId;
+        TFileElemId targetElemId = AssumeFile(Graph.Get(target.Id)->ElemId);
         auto node = RecurseGraph.GetFileNodeById(targetElemId);
         if (node.IsValid()) {
             RecurseStartTargets.push_back(node.Id());
@@ -491,14 +491,14 @@ public:
             return false;
         }
 
-        bool isPackageUnion = IsMultimodule && !IsDependsFinalTarget(RestoreContext.Modules, dep.To()->ElemId) && dep.To()->NodeType == EMNT_Bundle;
+        bool isPackageUnion = IsMultimodule && !IsDependsFinalTarget(RestoreContext.Modules, AssumeFile(dep.To()->ElemId)) && dep.To()->NodeType == EMNT_Bundle;
         if (!state.HasIncomingDep() && isPackageUnion) {
             return false;
         }
 
         YDIAG(Dev) << "Found DEPENDS: " << state.Top().GetFileName() << " -> " << RestoreContext.Graph.GetFileName(dep.To()) << Endl;
-        if (state.HasIncomingDep() || !IsMultimodule || IsDependsFinalTarget(RestoreContext.Modules, dep.To()->ElemId)) {
-            if (!IsFakeModule(RestoreContext.Modules, dep.To()->ElemId)) {
+        if (state.HasIncomingDep() || !IsMultimodule || IsDependsFinalTarget(RestoreContext.Modules, AssumeFile(dep.To()->ElemId))) {
+            if (!IsFakeModule(RestoreContext.Modules, AssumeFile(dep.To()->ElemId))) {
                 Iterator->second.push_back(dep.To().Id());
             }
         }
@@ -511,7 +511,7 @@ private:
         if (!IsModuleType(node->NodeType)) {
             return false;
         }
-        if (const TModule* mod = RestoreContext.Modules.Get(node->ElemId)) {
+        if (const TModule* mod = RestoreContext.Modules.Get(AssumeFile(node->ElemId))) {
             return mod->GetAttrs().RequireDepManagement;
         }
         return false;

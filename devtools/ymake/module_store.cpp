@@ -27,8 +27,8 @@ TModule& TModules::Create(const TStringBuf& dir, const TStringBuf& makefile, con
     return *module;
 }
 
-TModule* TModules::Get(ui32 id) {
-    const auto iter = ModulesById.find(id);
+TModule* TModules::Get(TFileElemId id) {
+    const auto iter = ModulesById.find(RawElemId(id));
     return iter != ModulesById.end() ? iter->second : nullptr;
 }
 
@@ -40,7 +40,7 @@ TStringBuf TModules::ResultKey(const TModule& module) const {
     return TStringBuf();
 }
 
-void TModules::NotifyMakefileReparsed(ui32 makefileId) {
+void TModules::NotifyMakefileReparsed(TFileElemId makefileId) {
     if (Loaded) {
         ReparsedMakefiles.insert(makefileId);
     }
@@ -53,31 +53,31 @@ TModules::TModules(TSymbols& symbols, const TPeersRules& rules, TBuildConfigurat
     , RootModule(Create("$B", TStringBuf("$U/root"), {}))
 {
     // Bypass validity checks
-    RootModule.Id = 0;
+    RootModule.Id = TFileElemId();
 }
 
 void TModules::Commit(TModule& module) {
     AssertEx(module.HasId(), "Attempt to commit module without Id");
 
     auto id = module.GetId();
-    if (ModulesById.contains(id)) {
-        TModule* oldMod = ModulesById[id];
+    if (ModulesById.contains(RawElemId(id))) {
+        TModule* oldMod = ModulesById[RawElemId(id)];
         if (oldMod == &module) {
-            ModuleIncludesById.erase(id);
+            ModuleIncludesById.erase(RawElemId(id));
             oldMod->PeersComplete = false;
             YDIAG(V) << "Re-Committed module: " << module.GetMakefile() << " as " << module.GetFileName() << " (" << id << ")" << Endl;
             return;
-        } else if (ModulesById[id]->IsLoaded()) {
+        } else if (ModulesById[RawElemId(id)]->IsLoaded()) {
             // We let override cached module by parsed one
             AssertEx(!module.IsLoaded(), "Attempt to commit new cached module " + ToString(id));
             ModulesStore.erase(oldMod);
-            ModuleIncludesById.erase(id);
+            ModuleIncludesById.erase(RawElemId(id));
             delete oldMod;
         } else {
             AssertEx(false, "Attempt to commit module with duplicate id " + ToString(id));
         }
     }
-    ModulesById[id] = &module;
+    ModulesById[RawElemId(id)] = &module;
     module.ComputeConfigVars();
     module.Committed = true;
     YDIAG(V) << "Committed module: " << module.GetMakefile() << " as " << module.GetFileName() << " (" << id << ")" << Endl;
@@ -87,8 +87,8 @@ void TModules::Commit(TModule& module) {
 
 void TModules::Destroy(TModule& module) {
     if (module.HasId() && module.Committed) {
-        ModulesById.erase(module.GetId());
-        ModuleIncludesById.erase(module.GetId());
+        ModulesById.erase(RawElemId(module.GetId()));
+        ModuleIncludesById.erase(RawElemId(module.GetId()));
     }
     ModulesStore.erase(&module);
     delete &module;
@@ -116,11 +116,11 @@ void TModules::LoadDMCache(IInputStream* input, const TDepGraph& graph) {
 
     ui32 modulesCount = LoadFromStream<ui32>(input);
     for (ui32 i = 0; i < modulesCount; ++i) {
-        ui32 modId = LoadFromStream<ui32>(input);
+        TFileElemId modId = TFileElemId(LoadFromStream<ui32>(input));
         auto module = Get(modId);
         Y_ASSERT(module);
 
-        TVector<ui32> uniqPeersIds, directPeersIds;
+        TVector<TFileElemId> uniqPeersIds, directPeersIds;
         THashMap<TString, TString> dmVars;
         bool isPeersComplete;
         ::Load(input, uniqPeersIds);
@@ -166,8 +166,8 @@ void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
     for (const auto& [modId, module] : ModulesById) {
         ::Save(output, modId);
 
-        const auto moduleLists = GetModuleNodeLists(modId);
-        TVector<ui32> uniqPeersIds, managedDirectPeersIds;
+        const auto moduleLists = GetModuleNodeLists(TFileElemId(modId));
+        TVector<TElemId> uniqPeersIds, managedDirectPeersIds;
         for (auto peer : moduleLists.UniqPeers()) {
             uniqPeersIds.push_back(graph.Get(peer)->ElemId);
         }
@@ -263,15 +263,15 @@ TModules::~TModules() {
     Clear();
 }
 
-TDependencyManagementModuleInfo& TModules::GetExtraDependencyManagementInfo(ui32 modId) {
+TDependencyManagementModuleInfo& TModules::GetExtraDependencyManagementInfo(TFileElemId modId) {
     return ModuleDMInfoById[modId];
 }
 
-const TDependencyManagementModuleInfo* TModules::FindExtraDependencyManagementInfo(ui32 modId) {
+const TDependencyManagementModuleInfo* TModules::FindExtraDependencyManagementInfo(TFileElemId modId) {
     return ModuleDMInfoById.FindPtr(modId);
 }
 
-THolder<TOwnEntries> TModules::ExtractSharedEntries(ui32 makefileId) {
+THolder<TOwnEntries> TModules::ExtractSharedEntries(TFileElemId makefileId) {
     auto it = SharedEntriesByMakefileId.find(makefileId);
     if (it == SharedEntriesByMakefileId.end()) {
         return {};
@@ -279,39 +279,39 @@ THolder<TOwnEntries> TModules::ExtractSharedEntries(ui32 makefileId) {
     return std::move(it->second);
 }
 
-TModuleNodeLists TModules::GetModuleNodeLists(ui32 moduleId) {
-    return {NodeListStore, ModuleIncludesById[moduleId].NodeIds};
+TModuleNodeLists TModules::GetModuleNodeLists(TFileElemId moduleId) {
+    return {NodeListStore, ModuleIncludesById[RawElemId(moduleId)].NodeIds};
 }
 
-TModuleNodeLists TModules::GetModuleNodeLists(ui32 moduleId) const {
-    return {NodeListStore, ModuleIncludesById.at(moduleId).NodeIds};
+TModuleNodeLists TModules::GetModuleNodeLists(TFileElemId moduleId) const {
+    return {NodeListStore, ModuleIncludesById.at(RawElemId(moduleId)).NodeIds};
 }
 
-TModuleNodeIds& TModules::GetModuleNodeIds(ui32 moduleId) {
-    return ModuleIncludesById[moduleId].NodeIds;
+TModuleNodeIds& TModules::GetModuleNodeIds(TFileElemId moduleId) {
+    return ModuleIncludesById[RawElemId(moduleId)].NodeIds;
 }
 
-const TModuleNodeIds& TModules::GetModuleNodeIds(ui32 moduleId) const {
-    return ModuleIncludesById.at(moduleId).NodeIds;
+const TModuleNodeIds& TModules::GetModuleNodeIds(TFileElemId moduleId) const {
+    return ModuleIncludesById.at(RawElemId(moduleId)).NodeIds;
 }
 
-TGlobalVars& TModules::GetGlobalVars(ui32 moduleId) {
-    return ModuleIncludesById[moduleId].GlobalVars;
+TGlobalVars& TModules::GetGlobalVars(TFileElemId moduleId) {
+    return ModuleIncludesById[RawElemId(moduleId)].GlobalVars;
 }
 
-const TGlobalVars& TModules::GetGlobalVars(ui32 moduleId) const {
-    return ModuleIncludesById.at(moduleId).GlobalVars;
+const TGlobalVars& TModules::GetGlobalVars(TFileElemId moduleId) const {
+    return ModuleIncludesById.at(RawElemId(moduleId)).GlobalVars;
 }
 
-void TModules::ClearModuleLateOuts(ui32 moduleId) {
+void TModules::ClearModuleLateOuts(TFileElemId moduleId) {
     ModuleLateOutsById.Insert(moduleId, TVector<TString>());
 }
 
-TVector<TString>& TModules::GetModuleLateOuts(ui32 moduleId) {
+TVector<TString>& TModules::GetModuleLateOuts(TFileElemId moduleId) {
     return ModuleLateOutsById.InsertIfAbsent(moduleId, TVector<TString>());
 }
 
-const TVector<TString>& TModules::GetModuleLateOuts(ui32 moduleId) const {
+const TVector<TString>& TModules::GetModuleLateOuts(TFileElemId moduleId) const {
     return ModuleLateOutsById.GetBucketForKey(moduleId).GetUnsafe(moduleId);
 }
 

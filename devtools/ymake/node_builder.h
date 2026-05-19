@@ -27,12 +27,12 @@ public:
     }
 
     TDepRef AddDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName);
-    TDepRef AddDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
+    TDepRef AddDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId);
 
     void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
-    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
+    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) final;
 
-    bool AddUniqueDep(EDepType, EMakeNodeType, ui32) final;
+    bool AddUniqueDep(EDepType, EMakeNodeType, TElemId) final;
     bool AddUniqueDep(EDepType, EMakeNodeType, TStringBuf) final;
 
     bool HasAnyDeps() const final {
@@ -48,10 +48,10 @@ public:
     void AddParsedIncls(TStringBuf type, const TVector<TResolveFile>& files) final;
 
     void AddDirsToProps(const TDirs& dirs, TStringBuf propName) final;
-    void AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propName) final;
+    void AddDirsToProps(const TVector<TFileElemId>& dirIds, TStringBuf propName) final;
     void AddDirsToProps(const TPropsNodeList& props, TStringBuf propName) final;
 
-    TNodeBuilder& AddOutput(ui32, EMakeNodeType, bool = true) final {
+    TNodeBuilder& AddOutput(TFileElemId, EMakeNodeType, bool = true) final {
         ythrow yexception() << "AddOutput: Not implemented yet for a new graph";
 
         /* TODO(spreis) implement

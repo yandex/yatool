@@ -6,7 +6,7 @@
 #include <util/generic/hash.h>
 
 struct TVarStrEx: public TVarStr {
-    ui32 ElemId;
+    TElemId ElemId;
 
     TVarStrEx(const TStringBuf& name)
         : TVarStr(name)
@@ -26,7 +26,7 @@ struct TVarStrEx: public TVarStr {
     {
     }
 
-    TVarStrEx(const TStringBuf& name, ui64 elemId, bool isPathResolved)
+    TVarStrEx(const TStringBuf& name, TElemId elemId, bool isPathResolved)
         : TVarStr(name, false, isPathResolved)
         , ElemId(elemId)
     {

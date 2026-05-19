@@ -13,7 +13,7 @@
 using TStreamMessage = TConfMsgManager::TStreamMessage;
 
 TStringStream& TConfMsgManager::SaveConfigureMessage(EConfMsgType type, TStringBuf kind, size_t row, size_t column, bool isPersistent) {
-    ui32 owner = Diag()->Where.back().first;
+    TFileElemId owner = Diag()->Where.back().first;
     Messages[owner].emplace_back(type, kind, TStringStream(), row, column, isPersistent);
     return Messages[owner].back().Message;
 }
@@ -37,8 +37,8 @@ TStreamMessage TConfMsgManager::ReportConfigureMessage(EConfMsgType type, TStrin
     }
 }
 
-void TConfMsgManager::AddDupSrcLink(ui32 id, ui32 modid, bool force) {
-    Y_ASSERT(modid != 0);
+void TConfMsgManager::AddDupSrcLink(TFileElemId id, TFileElemId modid, bool force) {
+    Y_ASSERT(modid != TFileElemId());
     if (force) {
         DupSrcMap[id].insert(modid);
     } else if (auto iter = DupSrcMap.find(id); iter != DupSrcMap.end()) {
@@ -46,12 +46,12 @@ void TConfMsgManager::AddDupSrcLink(ui32 id, ui32 modid, bool force) {
     }
 }
 
-void TConfMsgManager::AddVisitedModule(ui32 modId) {
+void TConfMsgManager::AddVisitedModule(TFileElemId modId) {
     VisitedModules.insert(modId);
 }
 
-void TConfMsgManager::ReportDupSrcConfigureErrors(std::function<TStringBuf (ui32)> toString) {
-    TVector<ui32> ids;
+void TConfMsgManager::ReportDupSrcConfigureErrors(std::function<TStringBuf (TFileElemId)> toString) {
+    TVector<TFileElemId> ids;
     for (const auto& [fid, modids] : DupSrcMap) {
         ids.clear();
         CopyIf(begin(modids), end(modids), std::back_inserter(ids), [this](auto id) { return VisitedModules.contains(id); });
@@ -85,17 +85,17 @@ void TConfMsgManager::Flush() const {
     }
 }
 
-void TConfMsgManager::Flush(ui32 owner) {
+void TConfMsgManager::Flush(TFileElemId owner) {
     FlushConfigureMessages(owner);
     FlushEvents(owner);
 }
 
 void TConfMsgManager::FlushTopLevel() const {
-    FlushConfigureMessages(0);
-    FlushEvents(0);
+    FlushConfigureMessages(TFileElemId());
+    FlushEvents(TFileElemId());
 }
 
-void TConfMsgManager::FlushConfigureMessages(ui32 owner) const {
+void TConfMsgManager::FlushConfigureMessages(TFileElemId owner) const {
     if (Messages.contains(owner)) {
         for (const auto& msg : Messages.at(owner)) {
             if (msg.Type == EConfMsgType::Error) {
@@ -106,7 +106,7 @@ void TConfMsgManager::FlushConfigureMessages(ui32 owner) const {
     }
 }
 
-void TConfMsgManager::FlushEvents(ui32 owner) const {
+void TConfMsgManager::FlushEvents(TFileElemId owner) const {
     if (Events.contains(owner)) {
         for (const auto& event : Events.at(owner)) {
             if (NYMake::TraceEnabled(event.Type)) {
@@ -131,13 +131,13 @@ void TConfMsgManager::EnableDelay() {
     Delayed = true;
 }
 
-void TConfMsgManager::Erase(ui32 owner) {
+void TConfMsgManager::Erase(TFileElemId owner) {
     Messages.erase(owner);
     DupSrcMap.erase(owner);
     Events.erase(owner);
 }
 
-bool TConfMsgManager::EraseMessagesByKind(const TStringBuf var, ui32 owner) {
+bool TConfMsgManager::EraseMessagesByKind(const TStringBuf var, TFileElemId owner) {
     auto eraseOwnerMessages = [](const TStringBuf& var, TVector<TConfigureMessage>& messages) {
         auto size = messages.size();
         EraseIf(messages, [&var](const TConfigureMessage& message) {
@@ -161,7 +161,7 @@ bool TConfMsgManager::EraseMessagesByKind(const TStringBuf var, ui32 owner) {
     }
 }
 
-bool TConfMsgManager::HasMessagesByKind(const TStringBuf var, ui32 owner) const {
+bool TConfMsgManager::HasMessagesByKind(const TStringBuf var, TFileElemId owner) const {
     const auto it = Messages.find(owner);
     if (it == Messages.end()) {
         return false;
@@ -199,7 +199,7 @@ void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
 }
 
 template<typename Container>
-void TConfMsgManager::Save(IOutputStream* output, THashMap<ui32, Container>& confValues) {
+void TConfMsgManager::Save(IOutputStream* output, THashMap<TFileElemId, Container>& confValues) {
     TSaver<typename Container::value_type> saver;
     for (const auto& [owner, values] : confValues) {
         for (const auto& value : values) {
@@ -232,7 +232,7 @@ void TConfMsgManager::Load(const TBlob& multi) {
 }
 
 template<typename Container>
-void TConfMsgManager::Load(IInputStream* input, THashMap<ui32, Container>& confValues) {
+void TConfMsgManager::Load(IInputStream* input, THashMap<TFileElemId, Container>& confValues) {
     TSaver<typename Container::value_type> saver;
     saver.Load(input);
     for (const auto& value : saver.Values) {
@@ -255,6 +255,6 @@ TConfMsgManager* ConfMsgManager() {
 }
 
 void TConfMsgManager::ClearTopLevelMessages() {
-    Messages[0].clear();
-    Events[0].clear();
+    Messages[TFileElemId()].clear();
+    Events[TFileElemId()].clear();
 }

@@ -38,8 +38,8 @@ namespace {
     const re2::RE2 CmdPrefix("\\d+:(\\w+)=");
 }
 
-TString FormatCmd(ui64 id, const TStringBuf& name, const TStringBuf& value) {
-    return TString::Join(ToString<ui64>(id), CmdDelimS, name, CmdNameDelimS, value);
+TString FormatCmd(TElemId id, const TStringBuf& name, const TStringBuf& value) {
+    return TString::Join(ToString<ui64>(RawElemId(id)), CmdDelimS, name, CmdNameDelimS, value);
 }
 
 void ParseCmd(const TStringBuf& source, ui64& id, TStringBuf& name, TStringBuf& value) {
@@ -54,10 +54,10 @@ void ParseCmd(const TStringBuf& source, ui64& id, TStringBuf& name, TStringBuf& 
     value = temp.SubStr(afterCmdName + 1);
 }
 
-ui64 GetId(const TStringBuf& cmd) {
+TElemId GetId(const TStringBuf& cmd) {
     size_t i = cmd.find(CmdDelimC);
     TStringBuf id = cmd.SubStr(0, i);
-    return FromString<ui64>(id);
+    return TElemId(FromString<ui64>(id));
 }
 
 TStringBuf SkipId(const TStringBuf& cmd) {

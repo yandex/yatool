@@ -10,10 +10,10 @@
 #include <util/system/types.h>
 
 namespace {
-    bool IsFakeLib(const TModules& mods, ui32 elemId) {
+    bool IsFakeLib(const TModules& mods, TFileElemId elemId) {
         return mods.Get(elemId)->IsFakeModule();
     }
-    bool IsCompleteTarget(const TModules& mods, ui32 elemId) {
+    bool IsCompleteTarget(const TModules& mods, TFileElemId elemId) {
         return mods.Get(elemId)->IsCompleteTarget();
     }
 }
@@ -28,11 +28,11 @@ void TYMake::ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& mod
         return;
     }
 
-    if (!IsFakeLib(Modules, node->ElemId)) {
+    if (!IsFakeLib(Modules, AssumeFile(node->ElemId))) {
         modules.push_back(node.Id());
     }
 
-    if (node->NodeType == EMNT_Library && !IsCompleteTarget(Modules, node->ElemId)) {
+    if (node->NodeType == EMNT_Library && !IsCompleteTarget(Modules, AssumeFile(node->ElemId))) {
         for (auto xdep: node.Edges()) {
             if (IsGlobalSrcDep(xdep) && xdep.To()->NodeType == EMNT_NonParsedFile) {
                 globSrcs.push_back(xdep.To().Id());
@@ -40,9 +40,9 @@ void TYMake::ListTargetResults(const TTarget& startTarget, TVector<TNodeId>& mod
         }
     }
 
-    const TModule* mod = Modules.Get(node->ElemId);
+    const TModule* mod = Modules.Get(AssumeFile(node->ElemId));
     Y_ASSERT(mod != nullptr);
-    ui32 dirId = mod->GetDirId();
+    TFileElemId dirId = mod->GetDirId();
     if (startTarget.IsDependsTarget) {
         const auto dirName = Graph.GetFileName(dirId).CutType();
         auto iter = DependsToModulesClosure.find(dirName);

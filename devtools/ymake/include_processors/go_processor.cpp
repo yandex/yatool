@@ -37,7 +37,7 @@ void TGoImportProcessor::ProcessIncludes(TAddDepAdaptor& node,
 
     if (parsedIncludes.empty()) {
         // Nothing to do - no imports found
-        node.AddDirsToProps(TVector<ui32>(), TStringBuf("Mod.PeerDirs"));
+        node.AddDirsToProps(TVector<TFileElemId>(), TStringBuf("Mod.PeerDirs"));
         return;
     }
 
@@ -60,7 +60,7 @@ void TGoImportProcessor::ProcessIncludes(TAddDepAdaptor& node,
                         break;
                     }
                     storage.emplace_back(std::move(peerdir));
-                    ui32 dirId = Symbols.AddName(EMNT_Directory, storage.back());
+                    auto dirId = AssumeFile(Symbols.AddName(EMNT_Directory, storage.back()));
                     peerDirs.Push(Symbols.FileNameById(dirId));
                 }
                 break;

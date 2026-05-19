@@ -390,7 +390,7 @@ namespace {
     }
 
     struct TCachedTarget {
-        ui32 ElemId_;
+        TFileElemId ElemId_;
         decltype(TTarget::AllFlags) AllFlags_;
 
         Y_SAVELOAD_DEFINE(ElemId_, AllFlags_);
@@ -904,7 +904,7 @@ TCacheFileReader::EReadResult TYMake::LoadDependencyManagementCache(const TFsPat
 
 bool TYMake::LoadDependsToModulesClosure(IInputStream* input) {
     try {
-        THashMap<TString, TVector<ui32>> cached;
+        THashMap<TString, TVector<TFileElemId>> cached;
         TDependsToModulesClosure closure;
         TVector<TNodeId> nodes;
         ::Load(input, cached);
@@ -954,18 +954,18 @@ bool TYMake::TryLoadUids(TUidsCachable* cachable) {
     return false;
 }
 
-TVector<ui32> TYMake::PreserveStartTargets() const {
-    TVector<ui32> result;
+TVector<TFileElemId> TYMake::PreserveStartTargets() const {
+    TVector<TFileElemId> result;
     result.reserve(StartTargets.size());
     for (const auto& target : StartTargets) {
-        result.push_back(Graph[target.Id]->ElemId);
+        result.push_back(AssumeFile(Graph[target.Id]->ElemId));
     }
     return result;
 }
 
-void TYMake::FixStartTargets(const TVector<ui32>& elemIds) {
+void TYMake::FixStartTargets(const TVector<TFileElemId>& elemIds) {
     int i = 0;
-    for (ui32 elemId : elemIds) {
+    for (auto elemId : elemIds) {
         StartTargets[i++].Id = Graph.GetFileNodeById(elemId).Id();
     }
 }
@@ -982,7 +982,7 @@ void TYMake::SaveStartTargets(TCacheFileWriter& writer) {
     TBufferOutput output(buffer);
     TVector<TCachedTarget> elemIds(Reserve(StartTargets.size()));
     for (const auto& target : StartTargets) {
-        elemIds.push_back(TCachedTarget{.ElemId_=Graph[target.Id]->ElemId, .AllFlags_=target.AllFlags});
+        elemIds.push_back(TCachedTarget{.ElemId_=AssumeFile(Graph[target.Id]->ElemId), .AllFlags_=target.AllFlags});
     }
     ::Save(&output, elemIds);
     writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(buffer)));
@@ -1073,8 +1073,8 @@ bool TYMake::SaveDependencyManagementCache(const TFsPath& cacheFile, TFsPath* te
 
 bool TYMake::SaveDependsToModulesClosure(IOutputStream* output) {
     try {
-        THashMap<TString, TVector<ui32>> temp;
-        TVector<ui32> elemIds;
+        THashMap<TString, TVector<TElemId>> temp;
+        TVector<TElemId> elemIds;
         for (const auto& [dirName, nodesIds]: DependsToModulesClosure) {
             elemIds.clear();
             for (auto nodeId: nodesIds) {

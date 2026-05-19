@@ -154,7 +154,7 @@ public:
         THolder<TDirs> LocalUserGlobal, UserGlobal, Global;
 
         struct TSavedState {
-            TVector<ui32> UserGlobalPropagated, GlobalPropagated, LocalUserGlobal, UserGlobal, Global;
+            TVector<TFileElemId> UserGlobalPropagated, GlobalPropagated, LocalUserGlobal, UserGlobal, Global;
             Y_SAVELOAD_DEFINE(UserGlobalPropagated, GlobalPropagated, LocalUserGlobal, UserGlobal, Global);
         };
 

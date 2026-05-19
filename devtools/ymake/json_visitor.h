@@ -77,7 +77,7 @@ private:
 
     TVector<TLoopCnt> LoopsHash;
 
-    TVector<std::pair<ui32, TMd5Sig>> Inputs;
+    TVector<std::pair<TFileElemId, TMd5Sig>> Inputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> NodesInputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> LoopsInputs;
     TVector<TString> HostResources;

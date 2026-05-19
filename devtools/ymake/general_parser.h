@@ -29,7 +29,7 @@ public:
     void ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStack& stack, TFileHolder& fileContent, TModule* mod);
     void ProcessCommand(TCmdView name, TNodeAddCtx& node, TAddIterStack& stack);
 
-    bool NeedUpdateFile(ui64 fileId, EMakeNodeType type, TFileHolder& fileContent);
+    bool NeedUpdateFile(TFileElemId fileId, EMakeNodeType type, TFileHolder& fileContent);
 
     EMakeNodeType DirectoryType(TFileView dirname) const;
     TNodeRelocationMap RelocatedNodes;
@@ -43,7 +43,7 @@ private:
     void ProcessProperty(TStringBuf name, TNodeAddCtx& node, TAddIterStack& stack);
     void ProcessCmdProperty(TStringBuf name, TNodeAddCtx& node, TAddIterStack& stack);
     void RelocateFile(TNodeAddCtx& node, TStringBuf newName, EMakeNodeType newType, TDGIterAddable& iterAddable);
-    void RelocateFile(TNodeAddCtx& node, ui32 id, EMakeNodeType newType, TDGIterAddable& iterAddable);
+    void RelocateFile(TNodeAddCtx& node, TElemId id, EMakeNodeType newType, TDGIterAddable& iterAddable);
 
 private:
     TYMake& YMake;

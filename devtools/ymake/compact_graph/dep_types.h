@@ -101,32 +101,32 @@ enum class TDepsCacheId: ui64 {
     None = 0
 };
 
-Y_FORCE_INLINE constexpr TDepsCacheId MakeDepsCacheId(EMakeNodeType nodeType, ui32 elemId) noexcept {
-    return static_cast<TDepsCacheId>((static_cast<ui64>(!UseFileId(nodeType)) << 63) | elemId);
+Y_FORCE_INLINE constexpr TDepsCacheId MakeDepsCacheId(EMakeNodeType nodeType, TElemId elemId) noexcept {
+    return static_cast<TDepsCacheId>((static_cast<ui64>(!UseFileId(nodeType)) << 63) | RawElemId(elemId));
 }
 
-Y_FORCE_INLINE constexpr TDepsCacheId MakeDepFileCacheId(ui32 elemId) noexcept {
-    return static_cast<TDepsCacheId>(elemId);
+Y_FORCE_INLINE constexpr TDepsCacheId MakeDepFileCacheId(TElemId elemId) noexcept {
+    return static_cast<TDepsCacheId>(RawElemId(elemId));
 }
 
 Y_FORCE_INLINE constexpr bool IsFile(TDepsCacheId cacheId) noexcept {
     return !(static_cast<ui64>(cacheId) & (ui64{1} << 63));
 }
 
-Y_FORCE_INLINE constexpr ui32 ElemId(TDepsCacheId cacheId) noexcept {
-    return static_cast<ui32>(static_cast<ui64>(cacheId) & ((ui64{1} << 63) - 1));
+Y_FORCE_INLINE constexpr TElemId ElemId(TDepsCacheId cacheId) noexcept {
+    return TElemId(static_cast<ui32>(static_cast<ui64>(cacheId) & ((ui64{1} << 63) - 1)));
 }
 
 struct TAddDepDescr {
     EDepType DepType;
     EMakeNodeType NodeType;
-    ui32 ElemId;    // FileId
+    TElemId ElemId;    // FileId
 
     TAddDepDescr() {
         // leave garbage
     }
 
-    TAddDepDescr(EDepType depType, EMakeNodeType nodeType, ui32 elemId)
+    TAddDepDescr(EDepType depType, EMakeNodeType nodeType, TElemId elemId)
         : DepType(depType)
         , NodeType(nodeType)
         , ElemId(elemId)
@@ -142,7 +142,7 @@ struct TAddDepDescr {
     }
 
     size_t Hash() const {
-        return CombineHashes(CombineHashes(static_cast<ui64>(ElemId), static_cast<ui64>(DepType)), static_cast<ui64>(NodeType));
+        return CombineHashes(CombineHashes(static_cast<ui64>(RawElemId(ElemId)), static_cast<ui64>(DepType)), static_cast<ui64>(NodeType));
     }
 };
 
@@ -169,11 +169,11 @@ struct TDeps {
         Locked = true;
     }
 
-    void Add(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
+    void Add(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId);
     void Add(const TDeps& what);
-    bool AddUnique(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
+    bool AddUnique(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId);
 
-    void Replace(size_t idx, EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
+    void Replace(size_t idx, EDepType depType, EMakeNodeType elemNodeType, TElemId elemId);
 
     // Proxy collection interface
 

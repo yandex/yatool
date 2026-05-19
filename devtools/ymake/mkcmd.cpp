@@ -56,7 +56,7 @@ TMakeModuleState::TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& g
         }
     }
 
-    bool moduleUsesPeers = modules.Get(modNode->ElemId)->GetAttrs().UsePeers;
+    bool moduleUsesPeers = modules.Get(AssumeFile(modNode->ElemId))->GetAttrs().UsePeers;
 
     TModuleRestorer restorer({conf, graph, modules}, modNode);
     restorer.RestoreModule();
@@ -146,14 +146,14 @@ TString TMakeCommand::RealPathEx(const TConstDepNodeRef& node) const {
 
 void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, TDumpInfoEx* addInfo, bool skipRender, bool isGlobalNode) {
     InitModuleEnv(modId);
-    RequirePeers = (nodeId == modId) && Modules.Get(Graph[modId]->ElemId)->GetAttrs().UsePeers;
+    RequirePeers = (nodeId == modId) && Modules.Get(AssumeFile(Graph[modId]->ElemId))->GetAttrs().UsePeers;
     if (isGlobalNode) {
         Vars.SetPathResolvedValue(NVariableDefs::VAR_GLOBAL_TARGET, Conf.RealPath(Graph.GetFileName(Graph.Get(nodeId))));
     }
     if (nodeId != TNodeId::Invalid) {
         MineInputsAndOutputs(nodeId, modId);
         MineVarsAndExtras(addInfo, nodeId, modId);
-        CmdInfo.KeepTargetPlatform = Graph.Names().CommandConf.GetById(TVersionedCmdId(Graph[CmdNode]->ElemId).CmdId()).KeepTargetPlatform;
+        CmdInfo.KeepTargetPlatform = Graph.Names().CommandConf.GetById(TVersionedCmdId(AssumeCmd(Graph[CmdNode]->ElemId)).CmdId()).KeepTargetPlatform;
         if (CmdInfo.KeepTargetPlatform) {
             YDebug() << "TMakeCommand::GetFromGraph: KeepTargetPlatform is set for " << Graph.ToTargetStringBuf(nodeId) << Endl;
         }
@@ -166,7 +166,7 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, TDumpInfoEx* addI
 
 bool TMakeCommand::IsFakeModule(TDepTreeNode nodeVal) {
     if (IsModuleType(nodeVal.NodeType)) {
-        return Modules.Get(nodeVal.ElemId)->IsFakeModule();
+        return Modules.Get(AssumeFile(nodeVal.ElemId))->IsFakeModule();
     }
     return false;
 }
@@ -300,7 +300,7 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
         return;
     }
     bool isModule = nodeId == modId;
-    ui32 nodeElemId = Graph.Get(nodeId)->ElemId;
+    auto nodeElemId = AssumeFile(Graph.Get(nodeId)->ElemId);
     TVector<TString> cmdLateOuts;
     if (isModule) {
         Modules.ClearModuleLateOuts(nodeElemId);
@@ -351,8 +351,8 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
 }
 
 void TMakeCommand::RenderCmdStr(TErrorShowerState* errorShower) {
-    Y_ABORT_UNLESS (Graph.Names().CmdNameById(Graph[CmdNode]->ElemId).IsNewFormat());
-    auto expr = Commands->GetByElemId(Graph[CmdNode]->ElemId);
+    Y_ABORT_UNLESS (Graph.Names().CmdNameById(AssumeCmd(Graph[CmdNode]->ElemId)).IsNewFormat());
+    auto expr = Commands->GetByElemId(AssumeCmd(Graph[CmdNode]->ElemId));
     YDIAG(MkCmd) << "CS for: " << Commands->PrintCmd(*expr) << "\n";
     if (!CmdInfo.MkCmdAcceptor) {
         // TBD: we can get here, e.g., from the MSVS generator; what's the goal?

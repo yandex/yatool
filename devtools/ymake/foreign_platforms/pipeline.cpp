@@ -187,7 +187,7 @@ private:
     }
 
     THashMap<ETransition, TAtomicSharedPtr<Queue>> Destinations_;
-    THashSet<std::pair<ui32, ETraceEvent>> LinesWritten_;
+    THashSet<std::pair<TFileElemId, ETraceEvent>> LinesWritten_;
     bool FinalSent_ = false;
 };
 

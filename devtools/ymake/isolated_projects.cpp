@@ -41,9 +41,9 @@ namespace {
             using TPathId = ui32;
             static const TPathId EmptyPath = 0;
 
-            ui32 From;  // elem id
-            ui32 To;  // elem id
-            ui32 ModuleId; // elem id of current module
+            TFileElemId From;  // elem id
+            TFileElemId To;  // elem id
+            TFileElemId ModuleId; // elem id of current module
             TPathId PathId{EmptyPath}; // index fist path node in TDepsCollectorVisitor::Paths (nodes on path from 'From' to 'To')
         };
 
@@ -64,7 +64,7 @@ namespace {
             if (nodeType == EMNT_File || nodeType == EMNT_Directory || nodeType == EMNT_MakeFile || IsModuleType(nodeType)) {
                 SourcesNodesStack_.emplace_back(nodeId);
                 if (IsModuleType(nodeType)) {
-                    const auto* module = RestoreContext_.Modules.Get(nodeRef->ElemId);
+                    const auto* module = RestoreContext_.Modules.Get(AssumeFile(nodeRef->ElemId));
                     if (RequireModuleRecheck(module)) {
                         YConfEraseByOwner(IslPrjs, module->GetId()); // clear all existing module isolated projects errors
                     }
@@ -132,23 +132,23 @@ namespace {
             }
 
             if (toNodeType == EMNT_File || toNodeType == EMNT_Directory || toNodeType == EMNT_MakeFile || IsModuleType(toNodeType)) {
-                AddDep(state, fileConf.GetTargetId(toNodeRef->ElemId));
+                AddDep(state, fileConf.GetTargetId(AssumeFile(toNodeRef->ElemId)));
             }
 
             return TBase::AcceptDep(state);
         }
 
-        void AddDep(TState& state, ui32 toElemId) {
+        void AddDep(TState& state, TFileElemId toElemId) {
             Y_ASSERT(toElemId);
             if (SourcesNodesStack_.empty()) {
                 return; // From absent
             }
             const auto& graph = RestoreContext_.Graph;
             const auto& fileConf = graph.Names().FileConf;
-            ui32 fromElemId = fileConf.GetTargetId(graph.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId);
+            auto fromElemId = fileConf.GetTargetId(AssumeFile(graph.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId));
             Y_ASSERT(fromElemId);
             const auto moduleIt = FindModule(state);
-            Deps_.emplace_back(TSourceDep{fromElemId, toElemId, moduleIt != state.end() ? moduleIt->Node()->ElemId : 0}); // store dep here
+            Deps_.emplace_back(TSourceDep{fromElemId, toElemId, moduleIt != state.end() ? AssumeFile(moduleIt->Node()->ElemId) : TFileElemId()}); // store dep here
             // store dependency path between sources
             size_t pathsSize = Paths_.size();
             for (auto it = state.Stack().rbegin(); it != state.Stack().rend(); ++it) {
@@ -266,8 +266,8 @@ namespace {
             const auto& parentNode = state.ParentNode();
             if (parentNode.IsValid() && state.Parent()->CurDep().Value() == EDT_BuildFrom/* DEPENDS */) {
                 auto& fileConf = RestoreContext_.Graph.Names().FileConf;
-                auto path = fileConf.GetTargetName(topNode->ElemId).GetTargetStr();
-                auto dir = fileConf.GetTargetName(parentNode->ElemId).GetTargetStr();
+                auto path = fileConf.GetTargetName(AssumeFile(topNode->ElemId)).GetTargetStr();
+                auto dir = fileConf.GetTargetName(AssumeFile(parentNode->ElemId)).GetTargetStr();
                 auto makefile = RestoreContext_.Graph.Names().FileConf.GetStoredName(NPath::SmartJoin(dir, "ya.make"));
                 RestoreContext_.Conf.IsolatedProjects.CheckStatementPath(NProps::DEPENDS, makefile, path);
             }

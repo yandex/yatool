@@ -106,8 +106,8 @@ namespace NFlatJsonGraph {
         TNodeWriter AddLink(TConstDepNodeRef from, EDepType type, TConstDepNodeRef to);
 
     protected:
-        TNodeWriter AddNode(const EMakeNodeType type, const ui32 id, const TStringBuf name);
-        TNodeWriter AddLink(const ui32 fromId, const EMakeNodeType fromType, const ui32 toId, const EMakeNodeType toType, const EDepType depType, const ELogicalDepType logicalDepType = ELDT_FromDepType);
+        TNodeWriter AddNode(const EMakeNodeType type, const TElemId id, const TStringBuf name);
+        TNodeWriter AddLink(const TElemId fromId, const EMakeNodeType fromType, const TElemId toId, const EMakeNodeType toType, const EDepType depType, const ELogicalDepType logicalDepType = ELDT_FromDepType);
 
     private:
         void FinishNode(bool reopen);

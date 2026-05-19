@@ -70,7 +70,7 @@ void TModuleBuilder::SetProperty(TStringBuf propName, TStringBuf value) {
 }
 
 void TModuleBuilder::AddDart(TStringBuf dartName, TStringBuf dartValue, const TVector<TStringBuf>& vars) {
-    ui32 propId = Graph.Names().AddName(EMNT_Property, FormatProperty(dartName, dartValue));
+    TCmdElemId propId = AssumeCmd(Graph.Names().AddName(EMNT_Property, FormatProperty(dartName, dartValue)));
     auto& groupVars = DartIdToGroupVars[propId];
     groupVars.insert(groupVars.begin(), vars.begin(), vars.end());
 }
@@ -123,7 +123,7 @@ void TModuleBuilder::RecursiveAddInputs() {
         }
         TCommandInfo& info = *cmdInfo;
         if (const auto* mainOut = cmdInfo->GetMainOutput()) {
-            AddOutput(mainOut->ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
+            AddOutput(AssumeFile(mainOut->ElemId), EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
         }
         QueueCommandOutputs(info);
     }
@@ -134,16 +134,17 @@ void TModuleBuilder::RecursiveAddInputs() {
 
     // 2. add remaining CheckIfUsed as EDT_Search
     for (auto id : Module.GetOwnEntries()) {
-        TModAddData* modInfo = UpdIter.GetAddedModuleInfo(MakeDepFileCacheId(id));
+        auto _id = TFileElemId(id);
+        TModAddData* modInfo = UpdIter.GetAddedModuleInfo(MakeDepFileCacheId(_id));
         // note that !modInfo means that the node has already been visited by AddIter, no need to worry
         if (modInfo && modInfo->CheckIfUsed && !modInfo->UsedAsInput) {
             //Node.AddDep(EDT_Search, i->second.AddCtx->NodeType, i->second.AddCtx->ElemId); <- this data might not be available yet
             if (!modInfo->AdditionalOutput) {
                 if (modInfo->BadCmdInput) {
-                    const auto& name = Graph.GetFileName(id);
+                    const auto& name = Graph.GetFileName(_id);
                     YConfWarn(BadSrc) << "can't build anything from " << name << Endl;
                 } else {
-                    Node.AddUniqueDep(EDT_Search, EMNT_NonParsedFile, id);
+                    Node.AddUniqueDep(EDT_Search, EMNT_NonParsedFile, _id);
                 }
             }
         }
@@ -209,12 +210,12 @@ void TModuleBuilder::SaveInputResolution(const TVarStrEx& input, TStringBuf orig
     }
 
     Module.ResolveResults.insert({
-        Graph.Names().AddName(
+        AssumeFile(Graph.Names().AddName(
             EMNT_MissingFile,
             NPath::IsTypedPathEx(origInput) ? origInput : NPath::ConstructPath(origInput,  NPath::Unset)
-        ),
+        )),
         curDir.IsValid() ? curDir.GetElemId() : TResolveResult::EmptyPath,
-        static_cast<ui32>(input.ElemId)
+        AssumeFile(input.ElemId)
     });
 }
 
@@ -233,7 +234,7 @@ bool TModuleBuilder::AddByExt(const TStringBuf& sectionName, TVarStrEx& src, con
     }
     if (src.IsPathResolved && src.ForIncludeOnly) { // avoid creating TCommandInfo without much need
         EMakeNodeType nType = NodeTypeForVar(src);
-        ui32 elemId = src.ElemId ?: Graph.Names().AddName(nType, src.Name);
+        TElemId elemId = src.ElemId ?: Graph.Names().AddName(nType, src.Name);
         IncludeOnly.AddUnique(EDT_Search, nType, elemId);
         return true;
     }
@@ -246,7 +247,7 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
         if (src.IsPathResolved && !src.ElemId) { // if src is direct module input: like .o in repo
             src.ElemId = Graph.Names().AddName(EMNT_File, src.Name);
         }
-        ui64 groupId = Graph.Names().AddName(EMNT_Property, NStaticConf::MODULE_INPUTS_MARKER);
+        TCmdElemId groupId = AssumeCmd(Graph.Names().AddName(EMNT_Property, NStaticConf::MODULE_INPUTS_MARKER));
         if (Module.GetAttrs().UseGlobalCmd && src.IsGlobal && ModuleDef->IsGlobalInput(src.Name)) {
             if (!GlobalNode) {
                 GlobalNodeElemId = Module.GetGlobalFileName().GetElemId();
@@ -259,7 +260,7 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
         return true;
     }
     if (!src.IsMacro && src.ElemId && src.OutputInThisModule) {
-        TAddDepAdaptor& node = AddOutput(src.ElemId, NodeTypeForVar(src));
+        TAddDepAdaptor& node = AddOutput(AssumeFile(src.ElemId), NodeTypeForVar(src));
         node.GetModuleData().CheckIfUsed = true;
     }
     if (src.NoAutoSrc) {
@@ -275,7 +276,7 @@ bool TModuleBuilder::AddSource(const TStringBuf& sname, TVarStrEx& src, const TV
     return false;
 }
 
-void TModuleBuilder::AddDep(TVarStrEx& curSrc, TAddDepAdaptor& inputNode, bool isInput, ui64 groupId) {
+void TModuleBuilder::AddDep(TVarStrEx& curSrc, TAddDepAdaptor& inputNode, bool isInput, TElemId groupId) {
     YDIAG(DG) << "SRCS dep for module: " << curSrc.Name << " " << curSrc.ElemId << Endl;
     EMakeNodeType nType = NodeTypeForVarEx(curSrc);
     if (!curSrc.IsPathResolved) {
@@ -290,7 +291,7 @@ void TModuleBuilder::AddDep(TVarStrEx& curSrc, TAddDepAdaptor& inputNode, bool i
     }
     bool builtInThisMod = !curSrc.IsGlobal || !GetModuleConf().Globals.contains("SRCS");
     HasBuildFrom |= isInput && builtInThisMod;
-    ui64* currentGroupId = &CurrentInputGroup;
+    TElemId* currentGroupId = &CurrentInputGroup;
     if (inputNode.ElemId == GlobalNodeElemId) {
         currentGroupId = &CurrentGlobalInputGroup;
     }
@@ -367,8 +368,8 @@ void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& 
             // (and are linked as "0:VARNAME=S:123" instead)
             auto cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
             auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
-            auto compiledVarText = FormatCmd(id, cmdName, value);
-            auto compiledVarElemId = Graph.Names().AddName(EMNT_BuildCommand, compiledVarText);
+            auto compiledVarText = FormatCmd(TCmdElemId(id), cmdName, value);
+            auto compiledVarElemId = AssumeCmd(Graph.Names().AddName(EMNT_BuildCommand, compiledVarText));
 
             TCommandInfo cmdInfo(Conf, &Graph, &UpdIter, &Module);
             cmdInfo.GetCommandInfoFromStructVar(compiledVarElemId, cmdElemId, Commands, Conf.CommandConf);
@@ -399,7 +400,7 @@ void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node) {
 void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind) {
     YDIAG(Dev) << "Add LinkDep for: " << name << node.NodeType << Endl;
 
-    auto mainOutputFile = Graph.GetFileName(node.ElemId);
+    auto mainOutputFile = Graph.GetFileName(AssumeFile(node.ElemId));
     auto mainOutputName = mainOutputFile.Basename();
     auto compiled = [&]() {
         if (cmdKind != EModuleCmdKind::Fail) {
@@ -411,7 +412,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         }
         return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {.MainOutput = mainOutputName});
     }();
-    const ui32 cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
+    const TCmdElemId cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
 
     TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->InitFromModule(Module);
@@ -420,7 +421,7 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
 
     if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
         AddGlobalVarDeps(node);
-        node.AddOutput(node.ElemId, EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
+        node.AddOutput(AssumeFile(node.ElemId), EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
     } else {
         YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
         if (cmdKind != EModuleCmdKind::Fail) {
@@ -449,7 +450,7 @@ void TModuleBuilder::AddGlobalDep() {
     }
 
     AddLinkDep(Module.GetGlobalFileName(), GetModuleConf().GlobalCmd, *GlobalNode, EModuleCmdKind::Global);
-    Module.SetGlobalLibId(GlobalNode->ElemId);
+    Module.SetGlobalLibId(AssumeFile(GlobalNode->ElemId));
 }
 
 void TModuleBuilder::AddFileGroupVars() {
@@ -922,7 +923,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         if (pattern == NArgs::EXCLUDE) {
             continue;
         }
-        if (excludeIds.Push(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern)))) {
+        if (excludeIds.Push(RawElemId(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern))))) {
             excludeMatcher.AddExcludePattern(Module.GetDir(), pattern);
         }
     }
@@ -948,8 +949,8 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     };
 
     const auto moduleElemId = Module.GetName().GetElemId();
-    ui32 globVarElemId = 0;
-    TVector<ui32> globPatternElemIds;
+    TCmdElemId globVarElemId = TCmdElemId();
+    TVector<TCmdElemId> globPatternElemIds;
     TGlobStat globStat;
     for (auto globStr : globs) {
         try {
@@ -957,20 +958,20 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
             TGlobPattern globPattern(Graph.Names().FileConf, globStr, Module.GetDir());
             TGlobStat globPatternStat;
             for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {
-                matches.Push(Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
+                matches.Push(RawElemId(Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId()));
             }
             globStat += globPatternStat;
 
             if (!globVarElemId) {
-                globVarElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+                globVarElemId = AssumeCmd(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName)));
             }
             const TString globCmd = FormatCmd(moduleElemId, NProps::LATE_GLOB, globStr);
-            const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
+            const auto globPatternElemId = AssumeCmd(Graph.Names().AddName(EMNT_BuildCommand, globCmd));
             globPatternElemIds.push_back(globPatternElemId);
             TGlobHelper::SaveGlobPatternStat(Module.ModuleGlobsData, globPatternElemId, std::move(globPatternStat));
             TModuleGlobInfo globInfo = {
                 .GlobPatternId = globPatternElemId,
-                .GlobPatternHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())),
+                .GlobPatternHash = AssumeCmd(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash()))),
                 .WatchedDirs = globPattern.GetWatchDirs().Data(),
                 .MatchedFiles = matches.Take(),
                 .Excludes = excludeIds.Data(),
@@ -996,14 +997,14 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         // Add fake glob property in order to be able to reference variable created with _LATE_GLOB
         // without patterns from command subgraph
         if (!globVarElemId) {
-            globVarElemId = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+            globVarElemId = AssumeCmd(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName)));
         }
         const TString globCmd = FormatCmd(moduleElemId, NProps::LATE_GLOB, "");
-        const auto globPatternElemId = Graph.Names().AddName(EMNT_BuildCommand, globCmd);
+        const auto globPatternElemId = AssumeCmd(Graph.Names().AddName(EMNT_BuildCommand, globCmd));
         globPatternElemIds.push_back(globPatternElemId);
         TModuleGlobInfo globInfo = {
             .GlobPatternId = globPatternElemId,
-            .GlobPatternHash = Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, "")),
+            .GlobPatternHash = AssumeCmd(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, ""))),
             .WatchedDirs = {},
             .MatchedFiles = {},
             .Excludes = excludeIds.Data(),
@@ -1072,7 +1073,7 @@ bool TModuleBuilder::QueueCommandOutputs(TCommandInfo& cmdInfo) {
         Y_ASSERT(cmdInfo.GetOutput().empty());
         for (auto& input : cmdInfo.GetInput()) {
             AddDep(input, Node, false);
-            TModAddData& data = AddOutput(input.ElemId, NodeTypeForVar(input)).GetModuleData();
+            TModAddData& data = AddOutput(AssumeFile(input.ElemId), NodeTypeForVar(input)).GetModuleData();
             data.CheckIfUsed = true;
             if (input.AddToModOutputs) {
                 data.AdditionalOutput = true;

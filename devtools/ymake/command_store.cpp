@@ -846,7 +846,7 @@ NCommands::TCompiledCommand TCommands::Compile(
     return Compile(cachedAst, conf, vars, preevaluate, io);
 }
 
-ui32 TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {
+TCmdElemId TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {
     ECmdId id;
     {
         auto key = GoodHash(expr);
@@ -856,7 +856,7 @@ ui32 TCommands::Add(TDepGraph& graph, NPolexpr::TExpression expr) {
         }
         id = it->second;
     }
-    const ui32 elemId = graph.Names().AddName(EMNT_BuildCommand, fmt::format("S:{}", static_cast<ui32>(id)));
+    const TCmdElemId elemId = AssumeCmd(graph.Names().AddName(EMNT_BuildCommand, fmt::format("S:{}", static_cast<ui32>(id))));
     Elem2Cmd[elemId] = id;
     return elemId;
 }
@@ -1080,7 +1080,7 @@ void TCommands::Load(const TBlob& multi) {
     TSerializer<decltype(Command2Id)>::Load(&inputIds, Command2Id);
 }
 
-TVector<TStringBuf> TCommands::GetCommandVars(ui32 elemId) const {
+TVector<TStringBuf> TCommands::GetCommandVars(TCmdElemId elemId) const {
     const auto* expr = GetByElemId(elemId);
     if (Y_UNLIKELY(expr == nullptr)) {
         return {};
@@ -1098,7 +1098,7 @@ TVector<TStringBuf> TCommands::GetCommandVars(ui32 elemId) const {
     return result.Take();
 }
 
-TToolsAndResults TCommands::GetCommandToolsEtc(ui32 elemId) const {
+TToolsAndResults TCommands::GetCommandToolsEtc(TCmdElemId elemId) const {
     const auto* expr = GetByElemId(elemId);
     if (Y_UNLIKELY(expr == nullptr)) {
         return {};

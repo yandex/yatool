@@ -3,7 +3,7 @@
 
 template <>
 void Out<TDepTreeNode>(IOutputStream& os, TTypeTraits<TDepTreeNode>::TFuncParam v) {
-    os << "(" << v.ElemId << " " << ToString(v.NodeType) << ")";
+    os << "(" << RawElemId(v.ElemId) << " " << ToString(v.NodeType) << ")";
 }
 
 void TDepGraph::ReportStats() const {

@@ -708,7 +708,7 @@ namespace {
         }
 
         void Finish(TStateItem& parentItem, void*) {
-            TModule* parent = RestoreContext.Modules.Get(parentItem.Node()->ElemId);
+            TModule* parent = RestoreContext.Modules.Get(AssumeFile(parentItem.Node()->ElemId));
             Y_ASSERT(parent);
             if (!parent->GetAttrs().RequireDepManagement) {
                 return;
@@ -812,7 +812,7 @@ namespace {
         }
 
         void Collect(TStateItem& parentItem, TConstDepNodeRef peerNode) {
-            const TModule* peer = RestoreContext.Modules.Get(peerNode->ElemId);
+            const TModule* peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
             Y_ASSERT(peer);
             if (!peer->GetAttrs().RequireDepManagement) {
                 parentItem.UnmanageablePeers.Push(peerNode.Id());
@@ -823,11 +823,11 @@ namespace {
         }
 
         const TModule* GetModule(TNodeId nodeId) const {
-            const auto* res = RestoreContext.Modules.Get(RestoreContext.Graph[nodeId]->ElemId);
+            const auto* res = RestoreContext.Modules.Get(AssumeFile(RestoreContext.Graph[nodeId]->ElemId));
             return res;
         }
 
-        ui32 GetAppliedExcludesProp() const {
+        TCmdElemId GetAppliedExcludesProp() const {
             return RestoreContext.Graph.Names().CommandConf.GetIdNx(FormatProperty(NProps::USED_RESERVED_VAR, "APPLIED_EXCLUDES"sv));
         }
 
@@ -1048,7 +1048,7 @@ namespace {
             static const NDetail::TPeersClosure EmptyPeersClosure;
             NDetail::TPeersClosure expanded;
             const auto excludePred = [&](TNodeId id) {
-                return rules.IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph[id]->ElemId));
+                return rules.IsExcluded(RestoreContext.Graph.GetFileName(AssumeFile(RestoreContext.Graph[id]->ElemId)));
             };
             const auto excludeLookup = [&](TNodeId id) -> const NDetail::TPeersClosure& {
                 const auto it = ManagedPeers.find(id);
@@ -1085,7 +1085,7 @@ namespace {
             static const NDetail::TPeersClosure EmptyPeersClosure;
             NDetail::TPeersClosure closure;
             const auto excludePred = [&](TNodeId id) {
-                return rules.IsExcluded(RestoreContext.Graph.GetFileName(RestoreContext.Graph[id]->ElemId));
+                return rules.IsExcluded(RestoreContext.Graph.GetFileName(AssumeFile(RestoreContext.Graph[id]->ElemId)));
             };
             const auto excludeLookup = [&](TNodeId id) -> const NDetail::TPeersClosure& {
                 const auto it = ManagedPeers.find(id);
@@ -1269,7 +1269,7 @@ namespace {
         TRestoreContext RestoreContext;
         TDependencyManagementConf DMConf;
 
-        THashMap<ui32, TNodeId> Proxies;
+        THashMap<TFileElemId, TNodeId> Proxies;
         THashMap<TNodeId, TManagedPeers> ManagedPeers;
         THashMap<TStringBuf, TNodeId> ContribsDict;
 
@@ -1304,7 +1304,7 @@ namespace {
         };
 
         TDependencyResolutionInfo GetResolutionInfo(const TConstDepRef& dep) {
-            const TModule* parent = RestoreContext.Modules.Get(dep.From()->ElemId);
+            const TModule* parent = RestoreContext.Modules.Get(AssumeFile(dep.From()->ElemId));
             Y_ASSERT(parent);
             const bool isDirect = StartModule.GetId() == parent->GetId();
             const TConstDepNodeRef peerNodeRef = GetReplacement(dep.To(), isDirect);
@@ -1317,7 +1317,7 @@ namespace {
                 return res; // Dependency is excluded on this particular path
             }
 
-            const TModule* peer = RestoreContext.Modules.Get(peerNodeRef->ElemId);
+            const TModule* peer = RestoreContext.Modules.Get(AssumeFile(peerNodeRef->ElemId));
             Y_ASSERT(peer);
             res.Peer = peer;
             res.PeerId = peerNodeRef.Id();
@@ -1349,7 +1349,7 @@ namespace {
             if (StartModuleManagedDeps.has(peerNode.Id())) {
                 return peerNode;
             }
-            const auto* peer = RestoreContext.Modules.Get(peerNode->ElemId);
+            const auto* peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
             Y_ASSERT(peer);
             if (!DMConf.IsContribWithVer(*peer)) {
                 return RestoreContext.Graph.GetInvalidNode();
@@ -1369,24 +1369,24 @@ namespace {
         }
 
         const TModule* FindOrig(const TModule& parent, const TConstDepNodeRef& peerNode) {
-            const auto* peer = RestoreContext.Modules.Get(peerNode->ElemId);
+            const auto* peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
             Y_ASSERT(peer);
             const auto& libResolutions = GetLibResolutions(parent.GetId());
             auto it = libResolutions.find(peer->GetDir());
             if (it != libResolutions.end()) {
-                return RestoreContext.Modules.Get(RestoreContext.Graph[it->second]->ElemId);
+                return RestoreContext.Modules.Get(AssumeFile(RestoreContext.Graph[it->second]->ElemId));
             }
 
             return peer;
         }
 
-        const THashMap<TFileView, TNodeId>& GetLibResolutions(ui32 moduleId) {
+        const THashMap<TFileView, TNodeId>& GetLibResolutions(TFileElemId moduleId) {
             const auto [it, inserted] = ModuleLibVersionsCache.emplace(moduleId, THashMap<TFileView, TNodeId>{});
             if (!inserted) {
                 return it->second;
             }
             for (TNodeId peerId: RestoreContext.Modules.GetModuleNodeLists(moduleId).UniqPeers()) {
-                auto* peer = RestoreContext.Modules.Get(RestoreContext.Graph[peerId]->ElemId);
+                auto* peer = RestoreContext.Modules.Get(AssumeFile(RestoreContext.Graph[peerId]->ElemId));
                 Y_ASSERT(peer);
                 if (DMConf.IsContribWithVer(*peer)) {
                     auto& fileConf = RestoreContext.Graph.Names().FileConf;
@@ -1401,7 +1401,7 @@ namespace {
                 return true;
             }
 
-            const auto *peer = RestoreContext.Modules.Get(peerNode->ElemId);
+            const auto *peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
             Y_ASSERT(peer);
             auto& fileConf = RestoreContext.Graph.Names().FileConf;
             return GetLibResolutions(parent.GetId()).contains(fileConf.Parent(peer->GetDir()));
@@ -1413,7 +1413,7 @@ namespace {
         const TModule& StartModule;
         const TUniqVector<TNodeId>& StartModuleManagedDeps;
 
-        THashMap<ui32, THashMap<TFileView, TNodeId>> ModuleLibVersionsCache;
+        THashMap<TFileElemId, THashMap<TFileView, TNodeId>> ModuleLibVersionsCache;
     };
 
     class TDepTreeVisitor: public TNoReentryVisitorBase<TVisitorStateItemBase, TGraphIteratorStateItemBase<true>> {
@@ -1443,7 +1443,7 @@ namespace {
                 return fresh;
             }
 
-            const auto* module = Explainer.GetRestoreContext().Modules.Get(state.TopNode()->ElemId);
+            const auto* module = Explainer.GetRestoreContext().Modules.Get(AssumeFile(state.TopNode()->ElemId));
             Y_ASSERT(module);
             if (!module->GetAttrs().RequireDepManagement) {
                 return false;
@@ -1487,9 +1487,9 @@ namespace {
             if (!TBase::AcceptDep(state) || !IsDirectPeerdirDep(dep)) {
                 return false;
             }
-            const auto* parent = Explainer.GetRestoreContext().Modules.Get(dep.From()->ElemId);
+            const auto* parent = Explainer.GetRestoreContext().Modules.Get(AssumeFile(dep.From()->ElemId));
             Y_ASSERT(parent);
-            const auto* peer = Explainer.GetRestoreContext().Modules.Get(dep.To()->ElemId);
+            const auto* peer = Explainer.GetRestoreContext().Modules.Get(AssumeFile(dep.To()->ElemId));
             Y_ASSERT(peer);
             return !IsGhost(*parent, *peer);
         }
@@ -1532,7 +1532,7 @@ namespace {
 
     private:
         TDependencyManagementExplainer Explainer;
-        THashSet<std::pair<ui32, ui32>> Reported; // from module id, to module id
+        THashSet<std::pair<TFileElemId, TFileElemId>> Reported; // from module id, to module id
         size_t ReplacementsInStack = 0;
     };
 
@@ -1547,12 +1547,12 @@ namespace {
 
         bool Enter(TState& state) {
             if (
-                ApplyExcludesProp != 0 &&
+                ApplyExcludesProp != TCmdElemId() &&
                 (state.TopNode()->NodeType == EMNT_Property && state.TopNode()->ElemId == ApplyExcludesProp) ||
                 ((
                     state.TopNode()->NodeType == EMNT_BuildCommand ||
                     state.TopNode()->NodeType == EMNT_BuildVariable
-                ) && CmdsWithApplyExcludes.contains(state.TopNode()->ElemId))
+                ) && CmdsWithApplyExcludes.contains(AssumeCmd(state.TopNode()->ElemId)))
             ) {
                 const auto curentModule = state.FindRecent([](auto& item) { return IsModule(item); });
                 Y_ASSERT(curentModule != state.end());
@@ -1564,7 +1564,7 @@ namespace {
         void Left(TState& state) {
             TBase::Left(state);
             if (
-                ApplyExcludesProp == 0 ||
+                ApplyExcludesProp == TCmdElemId() ||
                 !(
                     state.Top().CurDep().From()->NodeType == EMNT_BuildCommand ||
                     state.Top().CurDep().From()->NodeType == EMNT_BuildVariable
@@ -1574,13 +1574,13 @@ namespace {
                 return;
             }
 
-            const ui32 destId = state.Top().CurDep().To()->ElemId;
+            const auto destId = AssumeCmd(state.Top().CurDep().To()->ElemId);
             if (destId == ApplyExcludesProp || CmdsWithApplyExcludes.contains(destId)) {
-                auto cmdId = TVersionedCmdId(state.Top().CurDep().From()->ElemId);
+                auto cmdId = TVersionedCmdId(AssumeCmd(state.Top().CurDep().From()->ElemId));
                 if (cmdId.IsNewFormat()) {
                     CmdsWithApplyExcludes.insert(cmdId.ElemId());
                 } else {
-                    if (GetId(TDepGraph::GetCmdName(state.Top().CurDep().From()).GetStr()) == 0) {
+                    if (GetId(TDepGraph::GetCmdName(state.Top().CurDep().From()).GetStr()) == TElemId()) {
                         CmdsWithApplyExcludes.insert(cmdId.ElemId());
                     }
                 }
@@ -1588,8 +1588,8 @@ namespace {
         }
 
         private:
-            ui32 ApplyExcludesProp = 0;
-            THashSet<ui32> CmdsWithApplyExcludes;
+            TCmdElemId ApplyExcludesProp = TCmdElemId();
+            THashSet<TCmdElemId> CmdsWithApplyExcludes;
     };
 
 }
@@ -1713,7 +1713,7 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
 
 void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots) {
     for (TConstDepNodeRef node : GetStartModules(restoreContext.Graph, roots)) {
-        const TModule* module = restoreContext.Modules.Get(node->ElemId);
+        const TModule* module = restoreContext.Modules.Get(AssumeFile(node->ElemId));
         Y_ASSERT(module);
         TScopedContext diagContext{module->GetName()};
         if (!module->GetAttrs().RequireDepManagement) {
@@ -1730,7 +1730,7 @@ void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EMan
     const auto& rootModules = GetStartModules(restoreContext.Graph, roots);
     bool printRoots = rootModules.size() != 1;
     for (TConstDepNodeRef node : rootModules) {
-        const TModule* module = restoreContext.Modules.Get(node->ElemId);
+        const TModule* module = restoreContext.Modules.Get(AssumeFile(node->ElemId));
         Y_ASSERT(module);
         TScopedContext diagContext{module->GetName()};
         if (!module->GetAttrs().RequireDepManagement) {
@@ -1749,7 +1749,7 @@ void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EMan
         auto transitiveInfo = restoreContext.Modules.GetModuleNodeLists(module->GetId());
         const auto& peers = depth == EManagedPeersDepth::Direct ? transitiveInfo.ManagedDirectPeers() : transitiveInfo.UniqPeers();
         for (TNodeId dep: peers) {
-            const TModule* depModule = restoreContext.Modules.Get(restoreContext.Graph[dep]->ElemId);
+            const TModule* depModule = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[dep]->ElemId));
             Y_ASSERT(depModule);
             if (depModule->GetAttrs().RequireDepManagement) {
                 Cout << depModule->GetName().CutAllTypes() << Endl;

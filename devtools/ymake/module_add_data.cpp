@@ -7,12 +7,12 @@ TModAddData::TModAddData(const TModAddData& o)
     , AllFlags(o.AllFlags)
 {
     if (o.ParsedPeerdirs) {
-        ParsedPeerdirs = MakeHolder<THashSet<ui32>>(*o.ParsedPeerdirs);
+        ParsedPeerdirs = MakeHolder<THashSet<TFileElemId>>(*o.ParsedPeerdirs);
     }
 }
 
 TModAddData::~TModAddData() = default;
 
-bool TModAddData::IsParsedPeer(ui32 elemId) const {
+bool TModAddData::IsParsedPeer(TFileElemId elemId) const {
     return ParsedPeerdirs && ParsedPeerdirs->contains(elemId);
 }

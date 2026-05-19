@@ -1,6 +1,7 @@
 #pragma once
 
 #include "readdir.h"
+#include "elem_id.h"
 
 #include <devtools/ymake/diag/stats.h>
 
@@ -14,7 +15,7 @@ public:
     struct TDirItem {
         size_t BasenameBeg;
         size_t BasenameSize;
-        ui32 ElemId;
+        TFileElemId ElemId;
         bool IsDir;
         std::optional<TFileStat> Stat;
     };
@@ -28,7 +29,7 @@ public:
     bool IsReadFailed() const;
     TStringBuf ReadFailedMessage() const;
 
-    void AddItem(const TStringBuf basename, bool isDir, ui32 elemId = 0, const TFileStat* stat = nullptr);
+    void AddItem(const TStringBuf basename, bool isDir, TFileElemId elemId = TFileElemId(), const TFileStat* stat = nullptr);
     void ResortDirItems();
     TStringBuf GetBasename(const TDirItem& dirItem) const;
 

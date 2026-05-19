@@ -35,7 +35,7 @@ public:
 
     TPropertyType() = default;
     TPropertyType(TSymbols& symbols, EVisitIntent intent, TStringBuf name) {
-        Repr_ = (ui64)symbols.CommandConf.Add(name) << 16 | (ui64)intent;
+        Repr_ = (ui64)RawElemId(symbols.CommandConf.Add(name)) << 16 | (ui64)intent;
     }
 
     constexpr ui64 GetRepr() const {
@@ -55,7 +55,7 @@ public:
     }
 
     TStringBuf GetName(const TSymbols& symbols) const {
-        return symbols.CommandConf.GetName(Repr_ >> 16).GetStr();
+        return symbols.CommandConf.GetName(TCmdElemId(Repr_ >> 16)).GetStr();
     }
 
     TString Dump(const TDepGraph& graph) const {

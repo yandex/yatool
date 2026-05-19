@@ -9,7 +9,7 @@
 
 inline bool IsFakeModule(const TModules& modules, TDepTreeNode nodeVal) {
     if (IsModuleType(nodeVal.NodeType)) {
-        return modules.Get(nodeVal.ElemId)->IsFakeModule();
+        return modules.Get(AssumeFile(nodeVal.ElemId))->IsFakeModule();
     }
     return false;
 }

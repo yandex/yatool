@@ -10,12 +10,12 @@ bool IsReachableManagedDependency(const TRestoreContext& restoreContext, TDepRef
         return true;
     }
 
-    auto *parent = restoreContext.Modules.Get(dep.From()->ElemId);
+    auto *parent = restoreContext.Modules.Get(AssumeFile(dep.From()->ElemId));
     if (!parent->GetAttrs().RequireDepManagement) {
         return true;
     }
 
-    auto *peer = restoreContext.Modules.Get(dep.To()->ElemId);
+    auto *peer = restoreContext.Modules.Get(AssumeFile(dep.To()->ElemId));
     if (!peer->GetAttrs().RequireDepManagement && !parent->GetAttrs().ConsumeNonManageablePeers) {
         return true;
     }

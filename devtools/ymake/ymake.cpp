@@ -102,7 +102,7 @@ void TYMake::CheckIsolatedProjects() {
 void TYMake::TransferStartDirs() {
     for (const auto& dir : Conf.StartDirs) {
         TString curDir = NPath::ConstructPath(NPath::FromLocal(dir), NPath::Source);
-        CurStartDirs_.push_back(Names.AddName(EMNT_Directory, curDir));
+        CurStartDirs_.push_back(AssumeFile(Names.AddName(EMNT_Directory, curDir)));
     }
 }
 
@@ -117,7 +117,7 @@ void TYMake::PostInit() {
 void TYMake::CheckStartDirsChanges() {
     TransferStartDirs();
     // Compare order-independently since the order may vary for tool runs
-    if (TSet<ui32>{PrevStartDirs_.begin(), PrevStartDirs_.end()} != TSet<ui32>{CurStartDirs_.begin(), CurStartDirs_.end()}) {
+    if (TSet<TFileElemId>{PrevStartDirs_.begin(), PrevStartDirs_.end()} != TSet<TFileElemId>{CurStartDirs_.begin(), CurStartDirs_.end()}) {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because start dirs are different" << Endl;
     }

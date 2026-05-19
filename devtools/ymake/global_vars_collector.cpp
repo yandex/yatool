@@ -45,7 +45,7 @@ bool TGlobalVarsCollector::Start(const TStateItem& parentItem) {
 void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData* parentData) {
     Y_UNUSED(parentData);
 
-    auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
+    auto& parentVars = RestoreContext.Modules.GetGlobalVars(AssumeFile(parentItem.Node()->ElemId));
     for (const auto& dep : parentItem.Node().Edges()) {
         if (dep.To()->NodeType == EMNT_BuildCommand && dep.Value() == EDT_BuildCommand) {
             continue;
@@ -79,7 +79,7 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TEntryStatsData*
 void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TJSONEntryStats* parentData) {
     Finish(parentItem, static_cast<TEntryStatsData*>(parentData));
 
-    auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
+    auto& parentVars = RestoreContext.Modules.GetGlobalVars(AssumeFile(parentItem.Node()->ElemId));
     auto& urvLocal = parentData->UsedReservedVarsLocal;
     auto& urvTotal = parentData->UsedReservedVarsTotal;
     YDIAG(UIDs)
@@ -114,12 +114,12 @@ void TGlobalVarsCollector::Finish(const TStateItem& parentItem, TJSONEntryStats*
 }
 
 void TGlobalVarsCollector::Collect(const TStateItem& parentItem, TConstDepNodeRef peerNode) {
-    TModule* peer = RestoreContext.Modules.Get(peerNode->ElemId);
+    TModule* peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
     Y_ASSERT(peer);
     if (!peer->PassPeers()) {
         return;
     }
-    if (peer->GetAttrs().RequireDepManagement && RestoreContext.Modules.Get(parentItem.Node()->ElemId)->GetAttrs().RequireDepManagement) {
+    if (peer->GetAttrs().RequireDepManagement && RestoreContext.Modules.Get(AssumeFile(parentItem.Node()->ElemId))->GetAttrs().RequireDepManagement) {
         // Vars propagation between manageable peers can not be cached on each peerdir dep. It must be performed on the resulted
         // list of peers closuere after dependency management applied.
         // GlobalVars for DM aware module contains values that must be induced on consumers rather then complete closure of self
@@ -127,7 +127,7 @@ void TGlobalVarsCollector::Collect(const TStateItem& parentItem, TConstDepNodeRe
         return;
     }
     const auto& peerVars = RestoreContext.Modules.GetGlobalVars(peer->GetId());
-    auto& parentVars = RestoreContext.Modules.GetGlobalVars(parentItem.Node()->ElemId);
+    auto& parentVars = RestoreContext.Modules.GetGlobalVars(AssumeFile(parentItem.Node()->ElemId));
     for (const auto& peerVar : peerVars.GetVars()) {
         parentVars.GetVars()[peerVar.first].AppendUnique(peerVar.second);
     }

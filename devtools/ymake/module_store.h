@@ -25,21 +25,21 @@ private:
     TSharedEntriesMap SharedEntriesByMakefileId;
     TModulesSharedContext CreationContext;
     THashSet<TModule*> ModulesStore;
-    THashMap<ui32, TModule*, TIdentity> ModulesById;
+    THashMap<TElemId_Underlying, TModule*, TIdentity> ModulesById;
     TModule& RootModule;
 
     TStringBuf ResultKey(const TModule& module) const;
 
     TNodeListStore NodeListStore;
-    THashMap<ui32, TTransitiveModuleInfo, TIdentity> ModuleIncludesById;
-    THashMap<ui32, TDependencyManagementModuleInfo> ModuleDMInfoById;
+    THashMap<TElemId_Underlying, TTransitiveModuleInfo, TIdentity> ModuleIncludesById;
+    THashMap<TFileElemId, TDependencyManagementModuleInfo> ModuleDMInfoById;
 
-    TConcurrentHashMap<ui32, TVector<TString>> ModuleLateOutsById;
+    TConcurrentHashMap<TFileElemId, TVector<TString>> ModuleLateOutsById;
 
     mutable NStats::TModulesStats Stats = NStats::TModulesStats("TModules stats");
 
     bool Loaded = false;
-    THashSet<ui32> ReparsedMakefiles;
+    THashSet<TFileElemId> ReparsedMakefiles;
 
     class TModulesSaver {
     public:
@@ -78,10 +78,10 @@ public:
     void Destroy(TModule& module);
 
     /// Try to locate module by ElemId
-    TModule* Get(ui32 id);
+    TModule* Get(TFileElemId id);
 
     /// Try to locate module by ElemId
-    const TModule* Get(ui32 id) const {
+    const TModule* Get(TFileElemId id) const {
         return const_cast<TModules*>(this)->Get(id);
     }
 
@@ -105,7 +105,7 @@ public:
     /// This shall be done after Modules table are saved and dep management algorithm is done
     void SaveDMCache(IOutputStream* output, const TDepGraph& graph);
 
-    void NotifyMakefileReparsed(ui32 makefileId);
+    void NotifyMakefileReparsed(TFileElemId makefileId);
 
     TNodeListStore& GetNodeListStore() noexcept {
         return NodeListStore;
@@ -115,30 +115,30 @@ public:
         return NodeListStore;
     }
 
-    TDependencyManagementModuleInfo& GetExtraDependencyManagementInfo(ui32 modId);
-    const TDependencyManagementModuleInfo* FindExtraDependencyManagementInfo(ui32 modId);
+    TDependencyManagementModuleInfo& GetExtraDependencyManagementInfo(TFileElemId modId);
+    const TDependencyManagementModuleInfo* FindExtraDependencyManagementInfo(TFileElemId modId);
 
-    THolder<TOwnEntries> ExtractSharedEntries(ui32 makefileId);;
+    THolder<TOwnEntries> ExtractSharedEntries(TFileElemId makefileId);;
 
-    TModuleNodeLists GetModuleNodeLists(ui32 moduleId);
-    TModuleNodeLists GetModuleNodeLists(ui32 moduleId) const;
+    TModuleNodeLists GetModuleNodeLists(TFileElemId moduleId);
+    TModuleNodeLists GetModuleNodeLists(TFileElemId moduleId) const;
 
-    TModuleNodeIds& GetModuleNodeIds(ui32 moduleId);
-    const TModuleNodeIds& GetModuleNodeIds(ui32 moduleId) const;
+    TModuleNodeIds& GetModuleNodeIds(TFileElemId moduleId);
+    const TModuleNodeIds& GetModuleNodeIds(TFileElemId moduleId) const;
 
-    TGlobalVars& GetGlobalVars(ui32 moduleId);
+    TGlobalVars& GetGlobalVars(TFileElemId moduleId);
 
-    const TGlobalVars& GetGlobalVars(ui32 moduleId) const;
+    const TGlobalVars& GetGlobalVars(TFileElemId moduleId) const;
 
-    void ClearModuleLateOuts(ui32 moduleId);
-    TVector<TString>& GetModuleLateOuts(ui32 moduleId);
-    const TVector<TString>& GetModuleLateOuts(ui32 moduleId) const;
+    void ClearModuleLateOuts(TFileElemId moduleId);
+    TVector<TString>& GetModuleLateOuts(TFileElemId moduleId);
+    const TVector<TString>& GetModuleLateOuts(TFileElemId moduleId) const;
 
-    TConcurrentHashMap<ui32, TVector<TString>> TakeModulesLateOuts() {
+    TConcurrentHashMap<TFileElemId, TVector<TString>> TakeModulesLateOuts() {
         return std::move(ModuleLateOutsById);
     }
 
-    void SetModulesLateOuts(TConcurrentHashMap<ui32, TVector<TString>>&& lateOutsMap) {
+    void SetModulesLateOuts(TConcurrentHashMap<TFileElemId, TVector<TString>>&& lateOutsMap) {
         ModuleLateOutsById = std::move(lateOutsMap);
     }
 

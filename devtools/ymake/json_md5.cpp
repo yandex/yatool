@@ -26,7 +26,7 @@ namespace {
 
         auto id = GetId(name);
         name = SkipId(name);
-        TFileView moduleName = names.FileConf.GetName(static_cast<ui32>(id));
+        TFileView moduleName = names.FileConf.GetName(AssumeFile(id));
         return TStringBuilder() << moduleName << ":" << name;
     }
 }

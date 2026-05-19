@@ -116,7 +116,7 @@ struct TTimeStamps::TMoveMap: public std::array<TTimeStamps::TStampMoveDesc, 256
     }
 };
 
-void TTimeStamps::CompressTimes(THashMap<ui32, TNodeData>& nodeData) {
+void TTimeStamps::CompressTimes(THashMap<TElemId, TNodeData>& nodeData) {
     if (NumTimes <= SingleDrop) {
         return;
     }
@@ -177,7 +177,7 @@ void TTimeStamps::CompressTimes(THashMap<ui32, TNodeData>& nodeData) {
     }
 
     for (ui32 i = 1; i < Elems.FileConf.Size(); ++i) {
-        auto file = Elems.FileConf.GetFileById(i);
+        auto file = Elems.FileConf.GetFileById(TFileElemId(i));
         if (file->IsInternalLink()) {
             continue;
         }
@@ -198,7 +198,7 @@ void TTimeStamps::CompressTimes(THashMap<ui32, TNodeData>& nodeData) {
     memcpy(Times, nTimes, sizeof(nTimes));
 }
 
-void TTimeStamps::InitSession(THashMap<ui32, TNodeData>& nodeData) {
+void TTimeStamps::InitSession(THashMap<TElemId, TNodeData>& nodeData) {
 
     if (!NeedNewSession) {
         return;

@@ -85,7 +85,7 @@ struct TGlobRestrictions {
 };
 
 struct TModuleGlobVar {
-    TVector<ui32> PatternElemIds;
+    TVector<TCmdElemId> PatternElemIds;
     TGlobRestrictions GlobRestrictions;
 
     Y_SAVELOAD_DEFINE(
@@ -95,8 +95,8 @@ struct TModuleGlobVar {
 };
 
 struct TModuleGlobsData {
-    THashMap<ui32, TModuleGlobVar> GlobVars;
-    THashMap<ui32, TGlobStat> GlobPatternStats;
+    THashMap<TCmdElemId, TModuleGlobVar> GlobVars;
+    THashMap<TCmdElemId, TGlobStat> GlobPatternStats;
 
     Y_SAVELOAD_DEFINE(
         GlobVars,
@@ -143,9 +143,9 @@ public:
 private:
     void ParseGlobPattern();
 
-    bool ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
-    void ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 dirId, const TExcludeMatcher& excludeMatcher) const;
-    void ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
+    bool ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, TFileElemId id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
+    void ApplyRecursivePart(TVector<TFileView>& newDirs, TFileElemId dirId, const TExcludeMatcher& excludeMatcher) const;
+    void ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, TFileElemId dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const;
 };
 
 // Transforms ANT-like glob pattern to a regular expression. Usable in case of matching set of paths against

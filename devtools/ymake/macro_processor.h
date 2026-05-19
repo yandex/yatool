@@ -153,18 +153,18 @@ public:
 
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
-        ui32 cmdElemId,
+        TCmdElemId cmdElemId,
         NCommands::TCompiledCommand& compiled,
         bool skipMainOutput,
         const TVars& vars
     );
     bool GetCommandInfoFromStructVar(
-        ui32 varElemId,
-        ui32 cmdElemId,
+        TCmdElemId varElemId,
+        TCmdElemId cmdElemId,
         TCommands& commands,
         const TVars& vars
     );
-    bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, ui64 id);
+    bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, TElemId id);
     TString SubstMacro(const TYVar* origin, TStringBuf pattern, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, bool patHasPrefix, ECmdFormat formatFor = ECF_Unset);
 
     TString SubstMacroDeeply(const TYVar* origin, const TStringBuf& macro, const TVars& vars, bool patternHasPrefix = false, ECmdFormat cmdFormat = ECF_ExpandVars);
@@ -238,8 +238,8 @@ private:
     enum class EStructCmd {No, Yes};
     enum class EExprRole {Cmd, Var};
 
-    ui64 InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role);
-    void AddCmdNode(const TYVar& var, ui64 elemId, EStructCmd structCmd, EExprRole role);
+    TCmdElemId InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role);
+    void AddCmdNode(const TYVar& var, TCmdElemId elemId, EStructCmd structCmd, EExprRole role);
     // TODO: move MsgPad here, too?
     TString SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor = ECF_Unset);
     void FillCoords(const TYVar* origin, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& localVars, ECmdFormat cmdFormat, bool setAddCtxFilled = true);
@@ -258,7 +258,7 @@ private:
     void GetDirsFromOpts(const TStringBuf opt, const TVars& vars, THolder<TVector<TStringBuf>>& dst);
     void ApplyToolOptions(const TStringBuf macroName, const TVars& vars);
 
-    void CollectVarsDeep(TCommands& commands, ui32 srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources);
+    void CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources);
     void ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr);
 };
 

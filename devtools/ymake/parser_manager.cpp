@@ -79,7 +79,7 @@ namespace {
         node.AddDep(EDT_Property, EMNT_Property, cfgVars.Str());
 
         TPropertyType propType{node.Graph.Names(), EVI_ModuleProps, "Nuke"};
-        ui64 propElemId = node.Graph.Names().AddName(EMNT_Property, FormatProperty("Mod.Nuke", ToString(node.YMake.TimeStamps.CurStamp())));
+        TElemId propElemId = node.Graph.Names().AddName(EMNT_Property, FormatProperty("Mod.Nuke", ToString(node.YMake.TimeStamps.CurStamp())));
         TVector props{MakeDepsCacheId(EMNT_Property, propElemId)};
         TPropertySourceDebugOnly sourceDebug{EPropertyAdditionType::Created};
         node.GetEntry().Props.AddValues(propType, props, sourceDebug);
@@ -265,7 +265,7 @@ TParserBase* TIncParserManager::FindOrInheritParser(
             break;
         }
         Y_ASSERT(UseFileId(stackItem->Node.NodeType));
-        const TFileView pName = names.FileNameById(stackItem->Node.ElemId);
+        const TFileView pName = names.FileNameById(AssumeFile(stackItem->Node.ElemId));
         if (auto* parser = FindParser(pName.Basename()))
             return parser;
     }

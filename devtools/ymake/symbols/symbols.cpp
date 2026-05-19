@@ -15,25 +15,25 @@
 #include <util/system/yassert.h>
 
 
-TFileView TSymbols::FileNameById(ui32 id) const {
+TFileView TSymbols::FileNameById(TFileElemId id) const {
     return FileConf.GetName(id);
 }
 
-TCmdView TSymbols::CmdNameById(ui32 id) const {
+TCmdView TSymbols::CmdNameById(TCmdElemId id) const {
     return CommandConf.GetName(id);
 }
 
 TFileView TSymbols::FileNameByCacheId(TDepsCacheId cacheId) const {
     Y_ASSERT(IsFile(cacheId));
-    return FileConf.GetName(ElemId(cacheId));
+    return FileConf.GetName(AssumeFile(ElemId(cacheId)));
 }
 
 TCmdView TSymbols::CmdNameByCacheId(TDepsCacheId cacheId) const {
     Y_ASSERT(!IsFile(cacheId));
-    return CommandConf.GetName(ElemId(cacheId));
+    return CommandConf.GetName(AssumeCmd(ElemId(cacheId)));
 }
 
-ui32 TSymbols::AddName(EMakeNodeType type, TStringBuf name) {
+TElemId TSymbols::AddName(EMakeNodeType type, TStringBuf name) {
     if (UseFileId(type)) {
         return FileConf.Add(name);
     } else {
@@ -41,7 +41,7 @@ ui32 TSymbols::AddName(EMakeNodeType type, TStringBuf name) {
     }
 }
 
-ui32 TSymbols::IdByName(EMakeNodeType type, TStringBuf name) const {
+TElemId TSymbols::IdByName(EMakeNodeType type, TStringBuf name) const {
     if (UseFileId(type)) {
         return FileConf.GetId(name);
     } else {

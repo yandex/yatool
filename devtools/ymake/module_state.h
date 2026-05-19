@@ -58,7 +58,7 @@ enum class ERenderModuleType {
     Dll /* "so" */,
 };
 
-void InitModuleVars(TVars& vars, TVars& commandConf, ui32 makeFileId, TFileView moduleDir);
+void InitModuleVars(TVars& vars, TVars& commandConf, TFileElemId makeFileId, TFileView moduleDir);
 
 union TModuleAttrs {
     ui32 AllBits = 0;
@@ -93,7 +93,7 @@ union TModuleAttrs {
 
 static_assert(sizeof(TModuleAttrs::AllBits) == sizeof(TModuleAttrs));
 
-using TSharedEntriesMap = THashMap<ui32, THolder<TOwnEntries>>;
+using TSharedEntriesMap = THashMap<TFileElemId, THolder<TOwnEntries>>;
 
 struct TModulesSharedContext {
     TSharedEntriesMap& SharedEntries;
@@ -103,11 +103,11 @@ struct TModulesSharedContext {
 };
 
 struct TResolveResult {
-    ui32 OrigPath;
-    ui32 ResolveDir;
-    ui32 ResultPath;
+    TFileElemId OrigPath;
+    TFileElemId ResolveDir;
+    TFileElemId ResultPath;
 
-    static constexpr ui32 EmptyPath = std::numeric_limits<ui32>::max();
+    static constexpr TFileElemId EmptyPath = TFileElemId(std::numeric_limits<ui32>::max());
 
     bool operator== (const TResolveResult& rhs) const noexcept {
         return
@@ -128,21 +128,21 @@ struct THash<TResolveResult>: THash<std::tuple<ui32, ui32, ui32>> {
     const THash<std::tuple<ui32, ui32, ui32>>& TupleHasher() const noexcept {return *this;}
 
     size_t operator()(const TResolveResult& value) const {
-        return TupleHasher()(std::make_tuple(value.OrigPath, value.ResolveDir, value.ResultPath));
+        return TupleHasher()(std::make_tuple(RawElemId(value.OrigPath), RawElemId(value.ResolveDir), RawElemId(value.ResultPath)));
     }
 };
 
 using TRawIncludesInfo = THashMap<TPropertyType, TUniqVector<TDepsCacheId>>;
-using TRawIncludes = THashMap<ui32, TRawIncludesInfo>;
+using TRawIncludes = THashMap<TFileElemId, TRawIncludesInfo>;
 
 class TModuleSavedState {
 private:
     friend class TModule;
 
-    ui32 Id = 0;
-    ui32 DirId = 0;
-    ui32 MakefileId = 0;
-    ui32 GlobalLibId = 0;
+    TFileElemId Id = TFileElemId();
+    TFileElemId DirId = TFileElemId();
+    TFileElemId MakefileId = TFileElemId();
+    TFileElemId GlobalLibId = TFileElemId();
 
     EMakeNodeType NodeType = EMNT_Deleted;
 
@@ -155,14 +155,14 @@ private:
     // Tag=
     // PeerdirTags=
     // ConfigVars ()
-    TVector<ui32> ConfigVars;
+    TVector<TCmdElemId> ConfigVars;
 
     TModuleIncDirs::TSavedState IncDirs;
-    TVector<ui32> SrcsDirsIds;
-    TVector<ui32> MissingDirsIds;
-    TVector<ui32> DataPathsIds;
+    TVector<TFileElemId> SrcsDirsIds;
+    TVector<TFileElemId> MissingDirsIds;
+    TVector<TFileElemId> DataPathsIds;
     TVector<ui32> SelfPeers;
-    TVector<ui32> ExtraOuts;
+    TVector<TFileElemId> ExtraOuts;
 
     TVector<ui32> OwnEntries;
 
@@ -170,7 +170,7 @@ private:
 
     TRawIncludes RawIncludes;
 
-    THashMap<ui32, EGhostType> GhostPeers;
+    THashMap<TFileElemId, EGhostType> GhostPeers;
 
     TPeersRulesSavedState PeersRules;
 
@@ -222,11 +222,11 @@ public:
     TVars Vars;
     TPeersRestrictions PeersRestrictions;
     TVector<TString> Provides;
-    THashMap<ui32, EGhostType> GhostPeers; // dir ElemId -> material/virtual
+    THashMap<TFileElemId, EGhostType> GhostPeers; // dir ElemId -> material/virtual
     THashSet<TResolveResult> ResolveResults;
     TRawIncludes RawIncludes;
     TVector<ui32> SelfPeers;
-    TVector<ui32> ExtraOuts;
+    TVector<TFileElemId> ExtraOuts;
     ETransition Transition;
     TModuleGlobsData ModuleGlobsData;
 
@@ -249,7 +249,7 @@ public:
     void GetModuleDirs(const TStringBuf& dirType, TVector<TString>& dirs) const;
     TVars ModuleDirsToVars() const;
 
-    bool AddEntry(ui32 id);
+    bool AddEntry(TFileElemId id);
 
     TOwnEntries& GetSharedEntries() const;
     TOwnEntries& GetOwnEntries() const;
@@ -268,12 +268,12 @@ public:
         return Id != BAD_MODULE;
     }
 
-    ui32 GetId() const {
+    TFileElemId GetId() const {
         Y_ASSERT(HasId());
         return Id;
     }
 
-    void FinalizeConfig(ui32 id, const TModuleConf&);
+    void FinalizeConfig(TFileElemId id, const TModuleConf&);
 
     bool IsGlobVarsComplete() const noexcept {
         return GlobVarsComplete;
@@ -356,7 +356,7 @@ public:
         Attrs.FromMultimodule = true;
     }
 
-    ui32 GetDirId() const {
+    TFileElemId GetDirId() const {
         return DirId;
     }
 
@@ -380,7 +380,7 @@ public:
         return GetTag();
     }
 
-    ui32 GetMakefileId() const {
+    TFileElemId GetMakefileId() const {
         return MakefileId;
     }
 
@@ -400,11 +400,11 @@ public:
         return GlobalName;
     }
 
-    ui32 GetGlobalLibId() const {
+    TFileElemId GetGlobalLibId() const {
         return GlobalLibId;
     }
 
-    void SetGlobalLibId(ui32 id) {
+    void SetGlobalLibId(TFileElemId id) {
         GlobalLibId = id;
     }
 
@@ -474,7 +474,7 @@ public:
         return Attrs.SemForeign;
     }
 
-    bool IsExtraOut(ui32 elemId) const {
+    bool IsExtraOut(TFileElemId elemId) const {
         return std::find(ExtraOuts.begin(), ExtraOuts.end(), elemId) != ExtraOuts.end();
     }
 
@@ -484,10 +484,10 @@ public:
 
 private:
     friend class TModules;
-    static constexpr const ui32 BAD_MODULE = 0xfffffffe;
+    static constexpr const TFileElemId BAD_MODULE = TFileElemId(0xfffffffe);
 
     EMakeNodeType NodeType = EMNT_Deleted;
-    ui32 Id = BAD_MODULE;
+    TFileElemId Id = BAD_MODULE;
 
     TFileView Name;
     TString FileName; // Module output file name
@@ -495,9 +495,9 @@ private:
     TString GlobalFileName;
     mutable TFileView GlobalName;
 
-    ui32 DirId = 0;   // Module directory ElemId
-    ui32 MakefileId = 0;
-    ui32 GlobalLibId = 0;
+    TFileElemId DirId = TFileElemId();   // Module directory ElemId
+    TFileElemId MakefileId = TFileElemId();
+    TFileElemId GlobalLibId = TFileElemId();
 
     TString Tag;         // Discriminating tag for modules belonging to the same makefile
     EPeerdirType PeerdirType = EPT_Unset;
@@ -526,7 +526,7 @@ private:
     mutable THolder<TOwnEntries> OwnEntries;
     THolder<TOwnEntries>& SharedEntries;
 
-    TVector<ui32> ConfigVars;
+    TVector<TCmdElemId> ConfigVars;
 
     TModule(TFileView dir, TStringBuf makefile, TStringBuf tag, TModulesSharedContext& context);
     TModule(TModuleSavedState&& saved, TModulesSharedContext& context);

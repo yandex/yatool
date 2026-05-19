@@ -55,12 +55,12 @@ namespace {
             const auto topNode = state.TopNode();
             auto topNodeType = topNode->NodeType;
             if (IsModuleType(topNodeType)) {
-                const auto* module = RestoreContext_.Modules.Get(topNode->ElemId);
+                const auto* module = RestoreContext_.Modules.Get(AssumeFile(topNode->ElemId));
                 CheckModule(module);
             } else if (IsSrcFileType(topNodeType)) {
-                CheckPath(RestoreContext_.Graph.GetFileName(topNode->ElemId), state);
+                CheckPath(RestoreContext_.Graph.GetFileName(AssumeFile(topNode->ElemId)), state);
             } else if (IsMakeFileType(topNodeType)) {
-                auto pathView = RestoreContext_.Graph.GetFileName(topNode->ElemId);
+                auto pathView = RestoreContext_.Graph.GetFileName(AssumeFile(topNode->ElemId));
                 if (!pathView.GetTargetStr().EndsWith("/ya.make")) { // skip ya.make files - they duplicate checks by directory
                     CheckPath(pathView, state);
                 }
@@ -155,11 +155,11 @@ namespace {
                 THolder<TScopedContext> scopedContext{nullptr};
                 const auto moduleIt = FindModule(state);
                 if (moduleIt != state.end()) { // if module exists in state, fill it to context
-                    scopedContext = MakeHolder<TScopedContext>(RestoreContext_.Modules.Get(moduleIt->Node()->ElemId)->GetName());
+                    scopedContext = MakeHolder<TScopedContext>(RestoreContext_.Modules.Get(AssumeFile(moduleIt->Node()->ElemId))->GetName());
                 } else {
                     const auto& parentNode = state.ParentNode();
                     if (parentNode.IsValid()) { // else fill parent node to context
-                        scopedContext = MakeHolder<TScopedContext>(RestoreContext_.Graph.GetFileName(parentNode->ElemId));
+                        scopedContext = MakeHolder<TScopedContext>(RestoreContext_.Graph.GetFileName(AssumeFile(parentNode->ElemId)));
                     }
                 }
                 GenerateBlacklistError(ptr, path, macro);
@@ -195,7 +195,7 @@ namespace {
                 return false;
             }
             auto& names = RestoreContext_.Graph.Names();
-            auto path = names.FileNameById(topNode->ElemId).GetTargetStr();
+            auto path = names.FileNameById(AssumeFile(topNode->ElemId)).GetTargetStr();
             if (const auto* ptr = RestoreContext_.Conf.BlackList.IsValidPath(path)) {
                 const auto& parentNode = state.ParentNode();
                 TStringBuf dir;
@@ -211,9 +211,9 @@ namespace {
                         case EDT_Search: macro = NMacro::RECURSE_FOR_TESTS; break;
                         default: macro = "some recurse like macro";
                     }
-                    dir = names.FileNameById(parentNode->ElemId).GetTargetStr();
+                    dir = names.FileNameById(AssumeFile(parentNode->ElemId)).GetTargetStr();
                 } else {
-                    dir = names.FileNameById(topNode->ElemId).GetTargetStr(); // if no parent use my ya.make as context
+                    dir = names.FileNameById(AssumeFile(topNode->ElemId)).GetTargetStr(); // if no parent use my ya.make as context
                     macro = "command arguments";
                 }
                 auto scopedContext = MakeHolder<TScopedContext>(names.FileConf.GetStoredName(NPath::SmartJoin(dir, "ya.make")));

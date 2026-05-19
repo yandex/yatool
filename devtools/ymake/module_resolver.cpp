@@ -67,7 +67,7 @@ bool TModuleResolver::FormatBuildPath(TVarStrEx& var, TFileView srcDir, TFileVie
         var.Name = NPath::Reconstruct(var.Name);
     }
     var.IsPathResolved = true;
-    var.ElemId = 0; // Name may be changed, ElemId may be invalid
+    var.ElemId = TElemId(); // Name may be changed, ElemId may be invalid
     return true;
 }
 
@@ -282,7 +282,7 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
 
     // This one always has bits in upper part and only lowest bit in lower part
     auto rpKeySrcDirFn = [](TFileView srcDir, bool withRoots) -> ui64 {
-        return ((ui64)srcDir.GetElemId() << 32) + (ui64)withRoots;
+        return ((ui64)RawElemId(srcDir.GetElemId()) << 32) + (ui64)withRoots;
     };
 
     // This one has lower part >=2 so will never clash with 0 or previous Fn.

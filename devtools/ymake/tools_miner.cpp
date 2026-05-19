@@ -33,7 +33,7 @@ TVector<ui32> TToolMiner::MineTools(TConstDepNodeRef genFileNode) {
             if (stack.top().First == stack.top().Last) {
                 auto& frame = stack.top();
                 if (IsDirectToolDep(frame.Dep)) {
-                    frame.ParentTools.Push(frame.Dep.To()->ElemId);
+                    frame.ParentTools.Push(RawElemId(frame.Dep.To()->ElemId));
                 } else {
                     const auto [pos, inserted] = MinedCache.emplace(frame.Dep.To().Id(), frame.ChildTools.Take());
                     for (ui32 elemId: pos->second) {

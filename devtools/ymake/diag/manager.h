@@ -19,7 +19,7 @@ namespace NDetail {
 
     class TConfigureTraceDeduplicator {
     public:
-        bool CanTrace(ui32 fileElemId, ETraceEvent what) {
+        bool CanTrace(TFileElemId fileElemId, ETraceEvent what) {
             return Traced.insert({fileElemId, what}).second;
         }
 
@@ -28,7 +28,7 @@ namespace NDetail {
         }
 
     private:
-        THashSet<std::pair<ui32, ETraceEvent>> Traced;
+        THashSet<std::pair<TFileElemId, ETraceEvent>> Traced;
     };
 
 }
@@ -77,7 +77,7 @@ class TConfMsgManager {
 public:
     using TStreamMessage = std::shared_ptr<IOutputStream>;
     template<class T>
-    using TConfValuesMap = THashMap<ui32, TVector<T>>;
+    using TConfValuesMap = THashMap<TFileElemId, TVector<T>>;
 
     TConfMsgManager(bool delayed = false)
         : Delayed(delayed)
@@ -85,22 +85,22 @@ public:
     }
 
     void Flush() const;
-    void Flush(ui32 owner);
+    void Flush(TFileElemId owner);
     void FlushTopLevel() const;
 
     void ReportConfigureEvent(ETraceEvent what, const TString& event);
     TStreamMessage ReportConfigureMessage(EConfMsgType type, TStringBuf var, size_t row = 0, size_t column = 0);
-    void AddDupSrcLink(ui32 id, ui32 modid, bool force = true);
-    void AddVisitedModule(ui32 modId);
-    void ReportDupSrcConfigureErrors(std::function<TStringBuf (ui32)> toString);
+    void AddDupSrcLink(TFileElemId id, TFileElemId modid, bool force = true);
+    void AddVisitedModule(TFileElemId modId);
+    void ReportDupSrcConfigureErrors(std::function<TStringBuf (TFileElemId)> toString);
 
     void DisableDelay();
     void EnableDelay();
     bool IsDelayed() const;
 
-    void Erase(ui32 owner);
-    bool EraseMessagesByKind(const TStringBuf var, ui32 owner = 0); // If owner == 0 erase for all owners
-    bool HasMessagesByKind(const TStringBuf var, ui32 owner) const;
+    void Erase(TFileElemId owner);
+    bool EraseMessagesByKind(const TStringBuf var, TFileElemId owner = TFileElemId()); // If owner == 0 erase for all owners
+    bool HasMessagesByKind(const TStringBuf var, TFileElemId owner) const;
 
     void Load(const TBlob& blob);
     void Save(TMultiBlobBuilder& builder);
@@ -113,15 +113,15 @@ private:
     void SaveEvent(ETraceEvent what, const TString& event);
     TStringStream& SaveConfigureMessage(EConfMsgType type, TStringBuf var, size_t row = 0, size_t column = 0, bool useCache = true);
 
-    void FlushEvents(ui32 owner) const;
-    void FlushConfigureMessages(ui32 owner) const;
+    void FlushEvents(TFileElemId owner) const;
+    void FlushConfigureMessages(TFileElemId owner) const;
 
     template<typename Container>
-    void Load(IInputStream* input, THashMap<ui32, Container>& confValues);
+    void Load(IInputStream* input, THashMap<TFileElemId, Container>& confValues);
     template<typename Container>
-    void Save(IOutputStream* output, THashMap<ui32, Container>& confValues);
+    void Save(IOutputStream* output, THashMap<TFileElemId, Container>& confValues);
 
-    friend bool CanTraceUniqConfigureEvent(TConfMsgManager& manager, ui32 elemId, ETraceEvent what) {
+    friend bool CanTraceUniqConfigureEvent(TConfMsgManager& manager, TFileElemId elemId, ETraceEvent what) {
         return manager.TracesDeduplicator.CanTrace(elemId, what);
     }
 
@@ -129,8 +129,8 @@ private:
     bool Delayed;
     TConfValuesMap<TConfigureMessage> Messages;
     TConfValuesMap<TConfigureEvent> Events;
-    THashMap<ui32, TSet<ui32>> DupSrcMap;
-    THashSet<ui32> VisitedModules;
+    THashMap<TFileElemId, TSet<TFileElemId>> DupSrcMap;
+    THashSet<TFileElemId> VisitedModules;
     NDetail::TConfigureTraceDeduplicator TracesDeduplicator;
 };
 
@@ -164,11 +164,11 @@ template<class T>
 class TSavedState {
 private:
     friend class TConfMsgManager;
-    ui64 ElemId;
+    ui64 ElemId; // FIXME (TFileElemId)
     T Value;
 
 public:
-    TSavedState(ui64 elemId, const T& value)
+    TSavedState(TFileElemId elemId, const T& value)
         : ElemId(elemId)
         , Value(value)
     {

@@ -443,7 +443,7 @@ bool TJSONVisitor::Enter(TState& state) {
         TNodeDebugOnly nodeDebug{Graph, CurrNode.Id()};
 
         if (CurrType == EMNT_File || CurrType == EMNT_MakeFile) {
-            auto elemId = CurrNode->ElemId;
+            auto elemId = AssumeFile(CurrNode->ElemId);
             const TFileData& fileData = Graph.Names().FileConf.GetFileDataById(elemId);
             Y_ASSERT(fileData.HashSum != TMd5Sig());
             // TODO: Inputs нужны только если включен Conf.DumpInputsMapInJSON
@@ -482,7 +482,7 @@ bool TJSONVisitor::Enter(TState& state) {
 
     if (fresh) {
         if (IsModuleType(CurrType)) {
-            CurrState->Module = RestoreContext.Modules.Get(CurrNode->ElemId);
+            CurrState->Module = RestoreContext.Modules.Get(AssumeFile(CurrNode->ElemId));
             Y_ENSURE(CurrState->Module != nullptr);
             CurrData->Fake = CurrState->Module->IsFakeModule();
         }
@@ -644,7 +644,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                     node2ModuleIt->second = moduleState->Node().Id();
                 }
 
-                bool addToOuts = hasModule && moduleState->Module->IsExtraOut(CurrNode->ElemId);
+                bool addToOuts = hasModule && moduleState->Module->IsExtraOut(AssumeFile(CurrNode->ElemId));
                 if (!moduleDone && NeedAddToOuts(state, *CurrNode) && !CurrData->Fake) {
                     AddTo(CurrNode.Id(), moduleData->ExtraOuts);
                     if (outTogetherDependencyId != TNodeId::Invalid) {
@@ -706,7 +706,7 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 if (mod->GetPeerdirType() == EPT_BuildFrom) {
                     const auto& managedPeers = RestoreContext.Modules.GetModuleNodeLists(mod->GetId()).UniqPeers();
                     for (auto peerId : managedPeers) {
-                        auto peerModule = RestoreContext.Modules.Get(Graph.Get(peerId)->ElemId);
+                        auto peerModule = RestoreContext.Modules.Get(AssumeFile(Graph.Get(peerId)->ElemId));
                         if (peerModule->IsFakeModule()) {
                             continue;
                         }
@@ -848,7 +848,7 @@ void TJSONVisitor::PrepareCurrent(TState& state) {
     CurrState->Hash = new TJsonMd5(nodeDebug);
 
     if (IsModuleType(CurrNode->NodeType) && !CurrState->Module) {
-        CurrState->Module = RestoreContext.Modules.Get(CurrNode->ElemId);
+        CurrState->Module = RestoreContext.Modules.Get(AssumeFile(CurrNode->ElemId));
         Y_ENSURE(CurrState->Module != nullptr);
     }
 }
@@ -920,7 +920,7 @@ void TJSONVisitor::FinishCurrent(TState& state) {
     // include content hash to content uid
     if (CurrNode->NodeType == EMNT_File) {
         auto elemId = CurrNode->ElemId;
-        const TFileData& fileData = Graph.Names().FileConf.GetFileDataById(elemId);
+        const TFileData& fileData = Graph.Names().FileConf.GetFileDataById(AssumeFile(elemId));
         Y_ASSERT(fileData.HashSum != TMd5Sig());
         TString value = Md5SignatureAsBase64(fileData.HashSum);
         CurrState->Hash->ContentMd5Update(value, "Update content hash by current file hash sum");
@@ -1126,7 +1126,7 @@ void TJSONVisitor::PassToParent(TState& state) {
             bool isDMModules = false;
             if (isModuleDep) {
                 if (!CurrState->Module) {
-                    CurrState->Module = RestoreContext.Modules.Get(CurrNode->ElemId);
+                    CurrState->Module = RestoreContext.Modules.Get(AssumeFile(CurrNode->ElemId));
                     Y_ENSURE(CurrState->Module != nullptr);
                 }
                 isDMModules = CurrState->Module->GetAttrs().RequireDepManagement && PrntState->Module->GetAttrs().RequireDepManagement;
@@ -1162,7 +1162,7 @@ void TJSONVisitor::PassToParent(TState& state) {
 
 bool TJSONVisitor::NeedAddToOuts(const TState& state, const TDepTreeNode& node) const {
     auto moduleIt = FindModule(state);
-    return moduleIt != state.end() && moduleIt->Module->IsExtraOut(node.ElemId);
+    return moduleIt != state.end() && moduleIt->Module->IsExtraOut(AssumeFile(node.ElemId));
 }
 
 void TJSONVisitor::UpdateParent(TState& state, TStringBuf value, TStringBuf description) {
@@ -1223,7 +1223,7 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
         return;
     }
 
-    ui32 moduleElemId = moduleIt->Module->GetId();
+    auto moduleElemId = moduleIt->Module->GetId();
 
     if (CurrState->Node()->NodeType == EMNT_NonParsedFile) {
         // TGlobalVarsCollector propagates data through modules;
@@ -1259,7 +1259,7 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
         return result;
     };
 
-    auto addVarsFromModule = [&](ui32 moduleElemId) {
+    auto addVarsFromModule = [&](TFileElemId moduleElemId) {
         auto& vars = RestoreContext.Modules.GetGlobalVars(moduleElemId).GetVars();
         YDIAG(UIDs)
             << "AddGlobalVars \"" << state.Top().Print() << "\": "
@@ -1329,7 +1329,7 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
 
         const auto& managedPeersListId = RestoreContext.Modules.GetModuleNodeLists(moduleElemId).UniqPeers();
         for (TNodeId peerNodeId : managedPeersListId) {
-            ui32 peerModuleElemId = RestoreContext.Graph[peerNodeId]->ElemId;
+            auto peerModuleElemId = AssumeFile(RestoreContext.Graph[peerNodeId]->ElemId);
             addVarsFromModule(peerModuleElemId);
         }
     }

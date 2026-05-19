@@ -12,7 +12,7 @@ TDepRef TNodeBuilder::AddDep(EDepType depType, EMakeNodeType elemNodeType, TStri
     return AddDep(depType, elemNodeType, Names.AddName(elemNodeType, elemName));
 }
 
-TDepRef TNodeBuilder::AddDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
+TDepRef TNodeBuilder::AddDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     auto& graph = TDepGraph::Graph(Node);
     TDepNodeRef newNode = graph.GetNodeById(elemNodeType, elemId);
     if (newNode.IsValid()) {
@@ -27,7 +27,7 @@ void TNodeBuilder::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TSt
     AddDep(depType, elemNodeType, elemName);
 }
 
-void TNodeBuilder::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
+void TNodeBuilder::AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     AddDep(depType, elemNodeType, elemId);
 }
 
@@ -36,7 +36,7 @@ bool TNodeBuilder::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TS
     return true;
 }
 
-bool TNodeBuilder::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
+bool TNodeBuilder::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     auto& graph = TDepGraph::Graph(Node);
     TDepNodeRef newNode = graph.GetNodeById(elemNodeType, elemId);
     if (newNode.IsValid()) {
@@ -87,7 +87,7 @@ void TNodeBuilder::AddDirsToProps(const TDirs& dirs, TStringBuf propName) {
     }
 }
 
-void TNodeBuilder::AddDirsToProps(const TVector<ui32>&, TStringBuf) {
+void TNodeBuilder::AddDirsToProps(const TVector<TFileElemId>&, TStringBuf) {
     ythrow yexception() << "AddDirsToProps: Not implemented yet for a new graph";
 }
 

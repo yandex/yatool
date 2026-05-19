@@ -43,7 +43,7 @@ TGetPeerNodeResult NPeers::GetPeerNode(const TModules& modules, const TConstDepN
             if (IsModuleType(modNode->NodeType)) {
                 matchTagsFinalized = true;
 
-                const TModule* sinkMod = modules.Get(modNode->ElemId);
+                const TModule* sinkMod = modules.Get(AssumeFile(modNode->ElemId));
                 Y_ASSERT(sinkMod != nullptr);
 
                 // For tooldirs
@@ -84,7 +84,7 @@ TConstDepNodeRef NPeers::GetDirectPeerNode(const TDepGraph& graph, const TModule
 
         auto isCorrectDepType = isTooldir ? IsDirectToolDep(edge) : IsDirectPeerdirDep(edge);
         if (childNode.IsValid() && isCorrectDepType) {
-            const auto module = modules.Get(childNode->ElemId);
+            const auto module = modules.Get(AssumeFile(childNode->ElemId));
             if (module != nullptr && graph.GetFileNode(module->GetDir()).Id() == dirId) {
                 return childNode;
             }

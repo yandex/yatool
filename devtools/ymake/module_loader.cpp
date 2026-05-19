@@ -228,7 +228,7 @@ bool TModuleDef::IsMulti(const TStringBuf& name) const {
 
 TDepsCacheId TModuleDef::Commit() {
     TFileView modName = Module.GetName();
-    ui32 modId = modName.GetElemId();
+    TFileElemId modId = modName.GetElemId();
 
     ConfMsgManager()->Erase(modId);
 
@@ -299,13 +299,13 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         if (pattern == NArgs::EXCLUDE) {
             continue;
         }
-        if (excludeIds.Push(Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern)))) {
+        if (excludeIds.Push(RawElemId(AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern)))))) {
             excludeMatcher.AddExcludePattern(Module.GetDir(), pattern);
         }
     }
 
     const auto moduleElemId = Module.GetName().GetElemId();
-    ui32 globVarElemId = 0;
+    TCmdElemId globVarElemId = TCmdElemId();
     TGlobStat globStat;
     TUniqVector<TFileView> values;
     for (auto globStr : globs) {
@@ -319,15 +319,15 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             globStat += globPatternStat;
 
             if (!globVarElemId) {
-                globVarElemId = Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName));
+                globVarElemId = AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName)));
             }
             const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
-            const auto globPatternId = Names.AddName(EMNT_BuildCommand, globCmd);
+            const auto globPatternId = AssumeCmd(Names.AddName(EMNT_BuildCommand, globCmd));
             TGlobHelper::SaveGlobPatternStat(GetModuleGlobsData(), globPatternId, std::move(globPatternStat));
             ModuleGlobs.push_back(
                 TModuleGlobInfo {
                     .GlobPatternId = globPatternId,
-                    .GlobPatternHash = Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())),
+                    .GlobPatternHash = AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash()))),
                     .WatchedDirs = globPattern.GetWatchDirs().Data(),
                     .MatchedFiles = matches.Take(),
                     .Excludes = excludeIds.Data(),

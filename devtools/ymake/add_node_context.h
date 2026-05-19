@@ -84,13 +84,13 @@ struct TNodeAddCtx : public TAddDepAdaptor {
 public:
     // these are in add_node_context_inline.h
     void AddDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName);
-    void AddDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId);
+    void AddDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId);
 
     void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
-    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
+    void AddDepIface(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) final;
 
     bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
-    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
+    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) final;
 
     void AddDeps(const TDeps& deps) final {
         Deps.Add(deps);
@@ -117,11 +117,11 @@ public:
     TCreateParsedInclsResult CreateParsedIncls(TStringBuf type, const TVector<TResolveFile>& files);
     static TCreateParsedInclsResult CreateParsedIncls(
         TModule* module, TDepGraph& graph, TUpdIter& updIter, TYMake& yMake,
-        EMakeNodeType cmdNodeType, ui64 cmdElemId,
+        EMakeNodeType cmdNodeType, TElemId cmdElemId,
         TStringBuf type, const TVector<TResolveFile>& files);
     void AddParsedIncls(TStringBuf type, const TVector<TResolveFile>& files) final;
     void AddDirsToProps(const TDirs& dirs, TStringBuf propName) final;
-    void AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propName) final;
+    void AddDirsToProps(const TVector<TFileElemId>& dirIds, TStringBuf propName) final;
     void AddDirsToProps(const TPropsNodeList& props, TStringBuf propName) final;
 
     inline TPropertiesState& GetProps() final;
@@ -130,7 +130,7 @@ public:
         return Entry.get();
     }
 
-    inline TAddDepAdaptor& AddOutput(ui32 fileId, EMakeNodeType defaultType, bool addToOwn = true) final;
+    inline TAddDepAdaptor& AddOutput(TFileElemId fileId, EMakeNodeType defaultType, bool addToOwn = true) final;
 
     void UpdCmdStamp(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
     void UpdCmdStampForNewCmdNode(TNameDataStore<TCommandData, TCmdView>& conf, TTimeStamps& stamps, bool changed);
@@ -157,7 +157,7 @@ private:
 
     struct TAddDirsToPropsRequest {
         TString Type;
-        TVector<ui32> Dirs;
+        TVector<TFileElemId> Dirs;
     };
 
     enum class ERequestType {
@@ -181,19 +181,19 @@ public:
     {
     }
 
-    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) final;
+    bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) final;
     bool AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TStringBuf elemName) final;
     bool HasAnyDeps() const final;
     void AddParsedIncls(TStringBuf type, const TVector<TResolveFile>& files) final;
     void AddDirsToProps(const TDirs& dirs, TStringBuf propName) final;
-    void AddDirsToProps(const TVector<ui32>& dirIds, TStringBuf propName) final;
+    void AddDirsToProps(const TVector<TFileElemId>& dirIds, TStringBuf propName) final;
     void AddDirsToProps(const TPropsNodeList& props, TStringBuf propName) final;
 
     TDepRef AddDep(EDepType, EMakeNodeType, TStringBuf) {
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
-    TDepRef AddDep(EDepType, EMakeNodeType, ui32) {
+    TDepRef AddDep(EDepType, EMakeNodeType, TElemId) {
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
@@ -201,7 +201,7 @@ public:
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
-    void AddDepIface(EDepType, EMakeNodeType, ui32) final {
+    void AddDepIface(EDepType, EMakeNodeType, TElemId) final {
         ythrow TNotImplemented() << "AddDep: Not implemented in TMaybeNodeUpdater";
     }
 
@@ -209,7 +209,7 @@ public:
         ythrow TNotImplemented() << "AddDeps: Not implemented in TMaybeNodeUpdater";
     }
 
-    TAddDepAdaptor& AddOutput(ui32, EMakeNodeType, bool) final {
+    TAddDepAdaptor& AddOutput(TFileElemId, EMakeNodeType, bool) final {
         ythrow TNotImplemented() << "AddOutput: Not implemented in TMaybeNodeUpdater";
     }
 

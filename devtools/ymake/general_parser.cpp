@@ -31,7 +31,7 @@ namespace {
 
     void ProcessMakefileGlobs(TNodeAddCtx& node, const TVector<TModuleDef*>& modules) {
         for (const auto module : modules) {
-            THashMap<ui32, TVector<ui32>> globVarElemId2PatternElemIds;
+            THashMap<TCmdElemId, TVector<TCmdElemId>> globVarElemId2PatternElemIds;
             for (const auto& globInfo : module->GetModuleGlobs()) {
                 // EMNT_Makefile -> GlobCmd -> WatchDirs
                 const auto globPatternElemId = globInfo.GlobPatternId;
@@ -66,14 +66,14 @@ namespace {
         }
         ui64 id;
         TStringBuf name, val;
-        ParseCommandLikeProperty(node.Graph.GetCmdName(prev.NodeType, prev.ElemId).GetStr(), id, name, val);
+        ParseCommandLikeProperty(node.Graph.GetCmdName(prev.NodeType, AssumeCmd(prev.ElemId)).GetStr(), id, name, val);
         return name == NProps::LATE_GLOB || name == NProps::GLOB;
     }
 
     void ProcessMakefileInclude(TNodeAddCtx& node, TStringBuf incFile, bool useTextContext = false) {
         auto& fileConf = node.YMake.Names.FileConf;
         EMakeNodeType type;
-        ui32 elemId;
+        TFileElemId elemId;
         TFileView incView = fileConf.GetStoredName(incFile);
         fileConf.MarkAsMakeFile(incView);
         if (fileConf.YPathExists(incView, EPathKind::File)) {
@@ -105,7 +105,7 @@ namespace {
         }
 
         if (modules.size()) {
-            TFileView makefile = node.Graph.Names().FileConf.ResolveLink(node.Graph.GetFileName(node.ElemId));
+            TFileView makefile = node.Graph.Names().FileConf.ResolveLink(node.Graph.GetFileName(AssumeFile(node.ElemId)));
             for (const auto module : modules) {
                 for (const auto& [varName, useTextContext] : additionalDepsDescriptions) {
                     const auto additionalDeps = StringSplitter(module->GetVars().EvalValue(varName)).Split(' ').SkipEmpty();
@@ -119,7 +119,7 @@ namespace {
     }
 
     void ApplySelfPeers(const TVector<TModuleDef*>& modules) {
-        THashMap<TStringBuf, ui32> moduleMap;
+        THashMap<TStringBuf, TFileElemId> moduleMap;
         for (const auto mod : modules) {
             moduleMap[mod->GetModuleConf().Tag] = mod->GetModule().GetId();
         }
@@ -128,7 +128,7 @@ namespace {
             TUniqVector<ui32> selfPeers;
             for (const auto& tag : mod->GetModuleConf().SelfPeers) {
                 if (moduleMap.contains(tag)) {
-                    selfPeers.Push(moduleMap[tag]);
+                    selfPeers.Push(RawElemId(moduleMap[tag]));
                 }
             }
             mod->GetModule().SelfPeers = selfPeers.Take();
@@ -179,11 +179,11 @@ TGeneralParser::TGeneralParser(TYMake& yMake)
 }
 
 void TGeneralParser::RelocateFile(TNodeAddCtx& node, TStringBuf newName, EMakeNodeType newType, TDGIterAddable& iterAddable) {
-    ui32 id = YMake.Names.FileConf.Add(newName);
+    TFileElemId id = YMake.Names.FileConf.Add(newName);
     RelocateFile(node, id, newType, iterAddable);
 }
 
-void TGeneralParser::RelocateFile(TNodeAddCtx& node, ui32 newElemId, EMakeNodeType newType, TDGIterAddable& iterAddable) {
+void TGeneralParser::RelocateFile(TNodeAddCtx& node, TElemId newElemId, EMakeNodeType newType, TDGIterAddable& iterAddable) {
     auto originalCacheId = MakeDepsCacheId(node.NodeType, node.ElemId);
     node.ElemId = iterAddable.Node.ElemId = newElemId;
     node.NodeType = newType;
@@ -196,7 +196,7 @@ void TGeneralParser::RelocateFile(TNodeAddCtx& node, ui32 newElemId, EMakeNodeTy
     }
 }
 
-bool TGeneralParser::NeedUpdateFile(ui64 fileId, EMakeNodeType type, TFileHolder& fileContent) {
+bool TGeneralParser::NeedUpdateFile(TFileElemId fileId, EMakeNodeType type, TFileHolder& fileContent) {
     if (type == EMNT_MissingFile) {
         return true;
     }
@@ -234,7 +234,7 @@ void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStac
             fileNotFound = true;
         } else {
             if (!fileContent) {
-                fileContent = fileConf.GetFileById(node.ElemId);
+                fileContent = fileConf.GetFileById(AssumeFile(node.ElemId));
             }
             fileNotFound = fileContent->IsNotFound();
         }
@@ -258,7 +258,7 @@ void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStac
             YDIAG(Dev) << "parse set for " << name << Endl;
 
             if (fileNotFound) {
-                if (fileConf.GetFileDataById(node.ElemId).Changed) {
+                if (fileConf.GetFileDataById(AssumeFile(node.ElemId)).Changed) {
                     nodeEntry.Props.SetIntentNotReady(EVI_GetModules, YMake.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
                 }
                 break;
@@ -315,7 +315,7 @@ void TGeneralParser::ProcessFile(TFileView name, TNodeAddCtx& node, TAddIterStac
                 if (src.IsOutputFile) {
                     break;
                 }
-                fileContent = Graph.Names().FileConf.GetFileById(src.ElemId);
+                fileContent = Graph.Names().FileConf.GetFileById(AssumeFile(src.ElemId));
                 fileContent->UpdateContentHash();
             }
             YMake.IncParserManager.ProcessFile(*fileContent, YMake.GetFileProcessContext(mod, node));
@@ -371,7 +371,7 @@ void TGeneralParser::ProcessCommand(TCmdView cmdView, TNodeAddCtx& node, TAddIte
 
     switch (node.NodeType) {
         case EMNT_BuildCommand:
-            if (YMake.Commands.GetByElemId(node.ElemId)) {
+            if (YMake.Commands.GetByElemId(AssumeCmd(node.ElemId))) {
                 AddCommandNodeDeps(node);
             } else if (IsPropDep(stack)) {
                 ProcessCmdProperty(cmdView.GetStr(), node, stack); // NOTE: node.DepsToInducedProps() is already called
@@ -433,7 +433,7 @@ void TGeneralParser::ReportStats() {
 }
 
 void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
-    const auto toolsAndStuff = YMake.Commands.GetCommandToolsEtc(node.ElemId);
+    const auto toolsAndStuff = YMake.Commands.GetCommandToolsEtc(AssumeCmd(node.ElemId));
     for (const auto& toolValue : toolsAndStuff.Tools) {
         // lifted from tool handling in ProcessBuildCommand
         TString tool = NPath::IsExternalPath(toolValue) ? TString{toolValue} : NPath::ConstructYDir(toolValue, TStringBuf(), ConstrYDirDiag);
@@ -445,7 +445,7 @@ void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
         TString tool = NPath::IsExternalPath(resultValue) ? TString{resultValue} : NPath::ConstructYDir(resultValue, TStringBuf(), ConstrYDirDiag);
         SBDIAG << "Result dep: " << tool << Endl;
         node.AddUniqueDep(EDT_Include, EMNT_Directory, tool);
-        Graph.Names().CommandConf.GetById(TVersionedCmdId(node.ElemId).CmdId()).KeepTargetPlatform = true;
+        Graph.Names().CommandConf.GetById(TVersionedCmdId(AssumeCmd(node.ElemId)).CmdId()).KeepTargetPlatform = true;
         YDebug() << "TGeneralParser::AddCommandNodeDeps: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << tool << Endl;
     }
 
@@ -455,7 +455,7 @@ void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
     if (node.UpdNode != TNodeId::Invalid) {
         TDeps oldDeps;
         node.GetOldDeps(oldDeps, 0, false);
-        const auto& delayedDeps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, static_cast<ui32>(node.ElemId)}, EDT_Search);
+        const auto& delayedDeps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, node.ElemId}, EDT_Search);
         if (oldDeps.Size() != node.Deps.Size() + delayedDeps.size()) {
             depsChanged = true;
         } else {
@@ -468,7 +468,7 @@ void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
             if (!depsChanged) {
                 size_t n = 0;
                 for (const auto& dirId : delayedDeps) {
-                    if (oldDeps[node.Deps.Size() + n].ElemId != dirId) {
+                    if (oldDeps[node.Deps.Size() + n].ElemId != TElemId(dirId)) {
                         depsChanged = true;
                         break;
                     }
@@ -488,18 +488,18 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
     auto entries = YMake.Modules.ExtractSharedEntries(elemId);
     if (entries) {
         for (auto fileId: *entries) {
-            auto it = YMake.UpdIter->Nodes.find(MakeDepFileCacheId(fileId));
+            auto it = YMake.UpdIter->Nodes.find(MakeDepFileCacheId(TElemId(fileId)));
             if (it != YMake.UpdIter->Nodes.end()) {
                 it->second.MarkedAsUnknown = true;
-                YDIAG(Dev) << fileConf.GetName(fileId) << " was previously in OwnEntries of " << resolvedName << " and now is marked as unknown" << Endl;
+                YDIAG(Dev) << fileConf.GetName(TFileElemId(fileId)) << " was previously in OwnEntries of " << resolvedName << " and now is marked as unknown" << Endl;
             }
         }
     }
 
     YDIAG(Dev) << "ProcessMakeFile: " << resolvedName << Endl;
     Stats.Inc(NStats::EGeneralParserStats::Count);
-    ConfMsgManager()->Erase(node.ElemId);
-    ConfMsgManager()->Erase(elemId);
+    ConfMsgManager()->Erase(AssumeFile(node.ElemId));
+    ConfMsgManager()->Erase(AssumeFile(elemId));
 
     TPropValues modules, recurses, testRecurses, dirProps;
 
@@ -559,7 +559,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
     if (cmdName.at(0) == '$') { // special command, such as $LS
         YDIAG(DG) << "PBC special cmd: " << name << Endl;
         if (cmdId) { // TODO: same for other commands
-            node.AddUniqueDep(EDT_Include /*EDT_BuildFrom*/, EMNT_MissingFile /*must be EMNT_MissingFile or EMNT_MakeFile*/, cmdId);
+            node.AddUniqueDep(EDT_Include /*EDT_BuildFrom*/, EMNT_MissingFile /*must be EMNT_MissingFile or EMNT_MakeFile*/, TElemId(cmdId));
         }
         return;
     }
@@ -597,7 +597,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
                 YDIAG(DG) << (cmd.Result ? "Result" : "Tool") << " dep: " << dir << Endl;
                 node.AddUniqueDep(EDT_Include, EMNT_Directory, dir);
                 if (cmd.Result) {
-                    Graph.Names().CommandConf.GetById(node.ElemId).KeepTargetPlatform = true;
+                    Graph.Names().CommandConf.GetById(RawElemId(node.ElemId)).KeepTargetPlatform = true;
                     YDebug() << "TGeneralParser::ProcessBuildCommand: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << dir << Endl;
                 }
             }
@@ -632,7 +632,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
 
 void TGeneralParser::ProcessProperty(TStringBuf /*name*/, TNodeAddCtx& node, TAddIterStack& /* stack& */) {
     if (node.UpdNode == TNodeId::Invalid) {
-        Graph.Names().CommandConf.GetById(node.ElemId).CmdModStamp = YMake.TimeStamps.CurStamp();
+        Graph.Names().CommandConf.GetById(RawElemId(node.ElemId)).CmdModStamp = YMake.TimeStamps.CurStamp();
     }
     //TStringBuf propName = GetPropertyName(name);
     // "OWNER"
@@ -646,7 +646,7 @@ void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, 
     if (node.UpdNode != TNodeId::Invalid) {
         TDeps oldDeps;
         node.GetOldDeps(oldDeps, 0, false);
-        const auto& delayedDeps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, static_cast<ui32>(node.ElemId)}, EDT_Search);
+        const auto& delayedDeps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, node.ElemId}, EDT_Search);
         if (oldDeps.Size() != node.Deps.Size() + delayedDeps.size()) {
             depsChanged = true;
         } else {
@@ -659,7 +659,7 @@ void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, 
             if (!depsChanged) {
                 size_t n = 0;
                 for (const auto& dirId : delayedDeps) {
-                    if (oldDeps[node.Deps.Size() + n].ElemId != dirId) {
+                    if (oldDeps[node.Deps.Size() + n].ElemId != TElemId(dirId)) {
                         depsChanged = true;
                         break;
                     }
@@ -681,15 +681,15 @@ void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, 
 void PopulateGlobNode(TNodeAddCtx& node, const TModuleGlobInfo& globInfo) {
     node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.GlobPatternHash);
     for (ui32 fileId: globInfo.MatchedFiles) {
-        node.AddUniqueDep(EDT_Property, EMNT_File, fileId);
+        node.AddUniqueDep(EDT_Property, EMNT_File, TElemId(fileId));
     }
     for (ui32 exclId: globInfo.Excludes) {
-        node.AddUniqueDep(EDT_Property, EMNT_Property, exclId);
+        node.AddUniqueDep(EDT_Property, EMNT_Property, TElemId(exclId));
     }
     if (globInfo.ReferencedByVar) {
         node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.ReferencedByVar);
     }
-    auto& deps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, static_cast<ui32>(node.ElemId)}, EDT_Search);
+    auto& deps = node.UpdIter.DelayedSearchDirDeps.GetNodeDepsByType({node.NodeType, node.ElemId}, EDT_Search);
     deps.clear();
     for (const auto& dir : globInfo.WatchedDirs) {
         deps.Push(dir);

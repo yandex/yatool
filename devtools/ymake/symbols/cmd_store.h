@@ -29,25 +29,25 @@ using TCmdId = ui32;
 
 class TVersionedCmdId {
 public:
-    explicit TVersionedCmdId(ui32 elemId): ElemId_(elemId) {
+    explicit TVersionedCmdId(TCmdElemId elemId): ElemId_(elemId) {
     }
     TVersionedCmdId(TCmdId cmdId, bool isNewFormat): ElemId_(cmdId) {
         if (isNewFormat)
-            ElemId_ |= NEW_FORMAT_MASK;
+            ElemId_ = TCmdElemId(RawElemId(ElemId_) | NEW_FORMAT_MASK);
     }
-    ui32 ElemId() const {
+    TCmdElemId ElemId() const {
         return ElemId_;
     }
     bool IsNewFormat() const {
-        return ElemId_ & NEW_FORMAT_MASK;
+        return RawElemId(ElemId_) & NEW_FORMAT_MASK;
     }
     TCmdId CmdId() const {
-        return ElemId_ & ~NEW_FORMAT_MASK;
+        return RawElemId(ElemId_) & ~NEW_FORMAT_MASK;
     }
 
 private:
-    constexpr static ui32 NEW_FORMAT_MASK = (1 << 31);
-    ui32 ElemId_;
+    constexpr static TElemId_Underlying NEW_FORMAT_MASK = (1 << 31);
+    TCmdElemId ElemId_;
 };
 
 class TCmdView {
@@ -56,20 +56,24 @@ private:
     TVersionedCmdId Id;
 
 public:
-    TCmdView() : Table(nullptr), Id(0)
+    TCmdView() : Table(nullptr), Id(TCmdElemId())
     {}
 
-    TCmdView(const TNameStore* table, ui32 elemId)
+    TCmdView(const TNameStore* table, TCmdElemId elemId)
         : Table(table), Id(elemId)
     {}
 
+    // TCmdView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
+    //     : Table(table), Id(TCmdElemId(elemId))
+    // {}
+
     TStringBuf GetStr() const;
 
-    ui32 GetElemId() const {
+    TCmdElemId GetElemId() const {
         return Id.ElemId();
     }
 
-    void SetElemId(ui32 elemId) {
+    void SetElemId(TCmdElemId elemId) {
         Id = TVersionedCmdId(elemId);
     }
 
@@ -96,11 +100,11 @@ private:
     using TBase = TNameDataStore<TCommandData, TCmdView>;
 
 public:
-    ui32 Add(TStringBuf name);
+    TCmdElemId Add(TStringBuf name);
 
-    TCmdView GetName(ui32 elemId) const;
+    TCmdView GetName(TCmdElemId elemId) const;
     TCmdView GetStoredName(TStringBuf name);
 
-    ui32 GetIdNx(TStringBuf name) const;
-    ui32 GetId(TStringBuf name) const;
+    TCmdElemId GetIdNx(TStringBuf name) const;
+    TCmdElemId GetId(TStringBuf name) const;
 };

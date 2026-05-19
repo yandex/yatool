@@ -183,7 +183,7 @@ struct TYVar: public TVector<TVarStr> {
             ui32 DontParse : 1;
         };
     };
-    ui32 Id; // tmp hack! only used to return id from Lookup commands
+    TElemId Id; // tmp hack! only used to return id from Lookup commands
 
     TYVar()
         : Flags(0)
@@ -204,8 +204,8 @@ struct TYVar: public TVector<TVarStr> {
         push_back(TVarStr(s, hasPrefix, false));
     }
 
-    void SetSingleVal(const TStringBuf& name, const TStringBuf& val, ui32 id, int varsId = -1) {
-        Id = varsId >= 0 ? varsId : id;
+    void SetSingleVal(const TStringBuf& name, const TStringBuf& val, TElemId id, TElemId varsId = TElemId(-1)) {
+        Id = varsId != TElemId(-1) ? TElemId(varsId) : id;
         clear();
         push_back(TVarStr(FormatCmd(id, name, val), true, false));
     }
@@ -315,7 +315,7 @@ public:
 struct TVars: public THashMap<TString, TYVar> {
 public:
     const TVars* Base;
-    ui64 Id;
+    ui64 Id; // FIXME (TElemId)
 
 private:
     std::function<void(const TYVar&, const TStringBuf&)> VarLookupHook;
@@ -323,7 +323,7 @@ private:
 public:
     explicit TVars(const TVars* base = nullptr)
         : Base(base)
-        , Id(0)
+        , Id()
         , VarLookupHook([](const TYVar&, const TStringBuf&) {})
     {
     }
@@ -416,7 +416,7 @@ public:
         return nullptr;
     }
 
-    const TVars* GetBase(ui64 id) const {
+    const TVars* GetBase(TElemId id) const {
         //Cout << name << ": "  << (*this)[name] << Endl;
         const TVars* cur = this;
         while (cur->Id != id) {
@@ -470,7 +470,7 @@ public:
         return val && val->IsReservedName;
     }
 
-    bool IsIdDeeper(ui64 what, ui64 than) const {
+    bool IsIdDeeper(TFileElemId what, TFileElemId than) const {
         if (what == than)
             return false;
         const TVars* cur = this;

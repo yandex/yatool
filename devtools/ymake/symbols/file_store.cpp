@@ -93,7 +93,7 @@ void TFileConf::InitAfterCacheLoading() {
     BuildDummyFile = GetStoredName(NPath::DummyFile());
 }
 
-ui32 TFileConf::Add(TStringBuf name) {
+TFileElemId TFileConf::Add(TStringBuf name) {
     NPath::ValidateEx(name);
     bool isLink = NPath::IsLink(name);
     TStringBuf context;
@@ -102,17 +102,17 @@ ui32 TFileConf::Add(TStringBuf name) {
         name = NPath::GetTargetFromLink(name);
     }
     const auto sizeBeforeAdd = Size();
-    auto targetId = TBase::Add(name);
-    if (sizeBeforeAdd == targetId && NPath::IsTypedPath(name)) {
+    auto targetIdRaw = TBase::Add(name);
+    if (sizeBeforeAdd == targetIdRaw && NPath::IsTypedPath(name)) {
         const auto type = NPath::GetType(name);
         if (type == NPath::Source || type == NPath::Unset) {
-            Meta[targetId].IsSource = true;
+            Meta[targetIdRaw].IsSource = true;
         }
     }
     if (!isLink) {
-        return targetId;
+        return TFileElemId(targetIdRaw);
     }
-    return TFileId::CreateElemId(context, targetId);
+    return TFileId::CreateElemId(context, TFileElemId(targetIdRaw));
 }
 
 bool TFileConf::IsActualExternalChangesSource(const TFileData& data) const {
@@ -120,7 +120,7 @@ bool TFileConf::IsActualExternalChangesSource(const TFileData& data) const {
 }
 
 //TODO: we want to get rid of WasListed for directories. try to move ListDir into ReadContent
-const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* fileStat) {
+const TFileData& TFileConf::CheckFS(TFileElemId elemId, bool runStat, const TFileStat* fileStat) {
     TFileData& data = GetFileDataById(elemId);
     auto curStamp = TimeStamps.CurStamp();
 
@@ -177,7 +177,7 @@ const TFileData& TFileConf::CheckFS(ui32 elemId, bool runStat, const TFileStat* 
             event.SetReason("Stat failed: " + TString{LastSystemErrorText(err)});
             FORCE_TRACE(P, event);
 
-            TScopedContext context(0, targetPath, false); // We should try to re-stat such file every time
+            TScopedContext context(TFileElemId(), targetPath, false); // We should try to re-stat such file every time
             YConfErr(BadFile) << "Cannot stat source file " << targetPath << ": " << LastSystemErrorText(err)  << " (" << err << ")"<< Endl;
 
             data.MarkNotFound(curStamp, true /* temporary */);
@@ -213,7 +213,7 @@ const TFileData& TFileConf::VCheckFS(TFileView name) {
     return isSrc ? CheckFS(name.GetElemId()) : GetFileDataById(name.GetElemId());
 }
 
-void TFileConf::ReadContent(ui32 id, TFileContentHolder& contentHolder) {
+void TFileConf::ReadContent(TFileElemId id, TFileContentHolder& contentHolder) {
     TFileView view = GetName(id);
     ReadContent(view, Configuration.RealPath(view), contentHolder);
 }
@@ -350,7 +350,7 @@ void TFileConf::ReadContent(TFileView view, TString&& realPath, TFileContentHold
         event.SetReason("Read failed: " + TString{LastSystemErrorText(e.Status())});
         TRACE(P, event);
 
-        TScopedContext context(0, view.GetTargetStr(), false); // We should try to reread such file every time
+        TScopedContext context(TFileElemId(), view.GetTargetStr(), false); // We should try to reread such file every time
         YConfErr(BadFile) << "Cannot read source file " << view.GetTargetStr() << ": " << LastSystemErrorText(e.Status())  << " (" << e.Status() << ")"<< Endl;
 
         contentHolder.Content_ = TBlob();
@@ -496,7 +496,7 @@ int TFileConf::FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind
     return result.IsNull() ? err : 0;
 }
 
-void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
+void TFileConf::ListDir(TFileElemId dirElemId, bool forceList, bool forceStat) {
     const TFileData& dirFData = CheckFS(dirElemId);
     auto curStamp = TimeStamps.CurStamp();
 
@@ -511,7 +511,7 @@ void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
     TString fullPath = Configuration.RealPath(pathView);
     YDIAG(VV) << "  listing dir: " << fullPath << Endl;
 
-    THashSet<ui32>* addedContent = nullptr;
+    THashSet<TFileElemId>* addedContent = nullptr;
     if (IsChangesContentSupported_ && !ChangesAddedDirContent.empty()) {
         // Add entries which were added in the patch
         if (auto iter = ChangesAddedDirContent.find(dirElemId); iter != ChangesAddedDirContent.end()) {
@@ -533,7 +533,7 @@ void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
         // return;
     }
 
-    const ui32 REMOVED = TFileId::RemovedElemId();// Magic value for mark removed elements in directory items list
+    const TFileElemId REMOVED = TFileId::RemovedElemId();// Magic value for mark removed elements in directory items list
     for (auto& dirItem: dirItems) {
         auto arcFullname  = Base2FullNamer_.GetFullname(SortedReadDir_.GetBasename(dirItem));
         if (IsChangesContentSupported_) {
@@ -557,7 +557,7 @@ void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
 
     if (addedContent) {
         // Fill IsDir flag from Changes
-        auto fillAddedIsDir = [&](ui32 elemId) {
+        auto fillAddedIsDir = [&](TFileElemId elemId) {
             auto addedFileView = GetName(elemId);
             auto [_, kind] = Changes->GetFileContent(addedFileView.CutType());
             // We set IsDir for all entries from Changes which are explicitly
@@ -588,7 +588,7 @@ void TFileConf::ListDir(ui32 dirElemId, bool forceList, bool forceStat) {
             SortedReadDir_.ResortDirItems(); // Resort after add
 
             // use swap for clear and release used by THashSet memory
-            THashSet<ui32> emptySet;
+            THashSet<TFileElemId> emptySet;
             std::swap(*addedContent, emptySet); // empty set is flag about was already used
         }
     }
@@ -748,47 +748,47 @@ void TFileConf::ReportStats() const {
     }
 }
 
-ui32 TFileConf::CopySourceFileInto(ui32 id, TFileConf& other) const {
+TFileElemId TFileConf::CopySourceFileInto(TFileElemId id, TFileConf& other) const {
     TFileView name = GetName(id);
     if (name.IsType(NPath::Source)) {
         auto newId = other.Add(name.GetTargetStr());
-        other.PutById(newId, GetById(id));
+        other.PutById(RawElemId(newId), GetById(RawElemId(id)));
         Y_ASSERT(GetFileDataById(id).HashSum == other.GetFileDataById(newId).HashSum);
         return newId;
     }
     if (name.IsLink()) {
-        auto newTargetId = CopySourceFileInto(ResolveLink(name).GetElemId(), other);
+        auto newTargetId = TFileId::Create(CopySourceFileInto(ResolveLink(name).GetElemId(), other)).GetTargetId();
         if (!newTargetId) {
-            return 0;
+            return TFileElemId();
         }
         return TFileId::CreateElemId(name.GetContextType(), newTargetId);
     }
-    return 0;
+    return TFileElemId();
 }
 
 void TFileConf::CopySourceFilesInto(TFileConf& other) const {
     for (ui32 id = 1; id < Size(); id++) {
-        CopySourceFileInto(id, other);
+        CopySourceFileInto(TFileElemId(id), other);
     }
 }
 
 TFileView TFileConf::GetStoredName(TStringBuf name) {
-    ui32 elemId = Add(name);
+    TFileElemId elemId = Add(name);
     return GetName(elemId);
 }
 
-TFileView TFileConf::GetName(ui32 elemId) const {
+TFileView TFileConf::GetName(TFileElemId elemId) const {
     auto fileId = TFileId::Create(elemId);
     auto targetId = fileId.GetTargetId();
-    TFileView target = TBase::GetName(targetId);
+    TFileView target = TBase::GetName(RawElemId(targetId));
     if (!fileId.IsLink()) {
         return target;
     }
     return target.IsValid() ? TFileView{&NameStore, fileId.GetElemId()} : TFileView{};
 }
 
-TFileView TFileConf::GetTargetName(ui32 elemId) const {
-    return TBase::GetName(TFileId::Create(elemId).GetTargetId());
+TFileView TFileConf::GetTargetName(TFileElemId elemId) const {
+    return TBase::GetName(RawElemId(TFileId::Create(elemId).GetTargetId()));
 }
 
 bool TFileConf::HasName(TStringBuf name) const {
@@ -796,26 +796,26 @@ bool TFileConf::HasName(TStringBuf name) const {
     return isLink ? TBase::HasName(NPath::GetTargetFromLink(name)) : TBase::HasName(name);
 }
 
-ui32 TFileConf::GetId(TStringBuf name) const {
+TFileElemId TFileConf::GetId(TStringBuf name) const {
     bool isLink = NPath::IsLink(name);
     if (isLink) {
         TStringBuf context = NPath::GetContextFromLink(name);
         TStringBuf target = NPath::GetTargetFromLink(name);
-        ui32 targetId = TBase::GetId(target);
-        return targetId ? TFileId::CreateElemId(context, targetId) : 0;
+        TFileElemId targetId = TFileElemId(TBase::GetId(target));
+        return targetId ? TFileId::CreateElemId(context, targetId) : TFileElemId();
     }
-    return TBase::GetId(name);
+    return TFileElemId(TBase::GetId(name));
 }
 
-ui32 TFileConf::GetIdNx(TStringBuf name) const {
+TFileElemId TFileConf::GetIdNx(TStringBuf name) const {
     bool isLink = NPath::IsLink(name);
     if (isLink) {
         TStringBuf context = NPath::GetContextFromLink(name);
         TStringBuf target = NPath::GetTargetFromLink(name);
-        ui32 targetId = TBase::GetIdNx(target);
-        return targetId ? TFileId::CreateElemId(context, targetId) : 0;
+        TFileElemId targetId = TFileElemId(TBase::GetIdNx(target));
+        return targetId ? TFileId::CreateElemId(context, targetId) : TFileElemId();
     }
-    return TBase::GetIdNx(name);
+    return TFileElemId(TBase::GetIdNx(name));
 }
 
 const TFileData& TFileConf::GetFileData(TFileView name) const {
@@ -826,16 +826,16 @@ TFileData& TFileConf::GetFileData(TFileView name) {
     return GetFileDataById(name.GetElemId());
 }
 
-const TFileData& TFileConf::GetFileDataById(ui32 elemId) const {
-    return Meta[TFileId::Create(elemId).GetTargetId()];
+const TFileData& TFileConf::GetFileDataById(TFileElemId elemId) const {
+    return Meta[RawElemId(TFileId::Create(elemId).GetTargetId())];
 }
 
-TFileData& TFileConf::GetFileDataById(ui32 elemId) {
-    return Meta[TFileId::Create(elemId).GetTargetId()];
+TFileData& TFileConf::GetFileDataById(TFileElemId elemId) {
+    return Meta[RawElemId(TFileId::Create(elemId).GetTargetId())];
 }
 
 
-const TFileData& TFileConf::GetFileDataByIdWithStatusUpdate(ui32 elemId, bool stat) {
+const TFileData& TFileConf::GetFileDataByIdWithStatusUpdate(TFileElemId elemId, bool stat) {
     const auto& data = GetFileDataById(elemId);
     if (IsStatusUpToDate(data)) {
         return data;
@@ -852,11 +852,11 @@ bool TFileConf::IsContentUpdated(const TFileData& data) const {
     return data.IsContentUpdated(TimeStamps.CurStamp());
 }
 
-THolder<TFileContentHolder> TFileConf::GetFileById(ui32 elemId) {
+THolder<TFileContentHolder> TFileConf::GetFileById(TFileElemId elemId) {
     auto fileId = TFileId::Create(elemId);
     auto targetId = fileId.GetTargetId();
     if (fileId.IsLink()) {
-        auto result = GetFileById(targetId);
+        auto result = GetFileById(TFileElemId(targetId));
         result->OriginalId = elemId;
         return result;
     }
@@ -872,7 +872,7 @@ THolder<TFileContentHolder> TFileConf::GetFileByName(TFileView name) {
 }
 
 THolder<TFileContentHolder> TFileConf::GetFileByAbsPath(TStringBuf path) {
-    return THolder<TFileContentHolder>(new TFileContentHolder(*this, 0, TString(path)));
+    return THolder<TFileContentHolder>(new TFileContentHolder(*this, TFileElemId(), TString(path)));
 }
 
 bool TFileConf::IsPrefixOf(TFileView view, TStringBuf path) const {
@@ -895,12 +895,12 @@ TFileView TFileConf::DummyFile() const {
 
 TFileView TFileConf::ResolveLink(TFileView view) const {
     if (view.IsLink()) {
-        return GetName(view.GetTargetId());
+        return GetName(TFileElemId(view.GetTargetId()));
     }
     return view;
 }
 
-TFileView TFileConf::ResolveLink(ui32 elemId) const {
+TFileView TFileConf::ResolveLink(TFileElemId elemId) const {
     return ResolveLink(GetName(elemId));
 }
 
@@ -942,15 +942,15 @@ TFileView TFileConf::CreateFile(TFileView dir, TStringBuf filename) {
     return GetStoredName(fileStr);
 }
 
-bool TFileConf::IsLink(ui32 elemId) {
+bool TFileConf::IsLink(TFileElemId elemId) {
     return TFileId::Create(elemId).IsLink();
 }
 
-ui32 TFileConf::GetTargetId(ui32 elemId) {
+TFileElemId TFileConf::GetTargetId(TFileElemId elemId) {
     return TFileId::Create(elemId).GetTargetId();
 }
 
-TStringBuf TFileConf::GetContextStr(ui32 elemId) {
+TStringBuf TFileConf::GetContextStr(TFileElemId elemId) {
     auto fileId = TFileId::Create(elemId);
     Y_ENSURE(fileId.IsLink());
     return fileId.GetLinkName();
@@ -960,7 +960,7 @@ ELinkType TFileConf::GetContextType(TStringBuf context) {
     return ELinkTypeHelper::Name2Type(context);
 }
 
-TFileContentHolder::TFileContentHolder(TFileConf& fileConf, ui32 targetId, TString&& absName)
+TFileContentHolder::TFileContentHolder(TFileConf& fileConf, TFileElemId targetId, TString&& absName)
     : FileConf_(fileConf)
     , TargetId_(targetId)
     , IsSource_(TargetId_ ? FileConf_.GetFileDataById(TargetId_).IsSource : false)
@@ -1023,12 +1023,12 @@ TStringBuf TFileContentHolder::GetAbsoluteName() {
     return AbsoluteName_;
 }
 
-ui32 TFileContentHolder::GetTargetId() const {
+TFileElemId TFileContentHolder::GetTargetId() const {
     return TargetId_;
 }
 
 bool TFileContentHolder::IsInternalLink() const {
-    return OriginalId != 0;
+    return OriginalId != TElemId();
 }
 
 void TFileContentHolder::ReadContent() {
@@ -1086,13 +1086,13 @@ void TFileView::GetStr(TString& name) const {
 
 TStringBuf TFileView::GetTargetStr() const {
     return Table
-        ? Table->GetStringBufName(GetTargetId())
+        ? Table->GetStringBufName(RawElemId(GetTargetId()))
         : TStringBuf{};
 }
 
 bool TFileView::IsValid() const {
     return Table
-        ? Table->CheckId(GetTargetId())
+        ? Table->CheckId(RawElemId(GetTargetId()))
         : false;
 }
 

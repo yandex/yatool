@@ -690,9 +690,9 @@ public:
     TNodesQueue DependsQueue;
     TDelayedSearchDirDeps DelayedSearchDirDeps;
 
-    THashMap<ui32, ui32> MainOutputId;
-    THashMap<ui32, THashSet<TPropertyType>> PropsToUse;
-    ui32 NeverCachePropId;
+    THashMap<TElemId, TFileElemId> MainOutputId;
+    THashMap<TFileElemId, THashSet<TPropertyType>> PropsToUse;
+    TElemId NeverCachePropId;
 
     mutable NStats::TUpdIterStats Stats{"UpdIter stats"};
     mutable NStats::TResolveStats ResolveStats{"Resolving stats"};
@@ -720,7 +720,7 @@ public:
     typedef ::TUpdEntryPtr TEntryPtr;
     TEntryPtr CurEnt = nullptr;
     TNodeId LastNode = TNodeId::Invalid;
-    ui32 LastElem = 0;
+    TElemId LastElem = TElemId();
     EMakeNodeType LastType;
     TModule* ParentModule = nullptr;
 
@@ -731,11 +731,11 @@ public:
 
     void NukeModuleDir(TState& state);
 
-    void SaveModule(ui64 elemId, const TAutoPtr<TModuleDef>& mod);
+    void SaveModule(TFileElemId elemId, const TAutoPtr<TModuleDef>& mod);
 
-    TNodeId RecursiveAddStartTarget(EMakeNodeType type, ui32 elemId, TModule* module);
+    TNodeId RecursiveAddStartTarget(EMakeNodeType type, TElemId elemId, TModule* module);
     TNodeId RecursiveAddNode(EMakeNodeType type, const TStringBuf& name, TModule* module);
-    TNodeId RecursiveAddNode(EMakeNodeType type, ui64 id, TModule* module);
+    TNodeId RecursiveAddNode(EMakeNodeType type, TElemId id, TModule* module);
 
     void Rescan(TDGIterAddable& from);
 
@@ -882,7 +882,7 @@ struct TUpdReiter: public TDepthDGIter<TUpdReIterSt> {
     THashMap<TDepsCacheId, const TNodeAddCtx*> ParentUnflushed;
     bool UnflushedFilled = false;
     EMakeNodeType LastType;
-    ui32 LastElem = 0;
+    TElemId LastElem = TElemId();
 
     TUpdReiter(TUpdIter& parentIter);
 

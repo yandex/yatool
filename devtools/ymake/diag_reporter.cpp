@@ -38,12 +38,12 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
     const auto& node = state.TopNode();
 
     if (ReportPicNopic && TransitionSource != ETransition::None && IsModule(state.Top())) {
-        auto module = Modules.Get(node->ElemId);
+        auto module = Modules.Get(AssumeFile(node->ElemId));
         if (module->Transition != ETransition::None && module->Transition != TransitionSource) {
             if (module->Transition == ETransition::Pic) {
-                Writer.WriteLine(NYMake::EventToStr(RequiredPicEvent(*Modules.Get(node->ElemId))));
+                Writer.WriteLine(NYMake::EventToStr(RequiredPicEvent(*Modules.Get(AssumeFile(node->ElemId)))));
             } else if (module->Transition == ETransition::NoPic) {
-                Writer.WriteLine(NYMake::EventToStr(RequiredNoPicEvent(*Modules.Get(node->ElemId))));
+                Writer.WriteLine(NYMake::EventToStr(RequiredNoPicEvent(*Modules.Get(AssumeFile(node->ElemId)))));
             }
         }
     }
@@ -51,7 +51,7 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
     if (fresh) {
         if (IsModule(state.Top())) {
             if (RenderSemantics) {
-                auto module = Modules.Get(node->ElemId);
+                auto module = Modules.Get(AssumeFile(node->ElemId));
                 if (module->IsSemForeign()) {
                     FORCE_TRACE(T, RequiredIDEDependEvent(*module));
                 }
@@ -71,8 +71,8 @@ bool TForeignPlatformEventsReporter::Enter(TState& state) {
 
     // We should report tool even if we visited node by non-tool edge first
     if (!CurEnt->ToolReported && state.HasIncomingDep() && IsModule(state.Top()) && IsDirectToolDep(state.IncomingDep())) {
-        if (!TDepGraph::Graph(node).Names().CommandConf.GetById(TVersionedCmdId(state.IncomingDep().From()->ElemId).CmdId()).KeepTargetPlatform) {
-            Writer.WriteLine(NYMake::EventToStr(RequiredToolEvent(*Modules.Get(node->ElemId))));
+        if (!TDepGraph::Graph(node).Names().CommandConf.GetById(TVersionedCmdId(AssumeCmd(state.IncomingDep().From()->ElemId)).CmdId()).KeepTargetPlatform) {
+            Writer.WriteLine(NYMake::EventToStr(RequiredToolEvent(*Modules.Get(AssumeFile(node->ElemId)))));
             CurEnt->ToolReported = true;
         }
     }
@@ -98,7 +98,7 @@ bool TDupSrcReporter::Enter(TState& state) {
 
     if (fresh) {
         if (IsModule(state.Top())) {
-            auto module = Modules.Get(node->ElemId);
+            auto module = Modules.Get(AssumeFile(node->ElemId));
             if (RenderSemantics) {
                 if (module->IsSemIgnore()) {
                     return false;
@@ -115,7 +115,7 @@ bool TDupSrcReporter::Enter(TState& state) {
 
         if (state.HasIncomingDep()) {
             if (const auto incDep = state.IncomingDep(); IsModuleOwnNodeDep(incDep)) {
-                ConfMsgManager()->AddDupSrcLink(node->ElemId, Diag()->Where.back().first, false);
+                ConfMsgManager()->AddDupSrcLink(AssumeFile(node->ElemId), Diag()->Where.back().first, false);
             }
         }
     }
@@ -154,14 +154,14 @@ void TYMake::ReportForeignPlatformEvents() {
 }
 
 void FlushModuleNode(TConstDepNodeRef modNode) {
-    ui32 elemId = modNode->ElemId;
-    TScopedContext context(TDepGraph::Graph(modNode).GetFileName(elemId));
-    ConfMsgManager()->Flush(elemId);
-    ConfMsgManager()->AddVisitedModule(elemId);
+    auto elemId = modNode->ElemId;
+    TScopedContext context(TDepGraph::Graph(modNode).GetFileName(AssumeFile(elemId)));
+    ConfMsgManager()->Flush(AssumeFile(elemId));
+    ConfMsgManager()->AddVisitedModule(AssumeFile(elemId));
 }
 
 void FlushMakeFileNode(TConstDepNodeRef makeFileNode, const TSymbols& names) {
-    const auto view = names.FileConf.GetName(makeFileNode->ElemId);
+    const auto view = names.FileConf.GetName(AssumeFile(makeFileNode->ElemId));
     const auto targetView = names.FileConf.ResolveLink(view);
     TScopedContext context(targetView);
     ConfMsgManager()->Flush(view.GetElemId());
@@ -181,9 +181,9 @@ void TYMake::ReportConfigureEvents() {
         if (IsModuleType(node->NodeType)) {
             if (Conf.RenderSemantics && Conf.ForeignOnNoSem) {
                 const auto elemId = node->ElemId;
-                const auto& module = Modules.Get(elemId);
+                const auto& module = Modules.Get(AssumeFile(elemId));
                 if (module->IsSemIgnore()) {
-                    YConfEraseByOwner(NoSem, elemId);
+                    YConfEraseByOwner(NoSem, AssumeFile(elemId));
                 }
             }
             FlushModuleNode(node);
@@ -199,5 +199,5 @@ void TYMake::ReportConfigureEvents() {
         return t.IsModuleTarget;
     });
 
-    ConfMsgManager()->ReportDupSrcConfigureErrors([this](ui32 id) { return Names.FileConf.GetName(id).GetTargetStr(); });
+    ConfMsgManager()->ReportDupSrcConfigureErrors([this](TFileElemId id) { return Names.FileConf.GetName(id).GetTargetStr(); });
 }

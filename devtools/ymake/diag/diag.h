@@ -22,7 +22,7 @@ struct TDiagCtrl {
             where.emplace_back(0, TOP_LEVEL);
         }
 
-        void push_back(ui32 ownerElemId, TStringBuf owner) {
+        void push_back(TFileElemId ownerElemId, TStringBuf owner) {
             where.emplace_back(ownerElemId, TString(owner));
         }
 
@@ -30,7 +30,7 @@ struct TDiagCtrl {
             where.pop_back();
         }
 
-        const std::pair<ui32, TString>& back() {
+        const std::pair<TFileElemId, TString>& back() {
             return where.back();
         }
 
@@ -39,7 +39,7 @@ struct TDiagCtrl {
         }
 
     private:
-        TVector<std::pair<ui32, TString>> where;
+        TVector<std::pair<TFileElemId, TString>> where;
     } Where;
 
     bool Persistency = true;
@@ -143,7 +143,7 @@ TDiagCtrl* Diag();
 
 class TScopedContext {
 public:
-    explicit TScopedContext(ui32 ownerElemId, TStringBuf owner, bool persistency = true) {
+    explicit TScopedContext(TFileElemId ownerElemId, TStringBuf owner, bool persistency = true) {
         Diag()->Where.push_back(ownerElemId, owner);
         Diag()->Persistency = persistency;
     }

@@ -107,12 +107,12 @@ const TFsPath& TRootsOptions::RealPathRoot(const TStringBuf& p) const {
 
 struct TFakeView {
     TStringBuf Path;
-    std::optional<ui64> ElemId;
+    std::optional<ui64> ElemId; // FIXME
     bool HasId() const {
         return ElemId.has_value();
     }
-    ui32 GetTargetId() const {
-        return ElemId ? *ElemId : 0;
+    TFileElemId GetTargetId() const {
+        return ElemId ? TFileElemId(*ElemId) : TFileElemId();
     }
     TStringBuf GetTargetStr() const {
         return NPath::ResolveLink(Path);

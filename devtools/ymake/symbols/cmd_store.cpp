@@ -39,12 +39,12 @@ std::strong_ordering TCmdView::operator<=>(const TCmdView& view) const {
     return GetStr() < view.GetStr() ? std::strong_ordering::less : std::strong_ordering::greater;
 }
 
-ui32 TCmdConf::Add(TStringBuf name) {
+TCmdElemId TCmdConf::Add(TStringBuf name) {
     TVersionedCmdId id(TBase::Add(name), IsNewFormatCmd(name));
     return id.ElemId();
 }
 
-TCmdView TCmdConf::GetName(ui32 elemId) const {
+TCmdView TCmdConf::GetName(TCmdElemId elemId) const {
     TVersionedCmdId id(elemId);
     auto target = TBase::GetName(id.CmdId());
     if (id.IsNewFormat())
@@ -54,18 +54,18 @@ TCmdView TCmdConf::GetName(ui32 elemId) const {
 }
 
 TCmdView TCmdConf::GetStoredName(TStringBuf name) {
-    ui32 id = Add(name);
+    TCmdElemId id = Add(name);
     return GetName(id);
 }
 
-ui32 TCmdConf::GetIdNx(TStringBuf name) const {
+TCmdElemId TCmdConf::GetIdNx(TStringBuf name) const {
     auto id = TBase::GetIdNx(name);
     if (!id)
-        return 0;
+        return {};
     return TVersionedCmdId(id, IsNewFormatCmd(name)).ElemId();
 }
 
-ui32 TCmdConf::GetId(TStringBuf name) const {
+TCmdElemId TCmdConf::GetId(TStringBuf name) const {
     auto id = NameStore.GetId(name);
     return TVersionedCmdId(id, IsNewFormatCmd(name)).ElemId();
 }

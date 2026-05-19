@@ -70,7 +70,7 @@ namespace {
                 }
                 auto newValue = TCommandInfo(conf, nullptr, nullptr).SubstMacroDeeply(nullptr, varValue, vars, false, ECF_ExpandFoldableVars);
                 if (newValue != varValue) {
-                    var.SetSingleVal(TString(varName), newValue, id, vars.Id);
+                    var.SetSingleVal(TString(varName), newValue, TElemId(id), vars.Id);
                 }
             }
         }

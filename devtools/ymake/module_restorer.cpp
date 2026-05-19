@@ -49,7 +49,7 @@ namespace {
         }
 
         void Finish(TStateItem& parentItem, void*) {
-            TModule* parent = RestoreContext.Modules.Get(parentItem.Node()->ElemId);
+            TModule* parent = RestoreContext.Modules.Get(AssumeFile(parentItem.Node()->ElemId));
             Y_ASSERT(parent);
 
             auto& moduleNodeIds = RestoreContext.Modules.GetModuleNodeIds(parent->GetId());
@@ -68,10 +68,10 @@ namespace {
         }
 
         void Collect(TStateItem& parentItem, TConstDepNodeRef peerNode) {
-            TModule* parent = RestoreContext.Modules.Get(parentItem.Node()->ElemId);
+            TModule* parent = RestoreContext.Modules.Get(AssumeFile(parentItem.Node()->ElemId));
             Y_ASSERT(parent);
 
-            const TModule* peer = RestoreContext.Modules.Get(peerNode->ElemId);
+            const TModule* peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
             Y_ASSERT(peer);
 
             if (parent->GhostPeers.contains(peer->GetDirId())) {
@@ -113,7 +113,7 @@ namespace {
             }
 
             if (IsModule(state.Top())) {
-                ModuleElemId = state.TopNode()->ElemId;
+                ModuleElemId = AssumeFile(state.TopNode()->ElemId);
                 return true;
             }
 
@@ -237,7 +237,7 @@ namespace {
     private:
         THashMap<TStringBuf, TUniqVector<TNodeId>> MinedData;
         THashMap<TNodeId, TUniqVector<TNodeId>> GlobFiles;
-        ui32 ModuleElemId = 0;
+        TFileElemId ModuleElemId = TFileElemId();
     };
 
     class TMineToolsVisitor: public TDirectPeerdirsConstVisitor<> {
@@ -260,7 +260,7 @@ namespace {
                 return fresh;
             }
 
-            Parent = std::exchange(Peer, Modules.Get(state.Top().Node()->ElemId));
+            Parent = std::exchange(Peer, Modules.Get(AssumeFile(state.Top().Node()->ElemId)));
             Y_ASSERT(Peer);
 
             return fresh;
@@ -294,7 +294,7 @@ namespace {
                         return IsModule(stackItem) && stackItem.Node()->ElemId != Peer->GetId() && stackItem.Node()->ElemId != Parent->GetId();
                     });
 
-                TModule* grandparent = iter != state.Stack().rend() ? Modules.Get(iter->Node()->ElemId) : nullptr;
+                TModule* grandparent = iter != state.Stack().rend() ? Modules.Get(AssumeFile(iter->Node()->ElemId)) : nullptr;
                 Peer = std::exchange(
                     Parent,
                     grandparent);
@@ -433,7 +433,7 @@ void TModuleRestorer::MineGlobalVars() {
     IterateAll(Node, visitor);
 }
 
-bool TModuleRestorer::IsFakeModule(ui32 elemId) const {
+bool TModuleRestorer::IsFakeModule(TFileElemId elemId) const {
     return Context.Modules.Get(elemId)->IsFakeModule();
 }
 
@@ -478,7 +478,7 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
         if (const auto* dmInfo = Context.Modules.FindExtraDependencyManagementInfo(Module->GetId())) {
             auto& var = vars["APPLIED_EXCLUDES"];
             for (TNodeId excl: dmInfo->AppliedExcludes) {
-                auto* exclMod = Context.Modules.Get(Context.Graph.Get(excl)->ElemId);
+                auto* exclMod = Context.Modules.Get(AssumeFile(Context.Graph.Get(excl)->ElemId));
                 Y_ASSERT(exclMod);
                 AddPath(var, conf.RealPath(exclMod->GetDir().GetTargetStr()));
             }
@@ -501,7 +501,7 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
         bool usePeersLateOuts = Module->GetAttrs().UsePeersLateOuts;
         for (const auto& peer : modLists.UniqPeers()) {
             const auto peerRef = Context.Graph[peer];
-            ui32 elemId = peerRef->ElemId;
+            TFileElemId elemId = AssumeFile(peerRef->ElemId);
             if (usePeersLateOuts) {
                 for (const auto& lateOut : Context.Modules.GetModuleLateOuts(elemId)) {
                     lateOuts.Push(lateOut);
@@ -546,7 +546,7 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
 
 void TModuleRestorer::UpdateGlobalVarsFromModule(TVars& vars) {
     MineGlobalVars();
-    auto appendModVars = [&] (ui32 modId, bool uniq) {
+    auto appendModVars = [&] (TFileElemId modId, bool uniq) {
         const TVars& globalVars = Context.Modules.GetGlobalVars(modId).GetVars();
         for (auto& [name, val] : globalVars) {
             if (uniq) {
@@ -561,14 +561,14 @@ void TModuleRestorer::UpdateGlobalVarsFromModule(TVars& vars) {
     if (Module->GetAttrs().RequireDepManagement) {
         const auto& managedPeers = Context.Modules.GetModuleNodeLists(Module->GetId()).UniqPeers();
         for (TNodeId peer: managedPeers) {
-            appendModVars(Context.Graph[peer]->ElemId, true);
+            appendModVars(AssumeFile(Context.Graph[peer]->ElemId), true);
         }
         if (const auto* dmInfo = Context.Modules.FindExtraDependencyManagementInfo(Module->GetId())) {
             for (const auto& [name, _]: Context.Modules.GetGlobalVars(Module->GetId()).GetVars()) {
                 vars["EXCLUDED_" + name] = {};
             }
             for (TNodeId exclude: dmInfo->AppliedExcludes) {
-                const TVars& excludeVars = Context.Modules.GetGlobalVars(Context.Graph[exclude]->ElemId).GetVars();
+                const TVars& excludeVars = Context.Modules.GetGlobalVars(AssumeFile(Context.Graph[exclude]->ElemId)).GetVars();
                 for (const auto& [name, val]: excludeVars) {
                     vars["EXCLUDED_" + name].AppendUnique(val);
                 }
@@ -615,7 +615,7 @@ void TModuleRestorer::GetPeerDirIds(THashSet<TNodeId>& peerDirIds) {
 
     const auto& uniqPeers = Context.Modules.GetModuleNodeLists(Module->GetId()).UniqPeers();
     for (const auto& peer : uniqPeers) {
-        TModule* module = Context.Modules.Get(Context.Graph[peer]->ElemId);
+        TModule* module = Context.Modules.Get(AssumeFile(Context.Graph[peer]->ElemId));
         Y_ASSERT(module);
         peerDirIds.insert(Context.Graph.GetFileNode(module->GetDir()).Id());
     }
@@ -659,7 +659,7 @@ TVector<TDepNodeRef> GetStartModules(TDepGraph& graph, const TVector<TTarget>& s
 }
 
 TModule& InitModule(TModules& modules, const TVars& commandConf, const TConstDepNodeRef& node) {
-    ui32 elemId = node->ElemId;
+    TFileElemId elemId = AssumeFile(node->ElemId);
     EMakeNodeType nodeType = node->NodeType;
     TModule* modPtr = modules.Get(elemId);
 

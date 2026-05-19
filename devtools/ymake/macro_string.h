@@ -10,9 +10,9 @@
 struct TVars;
 
 // id:name=value ("id" is usually a module id, sometimes a node's ElemId, see FormatCmd invocations)
-TString FormatCmd(ui64 id, const TStringBuf& name, const TStringBuf& value);
+TString FormatCmd(TElemId id, const TStringBuf& name, const TStringBuf& value); // TODO so, is it TElemId or TFileElemId?
 void ParseCmd(const TStringBuf& source, ui64& id, TStringBuf& cmdName, TStringBuf& cmdValue);
-ui64 GetId(const TStringBuf& cmd);
+TElemId GetId(const TStringBuf& cmd);
 TStringBuf SkipId(const TStringBuf& cmd);
 TStringBuf GetCmdName(const TStringBuf& cmd);
 TStringBuf CheckAndGetCmdName(TStringBuf cmd);

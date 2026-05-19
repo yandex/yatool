@@ -17,7 +17,7 @@ TPrefixConstraint::TPrefixConstraint(TDepGraph& graph, TStringBuf peerPrefix, TR
     , PeerPrefix{GetStoredName(graph, peerPrefix)} {
 }
 
-TPrefixConstraint::TPrefixConstraint(TSymbols& symbols, ui32 dirId, TRequrementScopes scope)
+TPrefixConstraint::TPrefixConstraint(TSymbols& symbols, TFileElemId dirId, TRequrementScopes scope)
     : TDependencyConstraint<TPrefixConstraint>{scope}
     , PeerPrefix{symbols.FileNameById(dirId)} {
 }

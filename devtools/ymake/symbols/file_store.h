@@ -5,6 +5,7 @@
 #include "sortedreaddir.h"
 #include "base2fullnamer.h"
 
+#include <devtools/ymake/symbols/elem_id.h>
 #include <devtools/ymake/common/content_holder.h>
 #include <devtools/ymake/common/md5sig.h>
 #include <devtools/ymake/diag/stats.h>
@@ -172,11 +173,11 @@ public:
         return static_cast<ELinkType>(LinkType);
     }
 
-    ui32 GetTargetId() const {
-        return TargetId;
+    TFileElemId GetTargetId() const {
+        return TFileElemId(TargetId);
     }
 
-    ui32 GetElemId() const {
+    TFileElemId GetElemId() const {
         return ElemId;
     }
 
@@ -185,39 +186,39 @@ public:
     }
 
     bool Empty() const {
-        return ElemId == 0;
+        return ElemId == TElemId();
     }
 
 public: // Creating TFileId
-    static TFileId Create(ui32 elemId) {
+    static TFileId Create(TFileElemId elemId) {
         return TFileId(elemId);
     }
 
-    static TFileId Create(ELinkType linkType, ui32 targetId) {
+    static TFileId Create(ELinkType linkType, TFileElemId targetId) {
         return TFileId(linkType, targetId);
     }
 
-    static TFileId Create(TStringBuf linkName, ui32 targetId) {
+    static TFileId Create(TStringBuf linkName, TFileElemId targetId) {
         return TFileId(linkName, targetId);
     }
 
 public: // Creating ElemId from TargetId and LinkType
-    static ui32 CreateElemId(ELinkType linkType, ui32 targetId) {
+    static TFileElemId CreateElemId(ELinkType linkType, TFileElemId targetId) {
         return Create(linkType, targetId).GetElemId();
     }
 
-    static ui32 CreateElemId(TStringBuf linkName, ui32 targetId) {
+    static TFileElemId CreateElemId(TStringBuf linkName, TFileElemId targetId) {
         return Create(linkName, targetId).GetElemId();
     }
 
     /// Magic value for mark removed elements in directory items list
-    static ui32 RemovedElemId() {
-        return TFileId::CreateElemId(ELT_Default, Max<ui32>());
+    static TFileElemId RemovedElemId() {
+        return TFileId::CreateElemId(ELT_Default, TFileElemId(Max<ui32>()));
     }
 
 private:
     union {
-        ui32 ElemId; ///< Combine TargetId and LinkType in one ui32 word
+        TFileElemId ElemId; ///< Combine TargetId and LinkType in one ui32 word
         struct {
             ui32 TargetId : 29; ///< Index in NameStore table
             ui32 LinkType : 3;  ///< Link context type (see ELinkType above)
@@ -226,17 +227,17 @@ private:
     static_assert(ELT_COUNT <= (1 << 3u /* bits in LinkType */));
 
 protected: // constructors only for use in static create functions
-    explicit TFileId(ui32 elemId)
+    explicit TFileId(TFileElemId elemId)
         : ElemId(elemId)
     {}
 
-    explicit TFileId(ELinkType linkType, ui32 targetId)
-        : TargetId(targetId)
+    explicit TFileId(ELinkType linkType, TFileElemId targetId)
+        : TargetId(RawElemId(targetId))
         , LinkType(linkType)
     {}
 
-    explicit TFileId(TStringBuf linkName, ui32 targetId)
-        : TargetId(targetId)
+    explicit TFileId(TStringBuf linkName, TFileElemId targetId)
+        : TargetId(RawElemId(targetId))
         , LinkType(ELinkTypeHelper::Name2Type(linkName))
     {}
 };
@@ -252,10 +253,15 @@ public:
         , Table(nullptr)
     {}
 
-    TFileView(const TNameStore* table, ui32 elemId)
+    TFileView(const TNameStore* table, TFileElemId elemId)
         : TFileId(elemId)
         , Table(table)
     {}
+
+    // TFileView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
+    //     : TFileId(TFileElemId(elemId))
+    //     , Table(table)
+    // {}
 
     void GetStr(TString& name) const;
     TStringBuf GetTargetStr() const;
@@ -294,7 +300,7 @@ bool operator==(TFileView view, TStringBuf str);
 template<>
 struct THash<TFileView> {
     size_t operator()(const TFileView& view) const {
-        return THash<ui32>()(view.GetElemId());
+        return THash<ui32>()(RawElemId(view.GetElemId()));
     }
 };
 
@@ -307,7 +313,7 @@ class TFileContentHolder : public IContentHolder {
 private:
     TFileConf& FileConf_;
 
-    ui32 TargetId_;
+    TFileElemId TargetId_;
     bool IsSource_;
     TString AbsoluteName_;
 
@@ -317,7 +323,7 @@ private:
     friend class TFileConf;
 
 public:
-    ui32 OriginalId = 0;    // With which Id FileContent was requested (for internal links support)
+    TFileElemId OriginalId = TFileElemId();    // With which Id FileContent was requested (for internal links support)
 
 public:
     ~TFileContentHolder() = default;
@@ -339,7 +345,7 @@ public:
     ELinkType GetProcessingContext() const;
     TFileView GetName() const;
 
-    ui32 GetTargetId() const;
+    TFileElemId GetTargetId() const;
     bool IsInternalLink() const;
 
     bool WasRead() const;
@@ -348,7 +354,7 @@ public:
     void ValidateUtf8(const TStringBuf fileName);
 
 private:
-    TFileContentHolder(TFileConf& fileConf, ui32 targetId, TString&& absName);
+    TFileContentHolder(TFileConf& fileConf, TFileElemId targetId, TString&& absName);
 
     void ReadContent();
 };
@@ -402,10 +408,10 @@ private:
     TFileView SourceDir;
     TFileView BuildDir;
     TFileView BuildDummyFile;
-    THashSet<ui32> ExternalChanges;
-    THashMap<ui32, TVector<ui32>> DirData;
+    THashSet<TFileElemId> ExternalChanges;
+    THashMap<TFileElemId, TVector<TFileElemId>> DirData;
     THolder<IChanges> Changes = nullptr;
-    THashMap<ui32, THashSet<ui32>> ChangesAddedDirContent;
+    THashMap<TFileElemId, THashSet<TFileElemId>> ChangesAddedDirContent;
 
     mutable NStats::TFileConfStats Stats{"File access stats"};
     mutable THolder<NStats::TFileConfSubStats> SubStats = nullptr;
@@ -430,16 +436,16 @@ private:
     int FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind kind, TFileStat& result) const;
 
     void ReadContent(TStringBuf fileName, TFileContentHolder& contentHolder);
-    void ReadContent(ui32 id, TFileContentHolder& contentHolder);
+    void ReadContent(TFileElemId id, TFileContentHolder& contentHolder);
     void ReadContent(TFileView view, TString&& realPath, TFileContentHolder& contentHolder);
 
-    const TFileData& CheckFS(ui32 elemId, bool runStat = true, const TFileStat* fileStat = nullptr);
+    const TFileData& CheckFS(TFileElemId elemId, bool runStat = true, const TFileStat* fileStat = nullptr);
     /// ATTN: (1) adds `name' to the namespace; (2) visits the FS only for $S names
     const TFileData& VCheckFS(TFileView name);
 
     EMarkAsChangedResult MarkFileAsChanged(const TString& filename);
 
-    ui32 CopySourceFileInto(ui32 id, TFileConf& other) const;
+    TFileElemId CopySourceFileInto(TFileElemId id, TFileConf& other) const;
 
     bool IsActualExternalChangesSource(const TFileData& data) const;
 
@@ -463,26 +469,26 @@ public:
     /// ATTN: this does not necessarily equals to ModTime field
 
     void InitAfterCacheLoading();
-    ui32 Add(TStringBuf name);
-    TStringBuf RetBuf(ui32 targetId) const {
-        Y_ASSERT(NameStore.CheckId(targetId));
-        return NameStore.GetStringBufName(targetId);
+    TFileElemId Add(TStringBuf name);
+    TStringBuf RetBuf(TFileElemId targetId) const {
+        Y_ASSERT(NameStore.CheckId(RawElemId(targetId)));
+        return NameStore.GetStringBufName(RawElemId(targetId));
     }
 
     TFileView GetStoredName(TStringBuf name);
-    TFileView GetName(ui32 id) const;
-    TFileView GetTargetName(ui32 elemId) const;
+    TFileView GetName(TFileElemId id) const;
+    TFileView GetTargetName(TFileElemId elemId) const;
 
     bool HasName(TStringBuf name) const;
 
-    ui32 GetId(TStringBuf name) const;
-    ui32 GetIdNx(TStringBuf name) const;
+    TFileElemId GetId(TStringBuf name) const;
+    TFileElemId GetIdNx(TStringBuf name) const;
 
-    const TFileData& GetFileDataById(ui32 elemId) const;
-    TFileData& GetFileDataById(ui32 elemId);
+    const TFileData& GetFileDataById(TFileElemId elemId) const;
+    TFileData& GetFileDataById(TFileElemId elemId);
 
     /// Return file data with updated status. Stat or don't stat FS depending on `stat` argument
-    const TFileData& GetFileDataByIdWithStatusUpdate(ui32 elemId, bool stat);
+    const TFileData& GetFileDataByIdWithStatusUpdate(TFileElemId elemId, bool stat);
 
     void MarkAsMakeFile(TFileView view);
 
@@ -494,7 +500,7 @@ public:
     bool IsStatusUpToDate(const TFileData& data) const;
     bool IsContentUpdated(const TFileData& data) const;
 
-    THolder<TFileContentHolder> GetFileById(ui32 elemId);
+    THolder<TFileContentHolder> GetFileById(TFileElemId elemId);
     THolder<TFileContentHolder> GetFileByName(TStringBuf name);
     THolder<TFileContentHolder> GetFileByName(TFileView name);
     THolder<TFileContentHolder> GetFileByAbsPath(TStringBuf path);
@@ -534,9 +540,9 @@ public:
     std::tuple<bool, bool> FindFileInChangesNoFS(TStringBuf name, bool allowFile, bool allowDir) const;
 
     // ATTN! Will invalidate any other TFileData refs and pointers
-    void ListDir(ui32 dirElemId, bool forceList = false, bool forceStat = false);
+    void ListDir(TFileElemId dirElemId, bool forceList = false, bool forceStat = false);
 
-    const TVector<ui32>& GetCachedDirContent(ui32 dirId) const {
+    const TVector<TFileElemId>& GetCachedDirContent(TFileElemId dirId) const {
         return DirData.at(dirId);
     }
 
@@ -561,18 +567,18 @@ public:
 
     //link functions
     TFileView ResolveLink(TFileView view) const;
-    TFileView ResolveLink(ui32 id) const;
+    TFileView ResolveLink(TFileElemId id) const;
 
-    const THashSet<ui32>& GetExternalChanges() const {
+    const THashSet<TFileElemId>& GetExternalChanges() const {
         return ExternalChanges;
     }
 
     static TFileView ConstructLink(ELinkType context, TFileView target);
     static TString ConstructLink(ELinkType context, TStringBuf target);
     static TString ConstructPathWithLink(ELinkType context, TStringBuf target, NPath::ERoot root);
-    static bool IsLink(ui32 elemId);
-    static ui32 GetTargetId(ui32 elemId);
-    static TStringBuf GetContextStr(ui32 elemId);
+    static bool IsLink(TFileElemId elemId);
+    static TFileElemId GetTargetId(TFileElemId elemId);
+    static TStringBuf GetContextStr(TFileElemId elemId);
     static ELinkType GetContextType(TStringBuf context);
 
 private:
@@ -619,11 +625,11 @@ public:
     // Having this in header mystically gives 25% of perf in my experiments
     TStringBuf Content(TStringBuf path) override {
         TFileView file = Conf_.GetStoredName(path);
-        ui32 id = file.GetElemId();
+        TFileElemId id = file.GetElemId();
         ++ReadCount_;
 
-        if (Storage_.contains(id)) {
-            const auto& cached = Storage_[id];
+        if (Storage_.contains(RawElemId(id))) {
+            const auto& cached = Storage_[RawElemId(id)];
             ReadSize_ += cached->Size();
             return cached->GetContent();
         } else {
@@ -636,7 +642,7 @@ public:
                 ReadSize_ += holder->Size();
                 FillSize_ += holder->Size();
                 ++FillCount_;
-                Storage_[id].Swap(holder);
+                Storage_[RawElemId(id)].Swap(holder);
             } else {
                 throw yexception() << "File '" << file << "' is unreadable";
             }

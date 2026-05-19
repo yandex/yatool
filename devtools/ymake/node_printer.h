@@ -146,10 +146,10 @@ private:
 
 public:
     IOutputStream& Out;
-    const THashSet<ui32>& RecurseDirs;
+    const THashSet<TFileElemId>& RecurseDirs;
     const THashSet<TTarget>& ModuleStartTargets;
 
-    explicit TDumpMakeFileDartVisitor(IOutputStream& out, const THashSet<ui32>& recursesDirs, const THashSet<TTarget>& moduleStartTargets)
+    explicit TDumpMakeFileDartVisitor(IOutputStream& out, const THashSet<TFileElemId>& recursesDirs, const THashSet<TTarget>& moduleStartTargets)
         : Out(out)
         , RecurseDirs(recursesDirs)
         , ModuleStartTargets(moduleStartTargets)
@@ -212,7 +212,7 @@ public:
 };
 
 void DumpModulesInfo(IOutputStream& out, const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TString& filter);
-TString DumpNodeFlags(ui32 elemId, EMakeNodeType nodeType, const TSymbols& names);
+TString DumpNodeFlags(TElemId elemId, EMakeNodeType nodeType, const TSymbols& names);
 
 class TDartManager {
 public:

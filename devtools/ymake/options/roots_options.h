@@ -1,5 +1,6 @@
 #pragma once
 
+#include <devtools/ymake/symbols/elem_id.h>
 #include <devtools/ymake/symbols/name_store.h>
 
 #include <library/cpp/getopt/small/last_getopt.h>
@@ -26,22 +27,23 @@ struct TRootsOptions {
         if (!IsRealPathCacheEnabled() || !view.HasId()) {
             return RealPathByStr(view.GetTargetStr());
         }
-        ui32 targetId = view.GetTargetId();
-        if (targetId == 0) {
+        TFileElemId targetId = view.GetTargetId();
+        if (targetId == TFileElemId()) {
             return TString();
         }
 
+        auto targetIdRaw = RawElemId(targetId);
         auto& cache = PathsCache.Get();
-        if (targetId >= cache.size()) {
-            cache.resize(targetId + 1);
+        if (targetIdRaw >= cache.size()) {
+            cache.resize(targetIdRaw + 1);
         }
 
-        if (Y_UNLIKELY(cache[targetId].empty())) {
+        if (Y_UNLIKELY(cache[targetIdRaw].empty())) {
             TString res = RealPathByStr(view.GetTargetStr());
-            cache[targetId] = res;
+            cache[targetIdRaw] = res;
             return res;
         }
-        return cache[targetId];
+        return cache[targetIdRaw];
     }
 
     template<typename TView>

@@ -176,7 +176,7 @@ void TGlobPattern::ParseGlobPattern() {
 
 bool TGlobPattern::WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watchDirs) {
     return AnyOf(watchDirs, [&](ui32 dirId) {
-        return fileConf.GetFileById(dirId)->CheckForChanges(ECheckForChangesMethod::RELAXED);
+        return fileConf.GetFileById(TFileElemId(dirId))->CheckForChanges(ECheckForChangesMethod::RELAXED);
     });
 }
 
@@ -223,17 +223,17 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
                     auto id = FileConf.Add(path);
                     bool found = ApplyFixedPart(newDirs, matches, id, isLastPart, excludeMatcher, skippedFilesCount);
                     if (isLastPart || !found) {
-                        WatchDirs.Push(FileConf.Add(NPath::Parent(path)));
+                        WatchDirs.Push(RawElemId(FileConf.Add(NPath::Parent(path))));
                     }
                     break;
                 }
                 case TGlobPart::EGlobType::Pattern:
                 case TGlobPart::EGlobType::Anything: {
-                    WatchDirs.Push(dir.GetElemId());
+                    WatchDirs.Push(RawElemId(dir.GetElemId()));
                     ApplyPatternPart(newDirs, matches, match, dir.GetElemId(), isLastPart, excludeMatcher, skippedFilesCount);
                     if (!isLastPart) {
                         for (const auto& newDir : newDirs) {
-                            WatchDirs.Push(newDir.GetElemId());
+                            WatchDirs.Push(RawElemId(newDir.GetElemId()));
                         }
                     }
                     break;
@@ -242,7 +242,7 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
                     ApplyRecursivePart(newDirs, dir.GetElemId(), excludeMatcher);
                     newDirs.push_back(dir);
                     for (const auto& newDir : newDirs) {
-                        WatchDirs.Push(newDir.GetElemId());
+                        WatchDirs.Push(RawElemId(newDir.GetElemId()));
                     }
                     break;
                 }
@@ -254,7 +254,7 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
     }
 
     if (WatchDirs.empty()) {
-        WatchDirs.Push(RootDir.GetElemId());
+        WatchDirs.Push(RawElemId(RootDir.GetElemId()));
     }
 
     MD5 md5;
@@ -274,7 +274,7 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
     return matches;
 }
 
-void TGlobPattern::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, ui32 dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
+void TGlobPattern::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, const std::function<bool(TStringBuf)>& matcher, TFileElemId dirId, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
     FileConf.ListDir(dirId, true);
     const auto& children = FileConf.GetCachedDirContent(dirId);
     for (const auto& childId : children) {
@@ -300,7 +300,7 @@ void TGlobPattern::ApplyPatternPart(TVector<TFileView>& newDirs, TVector<TFileVi
     }
 }
 
-bool TGlobPattern::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, ui32 id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
+bool TGlobPattern::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView>& matches, TFileElemId id, const bool isLastPart, const TExcludeMatcher& excludeMatcher, size_t& skippedFilesCount) const {
     auto file = FileConf.GetFileById(id);
     const auto& fileData = file->GetFileData();
     if (fileData.NotFound) {
@@ -319,8 +319,8 @@ bool TGlobPattern::ApplyFixedPart(TVector<TFileView>& newDirs, TVector<TFileView
     return true;
 }
 
-void TGlobPattern::ApplyRecursivePart(TVector<TFileView>& newDirs, ui32 startDirId, const TExcludeMatcher& excludeMatcher) const {
-    for  (TQueue<ui32> queue({startDirId}); !queue.empty(); queue.pop()) {
+void TGlobPattern::ApplyRecursivePart(TVector<TFileView>& newDirs, TFileElemId startDirId, const TExcludeMatcher& excludeMatcher) const {
+    for  (TQueue<TFileElemId> queue({startDirId}); !queue.empty(); queue.pop()) {
         auto dirId = queue.front();
         FileConf.ListDir(dirId, true);
         const auto& children = FileConf.GetCachedDirContent(dirId);

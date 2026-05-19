@@ -18,7 +18,7 @@ enum class EInputsStatus {
 
 struct TModAddData {
     TAutoPtr<TCommandInfo> CmdInfo;
-    THolder<THashSet<ui32>> ParsedPeerdirs;
+    THolder<THashSet<TFileElemId>> ParsedPeerdirs;
 
     union {
         ui8 AllFlags = 0;
@@ -39,5 +39,5 @@ struct TModAddData {
 
     ~TModAddData();
 
-    bool IsParsedPeer(ui32 elemId) const;
+    bool IsParsedPeer(TFileElemId elemId) const;
 };

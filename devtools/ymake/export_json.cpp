@@ -103,7 +103,7 @@ namespace {
                 , RenderId{NodeDebug, "TJSONRenderer::RenderId"sv}
                 , CmdBuilder(cmdBuilder)
                 , DumpInfo(nodeInfo.GetNodeUid(), nodeInfo.GetNodeSelfUid())
-                , Subst2Json(cmdBuilder, DumpInfo, resultNode, ymake.Conf.FillModule2Nodes, Modules.Get(Graph[ModuleId]->ElemId))
+                , Subst2Json(cmdBuilder, DumpInfo, resultNode, ymake.Conf.FillModule2Nodes, Modules.Get(AssumeFile(Graph[ModuleId]->ElemId)))
                 , MakeCommand(modulesStatesCache, ymake)
         {
             PrepareDeps();
@@ -148,7 +148,7 @@ namespace {
                 return;
             }
 
-            ui32 moduleElemId = Graph[ModuleId]->ElemId;
+            auto moduleElemId = AssumeFile(Graph[ModuleId]->ElemId);
             auto& moduleLateOuts = Modules.GetModuleLateOuts(moduleElemId);
             moduleLateOuts = nodeSavedState.RestoreLateOuts(context);
         }
@@ -317,7 +317,7 @@ namespace {
 
         const TModule* GetModule() const {
             const auto moduleNode = Graph[ModuleId];
-            return Modules.Get(moduleNode->ElemId);
+            return Modules.Get(AssumeFile(moduleNode->ElemId));
         }
     };
 
@@ -474,7 +474,7 @@ namespace {
                     yMake.ListTargetResults(startTarget, moduleIds, glSrcIds);
 
                     for (TNodeId moduleId : moduleIds) {
-                        const TModule* mod = yMake.Modules.Get(graph[moduleId]->ElemId);
+                        const TModule* mod = yMake.Modules.Get(AssumeFile(graph[moduleId]->ElemId));
                         if (mod != nullptr && mod->IsFakeModule()) {
                             YDIAG(V) << "JSON: name " << graph.GetFileName(yMake.Graph.Get(moduleId)) << " is fake, excluded" << Endl;
                             continue;

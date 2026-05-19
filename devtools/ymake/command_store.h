@@ -121,7 +121,7 @@ public:
 
     const NPolexpr::TExpression* Get(TStringBuf name, const TCmdConf *conf) const;
 
-    ECmdId IdByElemId(ui32 elemId) const {
+    ECmdId IdByElemId(TCmdElemId elemId) const {
         const auto fres = Elem2Cmd.find(elemId);
         if (fres == Elem2Cmd.end()) {
             return ECmdId::Invalid;
@@ -129,7 +129,7 @@ public:
         return fres->second;
     }
 
-    const NPolexpr::TExpression* GetByElemId(ui32 elemId) const {
+    const NPolexpr::TExpression* GetByElemId(TCmdElemId elemId) const {
         const auto fres = Elem2Cmd.find(elemId);
         if (fres == Elem2Cmd.end() || fres->second == ECmdId::Invalid) {
             return nullptr;
@@ -157,7 +157,7 @@ public:
         bool preevaluate,
         TCompilationIODesc io
     );
-    ui32 Add(TDepGraph& graph, NPolexpr::TExpression expr);
+    TCmdElemId Add(TDepGraph& graph, NPolexpr::TExpression expr);
 
     TString PrintExpr(const NCommands::TSyntax& expr) const;
     TString PrintCmd(const NPolexpr::TExpression& cmdExpr, size_t highlightBegin = -1, size_t highlightEnd = -1) const;
@@ -177,8 +177,8 @@ public:
     ) const;
 
     // TODO collect vars and tools while compiling
-    TVector<TStringBuf> GetCommandVars(ui32 elemId) const;
-    TToolsAndResults GetCommandToolsEtc(ui32 elemId) const;
+    TVector<TStringBuf> GetCommandVars(TCmdElemId elemId) const;
+    TToolsAndResults GetCommandToolsEtc(TCmdElemId elemId) const;
 
     void Save(TMultiBlobBuilder& builder) const;
     void Load(const TBlob& multi);
@@ -273,7 +273,7 @@ private:
 private:
     TDeque<NPolexpr::TExpression> Commands;
     THashMap<ui64, ECmdId> Command2Id;
-    THashMap<ui32, ECmdId> Elem2Cmd;
+    THashMap<TCmdElemId, ECmdId> Elem2Cmd;
     TMacroValues Values;
     const NCommands::TModRegistry Mods;
 

@@ -1,6 +1,6 @@
 #include "dep_types.h"
 
-void TDeps::Add(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
+void TDeps::Add(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     Y_ASSERT(!IsLocked());
     Deps.emplace_back(depType, elemNodeType, elemId);
     Uniq.insert(Back());
@@ -12,7 +12,7 @@ void TDeps::Add(const TDeps& what) {
     Uniq.insert(what.Uniq.begin(), what.Uniq.end());
 }
 
-bool TDeps::AddUnique(EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
+bool TDeps::AddUnique(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     Y_ASSERT(elemId);
     Y_ASSERT(!IsLocked());
     TAddDepDescr dep = {depType, elemNodeType, elemId};
@@ -31,7 +31,7 @@ void TDeps::Erase(iterator b, iterator e) {
     Deps.erase(b, e);
 }
 
-void TDeps::Replace(size_t idx, EDepType depType, EMakeNodeType elemNodeType, ui32 elemId) {
+void TDeps::Replace(size_t idx, EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     Uniq.erase(Uniq.find(Deps[idx]));
     Deps[idx] = {depType, elemNodeType, elemId};
     Uniq.insert(Deps[idx]);

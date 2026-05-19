@@ -42,16 +42,16 @@ public:
     TVars& Vars;
     TDeps IncludeOnly;
     TDeque<TAutoPtr<TCommandInfo>> CmdAddQueue;
-    ui64 CurrentInputGroup = 0; //module input deps can be separated into different groups: for now implicit and explicit
-    ui64 CurrentGlobalInputGroup = 0;
-    ui64 ModuleNodeElemId = 0;
-    ui64 GlobalNodeElemId = 0;
+    TElemId CurrentInputGroup = TElemId(); //module input deps can be separated into different groups: for now implicit and explicit
+    TElemId CurrentGlobalInputGroup = TElemId();
+    TElemId ModuleNodeElemId = TElemId();
+    TFileElemId GlobalNodeElemId = TFileElemId();
     using TModuleDirBuilder::Module;
     using TModuleDirBuilder::Graph;
 
     TVector<TInducedDeps> DelayedInducedDeps;
-    TVector<std::pair<ui32, TAutoPtr<TCommandInfo>>> FileGroupCmds;
-    THashMap<ui32, TVector<TString>> DartIdToGroupVars;
+    TVector<std::pair<TElemId, TAutoPtr<TCommandInfo>>> FileGroupCmds;
+    THashMap<TCmdElemId, TVector<TString>> DartIdToGroupVars;
 
     friend class TAllSrcsContext;
     TAllSrcsContext AllSrcs;
@@ -109,12 +109,12 @@ public:
     bool ProcessMakeFile();
 
     /// @brief Add module output node
-    TAddDepAdaptor& AddOutput(ui64 fileId, EMakeNodeType defaultType, bool addToOwn = true) {
+    TAddDepAdaptor& AddOutput(TFileElemId fileId, EMakeNodeType defaultType, bool addToOwn = true) {
         return Node.AddOutput(fileId, defaultType, addToOwn);
     }
 
     /// @brief Add file dependency to module or global lib
-    void AddDep(TVarStrEx& curSrc, TAddDepAdaptor& node, bool isInput, ui64 groupId = 0);
+    void AddDep(TVarStrEx& curSrc, TAddDepAdaptor& node, bool isInput, TElemId groupId = TElemId());
 
     /// @brief Add file dependency to files group var
     void AddInputVarDep(TVarStrEx& curSrc, TAddDepAdaptor& node);

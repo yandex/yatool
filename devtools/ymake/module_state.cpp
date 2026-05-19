@@ -107,7 +107,7 @@ namespace {
     }
 }
 
-void InitModuleVars(TVars& vars, TVars& commandConf, ui32 makeFileId, TFileView moduleDir) {
+void InitModuleVars(TVars& vars, TVars& commandConf, TFileElemId makeFileId, TFileView moduleDir) {
     vars.Base = &commandConf;
     vars.Id = makeFileId;
 
@@ -144,11 +144,11 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
     DirId = saved.DirId;
     MakefileId = saved.MakefileId;
     GhostPeers = std::move(saved.GhostPeers);
-    Y_ASSERT(Id != 0 && NodeType != EMNT_Deleted && DirId != 0);
+    Y_ASSERT(Id != TElemId() && NodeType != EMNT_Deleted && DirId != TFileElemId());
     TFileView moduleDir = GetDir();
 
     InitModuleVars(Vars, context.CommandConf, MakefileId, moduleDir);
-    for (ui32 varId : saved.ConfigVars) {
+    for (TCmdElemId varId : saved.ConfigVars) {
         TStringBuf prop = Symbols.CmdNameById(varId).GetStr();
         TStringBuf propName = GetPropertyName(prop);
         TStringBuf propValue = GetPropertyValue(prop);
@@ -165,14 +165,14 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
         }
     }
 
-    if (GlobalLibId != 0) {
+    if (GlobalLibId != TFileElemId()) {
         GlobalName = Symbols.FileNameById(GlobalLibId);
     }
 
     SetupPeerdirRestrictions();
 
     for (const auto entry: saved.OwnEntries) {
-        AddEntry(entry);
+        AddEntry(TFileElemId(entry));
     }
 
     SrcDirs.RestoreFromsIds(saved.SrcsDirsIds, Symbols);
@@ -245,7 +245,7 @@ TModule::TModule(TFileView dir, TStringBuf makefile, TStringBuf tag, TModulesSha
     : IncDirs(context.SymbolsTable)
     , NodeType(EMNT_Deleted)
     , DirId(dir.GetElemId())
-    , MakefileId(context.SymbolsTable.AddName(EMNT_MakeFile, makefile))
+    , MakefileId(AssumeFile(context.SymbolsTable.AddName(EMNT_MakeFile, makefile)))
     , Tag(tag)
     , PeersRules(context.PeersRules, dir.GetTargetStr())
     , Symbols(context.SymbolsTable)
@@ -296,9 +296,9 @@ void TModule::SetToolsComplete() noexcept {
     ToolsComplete = true;
 }
 
-void TModule::FinalizeConfig(ui32 id, const TModuleConf& conf) {
+void TModule::FinalizeConfig(TFileElemId id, const TModuleConf& conf) {
     AssertEx(!HasId(), "Module already has ID");
-    AssertEx(id != 0 && id != BAD_MODULE, "Invalid ID for module");
+    AssertEx(id != TFileElemId() && id != BAD_MODULE, "Invalid ID for module");
     Y_ASSERT(!Committed);
 
     Id = id;
@@ -486,10 +486,10 @@ void TModule::AddInternalRule() {
     PeersRestrictions.Add({EPeerSearchStatus::DeprecatedByInternal, std::move(internalMatch)});
 }
 
-bool TModule::AddEntry(ui32 id) {
-    auto added = GetOwnEntries().Push(id);
+bool TModule::AddEntry(TFileElemId id) {
+    auto added = GetOwnEntries().Push(RawElemId(id));
     if (IsFromMultimodule()) {
-        GetSharedEntries().Push(id);
+        GetSharedEntries().Push(RawElemId(id));
     }
     return added;
 }
@@ -550,24 +550,24 @@ void TModule::OnBuildCompleted() {
 void TModule::ComputeConfigVars() {
     ConfigVars.clear();
     if (!Tag.empty()) {
-        ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_TAG, Tag)));
+        ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_TAG, Tag))));
     }
-    ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_FILENAME, FileName)));
-    ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_BASENAME, BaseName)));
+    ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_FILENAME, FileName))));
+    ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_BASENAME, BaseName))));
     if (!Provides.empty()) {
-        ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(PROP_PROVIDES, JoinStrings(Provides.begin(), Provides.end(), TStringBuf(" ")))));
+        ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_PROVIDES, JoinStrings(Provides.begin(), Provides.end(), TStringBuf(" "))))));
     }
     for (const auto& name : CONFIG_VAR_NAMES) {
         const auto value = Get(name);
         if (!value.empty()) {
-            ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
+            ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(name, value))));
         }
     }
     for (auto item: TRANSITIVE_CHECK_REGISTRY) {
         for (auto name: item.ConfVars) {
             const auto value = Get(name);
             if (!value.empty()) {
-                ConfigVars.push_back(Symbols.AddName(EMNT_Property, FormatProperty(name, value)));
+                ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(name, value))));
             }
         }
     }
