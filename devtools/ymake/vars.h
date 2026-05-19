@@ -315,7 +315,7 @@ public:
 struct TVars: public THashMap<TString, TYVar> {
 public:
     const TVars* Base;
-    ui64 Id; // FIXME (TElemId)
+    TElemId Id;
 
 private:
     std::function<void(const TYVar&, const TStringBuf&)> VarLookupHook;

@@ -164,7 +164,7 @@ template<class T>
 class TSavedState {
 private:
     friend class TConfMsgManager;
-    ui64 ElemId; // FIXME (TFileElemId)
+    TFileElemId ElemId;
     T Value;
 
 public:
