@@ -209,6 +209,7 @@ class CompositeHandler(BaseHandler):
         return self._handlers[kwargs.pop('handler')].act(**kwargs.pop('args', {}))
 
     def handle(self, root_handler, args, prefix):
+        OptsHandler._latest_handled_prefix = prefix
         handlers = self._handlers
 
         if len(args) > 0:
