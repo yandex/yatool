@@ -8,13 +8,16 @@ class DryReporter(object):
     def on_tests_interrupt(self):
         pass
 
-    def on_test_suite_finish(self, suite_name):
+    def on_test_suite_start(self, test_suite):
+        pass
+
+    def on_test_suite_finish(self, test_suite):
         pass
 
     def on_test_case_started(self, test_name):
         pass
 
-    def on_test_case_finished(self, test_name):
+    def on_test_case_finished(self, test_case):
         pass
 
     def on_message(self, text):

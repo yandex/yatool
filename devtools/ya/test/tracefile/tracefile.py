@@ -8,18 +8,23 @@ import io
 
 import six
 
+import typing
+
 from exts import yjson
 from library.python import strings
 from devtools.ya.test import const
 from devtools.ya.test import facility
 from yalibrary.formatter import term
 
+if typing.TYPE_CHECKING:
+    from devtools.ya.test import reports  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 
 class TestEventParser(object):
     def __init__(self, suite=None, reporter=None):
-        self.reporter = reporter
+        self.reporter = reporter  # type: reports.dry.DryReporter
         self.suite = suite or facility.Suite()
         self.current_chunk = None
         self.testcases = collections.OrderedDict()

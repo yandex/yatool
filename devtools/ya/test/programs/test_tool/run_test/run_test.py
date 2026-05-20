@@ -568,7 +568,7 @@ class StdErrWatcher(object):
 
 
 class TraceFileWatcher(object):
-    def __init__(self, trace_report, test_cwd, output_style, test_stderr):
+    def __init__(self, trace_report, test_cwd, output_style, stderr_reporter):
         self._trace_report = trace_report
         self._test_cwd = test_cwd
         self.pid = None
@@ -576,7 +576,7 @@ class TraceFileWatcher(object):
         self._buffer = []
         self._chunk_size = 8192
         self._output_style = output_style
-        self._test_stderr = test_stderr
+        self._stderr_reporter = stderr_reporter
 
     def open(self, command, process, out_file, err_file):
         self._displayed_tests = set()
@@ -627,12 +627,7 @@ class TraceFileWatcher(object):
 
         if full:
             try:
-                if self._test_stderr:
-                    reporter = devtools.ya.test.reports.StdErrReporter()
-                else:
-                    reporter = None
-
-                result = tracefile.TestTraceParser.parse_from_string(full, reporter=reporter, relaxed=True)
+                result = tracefile.TestTraceParser.parse_from_string(full, reporter=self._stderr_reporter, relaxed=True)
                 for testcase in result.tests:
                     if (
                         testcase.status
@@ -1276,6 +1271,14 @@ def main():
     test_output_dir = os.path.join(work_dir, const.TESTING_OUT_DIR_NAME)
     trace_report = os.path.join(work_dir, const.TRACE_FILE_NAME)
     suite = generate_suite(options, work_dir)
+    if options.test_stderr:
+        split_count = int(options.split_count) if options.split_count else 1
+        chunk_info = "{}/{}".format(int(options.split_index) + 1, split_count)
+        stderr_reporter = devtools.ya.test.reports.StdErrReporter(chunk_info=chunk_info)
+    else:
+        stderr_reporter = None
+    if stderr_reporter:
+        stderr_reporter.on_test_suite_start(suite)
 
     if list_path:
         cmd += ["--test-list-path", list_path]
@@ -1668,7 +1671,7 @@ def main():
                     trace_report,
                     command_cwd if options.show_test_cwd else None,
                     options.output_style,
-                    options.test_stderr,
+                    stderr_reporter,
                 )
                 watchers = [trace_watcher]
                 recipe_process_listener = None
@@ -1901,6 +1904,9 @@ def main():
         suite.load_run_results(trace_report)
         if suite.get_status == const.Status.GOOD and not suite.tests:
             logger.debug("Test wrapper didn't execute any test")
+
+        if stderr_reporter:
+            stderr_reporter.on_test_suite_finish(suite)
 
         stages.stage("process_results")
         if suite.chunks:
