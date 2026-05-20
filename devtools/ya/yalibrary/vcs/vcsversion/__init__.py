@@ -46,7 +46,7 @@ try:
     import yalibrary.svn
 
 except ImportError:
-    logger.info('Svn library is not available in this run, skipping import')
+    logger.debug('Svn library is not available in this run, skipping import')
     # if we can't import this modules, we aren't use methdos depends on SVN
 
 
