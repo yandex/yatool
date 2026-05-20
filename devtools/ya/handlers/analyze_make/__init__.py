@@ -3,7 +3,6 @@ import devtools.ya.app.modules.evlog as evlog_module
 import devtools.ya.app.modules.params as params_module
 import devtools.ya.app.modules.token_suppressions as token_suppressions
 import devtools.ya.handlers.analyze_make.graph_diff as graph_diff
-import devtools.ya.handlers.analyze_make.pretty_log as pretty_log
 import devtools.ya.handlers.analyze_make.timeline as timeline
 import devtools.ya.handlers.analyze_make.timebloat as timebloat
 import os
@@ -193,23 +192,25 @@ class AnalyzeMakeYaHandler(devtools.ya.core.yarg.CompositeHandler):
             ],
             unknown_args_as_free=False,
         )
-        self['pretty-log'] = devtools.ya.core.yarg.OptsHandler(
-            action=execute(pretty_log.run),
-            description='Open ya log in a local web UI',
-            opts=[devtools.ya.core.yarg.help.ShowHelpOptions(), pretty_log.PrettyLogOptions()],
-            examples=[
-                devtools.ya.core.yarg.UsageExample('{prefix}', 'Open the latest previous ya log'),
-                devtools.ya.core.yarg.UsageExample(
-                    '{prefix} --log <path/to/1.log> --log <path/to/2.log> --port 8766',
-                    'Open one or more explicit log files',
-                ),
-            ],
-            unknown_args_as_free=False,
-        )
         if app_config.in_house:
+            import devtools.ya.handlers.analyze_make.log_viewer as log_viewer
+
             self['task-contention'] = devtools.ya.core.yarg.OptsHandler(
                 action=run_analyze_make_task_contention,
                 description='Plot waiting processes with plotly',
                 opts=basic_options() + [AnalyzeYaMakeOpts()],
                 unknown_args_as_free=True,
+            )
+            self['log-viewer'] = devtools.ya.core.yarg.OptsHandler(
+                action=execute(log_viewer.run),
+                description='Open ya log in a local web UI',
+                opts=[devtools.ya.core.yarg.help.ShowHelpOptions(), log_viewer.LogViewerOptions()],
+                examples=[
+                    devtools.ya.core.yarg.UsageExample('{prefix}', 'Open the latest previous ya log'),
+                    devtools.ya.core.yarg.UsageExample(
+                        '{prefix} --log <path/to/1.log> --log <path/to/2.log> --port 8766',
+                        'Open one or more explicit log files',
+                    ),
+                ],
+                unknown_args_as_free=False,
             )

@@ -2,7 +2,6 @@ PY3_LIBRARY()
 
 PY_SRCS(
     __init__.py
-    pretty_log.py
 )
 
 PEERDIR(
@@ -15,16 +14,26 @@ PEERDIR(
     devtools/ya/app/modules/token_suppressions
     devtools/ya/app_config
     devtools/ya/handlers/analyze_make/graph_diff
-    devtools/ya/handlers/analyze_make/log_viewer
     devtools/ya/handlers/analyze_make/timeline
     devtools/ya/handlers/analyze_make/timebloat
     devtools/ya/yalibrary/evlog
 )
 
+IF (NOT OPENSOURCE)
+    PEERDIR(
+        devtools/ya/handlers/analyze_make/log_viewer
+    )
+ENDIF()
+
 END()
 
 RECURSE_FOR_TESTS(
     bin
-    log_viewer
     tests
 )
+
+IF (NOT OPENSOURCE)
+    RECURSE_FOR_TESTS(
+        log_viewer
+    )
+ENDIF()
