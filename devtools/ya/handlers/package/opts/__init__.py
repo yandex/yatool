@@ -434,7 +434,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
         self.debian_compression_level = None
         self.debian_compression_type = 'gzip'
         self.dist2_repo = False
-        self.dist2_repo_reindex = True
+        self.dist2_repo_reindex = False
         self.dist2_repo_s3_bucket = None
         self.dist2_repo_s3_endpoint = 'http://s3.mds.yandex.net'
         self.docker_add_host = []
