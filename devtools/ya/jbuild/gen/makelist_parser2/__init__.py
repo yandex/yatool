@@ -130,6 +130,9 @@ def obtain_targets_graph2(dart, cpp_graph):
         props = node.get('target_properties', {})
         return 'module_type' in props or node.get('is_module', False)
 
+    def is_excluded_from_idea(node):
+        return node.get('kv', {}).get('exclude_from_idea') == 'yes'
+
     all_java_peerdirs = set()
     all_java_external_srcs = set()
 
@@ -212,6 +215,9 @@ def obtain_targets_graph2(dart, cpp_graph):
         if not is_module(node):
             continue
 
+        if is_excluded_from_idea(node):
+            continue
+
         path = '/'.join(graph_base.hacked_normpath(node['outputs'][0]).split('/')[1:-1])
 
         if (
@@ -238,6 +244,9 @@ def obtain_targets_graph2(dart, cpp_graph):
                 dep_node = cpp_node_by_uid[dep_uid]
 
                 if not is_module(dep_node):
+                    continue
+
+                if is_excluded_from_idea(dep_node):
                     continue
 
                 dep_path = '/'.join(graph_base.hacked_normpath(dep_node['outputs'][0]).split('/')[1:-1])
