@@ -247,6 +247,12 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("xshow-targets-deps", "show dependency between target modules (only for all-relations)").SetFlag(&DumpDepsBetweenTargets).NoArgument();
     opts.AddLongOption("xflat-json", "dump graph in flat json format").SetFlag(&DumpGraphFlatJson).NoArgument();
     opts.AddLongOption("xflat-json-with-cmds", "dump graph in flat json format").SetFlag(&DumpGraphFlatJsonWithCmds).NoArgument();
+    opts.AddLongOption("xstruct-dmp", "dump graph in structured jsonl format").SetFlag(&DumpGraphStructured).NoArgument();
+    opts.AddLongOption("xstruct-dmp-platform", "a platform name to be used by structured graph dumps").StoreResult(&DumpGraphStructuredPlatform);
+    opts.AddLongOption("xstruct-dmp-tag", "tags for structured graph dumps").EmplaceTo(&DumpGraphStructuredTags);
+    opts.AddLongOption("xstruct-dmp-flags", "modes/styles for structured graph dumps")
+        .RequiredArgument("any combination of letters: H (unHash), P (Prettify), U (prUne)")
+        .StoreResult(&DumpGraphStructuredFlags);
     opts.AddLongOption("xdirect-dm", "dump direct managed peers only").SetFlag(&DumpDirectDM).NoArgument();
     opts.AddLongOption("xsrc-deps", "dump minimized source-level deps. This includes top-most directories and orphaned files.").SetFlag(&DumpSrcDeps).NoArgument();
     opts.AddLongOption("xmkf", "include ya.make files, that are only used as a build configuration (for src-deps)").SetFlag(&WithYaMake).NoArgument();
@@ -308,4 +314,20 @@ void TDebugOptions::PostProcess(const TVector<TString>& /* freeArgs */) {
     DumpGraphStuff = DumpGraph | DumpRenderedCmds | DumpBuildables | DumpNames;
 
     SetupCaches(this);
+
+    for (char c : DumpGraphStructuredFlags) {
+        switch (c) {
+            case 'H':
+                DumpGraphStructuredFlagUnhash = true;
+                break;
+            case 'P':
+                DumpGraphStructuredFlagPrettify = true;
+                break;
+            case 'U':
+                DumpGraphStructuredFlagPrune = true;
+                break;
+            default:
+                ythrow yexception() << "Unknown structured graph dump flag '" << c << "'";
+        }
+    }
 }

@@ -6,6 +6,7 @@
 #include "mkcmd.h"
 #include "shell_subst.h"
 #include "flat_json_graph.h"
+#include "graph_export.h"
 #include "tools_miner.h"
 #include "isolated_projects.h"
 #include "command_store.h"
@@ -774,6 +775,8 @@ void TYMake::DumpGraph() {
         Conf.Cmsg() << "}" << Endl;
     } else if (this->Conf.DumpGraphFlatJson || this->Conf.DumpGraphFlatJsonWithCmds) {
         DumpGraphInternal<TFlatJsonFormat>(*this);
+    } else if (this->Conf.DumpGraphStructured) {
+        NStructuredJsonlGraph::ExportGraph(*this);
     } else {
         DumpGraphInternal<THumanReadableFormat>(*this);
     }

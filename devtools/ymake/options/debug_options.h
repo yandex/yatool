@@ -36,6 +36,15 @@ struct TDebugOptions {
     bool DumpGraphNoPosNoId = false;
     bool DumpGraphFlatJson = false;
     bool DumpGraphFlatJsonWithCmds = false;
+
+    bool DumpGraphStructured = false;
+    TString DumpGraphStructuredPlatform = "default-platform";
+    TVector<TString> DumpGraphStructuredTags;
+    TString DumpGraphStructuredFlags;
+    bool DumpGraphStructuredFlagUnhash = false;
+    bool DumpGraphStructuredFlagPrettify = false;
+    bool DumpGraphStructuredFlagPrune = false;
+
     bool DumpDirectDM = false;
     bool DumpFiles = false;
     bool DumpDirs = false;

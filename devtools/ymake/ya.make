@@ -102,6 +102,7 @@ SRCS(
     glob_helper.cpp
     global_vars_collector.cpp
     graph_changes_predictor.cpp
+    graph_export.cpp
     incl_fixer.cpp
     include_processors/base.cpp
     include_processors/cfgproto_processor.cpp
