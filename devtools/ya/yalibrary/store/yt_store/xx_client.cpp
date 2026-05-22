@@ -30,6 +30,7 @@
 #include <util/generic/scope.h>
 #include <util/generic/size_literals.h>
 #include <util/memory/blob.h>
+#include <util/random/shuffle.h>
 #include <util/stream/format.h>
 #include <util/stream/printf.h>
 #include <util/string/builder.h>
@@ -2130,7 +2131,7 @@ namespace NYa {
                 if (config->Replicas.empty()) {
                     ythrow TYtStoreError::Muted() << "No enabled replica is found";
                 }
-                SortBy(config->Replicas, std::mem_fn(&TReplica::Lag));
+                ShuffleRange(config->Replicas);
             }
             return config;
         }
