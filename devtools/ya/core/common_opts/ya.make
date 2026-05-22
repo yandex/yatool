@@ -5,6 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/humanfriendly
     contrib/python/six
     devtools/ya/core/config
     devtools/ya/core/profiler

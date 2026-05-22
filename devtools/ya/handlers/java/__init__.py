@@ -11,6 +11,7 @@ def default_options():
         build_opts.BuildTargetsOptions(with_free=True),
         build_opts.BeVerboseOptions(),
         build_opts.ShowHelpOptions(),
+        build_opts.ToolsOptions(),
         build_opts.YMakeDebugOptions(),
         build_opts.YMakeBinOptions(),
         build_opts.YMakeRetryOptions(),

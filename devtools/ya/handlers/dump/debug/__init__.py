@@ -21,7 +21,7 @@ from devtools.ya.core.yarg import (
     UsageExample,
 )
 from devtools.ya.core.yarg import OptsHandler
-from devtools.ya.core.common_opts import DumpDebugCommonOptions, EventLogFileOptions, ShowHelpOptions
+from devtools.ya.core.common_opts import DumpDebugCommonOptions, EventLogFileOptions, ShowHelpOptions, ToolsOptions
 import devtools.ya.core.config
 import devtools.ya.core.logger
 import devtools.ya.core.yarg.help_level
@@ -326,6 +326,7 @@ debug_handler = OptsHandler(
         EventLogFileOptions(),
         SandboxAuthOptions(),
         ShowHelpOptions(),
+        ToolsOptions(),
     ],
     visible=True,
     examples=[

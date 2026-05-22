@@ -4,7 +4,7 @@ from humanfriendly import parse_size, format_size
 
 import devtools.ya.app
 import devtools.ya.core.yarg as yarg
-from devtools.ya.core.common_opts import LogFileOptions
+from devtools.ya.core.common_opts import LogFileOptions, ToolsOptions
 from devtools.ya.yalibrary.store.yt_store.opts_helper import parse_yt_max_cache_size
 from exts.asyncthread import future
 from yalibrary.store.yt_store.yt_store import YtStore
@@ -423,6 +423,7 @@ class CacheYtHandler(yarg.CompositeHandler):
 def get_common_opts():
     return [
         yarg.ShowHelpOptions(),
+        ToolsOptions(),
         LogFileOptions(),
         YtClusterOptions(),
     ]

@@ -828,6 +828,7 @@ class IdeYaHandler(yarg.CompositeHandler):
                 opts=[
                     devtools.ya.ide.fsnotifier.FixFsNotifierOptions(),
                     devtools.ya.core.common_opts.ShowHelpOptions(),
+                    devtools.ya.core.common_opts.ToolsOptions(),
                     devtools.ya.core.common_opts.DumpDebugOptions(),
                     devtools.ya.core.common_opts.AuthOptions(),
                 ],

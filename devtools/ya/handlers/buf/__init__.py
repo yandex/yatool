@@ -11,6 +11,7 @@ from exts.process import run_process, execve
 import yalibrary.tools
 from devtools.ya.build.build_facade import gen_json_graph
 from devtools.ya.build.build_opts import ShowHelpOptions, BuildTargetsOptions, SandboxAuthOptions
+from devtools.ya.core.common_opts import ToolsOptions
 from devtools.ya.core.yarg import CompositeHandler, OptsHandler
 from devtools.ya.core.yarg import Options, ArgConsumer, SetValueHook, ArgsValidatingException, SetConstValueHook
 
@@ -31,6 +32,7 @@ class BufYaHandler(CompositeHandler):
         )
         common_opts = [
             ShowHelpOptions(),
+            ToolsOptions(),
             BuildTargetsOptions(with_free=True),
             CommonOptions(),
             SandboxAuthOptions(),

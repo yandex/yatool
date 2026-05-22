@@ -1,3 +1,4 @@
+import devtools.ya.core.common_opts
 import devtools.ya.core.yarg
 import devtools.ya.app.modules.evlog as evlog_module
 import devtools.ya.app.modules.params as params_module
@@ -154,6 +155,7 @@ def run_analyze_make_task_contention(params):
 def basic_options():
     return [
         devtools.ya.core.yarg.help.ShowHelpOptions(),
+        devtools.ya.core.common_opts.ToolsOptions(),
         EvlogFileOptions(),
     ]
 
@@ -174,7 +176,11 @@ class AnalyzeMakeYaHandler(devtools.ya.core.yarg.CompositeHandler):
         self['graph-diff'] = devtools.ya.core.yarg.OptsHandler(
             action=execute(graph_diff.diff),
             description='find diff between two json graphs',
-            opts=[devtools.ya.core.yarg.help.ShowHelpOptions(), GraphDiffOptions()],
+            opts=[
+                devtools.ya.core.yarg.help.ShowHelpOptions(),
+                devtools.ya.core.common_opts.ToolsOptions(),
+                GraphDiffOptions(),
+            ],
             examples=[
                 devtools.ya.core.yarg.UsageExample('{prefix} <graph1> <graph2>', 'Create comparison info files in cwd'),
                 devtools.ya.core.yarg.UsageExample(

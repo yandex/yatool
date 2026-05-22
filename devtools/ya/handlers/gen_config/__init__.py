@@ -35,6 +35,7 @@ class GenConfigYaHandler(devtools.ya.core.yarg.OptsHandler):
             description=self.description,
             opts=[
                 devtools.ya.core.common_opts.ShowHelpOptions(),
+                devtools.ya.core.common_opts.ToolsOptions(),
                 GenConfigOptions(),
             ],
         )

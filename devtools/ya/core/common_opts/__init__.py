@@ -3,6 +3,7 @@ import os
 import re
 import six
 
+from humanfriendly import parse_size, InvalidSize
 
 import devtools.ya.core.stages_profiler
 from devtools.ya.core import config
@@ -16,6 +17,7 @@ from devtools.ya.core.yarg.groups import (
     GRAPH_GENERATION_GROUP,
     FEATURES_GROUP,
     COMMON_UPLOAD_OPT_GROUP,
+    CACHE_CONTROL_GROUP,
 )
 from devtools.ya.core.yarg.help_level import HelpLevel
 from devtools.ya.core.yarg import (
@@ -1190,3 +1192,168 @@ class DumpDebugOptions(Options):
             ),
             ConfigConsumer("dump_debug_enabled"),
         ]
+
+
+def parse_size_arg(size):
+    try:
+        return int(size)
+    except ValueError:
+        logger.debug('Failed to make int from size: %s. Will fallback to parse_size', size)
+
+    return parse_size(size, binary=True)
+
+
+class ToolsOptions(Options):
+    def __init__(self):
+        self.tools_cache = False
+        self.tools_cache_master = False
+        self.build_cache = False
+        self.build_cache_master = False
+        self.tools_cache_bin = None
+        self.tools_cache_ini = None
+
+        self.tools_cache_conf = []
+        self.tools_cache_conf_str = []
+        self.build_cache_conf = []
+        self.build_cache_conf_str = []
+        self.tools_cache_gl_conf = []
+        self.tools_cache_gl_conf_str = []
+        self.tools_cache_size = 32212254720
+
+    @staticmethod
+    def consumer():
+        tools_cache_size_hook = SetValueHook(
+            name='tools_cache_size',
+            transform=parse_size_arg,
+            default_value=lambda x: '{}GiB'.format(str(parse_size_arg(x) / 1024 / 1024 / 1024)),
+        )
+
+        return [
+            ArgConsumer(
+                ['--ya-tc'],
+                help='enable tools cache',
+                hook=SetConstValueHook('tools_cache', True),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--noya-tc'],
+                help='disable tools cache',
+                hook=SetConstValueHook('tools_cache', False),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_TC',
+                help='enable tools cache',
+                hook=SetValueHook('tools_cache', return_true_if_enabled),
+            ),
+            ArgConsumer(
+                ['--ya-ac'],
+                help='enable build cache',
+                hook=SetConstValueHook('build_cache', True),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_AC',
+                help='enable build cache',
+                hook=SetValueHook('build_cache', return_true_if_enabled),
+            ),
+            ArgConsumer(
+                ['--ya-tc-master'],
+                help='enable tools cache master mode',
+                hook=SetConstValueHook('tools_cache_master', True),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--ya-ac-master'],
+                help='enable build cache master mode',
+                hook=SetConstValueHook('build_cache_master', True),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--ya-tc-bin'],
+                help='Override tools cache binary',
+                hook=SetValueHook('tools_cache_bin'),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_TC_BIN',
+                hook=SetValueHook('tools_cache_bin'),
+            ),
+            ArgConsumer(
+                ['--ya-tc-ini'],
+                help='Override tools cache built-in ini-file',
+                hook=SetValueHook('tools_cache_ini'),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--ya-tc-conf'],
+                help='Override configuration options',
+                hook=SetAppendHook('tools_cache_conf_str'),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--ya-ac-conf'],
+                help='Override configuration options',
+                hook=SetAppendHook('build_cache_conf_str'),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--ya-gl-conf'],
+                help='Override configuration options',
+                hook=SetAppendHook('tools_cache_gl_conf_str'),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--tools-cache-size'],
+                help='Max tool cache size',
+                hook=tools_cache_size_hook,
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+            ConfigConsumer('tools_cache'),
+            ConfigConsumer('tools_cache_master'),
+            ConfigConsumer('build_cache'),
+            ConfigConsumer('build_cache_master'),
+            ConfigConsumer('tools_cache_ini'),
+            ConfigConsumer('tools_cache_conf', hook=ExtendHook('tools_cache_conf_str')),
+            ConfigConsumer('build_cache_conf', hook=ExtendHook('build_cache_conf_str')),
+            ConfigConsumer('tools_cache_gl_conf', hook=ExtendHook('tools_cache_gl_conf_str')),
+            ConfigConsumer('tools_cache_size', hook=tools_cache_size_hook),
+            EnvConsumer('YA_TOOLS_CACHE_SIZE', hook=tools_cache_size_hook),
+        ]
+
+    def postprocess(self):
+        self.tools_cache_conf = []
+        self.build_cache_conf = []
+        self.tools_cache_gl_conf = []
+
+        if not self.tools_cache:
+            return
+
+        self.tools_cache_conf = {k: v for k, v in (s.split('=', 1) for s in self.tools_cache_conf_str)}
+        self.build_cache_conf = {k: v for k, v in (s.split('=', 1) for s in self.build_cache_conf_str)}
+        self.tools_cache_gl_conf = {k: v for k, v in (s.split('=', 1) for s in self.tools_cache_gl_conf_str)}
+        self._set_tools_cache_size()
+
+    def _set_tools_cache_size(self):
+        try:
+            self.tools_cache_size = parse_size_arg(self.tools_cache_size)
+        except (ValueError, InvalidSize):
+            raise ArgsValidatingException(
+                "tools_cache_size ({}) is not convertible to long".format(self.tools_cache_size)
+            )
+
+    def postprocess2(self, params):
+        # Enable ya-tc in ya-bin executed indirectly, for example, through test_tool.
+        if params.tools_cache:
+            os.environ['YA_TC'] = '1'

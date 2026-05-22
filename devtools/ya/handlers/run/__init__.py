@@ -10,6 +10,7 @@ import devtools.ya.build.ya_make
 import devtools.ya.core.common_opts
 import devtools.ya.core.event_handling
 import devtools.ya.core.yarg as yarg
+from devtools.ya.core.common_opts import ToolsOptions
 from library.python import tmp
 
 import devtools.ya.app
@@ -52,7 +53,9 @@ class RunYaHandler(yarg.OptsHandler):
             self._opt = yarg.merge_opts([RunOptsSupplement(free_args)] + _reduced_ya_make_options())
         else:
             self._unknown_args_as_free = True
-            self._opt = yarg.merge_opts([RunOptsStandalone(), devtools.ya.core.common_opts.AuthOptions()])
+            self._opt = yarg.merge_opts(
+                [RunOptsStandalone(), devtools.ya.core.common_opts.AuthOptions(), ToolsOptions()],
+            )
 
         return super().handle(root_handler, args, prefix)
 
