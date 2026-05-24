@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+service RecipeManager {
+    rpc Ping(Empty) returns (Empty) {}
+    rpc HeartBeat(HeartBeatRequest) returns (Empty) {}
+    rpc Shutdown(ShutdownRequest) returns (Empty) {}
+    rpc FinishBuild(FinishBuildRequest) returns (Empty) {}
+
+    rpc StartRecipe(StartRecipeRequest) returns (StartRecipeResult) {}
+    rpc StopRecipe(StopRecipeRequest) returns (StopRecipeResult) {}
+    rpc ListRecipes(Empty) returns (ListRecipesResult) {}
+
+    rpc GetRecipe(GetRecipeRequest) returns (GetRecipeResult) {}
+    rpc AssociateRecipe(AssociateRecipeRequest) returns (Empty) {}
+}
+
+message Empty {
+}
+
+message ShutdownRequest {
+    bool keep_shallow_root = 1;
+    bool force = 2;
+}
+
+message HeartBeatRequest {
+    string invocation_id = 1;
+}
+
+message FinishBuildRequest {
+    string invocation_id = 1;
+    string build_id      = 2;
+}
+
+message StartRecipeRequest {
+    string invocation_id = 1;
+    string build_id = 2;
+    string recipe_uid = 3;
+    string lifetime = 4;  // "transient", "persistent"
+    repeated string command = 5;
+    map<string, string> env = 6;
+    string err_filename = 7;
+    string out_filename = 8;
+    string working_dir = 9;
+    uint32 retry_count = 10;
+    double timeout = 11;
+}
+
+message StartRecipeResult {
+}
+
+message StopRecipeRequest {
+    string recipe_uid = 1;
+    repeated string command = 2;
+    map<string, string> env = 3;
+    string err_filename = 4;
+    string out_filename = 5;
+    double timeout = 6;
+}
+
+message StopRecipeResult {
+}
+
+message UserRef {
+    string invocation_id = 1;
+    string build_id = 2;
+}
+
+message RecipeInfo {
+    string recipe_uid = 1;
+    string lifetime = 2;  // "transient", "persistent"
+    string working_dir = 3;
+    repeated UserRef users = 4;  // currently associated (invocation_id, build_id) pairs
+    double started_at = 5;       // Unix timestamp (seconds) when the recipe was started
+}
+
+message ListRecipesResult {
+    repeated RecipeInfo items = 1;
+}
+
+message GetRecipeRequest {
+    string recipe_uid = 1;
+}
+
+message GetRecipeResult {
+    // NOT_FOUND gRPC status if recipe doesn't exist.
+    RecipeInfo recipe = 1;
+}
+
+message AssociateRecipeRequest {
+    string invocation_id = 1;
+    string build_id = 2;
+    string recipe_uid = 3;
+}
