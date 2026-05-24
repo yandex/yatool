@@ -19,6 +19,7 @@ namespace {
 [[noreturn]]
 void ThrowPyCallError() {
     OwnedRef err{PyErr_GetRaisedException()};
+    PyErr_DisplayException(err.get());
     OwnedRef errStr{PyObject_Str(err.get())};
     throw TFFIMacro::TCallError{std::string{StrContent(*errStr)}};
 }
