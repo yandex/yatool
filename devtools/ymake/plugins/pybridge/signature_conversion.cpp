@@ -55,6 +55,12 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
         return std::unexpected(ESignatureDeductionError::IndistinguishableKwArg);
     auto kwargs = PyFunction_GetKwDefaults(&func);
 
+    const auto kwOnlyArgsNum = reinterpret_cast<PyCodeObject*>(PyFunction_GetCode(&func))->co_kwonlyargcount;
+    const auto kwOnlyWithDefaultsNum = kwargs ? PyDict_GET_SIZE(kwargs) : 0;
+    if (kwOnlyWithDefaultsNum != kwOnlyArgsNum) {
+        return std::unexpected(ESignatureDeductionError::KwArgWithoutDefaults);
+    }
+
     bool varargFound = false;
     TVector<TString> positionals;
     TSignature::TKeywords keywords;

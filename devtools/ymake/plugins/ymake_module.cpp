@@ -486,6 +486,9 @@ namespace {
                     case PositionalAfterVararg:
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only last (vararg) positional argument can be a tuple.");
                         break;
+                    case KwArgWithoutDefaults:
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro: all kw-only arguments must have default values.");
+                        break;
                     case IndistinguishableKwArg:
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro: non kw-only arguments are not allowed to have default values.");
                         break;
