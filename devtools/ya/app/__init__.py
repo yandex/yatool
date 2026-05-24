@@ -134,6 +134,45 @@ def execute_early(action):
     return helper
 
 
+def _configure_recipe_manager_client(ctx):
+    """Start Recipe Manager daemon if not running, yield client, close on teardown.
+
+    Only appended to modules when use_persistent_recipes=True (see execute()),
+    so no guard for that flag is needed here.
+    """
+    import devtools.ya.core.gsid as gsid
+    import devtools.ya.core.config as core_config
+    from devtools.recipe_manager.client.client import RecipeManagerClient, get_shallow_root_path
+
+    arc_root = getattr(ctx.params, 'arc_root', None)
+    if not arc_root:
+        # arc_root is set by resolve_and_respawn() which is only called for
+        # handlers using RespawnType.MANDATORY (the execute() default).
+        # Handlers with RespawnType.OPTIONAL or NONE (e.g. ya package) skip
+        # resolve_and_respawn(), so arc_root may be absent there even when
+        # use_persistent_recipes=True is set via ya.conf.
+        # See devtools/ya/app/modules/params/__init__.py::resolve_and_respawn.
+        raise RuntimeError("Cannot start recipe manager: arc_root unknown")
+
+    shallow_root = get_shallow_root_path(core_config.build_root(), arc_root)
+
+    rm_client = RecipeManagerClient(shallow_root=shallow_root)
+    # start_manager raises on failure — that's intentional (fail fast)
+    rm_client.start_manager(
+        invocation_id=gsid.uid(),
+        logs_root=core_config.logs_root(),
+        timeout=10,
+        force_restart=getattr(ctx.params, 'force_restart_recipe_manager', False),
+    )
+
+    try:
+        yield rm_client
+    finally:
+        # Persistent recipes keep running — just close the connection.
+        # RM learns about ya-bin death via heartbeat timeout.
+        rm_client.close()
+
+
 def execute(action, respawn=RespawnType.MANDATORY):
     # noinspection PyStatementEffect
     def helper(parameters, **kwargs):
@@ -174,6 +213,9 @@ def execute(action, respawn=RespawnType.MANDATORY):
 
         modules.append(('dump_debug', configure_debug(ctx)))
         modules.append(('vcs_info_json_callback', configure_vcs_info_json(ctx)))
+
+        if getattr(parameters, 'use_persistent_recipes', False):
+            modules.append(('recipe_manager_client', _configure_recipe_manager_client(ctx)))
 
         with ctx.configure(modules, modules_stager):
             el = getattr(ctx, "evlog", None)

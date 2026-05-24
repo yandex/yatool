@@ -756,6 +756,17 @@ def create_test_node(
     if suite.recipes:
         runner_cmd += ['--recipes', suite.recipes]
 
+    if getattr(suite, 'persistent_recipes', None):
+        runner_cmd += ['--persistent-recipes', suite.persistent_recipes]
+
+    if getattr(opts, 'use_persistent_recipes', False):
+        runner_cmd += ['--use-persistent-recipes']
+        runner_cmd += ['--shallow-root', '$(SHALLOW_ROOT)']
+        if getattr(opts, 'force_restart_recipes', False):
+            runner_cmd += ['--force-restart-recipes']
+        if getattr(opts, 'prepare_with_persistent', False):
+            runner_cmd += ['--prepare-with-persistent']
+
     if suite.supports_canonization:
         # MDS canonical resources
         for resource in testdeps.get_test_mds_resources(suite):

@@ -114,6 +114,10 @@ class RunTestOptions(devtools.ya.core.yarg.Options):
         self.test_threads = 0
         self.testing_split_factor = 0
         self.test_prepare = False
+        self.prepare_with_persistent = False
+        self.use_persistent_recipes = False
+        self.force_restart_recipes = False
+        self.force_restart_recipe_manager = False
         self._is_ya_test = is_ya_test
         self.cpu_detect_via_ram = True
 
@@ -175,6 +179,33 @@ class RunTestOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.EXPERT,
             ),
             TestArgConsumer(
+                ['--prepare-with-persistent'],
+                help='Prepare test environment with persistent recipes running but without executing tests',
+                hook=devtools.ya.core.yarg.SetConstValueHook('prepare_with_persistent', True),
+                subgroup=RUN_TEST_SUBGROUP,
+                visible=help_level.HelpLevel.INTERNAL,
+            ),
+            TestArgConsumer(
+                ['--use-persistent-recipes'],
+                help='Keep test recipes alive between ya test runs (persistent recipe mode)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_persistent_recipes', True),
+                subgroup=RUN_TEST_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('use_persistent_recipes'),
+            TestArgConsumer(
+                ['--force-restart-recipes'],
+                help='Force restart persistent recipes even if their content hash has not changed',
+                hook=devtools.ya.core.yarg.SetConstValueHook('force_restart_recipes', True),
+                subgroup=RUN_TEST_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_FORCE_RESTART_RECIPE_MANAGER',
+                help='Force restart recipe manager even if binary version has not changed (useful for local development)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('force_restart_recipe_manager', True),
+            ),
+            TestArgConsumer(
                 ['--remove-cpu-detect-via-ram'],
                 help='Dont change test cpu requirements depending on ram',
                 hook=devtools.ya.core.yarg.SetConstValueHook('cpu_detect_via_ram', False),
@@ -185,12 +216,23 @@ class RunTestOptions(devtools.ya.core.yarg.Options):
         ]
 
     def postprocess(self):
+        import app_config
+
         # use user desired default test size if '-t' is specified
         if self._is_ya_test and self.run_tests == 0:
             self.run_tests = self.RunAllTests
         if self.run_tests == 1:
             self.run_tests = max(1, min(self.RunAllTests, int(self.run_tests_size)))
         self.test_threads = max(0, self.test_threads)
+
+        import library.python.windows as windows
+
+        if self.use_persistent_recipes and windows.on_win():
+            raise devtools.ya.core.yarg.ArgsValidatingException("--use-persistent-recipes is not supported on Windows")
+
+        if self.use_persistent_recipes and not app_config.in_house:
+            logger.warning("Persistent recipes are not supported in current environment. Fallback will be used")
+            self.use_persistent_recipes = False
 
     def postprocess2(self, params):
         if self.run_tests:
@@ -199,6 +241,21 @@ class RunTestOptions(devtools.ya.core.yarg.Options):
                     getattr(params, flags)['TESTS_REQUESTED'] = 'yes'
                     if self.peerdirs_test_type != 'none':
                         getattr(params, flags)['ADD_PEERDIRS_GEN_TESTS'] = 'yes'
+
+        if self.use_persistent_recipes:
+            if getattr(params, 'use_distbuild', False):
+                raise devtools.ya.core.yarg.ArgsValidatingException(
+                    "--use-persistent-recipes is not compatible with --dist: "
+                    "persistent recipes require a shared filesystem between chunks"
+                )
+            if getattr(params, 'run_tagged_tests_on_yt', False):
+                raise devtools.ya.core.yarg.ArgsValidatingException(
+                    "--use-persistent-recipes is not compatible with --run-tagged-tests-on-yt"
+                )
+            if getattr(params, 'run_tagged_tests_on_sandbox', False):
+                raise devtools.ya.core.yarg.ArgsValidatingException(
+                    "--use-persistent-recipes is not compatible with --run-tagged-tests-on-sandbox"
+                )
 
 
 class ListingOptions(devtools.ya.core.yarg.Options):

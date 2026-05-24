@@ -130,6 +130,15 @@ class TaskContext(object):
         self._resources_map: dict[str, dict] = {x['pattern']: x for x in ctx.graph['conf']['resources']}
 
         self.opts = ctx.opts
+        if getattr(self.opts, 'use_persistent_recipes', False):
+            from devtools.ya.core import gsid
+            from library.python import unique_id as _unique_id
+
+            self._invocation_id = gsid.uid()
+            self._build_id = _unique_id.gen16()
+        else:
+            self._invocation_id = None
+            self._build_id = None
         self.state = app_ctx.state.sub(__name__)
         self.resources: dict[str, dict] = {}
         self.legacy_sandbox_fetcher = app_ctx.legacy_sandbox_fetcher
@@ -398,6 +407,16 @@ class TaskContext(object):
                 )
                 self._dist_cache.stats(self._execution_log, dist_cache_evlog_writer)
 
+            if self._build_id and getattr(self._app_ctx, 'recipe_manager_client', None):
+                try:
+                    self._app_ctx.recipe_manager_client.finish_build(
+                        invocation_id=self._invocation_id,
+                        build_id=self._build_id,
+                    )
+                    logger.debug("Notified RM that build %s finished", self._build_id)
+                except Exception:
+                    logger.debug("Failed to notify RM about build finish (build_id=%s)", self._build_id, exc_info=True)
+
         wall_time = time.time() - start_time
 
         if not self.opts.use_distbuild:
@@ -583,6 +602,7 @@ class TaskContext(object):
         patterns['SOURCE_ROOT'] = windows.win_path_fix(self._ctx.src_dir)
         patterns['TOOL_ROOT'] = windows.win_path_fix(self._ctx.res_dir)
         patterns['RESOURCE_ROOT'] = windows.win_path_fix(self._transient_resource_dir)
+        patterns['SHALLOW_ROOT'] = windows.win_path_fix(self._ctx.shallow_dir)
 
         if self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path:
             token_path = self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path

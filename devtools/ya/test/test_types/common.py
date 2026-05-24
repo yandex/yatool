@@ -374,6 +374,15 @@ class AbstractTestSuite(facility.Suite):
             return None
 
     @property
+    def persistent_recipes(self):
+        """
+        Base64 encoded content of USE_PERSISTENT_RECIPE entries.
+        """
+        if self.support_recipes():
+            return self.meta.test_persistent_recipes
+        return None
+
+    @property
     def env(self):
         """
         List of env variables set with ENV macros

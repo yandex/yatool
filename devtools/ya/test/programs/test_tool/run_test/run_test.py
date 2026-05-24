@@ -58,7 +58,6 @@ from library.python import windows
 
 logger = logging.getLogger(__name__)
 
-RECIPE_ERROR_MESSAGE_LIMIT = 1024
 SMOOTH_SHUTDOWN_TIMEOUT = 30
 TESTS_FAILED_EXIT_CODE = 66
 TIMEOUT_KILL_SIGNAL = 3  # signal.SIGQUIT
@@ -73,33 +72,19 @@ class TestRunTimeExhausted(TestError):
     pass
 
 
-class RecipeError(TestError):
-    def __init__(self, name, err_filename, out_filename):
-        super(RecipeError, self).__init__()
-        self.name = name
-        self.err_filename = err_filename
-        self.out_filename = out_filename
-        self.err_snippet = read_tail(err_filename).strip()
-
-    def format_full(self):
-        return "{}\n[[bad]]Stderr tail:[[bad]]{}[[rst]]".format(
-            self.format_info(), self.err_snippet[-RECIPE_ERROR_MESSAGE_LIMIT:]
-        )
-
-    def format_info(self):
-        return "[[bad]]{}: {} failed".format(type(self).__name__, self.name)
-
-
-class RecipeStartUpError(RecipeError):
-    pass
-
-
-class RecipeTearDownError(RecipeError):
-    pass
-
-
-class RecipeTimeoutError(RecipeError):
-    pass
+# RecipeError и его потомки определены в recipe.py во избежание
+# циклического импорта. Импортируем их сюда для обратной совместимости —
+# остальной код в этом файле продолжает использовать эти имена напрямую.
+from devtools.ya.test.programs.test_tool.run_test.recipe import (  # noqa: E402
+    RecipeConflictError,
+    RecipeError,
+    RecipeStartUpError,
+    RecipeTearDownError,
+    RecipeTimeoutError,
+    RecipeWaitTimeout,
+    append_traceback_to_file,
+    read_head_tail,
+)
 
 
 def log_stage(name):
@@ -498,6 +483,7 @@ def parse_args(args=None):
     parser.add_argument("--dump-test-environment", action='store_true')
     parser.add_argument("--dump-node-environment", action='store_true')
     parser.add_argument("--prepare-only", action="store_true", default=False)
+    parser.add_argument("--prepare-with-persistent", action="store_true", default=False)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     parser.add_argument(
         "--data-to-environment",
@@ -515,6 +501,44 @@ def parse_args(args=None):
     parser.add_argument("--tests-limit-in-chunk", action='store', type=int, default=0)
     parser.add_argument("--create-root-guidance-file", action='store_true')
     parser.add_argument("--pycache-prefix")
+    parser.add_argument(
+        "--shallow-root",
+        dest="shallow_root",
+        default=None,
+        help="path to shallow root directory for persistent recipes",
+    )
+    parser.add_argument(
+        "--invocation-id",
+        dest="invocation_id",
+        default=os.environ.get('_YA_INVOCATION_ID'),
+        help="unique ID of this ya-bin invocation",
+    )
+    parser.add_argument(
+        "--build-id",
+        dest="build_id",
+        default=os.environ.get('_YA_BUILD_ID'),
+        help="unique ID of this build",
+    )
+    parser.add_argument(
+        "--use-persistent-recipes",
+        dest="use_persistent_recipes",
+        action='store_true',
+        default=False,
+        help="enable persistent recipe mode",
+    )
+    parser.add_argument(
+        "--persistent-recipes",
+        dest="persistent_recipes",
+        default="",
+        help="base64-encoded persistent recipe groups (from USE_PERSISTENT_RECIPE)",
+    )
+    parser.add_argument(
+        "--force-restart-recipes",
+        dest="force_restart_recipes",
+        action='store_true',
+        default=False,
+        help="force restart all persistent recipes ignoring hash",
+    )
 
     args = parser.parse_args(args)
 
@@ -869,19 +893,6 @@ def update_rusage_metrics(metrics, rusage):
     ]
     for k, v in zip(fields, rusage):
         metrics[k] = v
-
-
-def read_head_tail(filename, length):
-    with io.open(filename, errors='ignore', encoding='utf-8') as afile:
-        afile.seek(0, os.SEEK_END)
-        size = afile.tell()
-        afile.seek(0, os.SEEK_SET)
-        data = afile.read(length)
-        pos = size - length * 2
-        if pos > 0:
-            afile.seek(pos + length, os.SEEK_SET)
-            return data + "\n...\n" + afile.read()
-        return data + afile.read()
 
 
 def get_output_dir(work_dir):
@@ -1617,7 +1628,35 @@ def main():
 
         failed_recipes = []
 
-        if options.prepare_only:
+        # Run persistent recipes via Recipe Manager when:
+        #   - normal run (not prepare_only): always run recipes before tests
+        #   - prepare_with_persistent: run recipes so env is captured in the saved context
+        # They survive the build and are reused on the next ya test run.
+        # Persistent recipes are NOT stopped in run_test -- they live in RM.
+        if (
+            (options.prepare_with_persistent or not options.prepare_only)
+            and options.use_persistent_recipes
+            and options.persistent_recipes
+            and options.shallow_root
+        ):
+            from devtools.ya.test.programs.test_tool.run_test.recipe import (
+                run_all_persistent_recipes,
+            )
+
+            out_dir = get_output_path(work_dir)
+            recipe_start_time = time.time()
+            persistent_env = run_all_persistent_recipes(
+                options,
+                out_dir=out_dir,
+                enable_recipe_timeout=enable_recipe_timeout,
+                chunk_time_left=chunk_time_left,
+            )
+            env.update(persistent_env)
+            context.update_env(persistent_env)
+            if enable_recipe_timeout:
+                chunk_time_left -= int(time.time() - recipe_start_time)
+
+        if options.prepare_only or options.prepare_with_persistent:
             test_context_file_path = os.path.join(work_dir, const.SUITE_CONTEXT_FILE_NAME)
             context.save(test_context_file_path)
             logger.debug("Saved test context to %s", test_context_file_path)
@@ -1690,6 +1729,31 @@ def main():
                 try:
                     recipes_env_file = os.path.join(work_dir, "env.json.txt")
                     rs = RunStages(options)
+
+                    # Embedded fallback for persistent recipes (no Recipe Manager available,
+                    # e.g. --dist, YT, Sandbox).  Runs like regular embedded recipes:
+                    # start here, stop in the finally block below.  env is updated so that
+                    # subsequent options.recipes and the test command inherit the variables.
+                    # started_persistent_embedded_recipes tracks only successfully started
+                    # recipes so that stop is called only for them (not for all declared ones).
+                    started_persistent_embedded_recipes = []
+                    if options.persistent_recipes and not options.use_persistent_recipes:
+                        from devtools.ya.test.programs.test_tool.run_test.recipe import (
+                            run_all_persistent_recipes_embedded,
+                        )
+
+                        stages.stage("prepare_persistent_recipes_embedded")
+                        recipe_start_time = time.time()
+                        persistent_env_fb, started_persistent_embedded_recipes = run_all_persistent_recipes_embedded(
+                            options,
+                            out_dir,
+                            enable_recipe_timeout=enable_recipe_timeout,
+                            chunk_time_left=chunk_time_left,
+                        )
+                        env.update(persistent_env_fb)
+                        if enable_recipe_timeout:
+                            chunk_time_left -= int(time.time() - recipe_start_time)
+
                     if options.recipes:
                         stages.stage("prepare_recipes")
                         for i, recipe in enumerate(dartfile.decode_recipe_cmdline(options.recipes), start=1):
@@ -1720,9 +1784,7 @@ def main():
                                         res.wait()
                             except Exception as e:
                                 logger.exception("Recipe %s start up exception: %s", recipe_name, e)
-                                with open(recipe_err_filename, 'a') as afile:
-                                    afile.write("\nRecipe start up exception:\n")
-                                    traceback.print_exc(file=afile)
+                                append_traceback_to_file(recipe_err_filename)
                                 if isinstance(e, process.ExecutionTimeoutError):
                                     raise RecipeTimeoutError(recipe_name, recipe_err_filename, recipe_out_filename)
                                 raise RecipeStartUpError(recipe_name, recipe_err_filename, recipe_out_filename)
@@ -1810,6 +1872,26 @@ def main():
                     if not wrapper_stderr_tail:
                         wrapper_stderr_tail = read_tail(stderr_path)
 
+                    # Stop persistent recipes that were started in embedded fallback mode.
+                    # Only recipes that actually started are stopped (started_persistent_embedded_recipes).
+                    # Errors are accumulated into failed_recipes (same as embedded recipes).
+                    if started_persistent_embedded_recipes:
+                        from devtools.ya.test.programs.test_tool.run_test.recipe import (
+                            stop_persistent_recipes_embedded,
+                        )
+
+                        fallback_stop_errors = stop_persistent_recipes_embedded(
+                            started_persistent_embedded_recipes,
+                            options,
+                            out_dir,
+                            enable_recipe_timeout=enable_recipe_timeout,
+                            chunk_time_left=chunk_time_left,
+                        )
+                        for _pkg_path, _err_fn, _out_fn, exc in fallback_stop_errors:
+                            # exc already converted to RecipeTimeoutError or RecipeTearDownError
+                            # inside stop_persistent_recipes_embedded
+                            failed_recipes.append(exc)
+
                     if options.recipes:
                         stages.stage("stop_recipes")
                         for i, recipe in reversed(
@@ -1842,9 +1924,7 @@ def main():
                                         res.wait()
                             except Exception as e:
                                 logger.exception("Recipe %s tear down exception: %s", recipe_name, e)
-                                with open(recipe_err_filename, 'a') as afile:
-                                    afile.write("\nRecipe tear down exception:\n")
-                                    traceback.print_exc(file=afile)
+                                append_traceback_to_file(recipe_err_filename)
                                 if isinstance(e, process.ExecutionTimeoutError):
                                     failed_recipes.append(
                                         RecipeTimeoutError(recipe_name, recipe_err_filename, recipe_out_filename)
@@ -2083,8 +2163,7 @@ def main():
     except Exception as exc:
         logger.exception("%r Internal error occurred", exc)
         exts.fs.ensure_dir(os.path.dirname(stderr_path))
-        with open(stderr_path, 'a') as afile:
-            traceback.print_exc(file=afile)
+        append_traceback_to_file(stderr_path)
 
         suite = generate_suite(options, work_dir)
         suite.set_work_dir(work_dir)
@@ -2099,7 +2178,7 @@ def main():
                     'recipe stdout': exc.out_filename,
                 }
             )
-        elif isinstance(exc, (testroot.ResourceConflictException, TestError)):
+        elif isinstance(exc, (testroot.ResourceConflictException, TestError, RecipeConflictError, RecipeWaitTimeout)):
             error_msg = str(exc)
         elif isinstance(exc, IOError) and getattr(exc, 'errno', None) == errno.ENOMEM:
             # IOError: [Errno 12] Cannot allocate memory
@@ -2110,7 +2189,7 @@ def main():
             error_msg = traceback.format_exc()
             is_user_error = False
 
-        if isinstance(exc, RecipeTimeoutError):
+        if isinstance(exc, (RecipeTimeoutError, RecipeWaitTimeout)):
             status = const.Status.TIMEOUT
             test_rc = const.TestRunExitCode.TimeOut
         elif is_user_error:

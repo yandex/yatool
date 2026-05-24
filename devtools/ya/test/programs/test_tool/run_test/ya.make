@@ -2,12 +2,15 @@ PY3_LIBRARY()
 
 PY_SRCS(
     core_file.py
+    recipe.py
+    recipe_context.py
     run_test.py
     stages.py
     test_context.py
 )
 
 PEERDIR(
+    devtools/recipe_manager/client
     devtools/ya/app_config
     devtools/ya/exts
     devtools/ya/test/canon
@@ -31,6 +34,7 @@ PEERDIR(
     devtools/ya/test/tracefile
     devtools/ya/test/util
     devtools/ya/yalibrary/term
+    library/python/filelock
     library/python/testing/system_info
     library/python/testing/yatest_common
 )

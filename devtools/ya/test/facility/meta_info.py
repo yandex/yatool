@@ -78,6 +78,7 @@ _META_MAP = [
     ('test_name', None, (dict.get, ('TEST-NAME',))),
     ('test_partition', None, (dict.get, ('TEST_PARTITION',))),
     ('test_recipes', None, (dict.get, ('TEST-RECIPES',))),
+    ('test_persistent_recipes', None, (dict.get, ('TEST-PERSISTENT-RECIPES',))),
     ('test_runner_bin', None, (dict.get, ('TEST-RUNNER-BIN',))),
     ('test_timeout', None, (dict.get, ('TEST-TIMEOUT',))),
     ('tested_project_filename', None, (dict.get, ('TESTED-PROJECT-FILENAME',))),

@@ -5,6 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/app_config
     devtools/ya/core/error
     devtools/ya/core/yarg
     devtools/ya/exts

@@ -5,6 +5,8 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/recipe_manager/client
+    devtools/recipe_manager/manager
     devtools/ya/app/modules/evlog
     devtools/ya/app/modules/params
     devtools/ya/app/modules/token_suppressions
