@@ -127,7 +127,7 @@ PyObject* iter_cov(PyObject *str) {
             }
             --State.bracers;
 
-            if (!State.keys_stack.empty() && State.keys_stack_bracers.back() == State.bracers) {
+            while (!State.keys_stack.empty() && State.keys_stack_bracers.back() > State.bracers) {
                 State.keys_stack.pop_back();
                 State.keys_stack_bracers.pop_back();
             }
