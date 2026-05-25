@@ -101,7 +101,7 @@ class PyRunner:
             # directory.
             path0 = self.arg0
         else:
-            path0 = os.path.abspath(os.path.dirname(self.arg0))
+            path0 = os.path.abspath(os.path.dirname(os.path.realpath(self.arg0)))
 
         if os.path.isdir(sys.path[0]):
             # sys.path fakery.  If we are being run as a command, then sys.path[0]

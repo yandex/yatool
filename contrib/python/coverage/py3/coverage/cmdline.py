@@ -874,6 +874,7 @@ class CoverageScript:
         sys.path.insert(0, "")
 
         self.coverage.load()
+        self.coverage.combine(strict=False, keep=False)
 
         total = None
         if options.action == "report":
@@ -1187,11 +1188,11 @@ def main_deprecated(argv: list[str] | None = None) -> int | None:
     """For entry points we'll be getting rid of."""
     print(
         textwrap.dedent("""\
-        **
-        ** This entry point is deprecated and will be removed.
-        ** Send me an email if you want to keep this command name working:
-        ** ned@nedbatchelder.com
-        **
+            **
+            ** This entry point is deprecated and will be removed.
+            ** Send me an email if you want to keep this command name working:
+            ** ned@nedbatchelder.com
+            **
         """)
     )
     return main(argv)
