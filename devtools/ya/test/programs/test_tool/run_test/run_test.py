@@ -1428,7 +1428,7 @@ def main():
                 new_root,
                 build_root,
                 skip_list=[sys.argv[0]],
-                skip_args=["--test-param", "--arcadia-root"],
+                skip_args=["--test-param"],
             )
         logger.debug("Changed command: %s", cmd)
 

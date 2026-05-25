@@ -12,7 +12,7 @@ import json
 import six
 import shlex
 
-from yalibrary import display
+from yalibrary import display, find_root
 
 from devtools.ya.test import const
 from devtools.ya.test.system import process
@@ -90,7 +90,6 @@ def parse_args():
 
     parser.add_argument("--go-coverage-per-pkg", action="store_true", help="Enable Go >= 1.25 coverage per package")
     parser.add_argument("--go-toolchain", help="Path to the go toolchain")
-    parser.add_argument("--arcadia-root", help="Path to the arcadia root")
 
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
@@ -104,8 +103,6 @@ def parse_args():
         args.dlv_args = shlex.split(args.dlv_args)
     if args.go_coverage_per_pkg and not args.go_toolchain:
         parser.error("--go-coverage-per-pkg requires --go-toolchain")
-    if args.go_coverage_per_pkg and not args.arcadia_root:
-        parser.error("--go-coverage-per-pkg requires --arcadia-root")
     return args
 
 
@@ -584,13 +581,27 @@ def covdata_textfmt(opts, cov_path):
         logger.error("Failed move Go coverage directory '%s' -> '%s': %s", gocover_dir, gocover_dir_raw, str(e))
         return const.TestRunExitCode.InfrastructureError
     try:
+        # Find arcadia root
+        with open(cov_path_txt, "r") as fr:
+            _ = fr.readline()  # Skip mode line
+            path_and_section = fr.readline().strip()
+            if not path_and_section:
+                return 0  # no coverage data, nothing to patch
+            path = path_and_section.split(":")[0]  # Extract path to first Go file in coverage for detect root
+            if not path:
+                logger.error("Failed find path for detect arcadia root in line '%s'", path_and_section)
+                return const.TestRunExitCode.InfrastructureError
+            arcadia_root = find_root.detect_root(path)
+            if not arcadia_root:
+                logger.error("Failed find arcadia root for Go coverage in path '%s'", path)
+                return const.TestRunExitCode.InfrastructureError
         # Replace in text format coverage path to arcadia by a.yandex-team.ru
         with open(cov_path_txt, "r") as fr:
             with open(cov_path, "w") as fw:  # Put patched coverage data to original cov_path
-                fw.write(fr.read().replace(opts.arcadia_root, 'a.yandex-team.ru'))
+                fw.write(fr.read().replace(arcadia_root, 'a.yandex-team.ru'))
         return 0
     except Exception as e:
-        logger.error("Failed replace paths in Go coverage text format: %s", str(e))
+        logger.error("Failed replace arcadia root to a.yandex-team.ru in Go coverage text format: %s", str(e))
         return const.TestRunExitCode.InfrastructureError
 
 
