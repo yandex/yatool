@@ -9,7 +9,7 @@
 #include <util/generic/strbuf.h>
 
 struct TDiagCtrl {
-    struct TWhere {
+    class TWhere {
     public:
         static constexpr const char* TOP_LEVEL = "At top level";
 

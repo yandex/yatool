@@ -18,17 +18,10 @@ protected:
 
 public:
     struct TEntryStats {
-        bool InStack;
-        bool HasBuildFrom;
-        bool HasBuildCmd;
-        bool IsFile;
-        TEntryStats(bool inStack = false, bool isFile = false)
-            : InStack(inStack)
-            , HasBuildFrom(0)
-            , HasBuildCmd(0)
-            , IsFile(isFile)
-        {
-        }
+        bool InStack = false;
+        bool HasBuildFrom = false;
+        bool HasBuildCmd = false;
+        bool IsFile = false;
     };
 
     enum class EDepVerdict { No, Yes, Delay };
