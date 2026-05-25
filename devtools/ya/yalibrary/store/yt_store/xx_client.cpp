@@ -367,7 +367,7 @@ namespace NYa {
                     const NYT::TNode& accessTimeNode = row.At("access_time");
                     const NYT::TNode& nameNode = row.At("name");
                     bool remove = false;
-                    if (!accessTimeNode.HasValue() || !nameNode.HasValue() || !row.At("data_size").HasValue()) {
+                    if (!accessTimeNode.HasValue() || !nameNode.HasValue() || !row.At("data_size").HasValue() || !row.At("hash").HasValue() || !row.At("chunks_count").HasValue()) {
                         remove = true;
                     } else {
                         const TYtTimestamp accessTime = accessTimeNode.As<TYtTimestamp>();
@@ -436,22 +436,25 @@ namespace NYa {
                     }
                 }
 
-                ++StripStat_.InitialFileCount;
-                if (const NYT::TNode& node = firstRow.At("data_size"); node.HasValue()) {
-                    size_t dataSize = node.AsUint64();
-                    StripStat_.InitialDataSize += dataSize;
-                    if (!allRowsRemoved) {
-                        StripStat_.RemainingDataSize += dataSize;
+                bool notCorruptedDataRef = firstRow.At("hash").HasValue() && firstRow.At("chunks_count").HasValue();
+                if (notCorruptedDataRef) {
+                    ++StripStat_.InitialFileCount;
+                    if (const NYT::TNode& node = firstRow.At("data_size"); node.HasValue()) {
+                        size_t dataSize = node.AsUint64();
+                        StripStat_.InitialDataSize += dataSize;
+                        if (!allRowsRemoved) {
+                            StripStat_.RemainingDataSize += dataSize;
+                        }
                     }
-                }
-                if (allRowsRemoved) {
-                    writer->AddRow(
-                        NYT::TNode()
-                            ("hash", firstRow["hash"])
-                            ("chunks_count", firstRow["chunks_count"])
-                    );
-                } else {
-                    ++StripStat_.RemainingFileCount;
+                    if (allRowsRemoved) {
+                        writer->AddRow(
+                            NYT::TNode()
+                                ("hash", firstRow["hash"])
+                                ("chunks_count", firstRow["chunks_count"])
+                        );
+                    } else {
+                        ++StripStat_.RemainingFileCount;
+                    }
                 }
 
                 if (!remainingRows.empty()) {
@@ -485,7 +488,10 @@ namespace NYa {
             TFirstRowReducer() = default;
 
             void Do(TReader* reader, TWriter* writer) override {
-                writer->AddRow(reader->GetRow());
+                const auto &firstRow = reader->GetRow();
+                if (firstRow.At("hash").HasValue()) {
+                    writer->AddRow(reader->GetRow());
+                }
             }
         };
         REGISTER_REDUCER(TFirstRowReducer)
