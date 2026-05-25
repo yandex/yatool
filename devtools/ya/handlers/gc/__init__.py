@@ -175,6 +175,11 @@ def _clean_evlogs():
     _clean_dir_selectively(evlogs, file_dir, file_name)
 
 
+def _clean_log_viewer_cache():
+    logger.debug('Cleaning log viewer cache root')
+    fs.remove_tree_safe(os.path.join(cc.misc_root(), 'log_viewer'))
+
+
 def _clean_tools():
     running_ya_bin_dir = os.path.dirname(sys.argv[0])
     base_running_ya_bin_dir = os.path.basename(running_ya_bin_dir).replace('_d', '')
@@ -255,6 +260,7 @@ def _do_collect_cache(cache, build_root, opts):
 
     _clean_logs()
     _clean_evlogs()
+    _clean_log_viewer_cache()
 
     if not on_win():
         logger.debug('Cleaning symres')
