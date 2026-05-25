@@ -112,6 +112,7 @@ class TsCheckSuite(BaseFrontendSuite):
         self._files = sorted(self.meta.test_files)
         self._check_type = self.meta.ts_check_type
         self._script_name = self.meta.test_name  # we use TEST_NAME to pass script name to runner
+        self._supports_coverage = self.meta.ts_check_has_coverage == "yes"
         # replace all none letters and none digits to '_'
         self._script_name_norm = re.sub(r"[\W_]+", "_", self._script_name)
 
@@ -146,6 +147,10 @@ class TsCheckSuite(BaseFrontendSuite):
     def supports_canonization(self):
         # https://docs.yandex-team.ru/ya-make/manual/tests/canon
         return False
+
+    @property
+    def supports_coverage(self):
+        return self._supports_coverage
 
     @property
     def cache_test_results(self):

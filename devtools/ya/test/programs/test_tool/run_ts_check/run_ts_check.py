@@ -7,7 +7,7 @@ import time
 
 import build.plugins.lib.nots.package_manager.constants as pm_const
 import build.plugins.lib.nots.package_manager.utils as pm_utils
-from devtools.ya.test.const import Status
+from devtools.ya.test.const import COVERAGE_TS_ENV_NAME, Status
 from devtools.ya.test.facility import TestCase
 from devtools.ya.test.system.process import execute
 from devtools.ya.test.test_types.common import PerformedTestSuite
@@ -48,6 +48,10 @@ def get_test_env() -> dict[str, str]:
             line = line.strip()
             if line:
                 env.update(json.loads(line))
+
+    if os.environ.get(COVERAGE_TS_ENV_NAME):
+        env[COVERAGE_TS_ENV_NAME] = os.environ[COVERAGE_TS_ENV_NAME]
+
     return env
 
 
@@ -235,9 +239,14 @@ def run(args: CliArgs):
 
 
 def get_cmd(args: CliArgs):
+    script_name = args.script_name
+
+    if os.environ.get(COVERAGE_TS_ENV_NAME):
+        script_name += ":coverage"
+
     cmd = [
         "node",
         "--run",
-        args.script_name,
+        script_name,
     ]
     return cmd
