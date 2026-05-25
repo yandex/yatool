@@ -89,7 +89,6 @@ class GarbageCollectionYaHandler(devtools.ya.core.yarg.CompositeHandler):
             description='Strip build cache and old build directories',
             opts=[
                 devtools.ya.core.common_opts.ShowHelpOptions(),
-                devtools.ya.core.common_opts.ToolsOptions(),
                 CollectCacheOptions(),
                 CustomBuildRootOptions(),
                 devtools.ya.core.common_opts.AuthOptions(),

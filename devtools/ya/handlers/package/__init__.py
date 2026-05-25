@@ -60,7 +60,6 @@ class PackageYaHandler(devtools.ya.core.yarg.OptsHandler):
                 devtools.ya.core.common_opts.CustomSourceRootOptions(),
                 devtools.ya.core.common_opts.CustomBuildRootOptions(),
                 devtools.ya.core.common_opts.ShowHelpOptions(),
-                devtools.ya.core.common_opts.ToolsOptions(),
                 devtools.ya.core.common_opts.BeVerboseOptions(),
                 devtools.ya.core.common_opts.HtmlDisplayOptions(),
                 devtools.ya.core.common_opts.CommonUploadOptions(),
