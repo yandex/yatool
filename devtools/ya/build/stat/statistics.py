@@ -669,7 +669,10 @@ def get_int_length(x: float) -> int:
     return len(str(int(x)))
 
 
-def print_summary_times(graph, tasks, display):
+_CTX_STAGE_DISPLAY_NAMES = {'context_creation': 'Configure time'}
+
+
+def print_summary_times(graph, tasks, display, ctx_stages=None):
     task_by_type = {}
     time_by_type = collections.defaultdict(int)
     download_time_by_type = collections.defaultdict(float)
@@ -739,6 +742,33 @@ def print_summary_times(graph, tasks, display):
         for task_type in sorted(time_by_type, key=time_by_type.get, reverse=True):
             display.emit_message(get_display_msg_for_task_type(task_type))
 
+    execution_stages = _transform_timeline(timeline)
+
+    wall_time_entries = [
+        (name.replace('_', ' ').capitalize(), duration_ms / 1000.0)
+        for name, duration_ms in execution_stages.items()
+        if duration_ms > 0
+    ]
+    if ctx_stages:
+        for name, seconds in ctx_stages.items():
+            duration_s = float(seconds)
+            if duration_s > 0:
+                wall_time_entries.append((_CTX_STAGE_DISPLAY_NAMES.get(name, name), duration_s))
+
+    if wall_time_entries:
+        display.emit_message()
+        display.emit_message('Wall time by stage:')
+
+        max_stage_int_len = max(get_int_length(duration_s) for _, duration_s in wall_time_entries)
+        for stage_name, duration_s in sorted(wall_time_entries, key=lambda item: -item[1]):
+            display.emit_message(
+                '[{:{tw}.1f} s] {}'.format(
+                    duration_s,
+                    stage_name,
+                    tw=max_stage_int_len + 2,
+                )
+            )
+
     total_run_task_time = 0
     total_tests_task_time = 0
     total_failed_run_task_time = 0
@@ -750,8 +780,6 @@ def print_summary_times(graph, tasks, display):
                 total_failed_run_task_time += elapsed
             if 'test' == task.abstract.meta.get('node-type', None):
                 total_tests_task_time += elapsed
-
-    execution_stages = _transform_timeline(timeline)
     display.emit_message()
     display.emit_message('Total tasks times:\n')
 
@@ -800,12 +828,10 @@ def print_stages(event_log, display):
 def print_context_stages(ctx_stages, display):
     assert ctx_stages is not None
 
-    _replaces = {'context_creation': 'Configure time'}
-
     display.emit_message()
 
     for k, v in ctx_stages.items():
-        display.emit_message('{} - {:.1f} s'.format(_replaces.get(k, k), float(v)))
+        display.emit_message('{} - {:.1f} s'.format(_CTX_STAGE_DISPLAY_NAMES.get(k, k), float(v)))
 
     return ctx_stages
 
@@ -880,7 +906,7 @@ def print_graph_statistics(
     )
     stats['biggest_tasks'] = print_biggest_copy_tasks(graph, _make_file_path('biggest-tasks'), display)
     stats['summary_times'], stats['task_execution_msec'], stats['execution_stages_msec'] = print_summary_times(
-        graph, tasks, display
+        graph, tasks, display, ctx_stages=ctx_stages
     )
     stats['substages'] = get_detailed_timings(tasks)
     print_stages(event_log, display)
