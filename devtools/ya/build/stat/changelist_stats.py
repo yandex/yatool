@@ -77,20 +77,37 @@ def _calculate_aggregated_stats(paths, deleted_paths, arc_root):
             if agg['max_mtime'] is None or mtime > agg['max_mtime']:
                 agg['max_mtime'] = mtime
 
+    return {
+        'level': 'aggregated',
+        'total_files': len(paths),
+        'total_deleted_files': len(deleted_paths),
+        'data': aggregated,
+        'deleted_data': _build_deleted_data(deleted_paths, detailed=False),
+    }
+
+
+def _aggregate_deleted_paths(deleted_paths):
     deleted_aggregated = {}
     for path in deleted_paths:
         _, ext = os.path.splitext(path)
         if ext not in deleted_aggregated:
             deleted_aggregated[ext] = {'count': 0}
         deleted_aggregated[ext]['count'] += 1
+    return deleted_aggregated
 
-    return {
-        'level': 'aggregated',
-        'total_files': len(paths),
-        'total_deleted_files': len(deleted_paths),
-        'data': aggregated,
-        'deleted_data': deleted_aggregated,
-    }
+
+def _build_deleted_data(deleted_paths, detailed):
+    # When the deleted change list is huge, calculating per-extension statistics
+    # may also be too expensive / heavy to send — report only the count.
+    if len(deleted_paths) > HUGE_CHANGE_FILES_THRESHOLD:
+        return {}
+    # When the deleted change list is big (but not huge), or when the caller
+    # requested detailed mode but deleted list is still too big for a flat list,
+    # send aggregated per-extension statistics instead of the full list.
+    if not detailed or len(deleted_paths) > BIG_CHANGE_FILES_THRESHOLD:
+        return _aggregate_deleted_paths(deleted_paths)
+    # Small list — keep the original detailed representation.
+    return deleted_paths
 
 
 def _calculate_detailed_stats(paths, deleted_paths, arc_root):
@@ -106,7 +123,7 @@ def _calculate_detailed_stats(paths, deleted_paths, arc_root):
         'total_files': len(paths),
         'total_deleted_files': len(deleted_paths),
         'data': res,
-        'deleted_data': deleted_paths,
+        'deleted_data': _build_deleted_data(deleted_paths, detailed=True),
     }
 
 
