@@ -1,3 +1,4 @@
+import dataclasses
 import grpc
 import inspect
 import logging
@@ -27,6 +28,12 @@ from .error import (
 logger = logging.getLogger(__name__)
 
 
+@dataclasses.dataclass()
+class Recipe:
+    sentinel: sentinel.Sentinel
+    users: set[tuple[str, str]]  # set of (invocation_id, build_id)
+
+
 class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
     def __init__(self, shallow_root: str, stop_event: threading.Event):
         super().__init__()
@@ -34,10 +41,12 @@ class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
         self._stop_event = stop_event
         self._keep_shallow_root = False
         self._lost_ownership = False
-        self._sentinels: dict[str, sentinel.Sentinel] = {}
-        self._recipe_users: dict[str, set[tuple[str, str]]] = {}  # recipe_uid → set of (invocation_id, build_id)
-        self._heartbeat_lock = threading.Lock()
+
+        self._recipes: dict[str, Recipe] = {}
+        self._recipes_lock = threading.Lock()
+
         self._heartbeat_times: dict[str, float] = {}  # invocation_id → last heartbeat time
+        self._heartbeat_lock = threading.Lock()
 
         # Inode of our socket file — set by start_watchdog() after server.start()
         # creates the socket.  None means watchdog has not been started yet.
@@ -104,30 +113,38 @@ class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
         Recipes keep running — persistent recipes survive ya-bin termination."""
         HEARTBEAT_TIMEOUT = 1.0
         CHECK_INTERVAL = 1.0
+
         while not self._stop_event.wait(timeout=CHECK_INTERVAL):
             now = time.time()
+
+            # Step 1: Find and pop stale invocation_ids under heartbeat_lock
             with self._heartbeat_lock:
                 stale = [
-                    invocation_id for invocation_id, ts in self._heartbeat_times.items()
-                    if now - ts > HEARTBEAT_TIMEOUT
+                    invocation_id for invocation_id, ts in self._heartbeat_times.items() if now - ts > HEARTBEAT_TIMEOUT
                 ]
-            for invocation_id in stale:
-                logger.debug(
-                    "Heartbeat timeout for invocation_id=%s, disassociating all its build users",
-                    invocation_id,
-                )
-                for recipe_uid in list(self._sentinels):
-                    users = self._recipe_users.get(recipe_uid)
-                    if users:
-                        stale_users = {u for u in users if u[0] == invocation_id}
+                # Pop stale invocation_ids under heartbeat_lock
+                for invocation_id in stale:
+                    self._heartbeat_times.pop(invocation_id, None)
+
+            # Step 2: Remove stale users under _recipes_lock (AFTER releasing heartbeat_lock)
+            # This prevents deadlock if RPC handler holds _heartbeat_lock and tries _recipes_lock
+            with self._recipes_lock:
+                for invocation_id in stale:
+                    logger.debug(
+                        "Heartbeat timeout for invocation_id=%s, disassociating all its build users",
+                        invocation_id,
+                    )
+                    for r in self._recipes.values():
+                        # Modify users set in-place
+                        stale_users = {u for u in r.users if u[0] == invocation_id}
                         if stale_users:
-                            users -= stale_users
+                            r.users -= stale_users
                             logger.debug(
                                 "Disassociated users=%s from recipe %s (heartbeat timeout), remaining users: %s",
-                                stale_users, recipe_uid, users,
+                                stale_users,
+                                r.sentinel.recipe_uid,
+                                r.users,
                             )
-                with self._heartbeat_lock:
-                    self._heartbeat_times.pop(invocation_id, None)
 
     def _filesystem_watchdog_loop(self) -> None:
         """Shut down if our socket file disappears or is replaced by another RM.
@@ -169,9 +186,13 @@ class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
 
     def cleanup(self) -> None:
         logger.debug("Start cleanup")
-        for s in self._sentinels.values():
-            logger.debug("Abort recipe %s", s.recipe_uid)
-            s.abort()
+
+        # Abort all sentinels
+        with self._recipes_lock:
+            for r in self._recipes.values():
+                logger.debug("Abort recipe %s", r.sentinel.recipe_uid)
+                r.sentinel.abort()
+
         if not self._keep_shallow_root and not self._lost_ownership:
             self._remove_data_dir()
 
@@ -212,21 +233,30 @@ class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
         Allows the next build of the same ya-bin to restart or reuse recipes.
         """
         user = (request.invocation_id, request.build_id)
-        for recipe_uid, users in self._recipe_users.items():
-            if user in users:
-                users.discard(user)
-                logger.debug(
-                    "FinishBuild: disassociated user=%s from recipe %s, remaining users: %s",
-                    user, recipe_uid, users,
-                )
+
+        with self._recipes_lock:
+            for r in self._recipes.values():
+                # Modify users set in-place
+                if user in r.users:
+                    r.users.discard(user)
+                    logger.debug(
+                        "FinishBuild: disassociated user=%s from recipe %s, remaining users: %s",
+                        user,
+                        r.sentinel.recipe_uid,
+                        r.users,
+                    )
         return manager_pb2.Empty()
 
     def _do_shutdown(self, request: manager_pb2.ShutdownRequest, context: grpc.ServicerContext) -> manager_pb2.Empty:
-        if not request.force and self._sentinels:
-            raise PreconditionError(
-                "Cannot shutdown: {} recipe(s) are still running. "
-                "Use force=True to abort them.".format(len(self._sentinels))
-            )
+        with self._recipes_lock:
+            users = set()
+            for r in self._recipes.values():
+                users.update(r.users)
+            if not request.force and users:
+                raise PreconditionError(
+                    "Cannot shutdown: someone uses running recipe(s). "
+                    "Use force=True to abort them anyway. Users {}".format(users)
+                )
         self._keep_shallow_root = request.keep_shallow_root
         self._stop_event.set()
         return manager_pb2.Empty()
@@ -234,8 +264,9 @@ class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
     def _do_start_recipe(
         self, request: manager_pb2.StartRecipeRequest, context: grpc.ServicerContext
     ) -> manager_pb2.StartRecipeResult:
-        if request.recipe_uid in self._sentinels:
-            raise AlreadyExistsError(f"Recipe {request.recipe_uid} already exists, use AssociateRecipe to associate")
+        with self._recipes_lock:
+            if request.recipe_uid in self._recipes:
+                raise AlreadyExistsError(f"Recipe {request.recipe_uid} already exists")
 
         working_dir = self._check_and_fix_path(context, request, "working_dir")
         err_filename = self._check_and_fix_path(context, request, "err_filename")
@@ -256,82 +287,120 @@ class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
         s.start(
             list(request.command), dict(request.env), err_filename, out_filename, request.timeout, request.retry_count
         )
-        # Add to sentinels only after successful start
-        self._sentinels[request.recipe_uid] = s
-        self._recipe_users[request.recipe_uid] = {(request.invocation_id, request.build_id)}
+
+        # XXX: Check if invocation_id exists in heartbeat_times. We should never
+        # add non-existent users. Lock prevents race when ya-bin times out
+        # immediately after sending StartRecipeRequest request.
+        with self._heartbeat_lock:
+            has_invocation = request.invocation_id in self._heartbeat_times
+            # Check invocation and add Recipe
+            with self._recipes_lock:
+                if has_invocation:
+                    users = {(request.invocation_id, request.build_id)}
+                else:
+                    users = set()
+
+                self._recipes[request.recipe_uid] = Recipe(sentinel=s, users=users)
+
         logger.debug(
-            "Recipe %s started, invocation_id=%s, build_id=%s",
-            request.recipe_uid, request.invocation_id, request.build_id,
+            "Recipe %s started, invocation_id=%s, build_id=%s, users=%s",
+            request.recipe_uid,
+            request.invocation_id,
+            request.build_id,
+            users,
         )
         return manager_pb2.StartRecipeResult()
 
     def _do_stop_recipe(
         self, request: manager_pb2.StopRecipeRequest, context: grpc.ServicerContext
     ) -> manager_pb2.StopRecipeResult:
-        if request.recipe_uid not in self._sentinels:
-            raise NotFoundError(f"No recipe found for recipe_uid={request.recipe_uid}")
-        users = self._recipe_users.get(request.recipe_uid, set())
-        assert not users, (
-            f"Recipe {request.recipe_uid} still has users: {users}. "
-            "Stop is only allowed when no users are associated."
-        )
+        with self._recipes_lock:
+            r = self._recipes.get(request.recipe_uid)
+            if r is None:
+                raise NotFoundError(f"No recipe found for recipe_uid={request.recipe_uid}")
+            if r.users:
+                raise PreconditionError(
+                    f"Recipe {request.recipe_uid} still has users: {r.users}. "
+                    "Stop is only allowed when no users are associated."
+                )
+
         err_filename = self._check_and_fix_path(context, request, "err_filename")
         out_filename = self._check_and_fix_path(context, request, "out_filename")
-        s = self._sentinels[request.recipe_uid]
-        # Stop first; only remove from state after successful stop
+
+        s = r.sentinel
         s.stop(list(request.command), dict(request.env), err_filename, out_filename, request.timeout)
-        self._sentinels.pop(request.recipe_uid)
-        self._recipe_users.pop(request.recipe_uid, None)
+        with self._recipes_lock:
+            self._recipes.pop(request.recipe_uid)
+
         return manager_pb2.StopRecipeResult()
 
     def _do_list_recipe(
         self, request: manager_pb2.Empty, context: grpc.ServicerContext
     ) -> manager_pb2.ListRecipesResult:
         items = []
-        for s in self._sentinels.values():
-            users = self._recipe_users.get(s.recipe_uid, set())
-            items.append(
-                manager_pb2.RecipeInfo(
-                    recipe_uid=s.recipe_uid,
-                    lifetime=s.lifetime.value,
-                    working_dir=s.working_dir,
-                    users=[manager_pb2.UserRef(invocation_id=u[0], build_id=u[1]) for u in users],
-                    started_at=s.started_at,
+
+        with self._recipes_lock:
+            for r in self._recipes.values():
+                s = r.sentinel
+                items.append(
+                    manager_pb2.RecipeInfo(
+                        recipe_uid=s.recipe_uid,
+                        lifetime=s.lifetime.value,
+                        working_dir=s.working_dir,
+                        users=[manager_pb2.UserRef(invocation_id=u[0], build_id=u[1]) for u in r.users],
+                        started_at=s.started_at,
+                    )
                 )
-            )
         return manager_pb2.ListRecipesResult(items=items)
 
     def _do_get_recipe(
         self, request: manager_pb2.GetRecipeRequest, context: grpc.ServicerContext
     ) -> manager_pb2.GetRecipeResult:
-        if request.recipe_uid not in self._sentinels:
-            raise NotFoundError(f"No recipe found for recipe_uid={request.recipe_uid}")
-        s = self._sentinels[request.recipe_uid]
-        users = self._recipe_users.get(request.recipe_uid, set())
-        recipe_info = manager_pb2.RecipeInfo(
-            recipe_uid=s.recipe_uid,
-            lifetime=s.lifetime.value,
-            working_dir=s.working_dir,
-            users=[manager_pb2.UserRef(invocation_id=u[0], build_id=u[1]) for u in users],
-            started_at=s.started_at,
-        )
+        with self._recipes_lock:
+            if request.recipe_uid not in self._recipes:
+                raise NotFoundError(f"No recipe found for recipe_uid={request.recipe_uid}")
+
+            r = self._recipes[request.recipe_uid]
+            s = r.sentinel
+
+            recipe_info = manager_pb2.RecipeInfo(
+                recipe_uid=s.recipe_uid,
+                lifetime=s.lifetime.value,
+                working_dir=s.working_dir,
+                users=[manager_pb2.UserRef(invocation_id=u[0], build_id=u[1]) for u in r.users],
+                started_at=s.started_at,
+            )
+
         return manager_pb2.GetRecipeResult(recipe=recipe_info)
 
     def _do_associate_recipe(
         self, request: manager_pb2.AssociateRecipeRequest, context: grpc.ServicerContext
     ) -> manager_pb2.Empty:
-        assert request.recipe_uid in self._sentinels, (
-            f"Recipe {request.recipe_uid} not found in sentinels — "
-            "AssociateRecipe must only be called for running recipes"
-        )
-        self._recipe_users.setdefault(request.recipe_uid, set()).add(
-            (request.invocation_id, request.build_id)
-        )
+        # XXX: Check if invocation_id exists in heartbeat_times. We should never
+        # add non-existent users. Lock prevents race when ya-bin times out
+        # immediately after sending AssociateRecipeRequest request.
+        with self._heartbeat_lock:
+            has_invocation = request.invocation_id in self._heartbeat_times
+            with self._recipes_lock:
+                if request.recipe_uid not in self._recipes:
+                    raise NotFoundError(
+                        f"Recipe {request.recipe_uid} not found in sentinels — "
+                        "AssociateRecipe must only be called for running recipes"
+                    )
+
+                r = self._recipes[request.recipe_uid]
+
+                # Modify users set in-place
+                if has_invocation:
+                    r.users.add((request.invocation_id, request.build_id))
+
         logger.debug(
-            "Associated (invocation_id=%s, build_id=%s) with recipe %s, users: %s",
-            request.invocation_id, request.build_id, request.recipe_uid,
-            self._recipe_users[request.recipe_uid],
+            "Associated (invocation_id=%s, build_id=%s) with recipe %s",
+            request.invocation_id,
+            request.build_id,
+            request.recipe_uid,
         )
+
         return manager_pb2.Empty()
 
     def _remove_data_dir(self) -> None:

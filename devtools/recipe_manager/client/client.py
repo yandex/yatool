@@ -105,7 +105,11 @@ class RecipeManagerClient:
                     saved_version,
                     current_version,
                 )
-                self.shutdown(keep_shallow_root=False)
+                # XXX: When version changes or force_restart is set kill all
+                # recipes forcefully even when someone uses them.
+                # Normally no one should use them at this point because
+                # switching branches during build is not recommended anyway.
+                self.shutdown(keep_shallow_root=False, force=True)
                 # meta/ survives shutdown — only data/ was removed.
                 # Recreate data/ so the new RM process can use it.
                 os.makedirs(get_shallow_root_data_path(self._shallow_root), exist_ok=True)
@@ -189,7 +193,8 @@ class RecipeManagerClient:
         t = threading.Thread(target=_loop, daemon=True, name='rm-heartbeat')
         t.start()
 
-    def shutdown(self, keep_shallow_root: bool = False, force: bool = True) -> None:
+    def shutdown(self, keep_shallow_root: bool = False, force: bool = False) -> None:
+        """`force` means shutdown even if there are running recipes and someone uses them."""
         request = manager_pb2.ShutdownRequest(
             keep_shallow_root=keep_shallow_root,
             force=force,

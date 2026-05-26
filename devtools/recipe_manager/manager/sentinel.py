@@ -36,7 +36,9 @@ class Sentinel:
         parent_conn, child_conn = mp.Pipe(duplex=True)
         self._conn = parent_conn
         self._child = mp.Process(
-            target=_worker_func, name="Recipe sentinel", args=(child_conn, mp_logging.get_log_queue(), self._working_dir)
+            target=_worker_func,
+            name="Recipe sentinel",
+            args=(child_conn, mp_logging.get_log_queue(), self._working_dir),
         )
 
     def start(
@@ -66,6 +68,8 @@ class Sentinel:
             self.abort()
 
     def abort(self):
+        # XXX: Concurrent stop and shutdown may call abort at the same time
+        # in different threads. Not sure if it may ever be a problem.
         if self._child.is_alive():
             self._child.terminate()
             self._child.join()
