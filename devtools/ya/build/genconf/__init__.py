@@ -64,9 +64,21 @@ def is_system(tc):
         return False
 
 
-def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode_version=False):
+FEATURE_TOOLCHAIN_OVERRIDES = (('use_afl', 'aflplusplus'),)
+
+
+def feature_toolchain_key(opts):
+    for attr, tc_key in FEATURE_TOOLCHAIN_OVERRIDES:
+        if getattr(opts, attr, False):
+            return tc_key
+    return None
+
+
+def _resolve_cxx(host, target, c_compiler, cxx_compiler, ignore_mismatched_xcode_version=False, toolchain_key=None):
     if c_compiler or cxx_compiler:
         res = resolve_system_cxx(cxx_compiler, host, target, c_compiler)
+    elif toolchain_key:
+        res = tools.resolve_tool('c++', host, target, toolchain_key=toolchain_key)
     elif devtools.ya.core.config.has_mapping() and windows.on_win():
         # XXX for small ya, TODO move to proper place
         res = resolve_system_cxx("cl.exe", host, target)
@@ -151,17 +163,34 @@ def host_for_target_platform_name(host_name, target_name):
     )
 
 
-def gen_tc(platform_name, c_compiler=None, cxx_compiler=None, ignore_mismatched_xcode_version=False):
-    return _resolve_cxx(platform_name, platform_name, c_compiler, cxx_compiler, ignore_mismatched_xcode_version)
+def gen_tc(
+    platform_name, c_compiler=None, cxx_compiler=None, ignore_mismatched_xcode_version=False, toolchain_key=None
+):
+    return _resolve_cxx(
+        platform_name,
+        platform_name,
+        c_compiler,
+        cxx_compiler,
+        ignore_mismatched_xcode_version,
+        toolchain_key=toolchain_key,
+    )
 
 
-def gen_cross_tc(host_name, target_name, c_compiler=None, cxx_compiler=None, ignore_mismatched_xcode_version=False):
+def gen_cross_tc(
+    host_name,
+    target_name,
+    c_compiler=None,
+    cxx_compiler=None,
+    ignore_mismatched_xcode_version=False,
+    toolchain_key=None,
+):
     return _resolve_cxx(
         host_for_target_platform_name(host_name, target_name),
         target_name,
         c_compiler,
         cxx_compiler,
         ignore_mismatched_xcode_version,
+        toolchain_key=toolchain_key,
     )
 
 

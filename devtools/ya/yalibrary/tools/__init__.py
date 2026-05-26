@@ -374,15 +374,33 @@ def get_tool_for_ide(name, ide):
     raise UnsupportedToolchain('No toolchain found for ide: %s' % ide)
 
 
-def resolve_tool(name, host, target):
+def _platform_os_arch(plat):
+    os_ = plat.get('os')
+    arch = plat.get('arch')
+    return (
+        os_.upper() if os_ else None,
+        arch.upper() if arch else None,
+    )
+
+
+def resolve_tool(name, host, target, toolchain_key=None):
+    match_os_arch_only = toolchain_key is not None
+    parsed_host = _platform_os_arch(pm.parse_platform(host)) if match_os_arch_only else None
+    parsed_target = _platform_os_arch(pm.parse_platform(target)) if match_os_arch_only else None
+
     def filter_host(tool_name, tool_host):
         avail = set()
         ok = False
+        tn_filter = (lambda key, descr: key == toolchain_key) if toolchain_key else None
 
-        for tool in iter_tools(tool_name):
+        for tool in iter_tools(tool_name, tn_filter):
             host_str = pm.stringize_platform(tool['platform']['host'])
             avail.add(host_str)
-            if host_str == tool_host:
+            if match_os_arch_only:
+                matched = _platform_os_arch(tool['platform']['host']) == parsed_host
+            else:
+                matched = host_str == tool_host
+            if matched:
                 ok = True
                 yield tool
 
@@ -392,7 +410,9 @@ def resolve_tool(name, host, target):
                 % (tool_host, tool_name, ', '.join(sorted(avail)))
             )
 
-    return _resolve_tool(name, host, target, filter_host)
+    target_match = (lambda plat: _platform_os_arch(plat) == parsed_target) if match_os_arch_only else None
+
+    return _resolve_tool(name, host, target, filter_host, target_match=target_match)
 
 
 def resolve_tool_by_host_os(name, host_os, target):
@@ -417,7 +437,7 @@ def resolve_tool_by_host_os(name, host_os, target):
     return _resolve_tool(name, host_os, target, filter_host)
 
 
-def _resolve_tool(name, host, target, filter_host):
+def _resolve_tool(name, host, target, filter_host, target_match=None):
     def filter_target():
         avail = set()
         ok = False
@@ -426,7 +446,12 @@ def _resolve_tool(name, host, target, filter_host):
             target_str = pm.stringize_platform(tool['platform']['target'])
             avail.add(target_str)
 
-            if target_str == target:
+            if target_match is not None:
+                matched = target_match(tool['platform']['target'])
+            else:
+                matched = target_str == target
+
+            if matched:
                 ok = True
 
                 yield tool

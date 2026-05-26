@@ -51,6 +51,7 @@ def resolve_target_tc(host: str, target_platform: dict, opts) -> dict:
             c_compiler=c_compiler,
             cxx_compiler=cxx_compiler,
             ignore_mismatched_xcode_version=should_ignore_mismatched_xcode_version(opts, target),
+            toolchain_key=genconf.feature_toolchain_key(opts),
         )
     )
     return target
