@@ -328,9 +328,12 @@ class RecipeManagerServicer(manager_pb2_grpc.RecipeManager):
         out_filename = self._check_and_fix_path(context, request, "out_filename")
 
         s = r.sentinel
-        s.stop(list(request.command), dict(request.env), err_filename, out_filename, request.timeout)
-        with self._recipes_lock:
-            self._recipes.pop(request.recipe_uid)
+        try:
+            s.stop(list(request.command), dict(request.env), err_filename, out_filename, request.timeout)
+        finally:
+            # XXX: sentinel is aborted even if stop fails so we remove regardless
+            with self._recipes_lock:
+                self._recipes.pop(request.recipe_uid)
 
         return manager_pb2.StopRecipeResult()
 
