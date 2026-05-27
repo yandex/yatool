@@ -5,12 +5,13 @@ import subprocess
 
 import six
 
+import app_config
+
 import exts.fs
 import devtools.ya.test.system.process
 import devtools.ya.test.common
 import devtools.ya.test.test_types.common
 import devtools.ya.test.const
-import devtools.ya.test.util.shared
 import devtools.ya.test.filter as test_filter
 from devtools.ya.test import facility
 import library.python.cores as cores
@@ -69,9 +70,15 @@ def main():
                     diff = "\n".join(differ.compare(formatted.splitlines(), original_lines))
 
                     out_lines.append(diff)
+
+                    if app_config.in_house:
+                        formatted_path = f"$(arc root){os.path.sep}{go_relative_path}"
+                    else:
+                        formatted_path = f"{go_relative_path} from repo root"
+
                     err_lines.append(
                         "[[imp]]Code needs to be formatted.[[rst]] Run [[alt1]]ya tool go fmt {}[[rst]]".format(
-                            go_relative_path
+                            formatted_path
                         )
                     )
                     failed = True
