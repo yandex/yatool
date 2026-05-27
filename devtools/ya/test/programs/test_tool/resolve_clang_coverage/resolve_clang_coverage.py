@@ -30,7 +30,8 @@ def parse_args():
     parser.add_argument('--output', required=True)
     parser.add_argument('--llvm-profdata-tool', required=True)
     parser.add_argument('--llvm-cov-tool', required=True)
-    parser.add_argument('--coverage-path', required=True)
+    parser.add_argument('--coverage-path')
+    parser.add_argument('--use-empty-profile', action='store_true', default=False)
     parser.add_argument('--source-root')
     parser.add_argument('--mcdc-coverage', action='store_true')
     parser.add_argument('--branch-coverage', action='store_true')
@@ -49,6 +50,10 @@ def parse_args():
     parser.add_argument('--test-mode', action='store_true')
 
     args = parser.parse_args()
+
+    if not args.use_empty_profile and args.coverage_path is None:
+        raise ValueError("Required --coverage-path argument is not set")
+
     return args
 
 
@@ -198,34 +203,36 @@ def main():
     with open(args.output, "w") as afile:
         afile.write("no valid output was provided")
 
-    datadir = extract(args.coverage_path)
-    target_dir = 'profdata'
-    exts.fs.create_dirs(target_dir)
-    filenames = [os.path.join(datadir, filename) for filename in os.listdir(datadir)]
-    logger.debug("Profdata files: %s", filenames)
-
-    # test might be skipped by filter and there will be no coverage data
-    if not filenames:
-        logger.debug('No profdata available')
-        with open(args.output, 'w') as afile:
-            json.dump({}, afile)
-        return
-
-    cov_files_map = lib_coverage.util.get_coverage_profiles_map(filenames)
-    logger.debug("Coverage profile files map: %s", cov_files_map)
-
     binname = os.path.basename(args.target_binary)
-    if not cov_files_map.get(binname):
-        logger.warning("No valid coverage profiles found for %s", binname)
-        gen_empty_output(args.output)
-        return 0
     if not libmagic.is_elf(six.ensure_binary(args.target_binary)):
         logger.warning("Skipping non-executable: %s", args.target_binary)
         gen_empty_output(args.output)
         return 0
 
-    app_ctx.display.emit_status('Indexing profiles')
-    profdata_path = merge_covdata(args.llvm_profdata_tool, binname, cov_files_map[binname])
+    target_dir = 'profdata'
+    exts.fs.create_dirs(target_dir)
+
+    if not args.use_empty_profile:
+        datadir = extract(args.coverage_path)
+        filenames = [os.path.join(datadir, filename) for filename in os.listdir(datadir)]
+        logger.debug("Profdata files: %s", filenames)
+
+        # test might be skipped by filter and there will be no coverage data
+        if not filenames:
+            logger.debug('No profdata available')
+            with open(args.output, 'w') as afile:
+                json.dump({}, afile)
+            return
+
+        cov_files_map = lib_coverage.util.get_coverage_profiles_map(filenames)
+        logger.debug("Coverage profile files map: %s", cov_files_map)
+
+        if not cov_files_map.get(binname):
+            logger.warning("No valid coverage profiles found for %s", binname)
+            gen_empty_output(args.output)
+            return 0
+        app_ctx.display.emit_status('Indexing profiles')
+        profdata_path = merge_covdata(args.llvm_profdata_tool, binname, cov_files_map[binname])
 
     app_ctx.display.emit_status('Exporting profile (target:{})'.format(args.target_binary))
     # https://pg.at.yandex-team.ru/5908
@@ -241,11 +248,17 @@ def main():
         'export',
         '-j',
         '4',
-        '--instr-profile',
-        profdata_path,
         '--object',
         args.target_binary,
     ]
+
+    if args.use_empty_profile:
+        cmd.append('--empty-profile')
+    else:
+        cmd += [
+            '--instr-profile',
+            profdata_path,
+        ]
 
     if args.mcdc_coverage:
         cmd.append('--show-mcdc-summary')

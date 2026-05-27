@@ -218,8 +218,6 @@ def inject_clang_coverage_resolve_node(
         "$({})/bin/llvm-profdata".format(platform_name),
         "--llvm-cov-tool",
         "$({})/bin/llvm-cov".format(platform_name),
-        "--coverage-path",
-        input_filename,
         "--target-binary",
         binary_path,
         "--output",
@@ -231,6 +229,20 @@ def inject_clang_coverage_resolve_node(
         "--timeout",
         str(timeout),
     ]
+
+    # extract baseline coverage for coverage_extractor tests, do not expect it to produce profile
+    if suite.get_type() == "coverage_extractor":
+        cmd.append("--use-empty-profile")
+        node_inputs = [binary_path]
+    else:
+        cmd += [
+            "--coverage-path",
+            input_filename,
+        ]
+        node_inputs = [
+            input_filename,
+            binary_path,
+        ]
 
     if opts.clang_mcdc_coverage:
         cmd.append("--mcdc-coverage")
@@ -245,7 +257,7 @@ def inject_clang_coverage_resolve_node(
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
-        "inputs": [input_filename, binary_path],
+        "inputs": node_inputs,
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
         "priority": 0,

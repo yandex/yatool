@@ -1,12 +1,10 @@
 # coding: utf-8
 
 from __future__ import print_function
+import argparse
+import logging
 import os
 import sys
-import json
-import logging
-import argparse
-import subprocess
 
 from devtools.ya.test.util import shared
 from devtools.ya.test import const
@@ -15,7 +13,7 @@ from devtools.ya.test.test_types.common import PerformedTestSuite
 
 logger = logging.getLogger(__name__)
 
-SUCCESSFULLY_DUMPED_RC = 15
+TEST_NAME = 'coverage_extractor::test'
 
 
 def parse_args():
@@ -50,33 +48,18 @@ def gen_suite(project_path):
     return suite
 
 
-def setup_env():
-    os.environ["YA_COVERAGE_DUMP_PROFILE_AND_EXIT"] = "1"
-    os.environ["YA_COVERAGE_DUMP_PROFILE_EXIT_CODE"] = str(SUCCESSFULLY_DUMPED_RC)
-
-
 def main():
     args = parse_args()
-    testname = "coverage_extractor::test"
 
     if args.list:
-        print(testname)
+        print(TEST_NAME)
         return 0
 
     setup_logging(args.verbose)
-    setup_env()
-    logger.debug("Environment variables: %s", json.dumps(dict(os.environ), sort_keys=True, indent=4))
 
     open(args.tracefile, "w").close()
     suite = gen_suite(args.project_path)
-
-    proc = subprocess.Popen([args.binary], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-    err = proc.communicate()[0]
-    rc = proc.wait()
-    if rc == SUCCESSFULLY_DUMPED_RC:
-        suite.chunk.tests.append(facility.TestCase(testname, const.Status.GOOD))
-    else:
-        suite.chunk.add_error("[[bad]]Binary failed with {} return code: {}".format(rc, err), const.Status.FAIL)
+    suite.chunk.tests.append(facility.TestCase(TEST_NAME, const.Status.GOOD))
     shared.dump_trace_file(suite, args.tracefile)
     return 0
 
