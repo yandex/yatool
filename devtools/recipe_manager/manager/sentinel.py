@@ -145,6 +145,7 @@ def _worker_func(conn, log_queue, working_dir):
                 conn.send(RecipeError(str(e)))
     except EOFError:
         logger.debug("Pipe is closed by parent")
+    subreaper.kill_children()
     # XXX: For the same reason as in _sigterm_handler
     os._exit(0)
 
