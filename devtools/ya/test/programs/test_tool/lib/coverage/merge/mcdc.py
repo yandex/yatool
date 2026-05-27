@@ -11,9 +11,8 @@ from .shared import dedup_and_sort, compare_records
 Condition = bool | None  # true, false, null (null when it's been short circuited)
 
 
-class ExecutedTestVector(tp.NamedTuple):
+class TestVector(tp.NamedTuple):
     conditions: tuple[Condition, ...]
-    executed: bool
     result: bool
 
 
@@ -54,7 +53,11 @@ class MCDCRecord(tp.NamedTuple):
     expanded_file_id: int
     region_kind: int  # Could be: 4 BranchRegion, 6 MC/DC branch region, 5 MC/DC decision region, 0 CodeRegion
     conditions: list[bool]  # list of covered conditions inside a region
-    executed_test_vectors: set[ExecutedTestVector]
+
+    # in json result this goes as one list but with the key "executed": bool
+    # we do store test vectors in different sets for convinience and a better understanding
+    executed_test_vectors: set[TestVector]
+    non_executed_test_vectors: set[TestVector]
 
     @classmethod
     def from_raw(cls, raw_record: list | tp.Self) -> tp.Self:
@@ -66,15 +69,26 @@ class MCDCRecord(tp.NamedTuple):
         if (n := len(raw_record)) != 8:
             raise ValueError(f"Invalid raw MC/DC record: actual len = {n}, expected = 8")
 
-        executed_test_vectors: set[ExecutedTestVector] = {
-            ExecutedTestVector(conditions=tuple(tv["conditions"]), executed=tv["executed"], result=tv["result"])
-            for tv in raw_record[MCDC_EXECUTED_TEST_VECTORS_IDX]
-        }
+        executed_test_vectors: set[TestVector] = set()
+        non_executed_test_vectors: set[TestVector] = set()
+
+        for raw_tv in raw_record[MCDC_EXECUTED_TEST_VECTORS_IDX]:
+            tv = TestVector(
+                conditions=tuple(raw_tv["conditions"]),
+                result=raw_tv["result"],
+            )
+
+            bucket = executed_test_vectors if raw_tv["executed"] else non_executed_test_vectors
+            bucket.add(tv)
+
+        # we should drop those that have been executed
+        non_executed_test_vectors -= executed_test_vectors
 
         return cls(
             *raw_record[:6],  # line_start to region_kind
             conditions=raw_record[6][:],  # list[bool]
             executed_test_vectors=executed_test_vectors,
+            non_executed_test_vectors=non_executed_test_vectors,
         )
 
     def __add__(self, other):
@@ -83,10 +97,15 @@ class MCDCRecord(tp.NamedTuple):
                 f"MC/DC Record mismatch left={self}, right={other}. Please contact DEVTOOLSSUPPORT with reproducer."
             )
 
-        merged_test_vectors = self.executed_test_vectors | other.executed_test_vectors
+        # Two records describe the same code region — merge their truth tables.
+        # A vector executed by either side is executed in the union, and is
+        # therefore no longer considered notExec.
+        merged_executed = self.executed_test_vectors | other.executed_test_vectors
+        merged_non_executed = (self.non_executed_test_vectors | other.non_executed_test_vectors) - merged_executed
 
         new_instance = self._replace(
-            executed_test_vectors=merged_test_vectors,
+            executed_test_vectors=merged_executed,
+            non_executed_test_vectors=merged_non_executed,
         )
 
         new_instance._recalc_conditions()
@@ -103,9 +122,13 @@ class MCDCRecord(tp.NamedTuple):
         return true_count / n * 100
 
     @staticmethod
-    def condition_proves_independence(tv1: ExecutedTestVector, tv2: ExecutedTestVector, cond_idx: int) -> bool:
+    def condition_proves_independence(tv1: TestVector, tv2: TestVector, cond_idx: int) -> bool:
         """
         https://github.com/llvm/llvm-project/blob/0a0d4979935cc13ecafdb8c9b00dd74779651781/llvm/lib/ProfileData/Coverage/CoverageMapping.cpp#L249-L252
+
+        Pre-condition: both `tv1` and `tv2` must be vectors that were actually
+        executed. The caller is expected to source them from
+        `MCDCRecord.executed_test_vectors`; non-executed must not be passed in.
         """
         conds1 = tv1.conditions
         conds2 = tv2.conditions
@@ -168,6 +191,13 @@ class MCDCRecord(tp.NamedTuple):
         return self.local_descriptor + self.file_id_descriptor + (len(self.conditions),)
 
     def dump(self) -> list:
+        """
+        Refer to llvm-cov json result
+        """
+        dumped_test_vectors = [{**tv._asdict(), "executed": True} for tv in self.executed_test_vectors] + [
+            {**tv._asdict(), "executed": False} for tv in self.non_executed_test_vectors
+        ]
+
         return [
             self.line_start,
             self.column_start,
@@ -176,7 +206,7 @@ class MCDCRecord(tp.NamedTuple):
             self.expanded_file_id,
             self.region_kind,
             self.conditions,
-            [tv._asdict() for tv in self.executed_test_vectors],
+            dumped_test_vectors,
         ]
 
     def is_covered(self) -> bool:

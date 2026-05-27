@@ -261,7 +261,10 @@ def main():
         ]
 
     if args.mcdc_coverage:
-        cmd.append('--show-mcdc-summary')
+        cmd += [
+            '--show-mcdc-summary',
+            '--show-mcdc-non-executed-vectors',
+        ]
 
     cmd += lib_coverage.util.get_default_llvm_export_args(args.include_generated)
 

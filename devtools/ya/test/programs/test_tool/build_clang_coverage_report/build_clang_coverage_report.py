@@ -199,7 +199,7 @@ def main():
         cmd += ["-object", binary]
 
     if args.mcdc_coverage:
-        cmd += ["--show-mcdc", "--show-mcdc-summary"]
+        cmd += ["--show-mcdc", "--show-mcdc-summary", "--show-mcdc-non-executed-vectors"]
 
     if args.branch_coverage:
         cmd += [f"--show-branches={args.branch_coverage_type}", "--show-branch-summary"]
