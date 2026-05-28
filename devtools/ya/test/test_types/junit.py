@@ -174,7 +174,33 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         return list(set(_f for _f in self.deps + self._custom_dependencies if _f))
 
     def get_run_cmd(self, opts, retry=None, for_dist_build=True):
-        return self._get_run_cmd(graph_consts.SOURCE_ROOT, graph_consts.BUILD_ROOT, opts, retry=retry)
+        cmd = self._get_run_cmd(graph_consts.SOURCE_ROOT, graph_consts.BUILD_ROOT, opts, retry=retry)
+        workers = self.get_parallel_tests_within_node_workers()
+        if workers and workers > 1:
+            run_jtest_cmd = test_tools.get_test_tool_cmd(
+                opts, 'run_jtest', self.global_resources, wrapper=True, run_on_target_platform=True
+            )
+            cmd = (
+                run_jtest_cmd
+                + ["--worker-count", str(workers)]
+                + ["--temp-tracefile-dir", self._get_temp_tracefile_dir(retry, opts.remove_tos)]
+                + cmd
+            )
+        return cmd
+
+    def _get_temp_tracefile_dir(self, retry, remove_tos):
+        suite_work_dir = yc.get_test_suite_work_dir(
+            graph_consts.BUILD_ROOT,
+            self.project_path,
+            self.name,
+            retry=retry,
+            split_count=self._modulo,
+            split_index=self._modulo_index,
+            target_platform_descriptor=self.target_platform_descriptor,
+            multi_target_platform_run=self.multi_target_platform_run,
+            remove_tos=remove_tos,
+        )
+        return os.path.join(suite_work_dir, test_const.TEMPORARY_TRACE_DIR_NAME)
 
     def get_run_cmd_inputs(self, opts):
         return super(JavaTestSuite, self).get_run_cmd_inputs(opts)
