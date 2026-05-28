@@ -12,7 +12,7 @@ import json
 import six
 import shlex
 
-from yalibrary import display, find_root
+from yalibrary import display
 
 from devtools.ya.test import const
 from devtools.ya.test.system import process
@@ -541,18 +541,25 @@ def covdata_textfmt(opts, cov_path):
     if not os.path.exists(covdata):
         logger.error("Not found Go tool covdata in Go toolchain at %s", covdata)
         return const.TestRunExitCode.InfrastructureError
-    cov_path_txt = cov_path + '.txt'
+    try:
+        # Move binary Go coverage data to *.raw directory
+        gocover_dir_raw = gocover_dir + '.raw'
+        os.rename(gocover_dir, gocover_dir_raw)
+        os.makedirs(gocover_dir)
+    except Exception as e:
+        logger.error("Failed move Go coverage directory '%s' -> '%s': %s", gocover_dir, gocover_dir_raw, str(e))
+        return const.TestRunExitCode.InfrastructureError
     try:
         # Convert Go binary coverage data to text format by covdata tool
-        covdata_stderr = os.path.join(gocover_dir, 'covdata.err')
-        covdata_stdout = os.path.join(gocover_dir, 'covdata.out')
+        covdata_stderr = os.path.join(gocover_dir_raw, 'covdata.err')
+        covdata_stdout = os.path.join(gocover_dir_raw, 'covdata.out')
         textfmt_cmd = [
             covdata,
             "textfmt",
             "-i",
-            gocover_dir,
+            gocover_dir_raw,
             "-o",
-            cov_path_txt,
+            cov_path,
         ]
         logger.debug("cmd: %s", textfmt_cmd)
         res = shared.tee_execute(
@@ -570,38 +577,6 @@ def covdata_textfmt(opts, cov_path):
         return const.TestRunExitCode.TimeOut
     except Exception as e:
         logger.error("Fail convert Go coverage to text format: %s", str(e))
-        return const.TestRunExitCode.InfrastructureError
-    try:
-        # Move binary Go coverage data to *.raw directory
-        gocover_dir_raw = gocover_dir + '.raw'
-        os.rename(gocover_dir, gocover_dir_raw)
-        cov_path_txt = os.path.join(gocover_dir_raw, os.path.basename(cov_path_txt))
-        os.makedirs(gocover_dir)
-    except Exception as e:
-        logger.error("Failed move Go coverage directory '%s' -> '%s': %s", gocover_dir, gocover_dir_raw, str(e))
-        return const.TestRunExitCode.InfrastructureError
-    try:
-        # Find arcadia root
-        with open(cov_path_txt, "r") as fr:
-            _ = fr.readline()  # Skip mode line
-            path_and_section = fr.readline().strip()
-            if not path_and_section:
-                return 0  # no coverage data, nothing to patch
-            path = path_and_section.split(":")[0]  # Extract path to first Go file in coverage for detect root
-            if not path:
-                logger.error("Failed find path for detect arcadia root in line '%s'", path_and_section)
-                return const.TestRunExitCode.InfrastructureError
-            arcadia_root = find_root.detect_root(path)
-            if not arcadia_root:
-                logger.error("Failed find arcadia root for Go coverage in path '%s'", path)
-                return const.TestRunExitCode.InfrastructureError
-        # Replace in text format coverage path to arcadia by a.yandex-team.ru
-        with open(cov_path_txt, "r") as fr:
-            with open(cov_path, "w") as fw:  # Put patched coverage data to original cov_path
-                fw.write(fr.read().replace(arcadia_root, 'a.yandex-team.ru'))
-        return 0
-    except Exception as e:
-        logger.error("Failed replace arcadia root to a.yandex-team.ru in Go coverage text format: %s", str(e))
         return const.TestRunExitCode.InfrastructureError
 
 
