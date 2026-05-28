@@ -66,7 +66,7 @@ void TConfMsgManager::ReportDupSrcConfigureErrors(std::function<TStringBuf (TFil
                     << MakeRangeJoiner(", "sv, MakeIteratorRange(begin(moduleNames), end(moduleNames)));
                 output.Finish();
             }
-            *Display()->NewConfMsg(EConfMsgType::Error, "-WDupSrc", TDiagCtrl::TWhere::TOP_LEVEL, 0, 0) << message;
+            *Display()->NewConfMsg(EConfMsgType::Error, "-WDupSrc", TDiagCtrl::TWhere::TOP_LEVEL, 0, 0) << message << Endl;
             HasConfigurationErrors = true;
         }
     }

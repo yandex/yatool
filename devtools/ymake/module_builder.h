@@ -38,10 +38,20 @@ bool IsForbiddenStatement(const TStringBuf& name);
 class TModuleBuilder : public TModuleDirBuilder, public TModuleWrapper
 {
 public:
+    struct TPeerQuery {
+        enum class EAction {Store, Invoke, InvokeForEach};
+        TString Sink; // variable or macro
+        TString Peers; // only a single peer supported so far (TODO)
+        TString View;
+        TVector<TString> Args;
+        EAction Action;
+    };
+public:
     TModuleDef* ModuleDef;
     TVars& Vars;
     TDeps IncludeOnly;
     TDeque<TAutoPtr<TCommandInfo>> CmdAddQueue;
+    std::deque<TPeerQuery> PeerQueries;
     TElemId CurrentInputGroup = TElemId(); //module input deps can be separated into different groups: for now implicit and explicit
     TElemId CurrentGlobalInputGroup = TElemId();
     TElemId ModuleNodeElemId = TElemId();
@@ -144,6 +154,11 @@ public:
 
     /// @brief Process directory macros: PEERDIR, ADDINCL, SRCDIR
     bool DirStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
+
+    /// @brief The action part of the INVOKE* forms of a peer query
+    bool PeerQueryInvoke(const TStringBuf& name, const TStringBuf& args);
+    bool PeerQueryInvoke(const TStringBuf& name, const TVector<TStringBuf>& args);
+
 private:
     enum class EModuleCmdKind {
         // change this enum with caution
@@ -186,6 +201,7 @@ private:
     bool SkipStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool PluginStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool LateGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
+    bool PeerFlowStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
 
     bool QueueCommandOutputs(TCommandInfo& cmdInfo);
 

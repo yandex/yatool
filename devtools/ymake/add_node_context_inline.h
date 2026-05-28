@@ -8,6 +8,13 @@ Y_FORCE_INLINE void TNodeAddCtx::AddDep(EDepType depType, EMakeNodeType elemNode
 
 Y_FORCE_INLINE void TNodeAddCtx::AddDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     Y_ASSERT(elemId);
+    YDIAG(NATR)
+        << "TNodeAddCtx::AddDep"
+        << " @(" << UpdIter.CurNode().NodeType << ")" << UpdIter.CurNode().ElemId << ":"
+        << " (" << NodeType << ")" << ElemId
+        << " -" << depType << "->"
+        << " (" << elemNodeType << ")" << elemId
+        << Endl;
     Deps.Add(depType, elemNodeType, elemId);
 }
 
@@ -25,11 +32,25 @@ Y_FORCE_INLINE bool TNodeAddCtx::AddUniqueDep(EDepType depType, EMakeNodeType el
 
 Y_FORCE_INLINE bool TNodeAddCtx::AddUniqueDep(EDepType depType, EMakeNodeType elemNodeType, TElemId elemId) {
     Y_ASSERT(elemId);
+    YDIAG(NATR)
+        << "TNodeAddCtx::AddUniqueDep"
+        << " @(" << UpdIter.CurNode().NodeType << ")" << UpdIter.CurNode().ElemId << ":"
+        << " (" << NodeType << ")" << ElemId
+        << " -" << depType << "->"
+        << " (" << elemNodeType << ")" << elemId
+        << Endl;
     return Deps.AddUnique(depType, elemNodeType, elemId);
 }
 
 Y_FORCE_INLINE void TNodeAddCtx::AddDepsUnique(const TPropsNodeList& what, EDepType depType, EMakeNodeType nodeType) {
     for (auto propNode : what) {
+        YDIAG(NATR)
+            << "TNodeAddCtx::AddDepsUnique"
+            << " @(" << UpdIter.CurNode().NodeType << ")" << UpdIter.CurNode().ElemId << ":"
+            << " (" << NodeType << ")" << ElemId
+            << " -" << depType << "->"
+            << " (" << nodeType << ")" << ::ElemId(propNode)
+            << Endl;
         Deps.AddUnique(depType, nodeType, ::ElemId(propNode));
     }
 }

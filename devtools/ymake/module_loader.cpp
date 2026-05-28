@@ -223,6 +223,8 @@ bool TModuleDef::IsMulti(const TStringBuf& name) const {
            || name == TStringBuf("DECLARE_EXTERNAL_HOST_RESOURCES_BUNDLE")
            || name == TStringBuf("DECLARE_EXTERNAL_HOST_RESOURCES_PACK")
            || name == NMacro::_LATE_GLOB
+           || name == NMacro::_PEER_QUERY
+           || name == NMacro::_PEER_EXPORT
            || IsUserMacro(name) || Conf.FindPluginMacro(name) != nullptr;
 }
 

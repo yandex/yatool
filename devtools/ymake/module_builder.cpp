@@ -10,6 +10,7 @@
 #include "parser_manager.h"
 #include "prop_names.h"
 #include "diag_reporter.h"
+#include "args2locals.h"
 
 #include <devtools/ymake/lang/plugin_facade.h>
 #include <devtools/ymake/lang/eval_context.h>
@@ -498,10 +499,12 @@ void TModuleBuilder::TryProcessStatement(const TStringBuf& name, const TVector<T
 }
 
 void TModuleBuilder::ProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
+    YDIAG(V) << "TModuleBuilder::ProcessStatement " << name << " (" << JoinSeq(", ", args) << ")" << Endl;
     DirStatement(name, args) ||
     SrcStatement(name, args) ||
     RememberStatement(name, args) ||
     LateGlobStatement(name, args) ||
+    PeerFlowStatement(name, args) ||
     MacroToVarStatement(name, args) ||
     GenStatement(name, args) ||
     PluginStatement(name, args) ||
@@ -695,6 +698,19 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
         return false;
     }
     return true;
+}
+
+bool TModuleBuilder::PeerQueryInvoke(const TStringBuf& name, const TStringBuf& arg) {
+    if (GenStatement(name, {arg})) // for macros with straight up .CMDs inside
+        return true;
+    ProcessConfigMacroCalls(name, {arg}); // for macros calling other macros
+    return true;
+}
+
+bool TModuleBuilder::PeerQueryInvoke(const TStringBuf& name, const TVector<TStringBuf>& args) {
+    if (name == "SRCS")
+        return SrcStatement(name, args);
+    return false;
 }
 
 bool TModuleBuilder::SrcStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
@@ -1017,6 +1033,42 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
         TGlobHelper::SaveGlobPatternElemIds(Module.ModuleGlobsData, globVarElemId, std::move(globPatternElemIds));
     }
     return true;
+}
+
+bool TModuleBuilder::PeerFlowStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
+    if (name == NMacro::_PEER_EXPORT) {
+        // TODO
+        return true;
+    } else if (name == NMacro::_PEER_QUERY) {
+        static auto sig = TSignature{
+            {"SINK", "PEER", "VIEW", "ARGS..."},
+            TSignature::TKeywords()
+                .AddFlagKeyword("INVOKE", "yes", "no")
+                .AddFlagKeyword("INVOKE_FOR_EACH", "yes", "no")
+        };
+        TVars _args = AddMacroArgsToLocals(sig, args).value();
+
+        bool invoke = NYMake::IsTrue(Get1(&_args["INVOKE"]));
+        bool invoke_for_each = NYMake::IsTrue(Get1(&_args["INVOKE_FOR_EACH"]));
+        if (invoke && invoke_for_each)
+            ythrow TError() << "In peer queries, INVOKE and INVOKE_FOR_EACH are mutually exclusive";
+        TVector<TString> queryArgs;
+        for (auto& val : _args["ARGS"])
+            queryArgs.push_back(val.Name);
+
+        PeerQueries.push_back(TPeerQuery{
+            .Sink{Get1(&_args["SINK"])},
+            .Peers{Get1(&_args["PEER"])},
+            .View{Get1(&_args["VIEW"])},
+            .Args{queryArgs},
+            .Action
+                = invoke_for_each ? TModuleBuilder::TPeerQuery::EAction::InvokeForEach
+                : invoke ? TModuleBuilder::TPeerQuery::EAction::Invoke
+                : TModuleBuilder::TPeerQuery::EAction::Store
+        });
+        return true;
+    }
+    return false;
 }
 
 void TModuleBuilder::CallMacro(TStringBuf name, const TVector<TStringBuf>& args) {

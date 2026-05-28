@@ -178,6 +178,8 @@ private:
 
     TModuleGlobsData ModuleGlobsData;
 
+    THashSet<TFileElemId> QueriedPeers;
+
 public:
     TModuleSavedState(const TModule& mod);
 
@@ -206,7 +208,8 @@ public:
         ExtraOuts,
         PeersRules,
         Transition,
-        ModuleGlobsData
+        ModuleGlobsData,
+        QueriedPeers
     );
 };
 
@@ -229,6 +232,7 @@ public:
     TVector<TFileElemId> ExtraOuts;
     ETransition Transition;
     TModuleGlobsData ModuleGlobsData;
+    THashSet<TFileElemId> QueriedPeers;
 
     explicit TModule() = delete; // Must initialize IncDirs.
 

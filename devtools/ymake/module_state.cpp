@@ -56,6 +56,7 @@ namespace {
         NVariableDefs::VAR_TS_CONFIG_DECLARATION_MAP,
         NVariableDefs::VAR_TS_CONFIG_DEDUCE_OUT,
         NVariableDefs::VAR_TS_CONFIG_PRESERVE_JSX,
+        NVariableDefs::VAR__TEST_HELPER__NOINLINE__,
     };
     const TStringBuf DEFAULT_VAR_NAMES[] = {
         NVariableDefs::VAR_CMAKE_CURRENT_SOURCE_DIR,
@@ -144,6 +145,7 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
     DirId = saved.DirId;
     MakefileId = saved.MakefileId;
     GhostPeers = std::move(saved.GhostPeers);
+    QueriedPeers = std::move(saved.QueriedPeers);
     Y_ASSERT(Id != TElemId() && NodeType != EMNT_Deleted && DirId != TFileElemId());
     TFileView moduleDir = GetDir();
 
@@ -216,6 +218,7 @@ void TModule::Save(TModuleSavedState& saved) const {
     saved.ExtraOuts = ExtraOuts;
     saved.Transition = Transition;
     saved.ModuleGlobsData = ModuleGlobsData;
+    saved.QueriedPeers = QueriedPeers;
 
     saved.Attrs.AllBits = Attrs.AllBits;
 

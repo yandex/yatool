@@ -771,6 +771,8 @@ private:
 
     void PropagateIncDirs(const TDGIterAddable& st) const;
     THashSet<TPropertyType> RestoreOutputNodeInducedDeps(TConstDepNodeRef node);
+
+    void DoPeerQueries(TNodeAddCtx* modNode);
 };
 
 template <class V>

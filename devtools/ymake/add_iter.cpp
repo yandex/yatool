@@ -7,6 +7,7 @@
 #include "module_builder.h"
 #include "module_state.h"
 #include "prop_names.h"
+#include "var_eval.h"
 #include "ymake.h"
 
 #include <devtools/ymake/builtin_macro_consts.h>
@@ -171,6 +172,140 @@ namespace {
             }
             return nullptr;
         };
+    }
+
+    //
+    // peer query helpers
+    //
+
+    class TMineInputsVisitor : public TNoReentryVisitorBase<TEntryStats, TGraphIteratorStateItemBase<true>> {
+    public:
+        using TBase = TNoReentryVisitorBase<TEntryStats, TGraphIteratorStateItemBase<true>>;
+        using TState = typename TBase::TState;
+
+    public:
+        bool AcceptDep(TState& state) {
+            return TBase::AcceptDep(state) && IsModuleSrcDep(state.NextDep());
+        }
+
+        bool Enter(TState& state) {
+            if (!TBase::Enter(state))
+                return false;
+            if (!state.HasIncomingDep())
+                return true;
+            return Result.Push(state.TopNode().Id());
+        }
+
+    public:
+        TUniqVector<TNodeId> Result;
+    };
+
+    TFileElemId ForSomePeer(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query, auto action) {
+        for (auto& dep : node->Deps) {
+            if (!IsDirectPeerdirDep(node->NodeType, dep.DepType, dep.NodeType))
+                continue;
+            auto peerMod = node->YMake.GetRestoreContext().Modules.Get(AssumeFile(dep.ElemId));
+            auto peerDir = peerMod->GetDir();
+            if (!(peerDir.InSrcDir() && peerDir.CutType() == query.Peers))
+                continue;
+            action(node->YMake.Graph.GetNodeById(dep.NodeType, dep.ElemId));
+            return peerMod->GetDirId(); // multimatches not supported yet
+        }
+        return TFileElemId();
+    };
+
+
+    TFileElemId DoQueryTarget(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
+        TYVar var;
+        auto result = ForSomePeer(node, query, [&](TConstDepNodeRef to) {
+            var.SetSingleVal(node->Graph.GetFileName(to).GetTargetStr(), false);
+        });
+        node->ModuleBldr->Vars[query.Sink] = std::move(var);
+        return result;
+    }
+
+    TFileElemId DoQueryVariable(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
+        if (query.Args.size() != 1)
+            ythrow TError() << "Querying a variable requires exactly one argument: its name";
+        TYVar var;
+        auto result = ForSomePeer(node, query, [&](TConstDepNodeRef to) {
+            for (const auto& peerDep : to.Edges()) {
+                if (!IsLocalVariableDep(peerDep))
+                    continue;
+                auto varData = node->Graph.GetCmdName(peerDep.To()).GetStr();
+                ui64 id;
+                TStringBuf varName;
+                TStringBuf varValue;
+                ParseLegacyCommandOrSubst(varData, id, varName, varValue);
+                if (varName == query.Args[0]) {
+                    TVars vars;
+                    auto vals = [&]() {
+                        // TBD: obtaining context variables;
+                        // a) `node->ModuleBldr->Vars` is incorrect, we need the peer's vars;
+                        // b) `YMake.Modules.Get(dep.To()->ElemId)->Vars` is half-correct due to `TModule::TrimVars` (only the select few vars are available there);
+                        // c) `TModuleRestorer::UpdateLocalVarsFromModule` is even more specialized and less helpful;
+                        // d) we can always mine peer's local vars from the graph, but eww;
+                        // we'll roll with b) for now
+                        TYVar cmdRef;
+                        cmdRef.SetSingleVal(varValue, false);
+                        cmdRef.back().StructCmdForVars = true;
+                        return EvalAll(
+                            cmdRef,
+                            node->YMake.Modules.Get(AssumeFile(to->ElemId))->Vars,
+                            node->YMake.Commands,
+                            node->Graph.Names().CommandConf,
+                            node->YMake.Conf
+                        );
+                    }();
+                    for (auto& val : vals)
+                        var.push_back(val);
+                    break;
+                }
+            }
+        });
+        node->ModuleBldr->Vars[query.Sink] = std::move(var);
+        return result;
+    }
+
+    TFileElemId DoQueryInputs(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
+        return ForSomePeer(node, query, [&](TConstDepNodeRef to) {
+            // cf. TMakeCommand::MineInputsAndOutputs
+            TMineInputsVisitor visitor;
+            ::IterateAll(to, visitor);
+            TYVar var;
+            for (auto& input : visitor.Result) {
+                auto name = node->Graph.GetFileName(node->Graph.Get(input)).GetTargetStr();
+                if (!std::any_of(query.Args.begin(), query.Args.end(), [&](const auto& arg) {
+                    return name.ends_with(arg);
+                }))
+                    continue;
+                var.push_back(TVarStr(name));
+            }
+            switch (query.Action) {
+                case TModuleBuilder::TPeerQuery::EAction::Store: {
+                    // TODO investigate: we should set var.DontParse here
+                    // to avoid paths becoming like `Terms($S, '/source.cpp')` after getting parsed,
+                    // but for some reason this flag is not propagated to the instance the expression compiler sees
+                    node->ModuleBldr->Vars[query.Sink] = std::move(var);
+                    break;
+                }
+                case TModuleBuilder::TPeerQuery::EAction::Invoke: {
+                    TVector<TStringBuf> args;
+                    args.reserve(var.size());
+                    for (auto& val : var)
+                        args.push_back(val.Name);
+                    if (!node->ModuleBldr->PeerQueryInvoke(query.Sink, args))
+                        ythrow TError() << "Could not invoke " << query.Sink;
+                    break;
+                }
+                case TModuleBuilder::TPeerQuery::EAction::InvokeForEach: {
+                    for (auto& val : var)
+                        if (!node->ModuleBldr->PeerQueryInvoke(query.Sink, val.Name))
+                            ythrow TError() << "Could not invoke " << query.Sink << " on " << val.Name;
+                    break;
+                }
+            }
+        });
     }
 }
 
@@ -1549,6 +1684,15 @@ inline void TUpdIter::Left(TState& state) {
     }
     TDGIterAddable& st = state.back();
 
+    if (!needEdit && chldStats.HasChanges) {
+        if (IsPeerdirDep(st.Node.NodeType, st.Dep.DepType, st.Dep.DepNode.NodeType)) {
+            auto mod = YMake.Modules.Get(AssumeFile(st.Node.ElemId)); // we cannot rely on st.Add's presence here
+            if (mod->QueriedPeers.contains(AssumeFile(st.Dep.DepNode.ElemId))) {
+                YDIAG(IPRP) << "Peerdirs query-status have been changed, set needEdit" << Endl;
+                needEdit = true;
+            }
+        }
+    }
     if (!needEdit && chldStats.HasChanges && DirectDepsNeedUpdate(st, oldDepNode) ) {
         if (IsPeerdirDep(st.Node.NodeType, st.Dep.DepType, st.Dep.DepNode.NodeType)) {
             YDIAG(IPRP) << "Peerdirs status have been changed, set needEdit" << Endl;
@@ -1644,6 +1788,7 @@ inline void TUpdIter::Left(TState& state) {
                 switch (peerNode.Status) {
                     case EPeerSearchStatus::Match:
                         if (peerNode.Node.IsValid()) {
+                            // TBD how about firing off relevant peer queries right here?
                             // Add direct peerdir
                             node->AddUniqueDep(st.Dep.DepType, peerNode.Node.Value().NodeType, peerNode.Node.Value().ElemId);
                         }
@@ -1676,6 +1821,7 @@ inline void TUpdIter::Left(TState& state) {
             if (st.AtEnd()) {
                 if (!node->Module->IsInputsComplete()) {
                     AssertEx(node->ModuleBldr != nullptr, "Module was not processed");
+                    DoPeerQueries(node);
                     node->ModuleBldr->RecursiveAddInputs();
                 }
             }
@@ -2060,4 +2206,24 @@ TNodeId TUpdIter::RecursiveAddNode(EMakeNodeType type, TElemId id, TModule* modu
     //YDIAG(GUpd) << "RA-: " << name << Endl;
 
     return LastNode;
+}
+
+void TUpdIter::DoPeerQueries(TNodeAddCtx* modNode) {
+    auto& _queries = modNode->ModuleBldr->PeerQueries;
+    while (!_queries.empty()) {
+        auto query = std::move(_queries.front());
+        _queries.pop_front();
+        auto peer = TFileElemId();
+        if (query.View == "target") {
+            peer = DoQueryTarget(modNode, query);
+        } else if (query.View == "variable") {
+            peer = DoQueryVariable(modNode, query);
+        } else if (query.View == "inputs") {
+            peer = DoQueryInputs(modNode, query);
+        } else {
+            // TODO default
+        }
+        if (peer)
+            modNode->Module->QueriedPeers.insert(peer);
+    }
 }
