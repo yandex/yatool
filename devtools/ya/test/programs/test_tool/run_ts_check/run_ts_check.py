@@ -143,7 +143,8 @@ class ReportFileWatcher:
         self.tracefile = tracefile
         self.last_position = 0
         self.last_check_time = 0
-        self.check_interval = 0.2  # Check every 500ms
+        self.check_interval = 0.2  # Check every 200ms
+        self._line_buffer = ""
 
     def open(self, command, process, out_file, err_file):
         """Called when process starts."""
@@ -168,14 +169,30 @@ class ReportFileWatcher:
                     new_content = f.read()
                     if new_content:
                         self.last_position = f.tell()
-                        lines = new_content.splitlines()
-                        self._process_event_lines(lines)
+                        self._process_new_content(new_content)
             except (IOError, OSError) as e:
                 logger.debug(f"Error reading report file: {e}")
+
+    def _process_new_content(self, new_content: str):
+        """Process complete lines from newly read report file content."""
+        content = self._line_buffer + new_content
+        if not content:
+            return
+
+        lines = content.split("\n")
+        if new_content.endswith("\n"):
+            self._line_buffer = ""
+        else:
+            self._line_buffer = lines.pop()
+
+        self._process_event_lines(lines)
 
     def _process_event_lines(self, lines: list[str]):
         """Process event lines from report file."""
         for line in lines:
+            line = line.rstrip("\r")
+            if not line:
+                continue
             test_case = parse_event(line, self.script_name)
             self.suite.chunk.tests.append(test_case)
         self.suite.generate_trace_file(self.tracefile, append=True)
@@ -183,6 +200,9 @@ class ReportFileWatcher:
     def close(self):
         """Called when process finishes - do final check."""
         self._check_report_file()
+        if self._line_buffer:
+            self._process_event_lines([self._line_buffer])
+            self._line_buffer = ""
 
 
 def run(args: CliArgs):
