@@ -43,12 +43,6 @@ public class Shared {
         }
     }
 
-    public static class TagSplitter implements IParameterSplitter {
-        public List<String> split(String value) {
-            return Arrays.asList(value.split("\\+|\\s"));
-        }
-    }
-
     //CHECKSTYLE:OFF
     public static class Parameters {
         @Parameter(names = {"-o", "--output"})
@@ -87,7 +81,7 @@ public class Shared {
         @Parameter(names = {"-F", "--filter"}, splitter = NonSplitter.class)
         public List<String> filters = new ArrayList<>();
 
-        @Parameter(names = {"--junit-tags"}, splitter = TagSplitter.class)
+        @Parameter(names = {"--junit-tags"}, splitter = NonSplitter.class)
         public List<String> junit_tags = new ArrayList<>();
 
         @Parameter(names = {"-t", "--tests-jar"}, required = true)
