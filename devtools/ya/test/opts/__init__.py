@@ -243,10 +243,13 @@ class RunTestOptions(devtools.ya.core.yarg.Options):
                         getattr(params, flags)['ADD_PEERDIRS_GEN_TESTS'] = 'yes'
 
         if self.use_persistent_recipes:
+            if getattr(params, 'cache_tests', False):
+                raise devtools.ya.core.yarg.ArgsValidatingException(
+                    '--use-persistent-recipes is not compatible with --cache-tests'
+                )
             if getattr(params, 'use_distbuild', False):
                 raise devtools.ya.core.yarg.ArgsValidatingException(
-                    "--use-persistent-recipes is not compatible with --dist: "
-                    "persistent recipes require a shared filesystem between chunks"
+                    "--use-persistent-recipes is not compatible with --dist"
                 )
             if getattr(params, 'run_tagged_tests_on_yt', False):
                 raise devtools.ya.core.yarg.ArgsValidatingException(
