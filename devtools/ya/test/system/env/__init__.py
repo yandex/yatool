@@ -136,6 +136,7 @@ def get_common_env_names():
         "YA_CACHE_DIR",
         "YA_TIMEOUT",
         "YA_TOKEN",
+        "YA_SOURCE_ROOT",
     )
     env_vars += [name for name in os.environ if name.startswith("YA_") and not name.startswith(skip)]
     return env_vars
