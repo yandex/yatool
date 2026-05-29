@@ -28,8 +28,6 @@ from . import fuzzing
 
 from . import sandbox as sandbox_node
 
-import exts.fs
-import exts.os2
 import exts.timer
 import devtools.ya.test.canon.data as canon_data
 import devtools.ya.test.common as test_common
@@ -288,7 +286,6 @@ class TestFramer(object):
 
         suite.uid = get_suite_uid(
             suite,
-            self.graph,
             self.arc_root,
             self.opts,
             self.distbuild_runner,
@@ -1287,7 +1284,6 @@ def _stable_dir_outputs(suite, opts):
 
 def get_suite_uid(
     suite,
-    graph,
     arc_root,
     opts,
     is_for_distbuild,
@@ -1313,11 +1309,54 @@ def get_suite_uid(
             'tests_limit_in_suite',
         )
 
-        imprint_parts = (
-            suite.get_run_cmd(opts, retry=None, for_dist_build=is_for_distbuild)
-            + [uid_gen.TestUidGenerator.get(suite, graph, arc_root, opts)]
-            + ["{}={}".format(x, getattr(opts, x)) for x in uid_changing_opts if getattr(opts, x, None)]
+        run_cmd = suite.get_run_cmd(opts, retry=None, for_dist_build=is_for_distbuild)
+        active_uid_opts = ["{}={}".format(x, getattr(opts, x)) for x in uid_changing_opts if getattr(opts, x, None)]
+
+        deps = list(suite.get_build_dep_uids())
+
+        paths = testdeps.get_test_related_paths(suite, arc_root, opts)
+        paths.extend([os.path.join(arc_root, "ya")])
+        paths = testdeps.remove_redundant_paths(paths)
+        test_paths_hashes = imprint.generate_path_imprint(paths)
+
+        affecting_tags = sorted(t for t in suite.tags if t.startswith(("ya:", "sb:")))
+
+        sandbox_resources = testdeps.get_test_sandbox_resources(suite)
+        sandbox_resource_parts = ["sandbox-resource-{}-ro".format(resource.get_id()) for resource in sandbox_resources]
+        ext_sbr_resource_parts = [
+            "sandbox-resource-ext-{}-ro".format(resource)
+            for resource in testdeps.get_test_ext_sbr_resources(suite, arc_root)
+        ]
+
+        prepare_cmds, _ = suite.get_prepare_test_cmds()
+        prepare_cmd_args = [x for cmd in prepare_cmds for x in cmd['cmd_args']]
+        prepare_cmd_cwds = [cmd.get('cwd', '') for cmd in prepare_cmds]
+
+        sbr_uid_ext_part = "sbr_uid_ext={}".format(suite.get_sandbox_uid_extension())
+
+        suite_imprint_parts = (
+            [
+                suite.name,
+                suite.project_path,
+                test_paths_hashes,
+                suite.timeout,
+                suite.get_fork_mode(),
+                suite.get_split_factor(opts),
+            ]
+            + deps
+            + sorted(suite._original_requirements.items())
+            + affecting_tags
+            + [sbr_uid_ext_part]
+            + prepare_cmd_args
+            + prepare_cmd_cwds
+            + sandbox_resource_parts
+            + ext_sbr_resource_parts
         )
+
+        if suite.recipes:
+            suite_imprint_parts.append(suite.recipes)
+
+        imprint_parts = run_cmd + [imprint.combine_imprints(*suite_imprint_parts)] + active_uid_opts
         # XXX
         # Suite output paths may contain the name of the target platform,
         # which can lead to problems when different platforms will not affect test's uid.
@@ -1335,6 +1374,66 @@ def get_suite_uid(
         imprint_parts.append(str(suite.get_fork_partition_mode()))
 
         uid = '-'.join(map(str, [_f for _f in ['test', imprint.combine_imprints(*imprint_parts)] if _f]))
+
+        if getattr(opts, 'log_uid_calc', False):
+            logger.debug(
+                "Suite uid for %s/%s: %s\n"
+                "  [suite imprint]\n"
+                "    name: %s\n"
+                "    project_path: %s\n"
+                "    test_paths_hashes: %s\n"
+                "    timeout: %s\n"
+                "    fork_mode: %s\n"
+                "    split_factor: %s\n"
+                "    deps: %s\n"
+                "    requirements: %s\n"
+                "    affecting_tags: %s\n"
+                "    sbr_uid_ext: %s\n"
+                "    prepare_cmd_args: %s\n"
+                "    prepare_cmd_cwds: %s\n"
+                "    sandbox_resources: %s\n"
+                "    ext_sbr_resources: %s\n"
+                "    recipes: %s\n"
+                "  [node imprint]\n"
+                "    run_cmd: %s\n"
+                "    active_uid_opts: %s\n"
+                "    out_dir: %s\n"
+                "    FAKEID: %s\n"
+                "    test_types_fakeid[%s]: %s\n"
+                "    test_fakeid: %s\n"
+                "    tests_retries: %s\n"
+                "    fork_test_files_requested: %s\n"
+                "    fork_partition_mode: %s",
+                suite.project_path,
+                suite.name,
+                uid,
+                suite.name,
+                suite.project_path,
+                test_paths_hashes,
+                suite.timeout,
+                suite.get_fork_mode(),
+                suite.get_split_factor(opts),
+                deps,
+                sorted(suite._original_requirements.items()),
+                affecting_tags,
+                sbr_uid_ext_part,
+                prepare_cmd_args,
+                prepare_cmd_cwds,
+                sandbox_resource_parts,
+                ext_sbr_resource_parts,
+                suite.recipes or '',
+                run_cmd,
+                active_uid_opts,
+                out_dir,
+                opts.flags.get('FAKEID', ''),
+                suite.get_type(),
+                opts.test_types_fakeid.get(suite.get_type(), ''),
+                opts.test_fakeid,
+                opts.tests_retries,
+                suite.fork_test_files_requested(opts),
+                suite.get_fork_partition_mode(),
+            )
+
     return uid
 
 

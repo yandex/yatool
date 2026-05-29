@@ -913,7 +913,7 @@ class RuntimeEnvironOptions(devtools.ya.core.yarg.Options):
             self.private_net_ns = True
             self.runner_dir_outputs = False
 
-    def postprocess2(self, params):  # type: (Options) -> None
+    def postprocess2(self, params):
         if params.autocheck_mode:
             params.limit_build_root_size = True
 
@@ -924,6 +924,7 @@ class UidCalculationOptions(devtools.ya.core.yarg.Options):
         self.test_types_fakeid = {}
         self.test_fakeid = ""
         self.force_retest = False
+        self.log_uid_calc = False
 
     def consumer(self):
         return [
@@ -949,6 +950,18 @@ class UidCalculationOptions(devtools.ya.core.yarg.Options):
             # Allows to change test's uid per suite type
             devtools.ya.core.yarg.ConfigConsumer('test_types_fakeid'),
             devtools.ya.core.yarg.ConfigConsumer('test_fakeid'),
+            TestArgConsumer(
+                ['--log-uid-calc'],
+                help='Log test suite uid and the parts it consists of',
+                hook=devtools.ya.core.yarg.SetConstValueHook('log_uid_calc', True),
+                subgroup=UID_CALCULATION_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_LOG_UID_CALC',
+                hook=devtools.ya.core.yarg.SetValueHook('log_uid_calc', devtools.ya.core.yarg.return_true_if_enabled),
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('log_uid_calc'),
         ]
 
     def postprocess(self):
