@@ -28,7 +28,7 @@ TModule& TModules::Create(const TStringBuf& dir, const TStringBuf& makefile, con
 }
 
 TModule* TModules::Get(TFileElemId id) {
-    const auto iter = ModulesById.find(RawElemId(id));
+    const auto iter = ModulesById.find(id);
     return iter != ModulesById.end() ? iter->second : nullptr;
 }
 
@@ -60,24 +60,24 @@ void TModules::Commit(TModule& module) {
     AssertEx(module.HasId(), "Attempt to commit module without Id");
 
     auto id = module.GetId();
-    if (ModulesById.contains(RawElemId(id))) {
-        TModule* oldMod = ModulesById[RawElemId(id)];
+    if (ModulesById.contains(id)) {
+        TModule* oldMod = ModulesById[id];
         if (oldMod == &module) {
-            ModuleIncludesById.erase(RawElemId(id));
+            ModuleIncludesById.erase(id);
             oldMod->PeersComplete = false;
             YDIAG(V) << "Re-Committed module: " << module.GetMakefile() << " as " << module.GetFileName() << " (" << id << ")" << Endl;
             return;
-        } else if (ModulesById[RawElemId(id)]->IsLoaded()) {
+        } else if (ModulesById[id]->IsLoaded()) {
             // We let override cached module by parsed one
             AssertEx(!module.IsLoaded(), "Attempt to commit new cached module " + ToString(id));
             ModulesStore.erase(oldMod);
-            ModuleIncludesById.erase(RawElemId(id));
+            ModuleIncludesById.erase(id);
             delete oldMod;
         } else {
             AssertEx(false, "Attempt to commit module with duplicate id " + ToString(id));
         }
     }
-    ModulesById[RawElemId(id)] = &module;
+    ModulesById[id] = &module;
     module.ComputeConfigVars();
     module.Committed = true;
     YDIAG(V) << "Committed module: " << module.GetMakefile() << " as " << module.GetFileName() << " (" << id << ")" << Endl;
@@ -87,8 +87,8 @@ void TModules::Commit(TModule& module) {
 
 void TModules::Destroy(TModule& module) {
     if (module.HasId() && module.Committed) {
-        ModulesById.erase(RawElemId(module.GetId()));
-        ModuleIncludesById.erase(RawElemId(module.GetId()));
+        ModulesById.erase(module.GetId());
+        ModuleIncludesById.erase(module.GetId());
     }
     ModulesStore.erase(&module);
     delete &module;
@@ -166,7 +166,7 @@ void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
     for (const auto& [modId, module] : ModulesById) {
         ::Save(output, modId);
 
-        const auto moduleLists = GetModuleNodeLists(TFileElemId(modId));
+        const auto moduleLists = GetModuleNodeLists(modId);
         TVector<TElemId> uniqPeersIds, managedDirectPeersIds;
         for (auto peer : moduleLists.UniqPeers()) {
             uniqPeersIds.push_back(graph.Get(peer)->ElemId);
@@ -280,27 +280,27 @@ THolder<TOwnEntries> TModules::ExtractSharedEntries(TFileElemId makefileId) {
 }
 
 TModuleNodeLists TModules::GetModuleNodeLists(TFileElemId moduleId) {
-    return {NodeListStore, ModuleIncludesById[RawElemId(moduleId)].NodeIds};
+    return {NodeListStore, ModuleIncludesById[moduleId].NodeIds};
 }
 
 TModuleNodeLists TModules::GetModuleNodeLists(TFileElemId moduleId) const {
-    return {NodeListStore, ModuleIncludesById.at(RawElemId(moduleId)).NodeIds};
+    return {NodeListStore, ModuleIncludesById.at(moduleId).NodeIds};
 }
 
 TModuleNodeIds& TModules::GetModuleNodeIds(TFileElemId moduleId) {
-    return ModuleIncludesById[RawElemId(moduleId)].NodeIds;
+    return ModuleIncludesById[moduleId].NodeIds;
 }
 
 const TModuleNodeIds& TModules::GetModuleNodeIds(TFileElemId moduleId) const {
-    return ModuleIncludesById.at(RawElemId(moduleId)).NodeIds;
+    return ModuleIncludesById.at(moduleId).NodeIds;
 }
 
 TGlobalVars& TModules::GetGlobalVars(TFileElemId moduleId) {
-    return ModuleIncludesById[RawElemId(moduleId)].GlobalVars;
+    return ModuleIncludesById[moduleId].GlobalVars;
 }
 
 const TGlobalVars& TModules::GetGlobalVars(TFileElemId moduleId) const {
-    return ModuleIncludesById.at(RawElemId(moduleId)).GlobalVars;
+    return ModuleIncludesById.at(moduleId).GlobalVars;
 }
 
 void TModules::ClearModuleLateOuts(TFileElemId moduleId) {

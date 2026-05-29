@@ -115,16 +115,16 @@ private:
     TFileView RootDir;
     TVector<TGlobPart> Parts;
 
-    TUniqVector<ui32> WatchDirs;
+    TUniqVector<TFileElemId> WatchDirs;
     TString MatchesHash;
 
 public:
     TGlobPattern(TFileConf& fileConf, TStringBuf glob, TFileView rootDir);
 
-    TGlobPattern(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<ui32>&& oldWatchDirs);
+    TGlobPattern(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<TFileElemId>&& oldWatchDirs);
 
     // Watch-dir timestamp changed -> apply glob
-    static bool WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watchDirs);
+    static bool WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<TFileElemId>& watchDirs);
 
     // Is hash(matches) or WatchDirs list changed
     bool NeedUpdate(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat = nullptr);
@@ -132,7 +132,7 @@ public:
     // Returns list of files, matched by the glob pattern
     TVector<TFileView> Apply(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat = nullptr);
 
-    const TUniqVector<ui32>& GetWatchDirs() const {
+    const TUniqVector<TFileElemId>& GetWatchDirs() const {
         return WatchDirs;
     }
 

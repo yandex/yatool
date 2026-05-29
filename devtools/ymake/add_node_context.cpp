@@ -118,7 +118,7 @@ namespace {
             if (!inProps.empty()) {
                 res.reserve(inProps.size());
                 for (auto file: parser->MapProps(ctx.Graph.Names(), tgtFile, type, inProps)) {
-                    res.push_back(MakeDepFileCacheId(ctx.Graph.Names().AddName(EMNT_MissingFile, file)));
+                    res.push_back(MakeDepFileCacheId(AssumeFile(ctx.Graph.Names().AddName(EMNT_MissingFile, file))));
                 }
             }
         }
@@ -220,7 +220,7 @@ void TNodeAddCtx::UseOldDeps() {
                         << " -" << dep.DepType << "> "
                         << dep.NodeType << " " << " " << dep.ElemId << " "
                         << Graph.GetFileName(dep.NodeType, AssumeFile(dep.ElemId)) << Endl;
-            delayedDeps.Push(RawElemId(dep.ElemId));
+            delayedDeps.Push(AssumeFile(dep.ElemId));
         } else {
             Deps.Add(dep.DepType, dep.NodeType, dep.ElemId);
         }
@@ -245,12 +245,12 @@ void TNodeAddCtx::AddInputs() {
             THashSet<TString> ignoreSelfPeers;
             StringSplitter(GetCmdValue(Module->Vars.Get1("_IGNORE_PEERDIRSELF"))).Split(' ').SkipEmpty().Collect(&ignoreSelfPeers);
             for (const auto modId : Module->SelfPeers) {
-                const auto mod = YMake.Modules.Get(TFileElemId(modId));
+                const auto mod = YMake.Modules.Get(modId);
                 if (!mod || ignoreSelfPeers.contains(mod->GetTag())) {
                     continue;
                 }
                 const auto depType = Module->GetPeerdirType() == EPT_BuildFrom ? EDT_BuildFrom : EDT_Include;
-                AddUniqueDep(depType, mod->GetNodeType(), TElemId(modId));
+                AddUniqueDep(depType, mod->GetNodeType(), modId);
             }
         }
         NodeType = Module->GetNodeType();
@@ -341,7 +341,7 @@ void TNodeAddCtx::AddDirsToProps(const TVector<TFileElemId>& dirIds, TStringBuf 
     propNodeDelayedDeps.clear();
 
     for (const auto& dirId : dirIds) {
-        propNodeDelayedDeps.Push(RawElemId(dirId));
+        propNodeDelayedDeps.Push(dirId);
         YDIAG(GUpd) << "Delaying prop dir dep " << NodeType << " " << Graph.ToString(Graph.GetNodeById(NodeType, ElemId))
                     << " " << (ui64)propNodeCacheId << " -> " << dirId << " "
                     << Graph.GetFileName(dirId) << Endl;

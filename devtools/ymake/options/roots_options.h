@@ -19,8 +19,8 @@ struct TRootsOptions {
     TString RealPath(const TStringBuf& p1, const TStringBuf& p2, const TStringBuf& p3) const;
 
     // Cache-accelerated versions work for elements of symbol table (RefNames)
-    TString RealPath(TStringBuf path, std::optional<ui64> elemId) const;
-    TString RealPathEx(TStringBuf path, std::optional<ui64> elemId) const;
+    TString RealPath(TStringBuf path, std::optional<TFileElemId> elemId) const;
+    TString RealPathEx(TStringBuf path, std::optional<TFileElemId> elemId) const;
 
     template<typename TView>
     TString RealPath(TView view) const {

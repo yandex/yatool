@@ -122,7 +122,7 @@ TGlobPattern::TGlobPattern(TFileConf& fileConf, TStringBuf glob, TFileView rootD
     ParseGlobPattern();
 }
 
-TGlobPattern::TGlobPattern(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<ui32>&& oldWatchDirs)
+TGlobPattern::TGlobPattern(TFileConf& fileConf, TFileView rootDir, TStringBuf pattern, TStringBuf hash, TUniqVector<TFileElemId>&& oldWatchDirs)
     : TGlobPattern(fileConf, pattern, rootDir)
 {
     WatchDirs = std::move(oldWatchDirs);
@@ -174,14 +174,14 @@ void TGlobPattern::ParseGlobPattern() {
     finishFixedPart(fixedPartBegin, parts.end());
 }
 
-bool TGlobPattern::WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<ui32>& watchDirs) {
-    return AnyOf(watchDirs, [&](ui32 dirId) {
-        return fileConf.GetFileById(TFileElemId(dirId))->CheckForChanges(ECheckForChangesMethod::RELAXED);
+bool TGlobPattern::WatchDirsUpdated(TFileConf& fileConf, const TUniqVector<TFileElemId>& watchDirs) {
+    return AnyOf(watchDirs, [&](TFileElemId dirId) {
+        return fileConf.GetFileById(dirId)->CheckForChanges(ECheckForChangesMethod::RELAXED);
     });
 }
 
 bool TGlobPattern::NeedUpdate(const TExcludeMatcher& excludeMatcher, TGlobStat* globStat) {
-    TUniqVector<ui32> oldWatchDirs = std::move(WatchDirs);
+    TUniqVector<TFileElemId> oldWatchDirs = std::move(WatchDirs);
     TString oldMatchesHash = std::move(MatchesHash);
     Apply(excludeMatcher, globStat);
     bool equal = (oldMatchesHash == MatchesHash) && (oldWatchDirs == WatchDirs);
@@ -223,17 +223,17 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
                     auto id = FileConf.Add(path);
                     bool found = ApplyFixedPart(newDirs, matches, id, isLastPart, excludeMatcher, skippedFilesCount);
                     if (isLastPart || !found) {
-                        WatchDirs.Push(RawElemId(FileConf.Add(NPath::Parent(path))));
+                        WatchDirs.Push(AssumeFile(FileConf.Add(NPath::Parent(path))));
                     }
                     break;
                 }
                 case TGlobPart::EGlobType::Pattern:
                 case TGlobPart::EGlobType::Anything: {
-                    WatchDirs.Push(RawElemId(dir.GetElemId()));
+                    WatchDirs.Push(dir.GetElemId());
                     ApplyPatternPart(newDirs, matches, match, dir.GetElemId(), isLastPart, excludeMatcher, skippedFilesCount);
                     if (!isLastPart) {
                         for (const auto& newDir : newDirs) {
-                            WatchDirs.Push(RawElemId(newDir.GetElemId()));
+                            WatchDirs.Push(newDir.GetElemId());
                         }
                     }
                     break;
@@ -242,7 +242,7 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
                     ApplyRecursivePart(newDirs, dir.GetElemId(), excludeMatcher);
                     newDirs.push_back(dir);
                     for (const auto& newDir : newDirs) {
-                        WatchDirs.Push(RawElemId(newDir.GetElemId()));
+                        WatchDirs.Push(newDir.GetElemId());
                     }
                     break;
                 }
@@ -254,7 +254,7 @@ TVector<TFileView> TGlobPattern::Apply(const TExcludeMatcher& excludeMatcher, TG
     }
 
     if (WatchDirs.empty()) {
-        WatchDirs.Push(RawElemId(RootDir.GetElemId()));
+        WatchDirs.Push(RootDir.GetElemId());
     }
 
     MD5 md5;

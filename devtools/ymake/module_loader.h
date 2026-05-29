@@ -22,9 +22,9 @@ class TModules;
 struct TModuleGlobInfo {
     TCmdElemId GlobPatternId;
     TCmdElemId GlobPatternHash;
-    TVector<ui32> WatchedDirs;
-    TVector<ui32> MatchedFiles;
-    TVector<ui32> Excludes;
+    TVector<TFileElemId> WatchedDirs;
+    TVector<TFileElemId> MatchedFiles;
+    TVector<TCmdElemId> Excludes;
     TCmdElemId ReferencedByVar;
 };
 

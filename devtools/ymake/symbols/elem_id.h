@@ -67,6 +67,24 @@ Y_FORCE_INLINE constexpr TCmdElemId AssumeCmd(TElemId elemId) {
     return TCmdElemId(elemId.Raw());
 }
 
+struct TElemIdIdentityHash {
+    size_t operator()(TElemId id) const noexcept {
+        return id.Raw();
+    }
+};
+
+struct TFileElemIdIdentityHash {
+    size_t operator()(TFileElemId id) const noexcept {
+        return id.Raw();
+    }
+};
+
+struct TCmdElemIdIdentityHash {
+    size_t operator()(TCmdElemId id) const noexcept {
+        return id.Raw();
+    }
+};
+
 template <>
 struct THash<TElemId> {
     size_t operator()(TElemId id) const noexcept {

@@ -161,10 +161,10 @@ private:
     TVector<TFileElemId> SrcsDirsIds;
     TVector<TFileElemId> MissingDirsIds;
     TVector<TFileElemId> DataPathsIds;
-    TVector<ui32> SelfPeers;
+    TVector<TFileElemId> SelfPeers;
     TVector<TFileElemId> ExtraOuts;
 
-    TVector<ui32> OwnEntries;
+    TVector<TFileElemId> OwnEntries;
 
     THashSet<TResolveResult> ResolveResults;
 
@@ -228,7 +228,7 @@ public:
     THashMap<TFileElemId, EGhostType> GhostPeers; // dir ElemId -> material/virtual
     THashSet<TResolveResult> ResolveResults;
     TRawIncludes RawIncludes;
-    TVector<ui32> SelfPeers;
+    TVector<TFileElemId> SelfPeers;
     TVector<TFileElemId> ExtraOuts;
     ETransition Transition;
     TModuleGlobsData ModuleGlobsData;

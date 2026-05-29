@@ -107,12 +107,12 @@ const TFsPath& TRootsOptions::RealPathRoot(const TStringBuf& p) const {
 
 struct TFakeView {
     TStringBuf Path;
-    std::optional<ui64> ElemId; // FIXME
+    std::optional<TFileElemId> ElemId;
     bool HasId() const {
         return ElemId.has_value();
     }
     TFileElemId GetTargetId() const {
-        return ElemId ? TFileElemId(*ElemId) : TFileElemId();
+        return ElemId.value_or(TFileElemId());
     }
     TStringBuf GetTargetStr() const {
         return NPath::ResolveLink(Path);
@@ -123,13 +123,13 @@ struct TFakeView {
 };
 
 // Note: returns path in host platform format
-TString TRootsOptions::RealPath(TStringBuf path, std::optional<ui64> elemId) const {
+TString TRootsOptions::RealPath(TStringBuf path, std::optional<TFileElemId> elemId) const {
     TFakeView view{path, elemId};
     return RealPath(view);
 }
 
 // Note: returns path in host platform format
-TString TRootsOptions::RealPathEx(TStringBuf path, std::optional<ui64> elemId) const {
+TString TRootsOptions::RealPathEx(TStringBuf path, std::optional<TFileElemId> elemId) const {
     TString res = RealPath(path, elemId);
     Y_ASSERT(!res.empty());
     return res;

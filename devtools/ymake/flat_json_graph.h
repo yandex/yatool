@@ -41,6 +41,19 @@ namespace NFlatJsonGraph {
         }
     };
 
+    template<>
+    struct TNodePropertyTrait<TElemId> {
+        static void Serialize(NJsonWriter::TBuf& to, TElemId value) {
+            to.WriteLongLong(RawElemId(value));
+        }
+    };
+
+    template<>
+    struct TNodePropertyTrait<TFileElemId>: TNodePropertyTrait<TElemId> {};
+
+    template<>
+    struct TNodePropertyTrait<TCmdElemId>: TNodePropertyTrait<TElemId> {};
+
     template<NodePropertiesRange TRange>
     struct TNodePropertyTrait<TRange> {
         static void Serialize(NJsonWriter::TBuf& to, const TRange& value) {

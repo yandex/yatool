@@ -29,8 +29,6 @@
 #include <util/string/cast.h>
 #include <util/string/split.h>
 
-// TODO switch over all them TUniqVector<ui32>'s to TElemId, if we end up making it an enum
-
 namespace {
     TElemId GetNeverCachePropElem(const TDepGraph& graph) {
         auto node = graph.GetCommandNode(NProps::NEVERCACHE_PROP);
@@ -39,9 +37,9 @@ namespace {
 
     struct TGlobPatternInfo {
         TStringBuf GlobHash;
-        TUniqVector<ui32> WatchDirs;
-        TUniqVector<ui32> VarElemIds;
-        TUniqVector<ui32> Excludes;
+        TUniqVector<TFileElemId> WatchDirs;
+        TUniqVector<TCmdElemId> VarElemIds;
+        TUniqVector<TCmdElemId> Excludes;
         TExcludeMatcher ExcludesMatcher;
     };
 
@@ -55,14 +53,14 @@ namespace {
                 if (propName == NProps::GLOB_HASH) {
                     res.GlobHash = GetPropertyValue(prop);
                 } else if (propName == NProps::REFERENCED_BY) {
-                    res.VarElemIds.Push(RawElemId(edge.To()->ElemId));
+                    res.VarElemIds.Push(AssumeCmd(edge.To()->ElemId));
                 } else if (propName == NProps::GLOB_EXCLUDE) {
-                    if (res.Excludes.Push(RawElemId(edge.To()->ElemId))) {
+                    if (res.Excludes.Push(AssumeCmd(edge.To()->ElemId))) {
                         res.ExcludesMatcher.AddExcludePattern(dirName, GetPropertyValue(prop));
                     }
                 }
             } else if (edge.Value() == EDT_Search && IsDirType(edge.To()->NodeType)) {
-                res.WatchDirs.Push(RawElemId(edge.To()->ElemId));
+                res.WatchDirs.Push(AssumeFile(edge.To()->ElemId));
             }
         }
         return res;
@@ -71,8 +69,8 @@ namespace {
     void OnChangeGlobPatternStat(TModuleGlobsData& moduleGlobsData, const TCmdElemId globPatternElemId, TGlobStat&& globPatternStat, const TGlobPatternInfo& globInfo, const TStringBuf& name, const TStringBuf& pattern) {
         TGlobHelper::SaveGlobPatternStat(moduleGlobsData, globPatternElemId, std::move(globPatternStat));
         for (const auto globVarElemId: globInfo.VarElemIds) {
-            const auto& globRestrictions = TGlobHelper::GetGlobRestrictions(moduleGlobsData, TCmdElemId(globVarElemId));
-            const auto& globPatternElemIds = TGlobHelper::GetGlobPatternElemIds(moduleGlobsData, TCmdElemId(globVarElemId));
+            const auto& globRestrictions = TGlobHelper::GetGlobRestrictions(moduleGlobsData, globVarElemId);
+            const auto& globPatternElemIds = TGlobHelper::GetGlobPatternElemIds(moduleGlobsData, globVarElemId);
             TGlobStat globStat;
             for (const auto globPatternElemId: globPatternElemIds) {
                 globStat += TGlobHelper::GetGlobPatternStat(moduleGlobsData, globPatternElemId);
@@ -99,9 +97,9 @@ namespace {
 
             st.ForceReassemble();
             st.StartEdit(updIter.YMake, updIter);
-            TUniqVector<ui32> matchIds;
+            TUniqVector<TFileElemId> matchIds;
             for (auto match: matchedFiles) {
-                matchIds.Push(RawElemId(st.Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, match).GetElemId()));
+                matchIds.Push(st.Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, match).GetElemId());
             }
             const auto globHash = st.Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()));
             TModuleGlobInfo globModuleInfo{
@@ -114,7 +112,7 @@ namespace {
             };
             PopulateGlobNode(*st.Add, globModuleInfo);
             for (const auto globVarElemId: globInfo.VarElemIds) {
-                st.Add->AddDep(EDT_Property, EMNT_Property, TCmdElemId(globVarElemId));
+                st.Add->AddDep(EDT_Property, EMNT_Property, globVarElemId);
             }
             if (prevGlobPatternStat != globPatternStat) {
                 OnChangeGlobPatternStat(module->ModuleGlobsData, globPatternElemId, std::move(globPatternStat), globInfo, NMacro::_GLOB, pattern);
@@ -338,11 +336,11 @@ void TDelayedSearchDirDeps::Flush(const TGeneralParser& parser, TDepGraph& graph
 
             Y_ENSURE(node.IsValid() || delayedDeps.empty());
 
-            for (const auto& depNodeId : delayedDeps) {
-                const auto depNodeType = GetNodeType(depType, TFileElemId(depNodeId));
+            for (const auto depNodeId : delayedDeps) {
+                const auto depNodeType = GetNodeType(depType, depNodeId);
 
-                auto existingDepNode = graph.GetNodeById(depNodeType, TFileElemId(depNodeId));
-                auto depNode = existingDepNode.IsValid() ? existingDepNode : graph.AddNode(depNodeType, TFileElemId(depNodeId));
+                auto existingDepNode = graph.GetNodeById(depNodeType, depNodeId);
+                auto depNode = existingDepNode.IsValid() ? existingDepNode : graph.AddNode(depNodeType, depNodeId);
                 depNode->NodeType = depNodeType;
                 node.AddUniqueEdge(depNode, depType);
             }
@@ -434,7 +432,7 @@ bool TUpdIterStBase::NodeToProps(TDepGraph& graph, TDelayedSearchDirDeps& delaye
         TVector<TDepsCacheId> props;
         auto& searchDirDeps = delayedDirs.GetNodeDepsByType({addCtx->NodeType, addCtx->ElemId}, EDT_Search);
         for (const auto& dirId : searchDirDeps) {
-            props.push_back(MakeDepsCacheId(EMNT_Directory, TFileElemId(dirId)));
+            props.push_back(MakeDepsCacheId(EMNT_Directory, dirId));
         }
         entry.Props.AddValues(propType, props, sourceDebug);
     } else {
@@ -829,8 +827,8 @@ inline void TDGIterAddable::StartEdit(TYMake& yMake, TUpdIter& dgIter) {
     bool isMod;
     TModule* module = GetModuleForEdit(yMake.Graph, dgIter, isMod);
     if (Y_UNLIKELY(reassemble && Node.NodeType == EMNT_NonParsedFile && !TFileConf::IsLink(AssumeFile(Node.ElemId)) &&
-                  (!module->GetSharedEntries().has(RawElemId(Graph.GetFileNameByCacheId(EntryPtr->first).GetTargetId()))))) {
-        const TModAddData* modData = dgIter.GetAddedModuleInfo(MakeDepFileCacheId(Node.ElemId));
+                  (!module->GetSharedEntries().has(Graph.GetFileNameByCacheId(EntryPtr->first).GetTargetId())))) {
+        const TModAddData* modData = dgIter.GetAddedModuleInfo(MakeDepFileCacheId(AssumeFile(Node.ElemId)));
         if (Y_UNLIKELY(!modData || !modData->Added))  {
             throw TInvalidGraph() << "Generated file " << yMake.Graph.GetFileName(Node) << " entered first from other module " << module->GetName() << " (check your PEERDIR's)";
         }
@@ -1212,7 +1210,7 @@ inline bool TUpdIter::Enter(TState& state) {
         } else if (st.Node.NodeType == EMNT_NonParsedFile && statusBeforeEnter != NGraphUpdater::ENodeStatus::Ready) {
             if (!Graph.GetFileName(st.Node).IsLink()) {
                 if (const auto* module = YMake.Modules.Get(AssumeFile(state[st.ModulePosition].Node.ElemId)); module && module->IsLoaded()) {
-                    if (!module->GetOwnEntries().has(RawElemId(st.Node.ElemId)) && !module->GetSharedEntries().has(RawElemId(st.Node.ElemId))) {
+                    if (!module->GetOwnEntries().has(AssumeFile(st.Node.ElemId)) && !module->GetSharedEntries().has(AssumeFile(st.Node.ElemId))) {
                         state[st.ModulePosition].Entry().Props.SetIntentNotReady(EVI_GetModules, Graph.Names().FileConf.TimeStamps.CurStamp(), TPropertiesState::ENotReadyLocation::Custom);
                         i->second.MarkedAsUnknown = true;
                         return false;
@@ -1898,7 +1896,7 @@ void TUpdIter::NukeModuleDir(TState& state) {
             if (IsModuleType(st.Dep.DepNode.NodeType)) {
                 if (auto* module = YMake.Modules.Get(AssumeFile(st.Dep.DepNode.ElemId)); module) {
                     for (auto id : module->GetOwnEntries()) {
-                        if (auto i = Nodes.find(MakeDepFileCacheId(TElemId(id))); i != Nodes.end()) {
+                        if (auto i = Nodes.find(MakeDepFileCacheId(id)); i != Nodes.end()) {
                             i->second.MarkedAsUnknown = true;
                         }
                     }
@@ -1944,7 +1942,7 @@ inline TUpdIter::EDepVerdict TUpdIter::AcceptDep(TState& state) {
     if (IsModuleType(st.Node.NodeType)) {
         auto* module = YMake.Modules.Get(AssumeFile(st.Node.ElemId));
         Y_ASSERT(module);
-        auto moduleInfo = GetAddedModuleInfo(MakeDepFileCacheId(st.Node.ElemId));
+        auto moduleInfo = GetAddedModuleInfo(MakeDepFileCacheId(AssumeFile(st.Node.ElemId)));
         Y_ASSERT(moduleInfo);
         if (module->IsLoaded()) {
 
@@ -1974,7 +1972,7 @@ inline TUpdIter::EDepVerdict TUpdIter::AcceptDep(TState& state) {
                      << " -" << dep.DepType << "> "
                      << dep.DepNode.NodeType << " " << " " << dep.DepNode.ElemId << " "
                      << Graph.ToString(dep.DepNode) << Endl;
-        DelayedSearchDirDeps.GetNodeDepsByType(st.Node, EDT_Search).Push(RawElemId(dep.DepNode.ElemId));
+        DelayedSearchDirDeps.GetNodeDepsByType(st.Node, EDT_Search).Push(AssumeFile(dep.DepNode.ElemId));
         return EDepVerdict::No;
     }
 

@@ -10,13 +10,13 @@ namespace {
         TConstDepRef Dep;
         TConstDepNodeRef::TIterator First;
         TConstDepNodeRef::TIterator Last;
-        TUniqVector<ui32> ChildTools;
-        TUniqVector<ui32>& ParentTools;
+        TUniqVector<TFileElemId> ChildTools;
+        TUniqVector<TFileElemId>& ParentTools;
     };
 }
 
-TVector<ui32> TToolMiner::MineTools(TConstDepNodeRef genFileNode) {
-    TUniqVector<ui32> tools;
+TVector<TFileElemId> TToolMiner::MineTools(TConstDepNodeRef genFileNode) {
+    TUniqVector<TFileElemId> tools;
     TStack<TStackFrame> stack;
     for (TConstDepRef dep : genFileNode.Edges()) {
         if (!IsBuildCommandDep(dep)) {
@@ -33,10 +33,10 @@ TVector<ui32> TToolMiner::MineTools(TConstDepNodeRef genFileNode) {
             if (stack.top().First == stack.top().Last) {
                 auto& frame = stack.top();
                 if (IsDirectToolDep(frame.Dep)) {
-                    frame.ParentTools.Push(RawElemId(frame.Dep.To()->ElemId));
+                    frame.ParentTools.Push(AssumeFile(frame.Dep.To()->ElemId));
                 } else {
                     const auto [pos, inserted] = MinedCache.emplace(frame.Dep.To().Id(), frame.ChildTools.Take());
-                    for (ui32 elemId: pos->second) {
+                    for (TFileElemId elemId: pos->second) {
                         frame.ParentTools.Push(elemId);
                     }
                 }

@@ -216,7 +216,7 @@ class TDepGraph: public TCompactGraph<EDepType, TDepTreeNode, TCompactEdge<EDepT
 private:
     TSymbols& Names_;
 
-    using TId2NodeMap = THashMap<TElemId_Underlying, TNodeId, TIdentity>;
+    using TId2NodeMap = THashMap<TElemId, TNodeId, TElemIdIdentityHash>;
     TId2NodeMap MainId2NodeMap;
     TId2NodeMap CmdId2NodeMap;
 
@@ -252,7 +252,7 @@ public:
     TNodeRef GetFileNodeById(TFileElemId id) {
         Y_ASSERT(HasId2NodeMaps());
 
-        const auto it = MainId2NodeMap.find(RawElemId(id));
+        const auto it = MainId2NodeMap.find(id);
         if (!it) {
             return GetInvalidNode();
         }
@@ -271,7 +271,7 @@ public:
     TNodeRef GetCommandNodeById(TCmdElemId id) {
         Y_ASSERT(HasId2NodeMaps());
 
-        const auto it = CmdId2NodeMap.find(RawElemId(id));
+        const auto it = CmdId2NodeMap.find(id);
         if (!it) {
             return GetInvalidNode();
         }
@@ -479,10 +479,10 @@ public:
 
             auto originalElemId = ElemId(relocation.first);
             auto newElemId = relocation.second.ElemId;
-            Y_ASSERT(id2NodeMap.contains(RawElemId(newElemId)));
+            Y_ASSERT(id2NodeMap.contains(newElemId));
 
-            if (const auto iit = id2NodeMap.find(RawElemId(originalElemId))) {
-                if (const auto nit = id2NodeMap.find(RawElemId(newElemId))) {
+            if (const auto iit = id2NodeMap.find(originalElemId)) {
+                if (const auto nit = id2NodeMap.find(newElemId)) {
                     replaces.insert({iit->second, nit->second});
                 }
             }
@@ -591,11 +591,11 @@ public:
 
     /// Converting to vector replacement NodeIds to ElemIds
     template<class TNodeIds>
-    static TVector<TElemId_Underlying> NodeToElemIds(const TDepGraph& graph, const TNodeIds& nodeIds) {
-        TVector<TElemId_Underlying> elemIds;
+    static TVector<TElemId> NodeToElemIds(const TDepGraph& graph, const TNodeIds& nodeIds) {
+        TVector<TElemId> elemIds;
         elemIds.reserve(nodeIds.size());
         for (const auto nodeId : nodeIds) {
-            elemIds.emplace_back(RawElemId(graph.Get(nodeId)->ElemId));
+            elemIds.emplace_back(graph.Get(nodeId)->ElemId);
         }
         return elemIds;
     }
@@ -632,7 +632,7 @@ private:
         Y_ASSERT(HasId2NodeMaps());
 
         auto& idmap = MapByType(node->NodeType);
-        idmap[RawElemId(node->ElemId)] = node.Id();
+        idmap[node->ElemId] = node.Id();
     }
 
     /// @brief check that Id2Node maps are proeprly initialized
@@ -642,9 +642,9 @@ private:
 
     void ResetId2NodeMaps() {
         MainId2NodeMap.clear();
-        MainId2NodeMap[0] = TNodeId::Invalid;
+        MainId2NodeMap[TElemId()] = TNodeId::Invalid;
         CmdId2NodeMap.clear();
-        CmdId2NodeMap[0] = TNodeId::Invalid;
+        CmdId2NodeMap[TElemId()] = TNodeId::Invalid;
     }
 
     void MakeId2NodeMaps() {

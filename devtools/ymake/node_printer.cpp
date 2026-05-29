@@ -623,8 +623,9 @@ bool TNodePrinter<TFormatter>::Enter(TState& state) {
             }
             if (Mode == DM_DGraphFlatJson && IsOutputType(nodeType)) {
                 const auto tools = ToolMiner.MineTools(state.TopNode());
-                for (ui32 toolId : tools) {
-                    Formatter().EmitDep(elemId, nodeType, TElemId(toolId), TDepGraph::Graph(topNode).GetFileNodeById(TFileElemId(toolId))->NodeType, EDepType::EDT_Include, fresh);
+                for (TFileElemId toolId : tools) {
+                    const auto toolNode = RestoreContext.Graph.GetFileNodeById(toolId);
+                    Formatter().EmitDep(elemId, nodeType, toolId, toolNode->NodeType, EDepType::EDT_Include, fresh);
                 }
             }
             if (DumpDepends && hasIncDep && parentType == EMNT_BuildCommand && parent != state.end() && IsPropToDirSearchDep(incDep) && parentName.EndsWith("DEPENDS=")) {

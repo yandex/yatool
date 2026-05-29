@@ -953,7 +953,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
         YDIAG(Dev) << "Process: AddName " << output.Name << Endl;
 
         if (const auto fid = fileConf.GetIdNx(output.Name)) {
-            if (ownEntries.has(RawElemId(fid))) {
+            if (ownEntries.has(fid)) {
                 YConfErr(DupSrc) << output.Name << " was already added in this project. Skip command: "
                                  << SkipId(curCmdName) << Endl;
                 return false;
@@ -961,7 +961,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
 
             // We do not consider outputs of module command that macth main module output as a DupSrc issue
             if (!mod.IgnoreDupSrc() && !(finalTargetCmd && fid == mod.GetId())) {
-                if (UpdIter->CheckNodeStatus({EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready && !mod.GetSharedEntries().has(RawElemId(fid))) {
+                if (UpdIter->CheckNodeStatus({EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready && !mod.GetSharedEntries().has(fid)) {
                     ConfMsgManager()->AddDupSrcLink(fid, mod.GetId());
                 }
             }
@@ -1161,7 +1161,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             actionNode.AddDepIface(EDT_BuildFrom, nodeType, input.ElemId);
         }
         if (TFileConf::IsLink(AssumeFile(input.ElemId)) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
-            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(RawElemId(TFileConf::GetTargetId(AssumeFile(input.ElemId))));
+            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(AssumeFile(input.ElemId)));
         }
     }
 
@@ -1239,10 +1239,10 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
     if (finalTargetCmd) {
         for (const auto id : ownEntries) {
             Y_ENSURE(UpdIter != nullptr);
-            auto modInfo = UpdIter->GetAddedModuleInfo(MakeDepsCacheId(EMNT_NonParsedFile, TElemId(id)));
+            auto modInfo = UpdIter->GetAddedModuleInfo(MakeDepFileCacheId(id));
             Y_ASSERT(modInfo != nullptr);
             if (modInfo != nullptr && modInfo->AdditionalOutput) {
-                actionNode.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, TElemId(id));
+                actionNode.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, id);
             }
         }
     }
@@ -1307,10 +1307,10 @@ void TCommandInfo::ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr) {
 
     try {
         TExcludeMatcher excludeMatcher;
-        TUniqVector<ui32> matches;
+        TUniqVector<TFileElemId> matches;
         TGlobPattern glob(Graph->Names().FileConf, globStr, Module->GetDir());
         for (const auto& result : glob.Apply(excludeMatcher)) {
-            matches.Push(RawElemId(Graph->Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId()));
+            matches.Push(Graph->Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
         }
         const TString globCmd = FormatCmd(Module->GetName().GetElemId(), NProps::LATE_GLOB, globStr);
         TModuleGlobInfo globInfo = {
@@ -1340,7 +1340,7 @@ bool TCommandInfo::ProcessVar(TModuleBuilder& modBuilder, TAddDepAdaptor& inputN
         modBuilder.AddInputVarDep(input, inputNode);
 
         if (TFileConf::IsLink(AssumeFile(input.ElemId)) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
-            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(RawElemId(TFileConf::GetTargetId(AssumeFile(input.ElemId))));
+            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(AssumeFile(input.ElemId)));
         }
     }
 

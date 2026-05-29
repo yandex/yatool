@@ -105,7 +105,7 @@ Y_FORCE_INLINE constexpr TDepsCacheId MakeDepsCacheId(EMakeNodeType nodeType, TE
     return static_cast<TDepsCacheId>((static_cast<ui64>(!UseFileId(nodeType)) << 63) | RawElemId(elemId));
 }
 
-Y_FORCE_INLINE constexpr TDepsCacheId MakeDepFileCacheId(TElemId elemId) noexcept {
+Y_FORCE_INLINE constexpr TDepsCacheId MakeDepFileCacheId(TFileElemId elemId) noexcept {
     return static_cast<TDepsCacheId>(RawElemId(elemId));
 }
 
@@ -306,4 +306,4 @@ inline bool IsTypeCompatibleWith(EMakeNodeType newType, EMakeNodeType knownType)
 
 struct TDGIterAddable;
 typedef TVector<TDGIterAddable> TAddIterStack;
-typedef TUniqVector<ui32> TOwnEntries;
+typedef TUniqVector<TFileElemId> TOwnEntries;

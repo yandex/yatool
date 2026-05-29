@@ -14,7 +14,7 @@ struct TDependencyManagementModuleInfo;
 /// @brief Collection that owns all TModules and provides navigation among them.
 /// Modules are created using 2-stage initialization:
 /// - Create() methods allocate almost uninitialized modules
-/// - Commit() method adds module to ElemId-based index
+/// - Commit() method adds module to FileElemId-based index
 /// - Destroy() deletes module (both committed and non-committed)
 class TModules {
 private:
@@ -25,13 +25,13 @@ private:
     TSharedEntriesMap SharedEntriesByMakefileId;
     TModulesSharedContext CreationContext;
     THashSet<TModule*> ModulesStore;
-    THashMap<TElemId_Underlying, TModule*, TIdentity> ModulesById;
+    THashMap<TFileElemId, TModule*, TFileElemIdIdentityHash> ModulesById;
     TModule& RootModule;
 
     TStringBuf ResultKey(const TModule& module) const;
 
     TNodeListStore NodeListStore;
-    THashMap<TElemId_Underlying, TTransitiveModuleInfo, TIdentity> ModuleIncludesById;
+    THashMap<TFileElemId, TTransitiveModuleInfo, TFileElemIdIdentityHash> ModuleIncludesById;
     THashMap<TFileElemId, TDependencyManagementModuleInfo> ModuleDMInfoById;
 
     TConcurrentHashMap<TFileElemId, TVector<TString>> ModuleLateOutsById;
@@ -77,10 +77,10 @@ public:
     /// One shouldn't use module after this call: the reference becomes invalid
     void Destroy(TModule& module);
 
-    /// Try to locate module by ElemId
+    /// Try to locate module by FileElemId
     TModule* Get(TFileElemId id);
 
-    /// Try to locate module by ElemId
+    /// Try to locate module by FileElemId
     const TModule* Get(TFileElemId id) const {
         return const_cast<TModules*>(this)->Get(id);
     }

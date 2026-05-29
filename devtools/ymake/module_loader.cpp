@@ -295,13 +295,13 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     }
     const auto [globs, excludes] = SplitBy(TArrayRef<const TStringBuf>{globsWithExcludes}, NArgs::EXCLUDE);
 
-    TUniqVector<ui32> excludeIds;
+    TUniqVector<TCmdElemId> excludeIds;
     TExcludeMatcher excludeMatcher;
     for (auto pattern: excludes) {
         if (pattern == NArgs::EXCLUDE) {
             continue;
         }
-        if (excludeIds.Push(RawElemId(AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern)))))) {
+        if (excludeIds.Push(AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern))))) {
             excludeMatcher.AddExcludePattern(Module.GetDir(), pattern);
         }
     }
@@ -312,7 +312,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     TUniqVector<TFileView> values;
     for (auto globStr : globs) {
         try {
-            TUniqVector<ui32> matches;
+            TUniqVector<TFileElemId> matches;
             TGlobPattern globPattern(Names.FileConf, globStr, Module.GetDir());
             TGlobStat globPatternStat;
             for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {

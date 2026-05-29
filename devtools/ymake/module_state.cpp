@@ -174,7 +174,7 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
     SetupPeerdirRestrictions();
 
     for (const auto entry: saved.OwnEntries) {
-        AddEntry(TFileElemId(entry));
+        AddEntry(entry);
     }
 
     SrcDirs.RestoreFromsIds(saved.SrcsDirsIds, Symbols);
@@ -490,9 +490,9 @@ void TModule::AddInternalRule() {
 }
 
 bool TModule::AddEntry(TFileElemId id) {
-    auto added = GetOwnEntries().Push(RawElemId(id));
+    auto added = GetOwnEntries().Push(id);
     if (IsFromMultimodule()) {
-        GetSharedEntries().Push(RawElemId(id));
+        GetSharedEntries().Push(id);
     }
     return added;
 }

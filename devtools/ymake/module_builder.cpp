@@ -135,17 +135,16 @@ void TModuleBuilder::RecursiveAddInputs() {
 
     // 2. add remaining CheckIfUsed as EDT_Search
     for (auto id : Module.GetOwnEntries()) {
-        auto _id = TFileElemId(id);
-        TModAddData* modInfo = UpdIter.GetAddedModuleInfo(MakeDepFileCacheId(_id));
+        TModAddData* modInfo = UpdIter.GetAddedModuleInfo(MakeDepFileCacheId(id));
         // note that !modInfo means that the node has already been visited by AddIter, no need to worry
         if (modInfo && modInfo->CheckIfUsed && !modInfo->UsedAsInput) {
             //Node.AddDep(EDT_Search, i->second.AddCtx->NodeType, i->second.AddCtx->ElemId); <- this data might not be available yet
             if (!modInfo->AdditionalOutput) {
                 if (modInfo->BadCmdInput) {
-                    const auto& name = Graph.GetFileName(_id);
+                    const auto& name = Graph.GetFileName(id);
                     YConfWarn(BadSrc) << "can't build anything from " << name << Endl;
                 } else {
-                    Node.AddUniqueDep(EDT_Search, EMNT_NonParsedFile, _id);
+                    Node.AddUniqueDep(EDT_Search, EMNT_NonParsedFile, id);
                 }
             }
         }
@@ -933,13 +932,13 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     }
     const auto [globs, excludes] = SplitBy(globsWithExcludes, NArgs::EXCLUDE);
 
-    TUniqVector<ui32> excludeIds;
+    TUniqVector<TCmdElemId> excludeIds;
     TExcludeMatcher excludeMatcher;
     for (auto pattern: excludes) {
         if (pattern == NArgs::EXCLUDE) {
             continue;
         }
-        if (excludeIds.Push(RawElemId(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern))))) {
+        if (excludeIds.Push(AssumeCmd(Graph.Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_EXCLUDE, pattern))))) {
             excludeMatcher.AddExcludePattern(Module.GetDir(), pattern);
         }
     }
@@ -970,11 +969,11 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     TGlobStat globStat;
     for (auto globStr : globs) {
         try {
-            TUniqVector<ui32> matches;
+            TUniqVector<TFileElemId> matches;
             TGlobPattern globPattern(Graph.Names().FileConf, globStr, Module.GetDir());
             TGlobStat globPatternStat;
             for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {
-                matches.Push(RawElemId(Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId()));
+                matches.Push(Graph.Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
             }
             globStat += globPatternStat;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/diag/dbg.h>
+#include <devtools/ymake/symbols/elem_id.h>
 
 #include <library/cpp/containers/absl_flat_hash/flat_hash_map.h>
 #include <library/cpp/containers/absl_flat_hash/flat_hash_set.h>
@@ -544,6 +545,15 @@ class TUniqVector<TString, false> : public TUniqContainerImpl<TString, NUniqCont
 
 template <>
 class TUniqVector<std::string, false> : public TUniqContainerImpl<std::string, NUniqContainer::TRefWithIndex<std::string>, 32> {};
+
+template <>
+class TUniqVector<TElemId, false> : public TUniqContainerImpl<TElemId, TElemId, 128> {};
+
+template <>
+class TUniqVector<TFileElemId, false> : public TUniqContainerImpl<TFileElemId, TFileElemId, 128> {};
+
+template <>
+class TUniqVector<TCmdElemId, false> : public TUniqContainerImpl<TCmdElemId, TCmdElemId, 128> {};
 
 // Non-Intergral types stored via TRefWrapper
 // Note T should be hashable and equaly comparable

@@ -856,7 +856,7 @@ THolder<TFileContentHolder> TFileConf::GetFileById(TFileElemId elemId) {
     auto fileId = TFileId::Create(elemId);
     auto targetId = fileId.GetTargetId();
     if (fileId.IsLink()) {
-        auto result = GetFileById(TFileElemId(targetId));
+        auto result = GetFileById(targetId);
         result->OriginalId = elemId;
         return result;
     }

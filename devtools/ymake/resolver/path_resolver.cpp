@@ -168,7 +168,7 @@ TResolveFile TPathResolver::CheckBuilt(TStringBuf path) {
         return {};
     }
 
-    if (Context_.OwnEntries.has(RawElemId(fileId))) {
+    if (Context_.OwnEntries.has(fileId)) {
         // File known to be owned by module (from ya.make parsing)
         return TResolveFile(FileConf_.GetName(fileId));
     }

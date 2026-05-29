@@ -571,7 +571,7 @@ namespace {
                     for (TNodeId peer : closure.Closure) {
                         TModule* peerModule = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[peer]->ElemId));
                         Y_ASSERT(peerModule);
-                        if (parent.GetDirId() == peerModule->GetDirId() && Find(parent.SelfPeers, RawElemId(peerModule->GetId())) != parent.SelfPeers.end()) {
+                        if (parent.GetDirId() == peerModule->GetDirId() && Find(parent.SelfPeers, peerModule->GetId()) != parent.SelfPeers.end()) {
                             continue;
                         }
                         if (!constraints.IsAllowed(peerModule->GetDir(), ERequirementsScope::Peers)

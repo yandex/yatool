@@ -4,8 +4,8 @@
 
 class TToolMiner {
 public:
-    TVector<ui32> MineTools(TConstDepNodeRef genFileNode);
+    TVector<TFileElemId> MineTools(TConstDepNodeRef genFileNode);
 
 private:
-    THashMap<TNodeId, TVector<ui32>> MinedCache;
+    THashMap<TNodeId, TVector<TFileElemId>> MinedCache;
 };

@@ -80,21 +80,21 @@ private:
 
 struct TDelayedSearchDirDeps {
 public:
-    const THashMap<TDepsCacheId, TUniqVector<ui32>>& GetDepsByType(EDepType depType) const {
+    const THashMap<TDepsCacheId, TUniqVector<TFileElemId>>& GetDepsByType(EDepType depType) const {
         Y_ASSERT(DepTypeToNodeDeps.contains(depType));
         return DepTypeToNodeDeps.at(depType);
     }
-    THashMap<TDepsCacheId, TUniqVector<ui32>>& GetDepsByType(EDepType depType) {
+    THashMap<TDepsCacheId, TUniqVector<TFileElemId>>& GetDepsByType(EDepType depType) {
         return DepTypeToNodeDeps[depType];
     }
 
-    TUniqVector<ui32>& GetNodeDepsByType(TDepTreeNode node, EDepType depType) {
+    TUniqVector<TFileElemId>& GetNodeDepsByType(TDepTreeNode node, EDepType depType) {
         return GetDepsByType(depType)[MakeDepsCacheId(node.NodeType, node.ElemId)];
     }
 
     void Flush(const TGeneralParser& parser, TDepGraph& graph) const;
 private:
-    using TNodeToDeps = THashMap<TDepsCacheId, TUniqVector<ui32>>;
+    using TNodeToDeps = THashMap<TDepsCacheId, TUniqVector<TFileElemId>>;
     THashMap<EDepType, TNodeToDeps> DepTypeToNodeDeps;
 };
 

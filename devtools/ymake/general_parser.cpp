@@ -125,10 +125,10 @@ namespace {
         }
 
         for (auto mod : modules) {
-            TUniqVector<ui32> selfPeers;
+            TUniqVector<TFileElemId> selfPeers;
             for (const auto& tag : mod->GetModuleConf().SelfPeers) {
                 if (moduleMap.contains(tag)) {
-                    selfPeers.Push(RawElemId(moduleMap[tag]));
+                    selfPeers.Push(moduleMap[tag]);
                 }
             }
             mod->GetModule().SelfPeers = selfPeers.Take();
@@ -468,7 +468,7 @@ void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
             if (!depsChanged) {
                 size_t n = 0;
                 for (const auto& dirId : delayedDeps) {
-                    if (oldDeps[node.Deps.Size() + n].ElemId != TElemId(dirId)) {
+                    if (oldDeps[node.Deps.Size() + n].ElemId != dirId) {
                         depsChanged = true;
                         break;
                     }
@@ -488,10 +488,10 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
     auto entries = YMake.Modules.ExtractSharedEntries(elemId);
     if (entries) {
         for (auto fileId: *entries) {
-            auto it = YMake.UpdIter->Nodes.find(MakeDepFileCacheId(TElemId(fileId)));
+            auto it = YMake.UpdIter->Nodes.find(MakeDepFileCacheId(fileId));
             if (it != YMake.UpdIter->Nodes.end()) {
                 it->second.MarkedAsUnknown = true;
-                YDIAG(Dev) << fileConf.GetName(TFileElemId(fileId)) << " was previously in OwnEntries of " << resolvedName << " and now is marked as unknown" << Endl;
+                YDIAG(Dev) << fileConf.GetName(fileId) << " was previously in OwnEntries of " << resolvedName << " and now is marked as unknown" << Endl;
             }
         }
     }
@@ -659,7 +659,7 @@ void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, 
             if (!depsChanged) {
                 size_t n = 0;
                 for (const auto& dirId : delayedDeps) {
-                    if (oldDeps[node.Deps.Size() + n].ElemId != TElemId(dirId)) {
+                    if (oldDeps[node.Deps.Size() + n].ElemId != dirId) {
                         depsChanged = true;
                         break;
                     }
@@ -680,11 +680,11 @@ void TGeneralParser::ProcessCmdProperty(TStringBuf /*name*/, TNodeAddCtx& node, 
 
 void PopulateGlobNode(TNodeAddCtx& node, const TModuleGlobInfo& globInfo) {
     node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.GlobPatternHash);
-    for (ui32 fileId: globInfo.MatchedFiles) {
-        node.AddUniqueDep(EDT_Property, EMNT_File, TElemId(fileId));
+    for (TFileElemId fileId: globInfo.MatchedFiles) {
+        node.AddUniqueDep(EDT_Property, EMNT_File, fileId);
     }
-    for (ui32 exclId: globInfo.Excludes) {
-        node.AddUniqueDep(EDT_Property, EMNT_Property, TElemId(exclId));
+    for (TCmdElemId exclId: globInfo.Excludes) {
+        node.AddUniqueDep(EDT_Property, EMNT_Property, exclId);
     }
     if (globInfo.ReferencedByVar) {
         node.AddUniqueDep(EDT_Property, EMNT_Property, globInfo.ReferencedByVar);
