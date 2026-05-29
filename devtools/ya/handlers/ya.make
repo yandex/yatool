@@ -36,6 +36,7 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/handlers/paste
         devtools/ya/handlers/profile
         devtools/ya/handlers/project
+        devtools/ya/handlers/recipe
         devtools/ya/handlers/svn
         devtools/ya/handlers/upload
         devtools/ya/handlers/vmctl
@@ -92,6 +93,7 @@ RECURSE(
     paste
     profile
     project
+    recipe
     py
     # remote_gdb
     # repo_check

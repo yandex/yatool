@@ -65,6 +65,20 @@ class RecipeInfo:
     users: list = field(default_factory=list)
     started_at: float = 0.0
 
+    def _format_users(self) -> str:
+        if not self.users:
+            return '(none)'
+        return ','.join('{}:{}'.format(u.invocation_id, u.build_id) for u in self.users)
+
+    def __str__(self) -> str:
+        return f"""\
+recipe_uid: {self.recipe_uid}
+lifetime: {self.lifetime}
+working_dir: {self.working_dir}
+users: {self._format_users()}
+started_at: {self.started_at:.3f}
+"""
+
 
 class RecipeManagerClient:
     def __init__(self, shallow_root: str):
