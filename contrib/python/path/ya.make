@@ -2,7 +2,7 @@
 
 PY3_LIBRARY()
 
-VERSION(17.0.0)
+VERSION(17.1.1)
 
 LICENSE(MIT)
 
@@ -11,13 +11,10 @@ NO_LINT()
 PY_SRCS(
     TOP_LEVEL
     path/__init__.py
-    path/__init__.pyi
     path/classes.py
-    path/classes.pyi
     path/compat/py38.py
     path/masks.py
     path/matchers.py
-    path/matchers.pyi
 )
 
 RESOURCE_FILES(
