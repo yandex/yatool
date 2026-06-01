@@ -42,6 +42,7 @@ def _get_binary_version() -> str:
     default = "unknown"
     with contextlib.suppress(ImportError):
         from library.python import svn_version
+
         return svn_version.hash() or svn_version.commit_id() or default
     return default
 
@@ -124,6 +125,18 @@ class RecipeManagerClient:
                 # Normally no one should use them at this point because
                 # switching branches during build is not recommended anyway.
                 self.shutdown(keep_shallow_root=False, force=True)
+                # Wait for the old RM process to release manager.lock before
+                # launching a new one.  shutdown() is asynchronous (it sets a
+                # stop_event inside the RM process), so the old process may
+                # still be running cleanup() when we reach _launch_manager().
+                # Without this wait the new RM would fail to acquire
+                # manager.lock and exit with an error.
+                #
+                # There is no race here: _start_manager_locked is always called
+                # under version.lock, so only one client can execute this
+                # sequence at a time.
+                meta_dir = get_shallow_root_meta_path(self._shallow_root)
+                self._wait_for_manager_lock_release(meta_dir, timeout)
                 # meta/ survives shutdown — only data/ was removed.
                 # Recreate data/ so the new RM process can use it.
                 os.makedirs(get_shallow_root_data_path(self._shallow_root), exist_ok=True)
@@ -134,6 +147,30 @@ class RecipeManagerClient:
         else:
             self._launch_manager(timeout)
         self._write_version_file(current_version)
+
+    def _wait_for_manager_lock_release(self, meta_dir: str, timeout: float) -> None:
+        """Poll manager.lock until the old RM process releases it.
+
+        The old RM holds manager.lock for the entire duration of main() —
+        including cleanup() after server.stop().  We must not launch a new RM
+        until the lock is free, otherwise the new RM will fail to acquire it
+        and exit with an error.
+
+        Raises RuntimeError if the lock is not released within `timeout` seconds.
+        """
+        lock_path = os.path.join(meta_dir, "manager.lock")
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            lk = FileLock(lock_path)
+            if lk.acquire(blocking=False):
+                lk.release()
+                logger.debug("manager.lock released, proceeding to launch new RecipeManager")
+                return
+            time.sleep(0.05)
+        raise RuntimeError(
+            "Timed out waiting for old RecipeManager to stop "
+            "(manager.lock not released within {:.1f}s)".format(timeout)
+        )
 
     def _launch_manager(self, timeout: float) -> None:
         """Start the RM daemon process and wait until it is alive."""
@@ -193,9 +230,7 @@ class RecipeManagerClient:
 
         def _send():
             try:
-                self._client.HeartBeat(
-                    manager_pb2.HeartBeatRequest(invocation_id=invocation_id)
-                )
+                self._client.HeartBeat(manager_pb2.HeartBeatRequest(invocation_id=invocation_id))
             except Exception:
                 pass
 
