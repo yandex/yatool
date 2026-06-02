@@ -68,7 +68,7 @@ class DefaultConfig:
             try:
                 config_map = devtools.ya.core.config.config_from_arc_rel_path(defaults_file)
             except Exception as e:
-                logger.warning("Couldn't obtain config from fs, config file %s, error %s", defaults_file, repr(e))
+                logger.exception("Couldn't obtain config from fs, config file %s, error %s", defaults_file, repr(e))
             else:
                 return Path(os.path.join(find_root(), config_map[linter_name]))
 
@@ -77,7 +77,9 @@ class DefaultConfig:
             try:
                 content: bytes = devtools.ya.core.resource.try_get_resource(resource_name)  # type: ignore
             except Exception as e:
-                logger.warning("Couldn't obtain config from memory, resource name %s, error %s", resource_name, repr(e))
+                logger.exception(
+                    "Couldn't obtain config from memory, resource name %s, error %s", resource_name, repr(e)
+                )
             else:
                 temp = tempfile.NamedTemporaryFile(delete=False)  # will be deleted by tmp_dir_interceptor
                 temp.write(content)
@@ -117,7 +119,7 @@ class AutoincludeConfig:
                     for path in devtools.ya.core.config.config_from_arc_rel_path(afile)
                 )
             except Exception as e:
-                logger.warning(
+                logger.exception(
                     "Couldn't load autoinclude paths due to error %s. Autoincludes won't be used for configs lookup",
                     repr(e),
                 )
