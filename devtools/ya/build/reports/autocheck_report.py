@@ -18,13 +18,12 @@ from exts.hashing import md5_value
 import devtools.ya.build.owners as ow
 from devtools.ya.test import const as constants
 from devtools.ya.test.const import Status, TestSize
-from devtools.ya.test.reports import trace_comment
 import devtools.ya.test.reports.report_prototype as rp
 import devtools.ya.test.util.tools as tut
 from yalibrary import formatter
 from yalibrary import platform_matcher
 
-from . import results_report
+from . import results_report, utils
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +32,6 @@ TEST_SIZES = [TestSize.Small, TestSize.Medium, TestSize.Large]
 TIMEOUT_TARGETS_MARKER = "Process exceeds time limit"
 DEPENDS_ON_BROKEN_TARGETS_MARKER = "Depends on broken targets"
 IMPORTANT_FIELDS = {'path', 'toolchain', 'duration'}
-
-
-def truncate_snippet(record):
-    if record.get("rich-snippet"):
-        record["rich-snippet"] = trace_comment.truncate_comment(record["rich-snippet"], constants.REPORT_SNIPPET_LIMIT)
-    return record
 
 
 def remove_empty_field(entry):
@@ -507,7 +500,8 @@ class ReportGenerator:
             return None
         entry["rich-snippet"] = formatter.ansi_codes_to_markup(entry.get("rich-snippet", ""))
         entry = remove_empty_field(entry)
-        entry = truncate_snippet(entry)
+        snippet_limit = 0 if self._opts.inline_diff else constants.REPORT_SNIPPET_LIMIT
+        utils.truncate_snippet(entry, limit=snippet_limit)
         return entry
 
     def _add_entries(self, entries):

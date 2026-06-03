@@ -6,12 +6,14 @@ PY_SRCS(
     configure_error.py
     results_listener.py
     results_report.py
+    utils.py
 )
 
 PEERDIR(
     devtools/ya/build/owners
     devtools/ya/build/stat
     devtools/ya/exts
+    devtools/ya/test/const
     devtools/ya/test/reports
     devtools/ya/test/result
     devtools/ya/test/test_node

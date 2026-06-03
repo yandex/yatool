@@ -4,6 +4,10 @@ import time
 
 import exts.yjson as json
 
+from devtools.ya.test import const as test_const
+
+from .utils import truncate_snippet
+
 
 class BatchEventProcessor:
     _logger = logging.getLogger('BatchEventProcessor')
@@ -133,10 +137,13 @@ class JsonLineReport(BatchReportBase):
 
         lines = []
         for x in entries:
+            # snippet trancation is intended here for CI reasanable limits
+            entry = x.copy()
+            truncate_snippet(entry, test_const.REPORT_SNIPPET_LIMIT)
             data = {
                 "time": int(time.time()),
                 "type": "result",
-                "data": x,
+                "data": entry,
             }
             lines.append(json.dumps(data))
 
