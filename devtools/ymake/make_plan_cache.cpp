@@ -477,7 +477,7 @@ bool TMakePlanCache::LoadFromFile() {
         return false;
     }
 
-    NYMake::TTraceStage stage{"Load JSON cache"};
+    NYMake::TTraceStageWithTimer stage{"Load JSON cache", MON_NAME(EYmakeStats::JSONCacheLoadTime)};
 
     TCacheFileReader cacheReader(Conf, false, false, JsonConfHash);
     auto readResult = cacheReader.Read(CachePath);
@@ -499,7 +499,7 @@ TFsPath TMakePlanCache::SaveToFile() {
         return {};
     }
 
-    NYMake::TTraceStage stage{"Save JSON cache"};
+    NYMake::TTraceStageWithTimer stage{"Save JSON cache", MON_NAME(EYmakeStats::JSONCacheSaveTime)};
 
     TCacheFileWriter cacheWriter(Conf, CachePath, JsonConfHash);
     Save(cacheWriter.GetBuilder());

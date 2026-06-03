@@ -274,15 +274,23 @@ namespace {
 
             TString modulesData;
 
+            double prepareTime = 0.0;
             if (!SaveFsCacheOnly) {
+                TCyclesTimer prepareSaveTimer;
                 PrepareModules(modulesData);  // This writes to Names: don't move down
+                prepareTime = prepareSaveTimer.GetSeconds();
             }
 
-            SaveSymbolsTable();
-            SaveTimesTable();
-            SaveParsersCache();
+            {
+                TCyclesTimer fsCacheSaveTimer;
+                SaveSymbolsTable();
+                SaveTimesTable();
+                SaveParsersCache();
+                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheSaveTime), fsCacheSaveTimer.GetSeconds());
+            }
 
             if (!SaveFsCacheOnly) {
+                TCyclesTimer depsCacheSaveTimer;
                 SaveModules(modulesData);
                 SaveCommands();
                 SaveInternalGraph();
@@ -291,6 +299,7 @@ namespace {
                 SaveDiagnostics();
                 YMake.SaveStartDirs(Writer);
                 YMake.SaveStartTargets(Writer);
+                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheSaveTime), prepareTime + depsCacheSaveTimer.GetSeconds());
             }
 
             Stats.Set(NStats::EInternalCacheSaverStats::TotalCacheSize, Writer.GetBuilder().GetLength());
@@ -757,18 +766,26 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         prevDepsFingerprint = TString(reinterpret_cast<const char*>(blob.Data()), blob.Length());
     }
 
-    if (loadFsCache && loadFsCacheFromBlobs()) {
-        YDebug() << "FS cache has been loaded..." << Endl;
-        FSCacheLoaded_ = true;
+    if (loadFsCache) {
+        TCyclesTimer fsCacheLoadTimer;
+        if (loadFsCacheFromBlobs()) {
+            YDebug() << "FS cache has been loaded..." << Endl;
+            FSCacheLoaded_ = true;
+            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheLoadTime), fsCacheLoadTimer.GetSeconds());
+        } else {
+            return false;
+        }
     } else {
         return false;
     }
 
     if (loadDepsCache && cacheReader.HasNextBlob()) {
+        TCyclesTimer depsCacheLoadTimer;
         if (loadDepsCacheFromBlobs()) {
             YDebug() << "Deps cache has been loaded..." << Endl;
             PrevDepsFingerprint = prevDepsFingerprint;
             DepsCacheLoaded_ = true;
+            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheLoadTime), depsCacheLoadTimer.GetSeconds());
         } else {
             return false;
         }
@@ -841,7 +858,7 @@ TCacheFileReader::EReadResult TYMake::LoadDependencyManagementCache(const TFsPat
         return TCacheFileReader::EReadResult::IncompatibleFormat;
     }
 
-    NYMake::TTraceStage loadDMStage{"Load Dependency management cache"};
+    NYMake::TTraceStageWithTimer loadDMStage{"Load Dependency management cache", MON_NAME(EYmakeStats::DMCacheLoadTime)};
     YDebug() << "Loading dependency management cache" << Endl;
 
     try {
@@ -928,7 +945,7 @@ bool TYMake::LoadDependsToModulesClosure(IInputStream* input) {
 
 bool TYMake::TryLoadUids(TUidsCachable* cachable) {
     if (!PrevDepsFingerprint.empty() && Conf.YmakeUidsCache.Exists()) {
-        NYMake::TTraceStage loadUidsStage{"Load Uids cache"};
+        NYMake::TTraceStageWithTimer loadUidsStage{"Load Uids cache", MON_NAME(EYmakeStats::UidsCacheLoadTime)};
 
         TFileInput input(TFile{Conf.YmakeUidsCache, OpenExisting | RdOnly | Seq | NoReuse}, 1_MB);
 
@@ -1014,7 +1031,7 @@ void TYMake::Compact() {
 
 void TYMake::SaveUids(TUidsCachable* uidsCachable) {
     if (Conf.WriteUidsCache && !CurrDepsFingerprint.empty()) {
-        NYMake::TTraceStage stage("Save Uids cache");
+        NYMake::TTraceStageWithTimer stage("Save Uids cache", MON_NAME(EYmakeStats::UidsCacheSaveTime));
 
         UidsCacheTempFile = MakeTempFilename(Conf.YmakeUidsCache.GetPath());
         TFileOutput uidsOutput{TFile{UidsCacheTempFile.GetPath(), CreateAlways | WrOnly}};
@@ -1034,7 +1051,7 @@ bool TYMake::SaveDependencyManagementCache(const TFsPath& cacheFile, TFsPath* te
     }
 
     try {
-        NYMake::TTraceStage stage("Save Dependency management cache");
+        NYMake::TTraceStageWithTimer stage("Save Dependency management cache", MON_NAME(EYmakeStats::DMCacheSaveTime));
 
         TCacheFileWriter cacheWriter(Conf, cacheFile);
         cacheWriter.AddBlob(new TBlobSaverMemory(&DMCacheVersion, sizeof(ui64)));

@@ -151,6 +151,18 @@ namespace NStats {
         RejectedDepsCache /* "Rejected Deps cache, int" */,
         RejectedJSONCache /* "Rejected JSON cache, int" */,
         RejectedUidsCache /* "Rejected Uids cache, int" */,
+        ConfCacheLoadTime /* "Conf cache load time, sec" */,
+        ConfCacheSaveTime /* "Conf cache save time, sec" */,
+        FSCacheLoadTime /* "FS cache load time, sec" */,
+        FSCacheSaveTime /* "FS cache save time, sec" */,
+        DepsCacheLoadTime /* "Deps cache load time, sec" */,
+        DepsCacheSaveTime /* "Deps cache save time, sec" */,
+        JSONCacheLoadTime /* "JSON cache load time, sec" */,
+        JSONCacheSaveTime /* "JSON cache save time, sec" */,
+        UidsCacheLoadTime /* "Uids cache load time, sec" */,
+        UidsCacheSaveTime /* "Uids cache save time, sec" */,
+        DMCacheLoadTime /* "DM cache load time, sec" */,
+        DMCacheSaveTime /* "DM cache save time, sec" */,
     };
 
     enum class EStackDepthStats {

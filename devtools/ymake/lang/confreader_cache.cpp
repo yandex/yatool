@@ -85,6 +85,7 @@ namespace {
     }
 
     ELoadStatus LoadCache(TBuildConfiguration& conf, TMd5Sig& confMd5) {
+        TCyclesTimer confCacheLoadTimer;
         const TFsPath& cacheFile = conf.YmakeConfCache;
         if (!cacheFile.Exists()) {
             return ELoadStatus::DoesNotExist;
@@ -117,10 +118,12 @@ namespace {
 
         conf.SetFromCache(true);
 
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::ConfCacheLoadTime), confCacheLoadTimer.GetSeconds());
         return ELoadStatus::Success;
     }
 
     ESaveStatus SaveCache(TBuildConfiguration& conf, const TMd5Sig& confMd5) {
+        TCyclesTimer confCacheSaveTimer;
         const TFsPath& cachePathTemp = TString::Join(conf.YmakeConfCache.GetPath(), "."sv, ToString(GetPID()));
         TFile tempFile{cachePathTemp, CreateAlways | WrOnly};
         {
@@ -133,6 +136,7 @@ namespace {
         }
         tempFile.Close();
         cachePathTemp.RenameTo(conf.YmakeConfCache);
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::ConfCacheSaveTime), confCacheSaveTimer.GetSeconds());
         return ESaveStatus::Success;
     }
 
