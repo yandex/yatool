@@ -176,13 +176,17 @@ public:
     void OnLeft(TState& state) override {
         const auto& dep = state.Top().CurDep();
         if (IsDirectPeerdirDep(dep)) {
-            //Note: This part checks dependence of the test on the library in the same dir, because for java we should not distribute attributes
+            // Note: This part checks dependence of the test on the library in the same dir, because for java we should not distribute attributes
             bool isSameDir = false;
             const auto* toTarget = Mod2Target_[dep.To().Id()];
             if (auto* curSubdir = ProjectBuilder_->CurrentSubdir(); curSubdir) {
-                for (const auto& target: curSubdir->Targets) {
+                for (auto& target: curSubdir->Targets) {
                     if (target.Get() == toTarget) {
                         isSameDir = true;
+                        if (ProjectBuilder_->CurrentTarget()->IsTest() && target->IsTest()) {
+                            // test use other test in module as depend, detected test library
+                            NInternalAttrs::EmplaceAttr(target->Attrs->GetWritableMap(), NInternalAttrs::TestLib, true);
+                        }
                         break;
                     }
                 }

@@ -11,6 +11,7 @@ namespace NInternalAttrs {
     inline static const std::string MacroArgs = "macro_args";///< Macro arguments of target
     inline static const std::string IsTest = "is_test";///< This target is test
     inline static const std::string TestRelDir = "test_reldir";///< Relative to main target subdirectory of test
+    inline static const std::string TestLib = "test_lib";///< This test is library for other tests in module
     inline static const std::string Subdirs = "subdirs";///< Subdirectories of directory
     inline static const std::string Curdir = "curdir";///< Current directory (relative to export root)
     inline static const std::string Target = "target";///< Main target of directory
