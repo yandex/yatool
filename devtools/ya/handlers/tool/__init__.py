@@ -37,6 +37,11 @@ import exts.asyncthread
 
 logger = logging.getLogger(__name__)
 
+TOOL_REAL_AND_SUPPOSED_PATHS_ARE_MISSMATCHED_MSG = """Executable for tool `{tool_name}` is not found at {tool_path}.
+You can run ya tool {tool_name} --print-path to check where tool is located on FS.
+Check the tool's path in build/ya.conf.json since there is mismatch in real and supposed paths.
+Please contact owners of the tool to fix that issue."""
+
 
 class ToolYaHandler(CompositeHandler):
     description = 'Execute specific tool'
@@ -256,6 +261,10 @@ def do_tool(params):
             )
             raise ArgsValidatingException(message)
         exts.process.execve(tool_path, extra_args, env=env)
+    else:
+        raise ArgsValidatingException(
+            TOOL_REAL_AND_SUPPOSED_PATHS_ARE_MISSMATCHED_MSG.format(tool_name=tool_name, tool_path=tool_path)
+        )
 
     if lock_result:
         lock_resource(toolchain_root(tool_name, params.toolchain, for_platform))
