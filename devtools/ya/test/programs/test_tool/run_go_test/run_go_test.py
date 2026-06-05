@@ -571,8 +571,7 @@ def covdata_textfmt(opts, cov_path):
                 res.returncode,
                 textfmt_cmd,
             )
-            return res.returncode
-        # Here cov_path_txt has text format coverage, BUT with full paths for all sources
+        return res.returncode
     except process.SignalInterruptionError:
         return const.TestRunExitCode.TimeOut
     except Exception as e:
