@@ -15,7 +15,6 @@ SRCS(
 PEERDIR(
     library/cpp/containers/absl_flat_hash
     library/cpp/string_utils/base64
-    devtools/ymake/diag
 )
 
 END()

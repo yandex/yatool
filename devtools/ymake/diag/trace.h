@@ -1,7 +1,8 @@
 #pragma once
 
-#include <devtools/ymake/diag/trace.ev.pb.h>
 #include <devtools/ymake/diag/manager.h>
+#include <devtools/ymake/diag/stats.h>
+#include <devtools/ymake/diag/trace.ev.pb.h>
 #include <devtools/ymake/common/cyclestimer.h>
 
 #include <google/protobuf/message.h>

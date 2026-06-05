@@ -2,8 +2,6 @@ LIBRARY()
 
 SRCS(
     globs.cpp
-    name_store.cpp
-    name_data_store.cpp
     symbols.cpp
     time_store.cpp
     file_store.cpp
@@ -17,6 +15,7 @@ PEERDIR(
     devtools/ymake/common
     devtools/ymake/options
     devtools/ymake/diag
+    devtools/ymake/libs/name_store
     library/cpp/containers/absl_flat_hash
     library/cpp/on_disk/multi_blob
     library/cpp/on_disk/st_hash

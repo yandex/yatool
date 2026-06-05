@@ -5,7 +5,7 @@
 
 #include <devtools/ymake/compact_graph/graph.h>
 #include <devtools/ymake/make_plan/make_plan.h>
-#include <devtools/ymake/symbols/name_store.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
 
 #include <mutex>
 #include <util/ysaveload.h>

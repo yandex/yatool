@@ -126,7 +126,7 @@ void TTimeStamps::CompressTimes(THashMap<TElemId, TNodeData>& nodeData) {
         useCount.push_back({pos});
 
     // we want to delete least used date stamps
-    for (auto i = Elems.FileConf.Meta.begin(), e = Elems.FileConf.Meta.end(); i != e; ++i) {
+    for (auto i = Elems.FileConf.Meta_.begin(), e = Elems.FileConf.Meta_.end(); i != e; ++i) {
         const auto& data = *i;
         Y_ASSERT(data.RealModStamp < NumTimes);
         useCount[data.RealModStamp].Count++; // old LastCheckedStamp's have no value, we don't count them
@@ -186,7 +186,7 @@ void TTimeStamps::CompressTimes(THashMap<TElemId, TNodeData>& nodeData) {
         moveMap.MoveStamp(fileData.RealModStamp, rescanFileCont);
     }
 
-    for (auto i = Elems.CommandConf.Meta.begin(), e = Elems.CommandConf.Meta.end(); i != e; ++i) {
+    for (auto i = Elems.CommandConf.Meta_.begin(), e = Elems.CommandConf.Meta_.end(); i != e; ++i) {
         moveMap.MoveStamp(i->CmdModStamp, recmdCount);
     }
 

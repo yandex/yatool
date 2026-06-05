@@ -1,9 +1,8 @@
 #pragma once
 
-#include "name_store.h"
-#include "name_data_store.h"
-
 #include <devtools/ymake/compact_graph/dep_types.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
+#include <devtools/ymake/libs/name_store/name_data_store.h>
 
 #include <util/ysaveload.h>
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "name_data_store.h"
 #include "file_store.h"
 #include "cmd_store.h"
 
+#include <devtools/ymake/libs/name_store/name_store.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
 
 #include <util/memory/blob.h>

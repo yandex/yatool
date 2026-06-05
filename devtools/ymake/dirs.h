@@ -1,7 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/common/uniq_vector.h>
-#include <devtools/ymake/symbols/name_store.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
 #include <devtools/ymake/symbols/symbols.h>
 
 #include <util/generic/strbuf.h>

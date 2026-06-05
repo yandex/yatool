@@ -1,7 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/macro_vars.h>
-#include <devtools/ymake/symbols/name_store.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
 
 #include <util/folder/path.h>
 #include <util/generic/hash.h>

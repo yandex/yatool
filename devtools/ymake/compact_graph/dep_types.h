@@ -2,7 +2,7 @@
 
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/common/uniq_vector.h>
-#include <devtools/ymake/symbols/name_store.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
 
 #include <util/system/defaults.h>
 #include <util/system/yassert.h>

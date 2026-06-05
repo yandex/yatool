@@ -6,7 +6,7 @@
 #include <devtools/ymake/include_parsers/cython_parser.h>
 #include <devtools/ymake/include_parsers/includes_parser_type.h>
 #include <devtools/ymake/include_parsers/ros_parser.h>
-#include <devtools/ymake/symbols/name_store.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
 
 #include <util/generic/hash.h>
 #include <util/generic/variant.h>

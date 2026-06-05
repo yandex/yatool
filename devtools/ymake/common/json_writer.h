@@ -1,7 +1,5 @@
 #pragma once
 
-#include <devtools/ymake/diag/stats.h>
-
 #include <util/generic/string.h>
 #include <util/generic/strbuf.h>
 #include <util/generic/ymath.h>

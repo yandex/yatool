@@ -3,7 +3,7 @@
 #include "value_storage.h"
 
 #include <devtools/ymake/polexpr/ids.h>
-#include <devtools/ymake/symbols/name_store.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
 
 #include <string_view>
 #include <variant>

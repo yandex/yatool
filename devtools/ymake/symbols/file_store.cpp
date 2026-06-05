@@ -106,7 +106,7 @@ TFileElemId TFileConf::Add(TStringBuf name) {
     if (sizeBeforeAdd == targetIdRaw && NPath::IsTypedPath(name)) {
         const auto type = NPath::GetType(name);
         if (type == NPath::Source || type == NPath::Unset) {
-            Meta[targetIdRaw].IsSource = true;
+            Meta_[targetIdRaw].IsSource = true;
         }
     }
     if (!isLink) {
@@ -784,7 +784,7 @@ TFileView TFileConf::GetName(TFileElemId elemId) const {
     if (!fileId.IsLink()) {
         return target;
     }
-    return target.IsValid() ? TFileView{&NameStore, fileId.GetElemId()} : TFileView{};
+    return target.IsValid() ? TFileView{&NameStore_, fileId.GetElemId()} : TFileView{};
 }
 
 TFileView TFileConf::GetTargetName(TFileElemId elemId) const {
@@ -827,11 +827,11 @@ TFileData& TFileConf::GetFileData(TFileView name) {
 }
 
 const TFileData& TFileConf::GetFileDataById(TFileElemId elemId) const {
-    return Meta[RawElemId(TFileId::Create(elemId).GetTargetId())];
+    return Meta_[RawElemId(TFileId::Create(elemId).GetTargetId())];
 }
 
 TFileData& TFileConf::GetFileDataById(TFileElemId elemId) {
-    return Meta[RawElemId(TFileId::Create(elemId).GetTargetId())];
+    return Meta_[RawElemId(TFileId::Create(elemId).GetTargetId())];
 }
 
 

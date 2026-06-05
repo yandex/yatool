@@ -10,6 +10,8 @@
 
 #include <devtools/ymake/config/transition.h>
 
+#include <devtools/ymake/diag/dbg.h>
+
 // TODO: fix back includes
 #include <devtools/ymake/cmd_properties.h>
 

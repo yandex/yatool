@@ -1,5 +1,6 @@
 #include "base.h"
 
+#include <devtools/ymake/common/content_holder.h>
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/options/static_options.h>
 

@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
+#include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/debug_values.h>
 
 struct TNodeIdLog {

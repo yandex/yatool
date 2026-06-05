@@ -6,6 +6,7 @@
 #include <library/cpp/digest/md5/md5.h>
 
 #include <util/digest/city.h>
+#include <util/stream/buffer.h>
 #include <util/ysaveload.h>
 
 namespace {

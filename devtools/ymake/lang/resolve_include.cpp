@@ -1,5 +1,6 @@
 #include "resolve_include.h"
 #include <devtools/ymake/common/npath.h>
+#include <devtools/ymake/diag/dbg.h>
 
 // fromFile is in internal format (?)
 TString ResolveIncludePath(const TStringBuf& path, const TStringBuf& fromFile) {

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/symbols/elem_id.h>
+
+#include <util/generic/yexception.h>
 
 #include <library/cpp/containers/absl_flat_hash/flat_hash_map.h>
 #include <library/cpp/containers/absl_flat_hash/flat_hash_set.h>
@@ -378,7 +379,7 @@ private:
 #ifndef NDEBUG
         if (UniqMap && UniqMap->size() != Container.size()) {
             Dump();
-            AssertEx(false, "Different sizes: " << UniqMap->size() << " and " << Container.size());
+            ythrow yexception() << "Different sizes: " << UniqMap->size() << " and " << Container.size();
         }
 
         if (UniqMap) {
@@ -388,18 +389,18 @@ private:
                 if (it == UniqMap->end()) {
                     Dump();
                     if constexpr (IsSimpleRef) {
-                        AssertEx(false, "No key " << TRef(val) << " in map");
+                        ythrow yexception() << "No key " << TRef(val) << " in map";
                     } else {
-                        AssertEx(false, "No key " << TRef::ToString(Container, i) << " in map");
+                        ythrow yexception() << "No key " << TRef::ToString(Container, i) << " in map";
                     }
                 }
                 if constexpr (IsIndexed) {
                     if (it->second != i) {
                         Dump();
                         if constexpr (IsSimpleRef) {
-                            AssertEx(false, "For key " << TRef(val) << " different indexes: " << it->second << " != " << i);
+                            ythrow yexception() << "For key " << TRef(val) << " different indexes: " << it->second << " != " << i;
                         } else {
-                            AssertEx(false, "For key " << TRef::ToString(Container, i) << " different indexes: " << it->second << " != " << i);
+                            ythrow yexception() << "For key " << TRef::ToString(Container, i) << " different indexes: " << it->second << " != " << i;
                         }
                     }
                 }

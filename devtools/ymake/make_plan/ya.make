@@ -2,6 +2,7 @@ LIBRARY()
 
 PEERDIR(
     devtools/ymake/common
+    devtools/ymake/diag
     library/cpp/json
 )
 

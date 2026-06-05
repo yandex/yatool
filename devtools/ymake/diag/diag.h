@@ -2,11 +2,13 @@
 
 #include "trace_type_enums.h"
 
-#include <devtools/ymake/symbols/file_store.h>
+#include <devtools/ymake/symbols/elem_id.h>
 
 #include <util/generic/vector.h>
 #include <util/generic/string.h>
 #include <util/generic/strbuf.h>
+
+class TFileView;
 
 struct TDiagCtrl {
     class TWhere {
@@ -148,9 +150,7 @@ public:
         Diag()->Persistency = persistency;
     }
 
-    explicit TScopedContext(TFileView owner, bool persistency = true)
-    : TScopedContext(owner.GetElemId(), owner.GetTargetStr(), persistency)
-    {}
+    explicit TScopedContext(TFileView owner, bool persistency = true);
 
     ~TScopedContext() {
         Diag()->Where.pop_back();

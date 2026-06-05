@@ -11,26 +11,10 @@
 
 #include <library/cpp/containers/absl_flat_hash/flat_hash_map.h>
 
-#include <compare>
-
 class MD5;
 class IOutputStream;
 
 class TNameStore {
-private:
-    // pray hashes never clashes
-    typedef absl::flat_hash_map<ui64, ui32, TIdentity> TNameToId;
-    typedef TVector<TStringBuf> TNames;
-
-    TAutoPtr<IMemoryPool> Pool;
-
-    TBlob Blob;
-    TNameToId Name2Id;
-    TNames Names;
-
-    friend class TCmdView;
-    friend class TFileView;
-    friend class TFileConf;
 public:
     TNameStore() {
         // pray 64bit hash never be 0
@@ -41,7 +25,7 @@ public:
     ~TNameStore();
 
     size_t Size() const {
-        return Names.size();
+        return Names_.size();
     }
 
     ui32 Add(TStringBuf name);
@@ -90,4 +74,20 @@ public:
 
 private:
     TStringBuf GetStringBufName(ui32 id) const;
+
+private:
+    // pray hashes never clashes
+    using TNameToId = absl::flat_hash_map<ui64, ui32, TIdentity>;
+    using TNames = TVector<TStringBuf>;
+
+    friend class TCmdView;
+    friend class TFileView;
+    friend class TFileConf;
+
+private:
+    TAutoPtr<IMemoryPool> Pool_;
+
+    TBlob Blob_;
+    TNameToId Name2Id_;
+    TNames Names_;
 };

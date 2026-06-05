@@ -1,10 +1,9 @@
 #include "name_store.h"
 
 #include <devtools/ymake/common/npath.h>
-#include <devtools/ymake/diag/dbg.h>
 
-#include <library/cpp/digest/md5/md5.h>
-
+#include <util/generic/buffer.h>
+#include <util/stream/buffer.h>
 #include <util/ysaveload.h>
 
 static inline ui64 GoodHash(const TStringBuf& s) noexcept {
@@ -15,18 +14,18 @@ ui32 TNameStore::Add(TStringBuf name) {
     auto key = GoodHash(name);
 
     {
-        const auto it = Name2Id.find(key);
+        const auto it = Name2Id_.find(key);
 
-        if (it != Name2Id.end()) {
+        if (it != Name2Id_.end()) {
             return it->second;
         }
     }
 
-    size_t currentId = Names.size();
-    auto sName = Pool->Append(name);
+    size_t currentId = Names_.size();
+    auto sName = Pool_->Append(name);
 
-    Name2Id[key] = currentId;
-    Names.push_back(sName);
+    Name2Id_[key] = currentId;
+    Names_.push_back(sName);
 
     return currentId;
 }
@@ -42,9 +41,9 @@ ui32 TNameStore::GetId(TStringBuf name) const {
 }
 
 ui32 TNameStore::GetIdNx(TStringBuf name) const {
-    TNameToId::const_iterator it = Name2Id.find(GoodHash(name));
+    TNameToId::const_iterator it = Name2Id_.find(GoodHash(name));
 
-    if (it != Name2Id.end()) {
+    if (it != Name2Id_.end()) {
         return it->second;
     }
 
@@ -52,14 +51,14 @@ ui32 TNameStore::GetIdNx(TStringBuf name) const {
 }
 
 bool TNameStore::Has(TStringBuf name) const {
-    return Name2Id.find(GoodHash(name)) != Name2Id.end();
+    return Name2Id_.find(GoodHash(name)) != Name2Id_.end();
 }
 
 bool TNameStore::CheckId(ui32 id) const {
     if (Y_UNLIKELY(!id)) {
         throw yexception() << "GetName: internal error: trying to get name for id = 0\n";
     }
-    if (Y_UNLIKELY(id >= Names.size())) {
+    if (Y_UNLIKELY(id >= Names_.size())) {
         return false;
     }
     return true;
@@ -69,11 +68,11 @@ TNameStore::~TNameStore() {
 }
 
 void TNameStore::Clear() {
-    IMemoryPool::Construct().Swap(Pool);
-    Name2Id.clear();
-    Names.clear();
-    Names.push_back(Pool->Append(TStringBuf()));
-    Blob = TBlob();
+    IMemoryPool::Construct().Swap(Pool_);
+    Name2Id_.clear();
+    Names_.clear();
+    Names_.push_back(Pool_->Append(TStringBuf()));
+    Blob_ = TBlob();
 }
 
 template <>
@@ -118,7 +117,7 @@ void TNameStore::Save(TMultiBlobBuilder& builder) const {
 }
 
 void TNameStore::Save(IOutputStream* out) const {
-    ::Save(out, Names);
+    ::Save(out, Names_);
 }
 
 void TNameStore::Load(TBlob& multi) {
@@ -133,22 +132,22 @@ void TNameStore::LoadSingleBlob(TBlob& blob) {
 
     Clear();
 
-    Blob = blob;
+    Blob_ = blob;
 
     {
-        TMemoryInput mi(Blob.Data(), Blob.Size());
+        TMemoryInput mi(Blob_.Data(), Blob_.Size());
 
-        ::Load(&mi, Names);
+        ::Load(&mi, Names_);
     }
 
-    for (size_t i = 1; i < Names.size(); ++i) {
-        Name2Id[GoodHash(Names[i])] = i;
+    for (size_t i = 1; i < Names_.size(); ++i) {
+        Name2Id_[GoodHash(Names_[i])] = i;
     }
 }
 
 TStringBuf TNameStore::GetStringBufName(ui32 id) const {
     if (CheckId(id)) {
-        return Names[id];
+        return Names_[id];
     }
 
     return {};

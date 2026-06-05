@@ -1,7 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/symbols/elem_id.h>
-#include <devtools/ymake/symbols/name_store.h>
+#include <devtools/ymake/libs/name_store/name_store.h>
 
 #include <library/cpp/getopt/small/last_getopt.h>
 

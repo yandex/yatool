@@ -66,6 +66,6 @@ TCmdElemId TCmdConf::GetIdNx(TStringBuf name) const {
 }
 
 TCmdElemId TCmdConf::GetId(TStringBuf name) const {
-    auto id = NameStore.GetId(name);
+    auto id = NameStore_.GetId(name);
     return TVersionedCmdId(id, IsNewFormatCmd(name)).ElemId();
 }

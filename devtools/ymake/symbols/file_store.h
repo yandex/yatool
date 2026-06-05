@@ -1,11 +1,11 @@
 #pragma once
 
-#include "name_data_store.h"
 #include "content_provider.h"
 #include "sortedreaddir.h"
 #include "base2fullnamer.h"
 
 #include <devtools/ymake/symbols/elem_id.h>
+#include <devtools/ymake/libs/name_store/name_data_store.h>
 #include <devtools/ymake/common/content_holder.h>
 #include <devtools/ymake/common/md5sig.h>
 #include <devtools/ymake/diag/stats.h>
@@ -471,8 +471,8 @@ public:
     void InitAfterCacheLoading();
     TFileElemId Add(TStringBuf name);
     TStringBuf RetBuf(TFileElemId targetId) const {
-        Y_ASSERT(NameStore.CheckId(RawElemId(targetId)));
-        return NameStore.GetStringBufName(RawElemId(targetId));
+        Y_ASSERT(NameStore_.CheckId(RawElemId(targetId)));
+        return NameStore_.GetStringBufName(RawElemId(targetId));
     }
 
     TFileView GetStoredName(TStringBuf name);

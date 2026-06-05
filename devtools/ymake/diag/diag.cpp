@@ -2,6 +2,7 @@
 #include "display.h"
 
 #include <devtools/ymake/context_executor.h>
+#include <devtools/ymake/symbols/file_store.h>
 
 #include <util/stream/output.h>
 #include <util/string/split.h>
@@ -58,6 +59,10 @@ void TDiagCtrl::Init(const TVector<TString>& list, bool suppressDbgWarn) {
         YWarn() << "-W: some of the dbg flags will be ignored in release build of ymake" << Endl;
 #endif
 }
+
+TScopedContext::TScopedContext(TFileView owner, bool persistency)
+    : TScopedContext(owner.GetElemId(), owner.GetTargetStr(), persistency)
+{}
 
 TDiagCtrl* Diag() {
     auto ctx = CurrentContext<TExecContext>;

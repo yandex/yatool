@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/common/npath.h>
+#include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/options/static_options.h>
 #include <devtools/ymake/resolver/path_resolver.h>
 

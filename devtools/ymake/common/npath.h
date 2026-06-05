@@ -1,8 +1,6 @@
 #pragma once
 #include "path_definitions.h"
 
-#include <devtools/ymake/diag/dbg.h>
-
 #include <util/folder/path.h>
 #include <util/folder/pathsplit.h>
 #include <util/generic/strbuf.h>

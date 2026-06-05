@@ -4,8 +4,10 @@ PEERDIR(
     contrib/libs/fmt
     library/cpp/json
     library/cpp/protobuf/json
+    devtools/ymake/common
     devtools/ymake/diag/common_display
     devtools/ymake/diag/common_msg
+    devtools/ymake/libs/name_store
 )
 
 SRCS(
