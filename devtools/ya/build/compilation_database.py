@@ -20,7 +20,7 @@ from yalibrary.toolscache import toolscache_version
 
 logger = logging.getLogger(__name__)
 
-SOURCE_EXTS = ('cpp', 'c', 'cc', 'cxx')
+SOURCE_EXTS = ('cpp', 'c', 'cc', 'cxx', 'm', 'mm')
 CLANG_NAMES = ('clang', 'clang++')
 
 COMPILATION_DATABASE_OPTS_GROUP = devtools.ya.core.yarg.Group('Compilation database options', 1)
