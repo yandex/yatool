@@ -72,7 +72,6 @@ public:
 
     void Clear();
 
-private:
     TStringBuf GetStringBufName(ui32 id) const;
 
 private:

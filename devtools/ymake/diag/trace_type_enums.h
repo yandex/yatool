@@ -15,6 +15,7 @@ enum class ETraceEvent: ui64 {
     H = 0x004,
     G = 0x080,
     T = 0x100,
+    M = 0x400, // Events related to aggregated statistics for modules
 
     a = ~0u,
     A = a,

@@ -83,6 +83,7 @@ SRCS(
     commands/preeval_reducer.cpp
     commands/script_evaluator.cpp
     compute_reachability.cpp
+    context_executor.cpp
     conf.cpp
     config/config.cpp
     configure_tasks.cpp

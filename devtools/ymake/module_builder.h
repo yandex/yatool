@@ -192,6 +192,7 @@ private:
     void AddFileGroupVars();
     void AddDartsVars();
 
+    void InterpretMakefile();
     void TryProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args); // try-catch for ProcessStatement
     void ProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool SrcStatement(const TStringBuf& name, const TVector<TStringBuf>& args);

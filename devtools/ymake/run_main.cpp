@@ -7,9 +7,10 @@
 #include "context_executor.h"
 
 #include <asio/use_future.hpp>
-#include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/diag/mod_stats_manager.h>
 #include <devtools/ymake/diag/progress_manager.h>
 #include <devtools/ymake/diag/stats.h>
+#include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/foreign_platforms/pipeline.h>
 #include <devtools/ymake/python_runtime.h>
 
@@ -232,6 +233,7 @@ void SubmitNextConfigIfAny(NYMake::TPythonRuntimeScope& pythonRuntime, TAdaptive
         std::make_shared<NCommonDisplay::TLockedStream>(),
         std::make_shared<TConfMsgManager>(),
         std::make_shared<TProgressManager>(),
+        std::make_shared<TModuleStagesStatsManager>(),
         std::make_shared<TDiagCtrl>()
     );
     auto proxy = TExecutorWithContext<TExecContext>(

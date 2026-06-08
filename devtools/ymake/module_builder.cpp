@@ -19,10 +19,11 @@
 
 #include <devtools/ymake/common/npath.h>
 
-#include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/manager.h>
+#include <devtools/ymake/diag/mod_stats_manager.h>
+#include <devtools/ymake/diag/trace.h>
 
 #include <devtools/libs/yaplatform/platform_map.h>
 
@@ -77,6 +78,7 @@ void TModuleBuilder::AddDart(TStringBuf dartName, TStringBuf dartValue, const TV
 }
 
 void TModuleBuilder::RecursiveAddInputs() {
+    const auto stageScope = TModuleStagesStatsManager::Current().Measure();
     bool lastTryMode = false;
     const TCommandInfo* firstFail = nullptr;
     while (!CmdAddQueue.empty()) {
@@ -487,6 +489,48 @@ void TModuleBuilder::AddDartsVars() {
     }
 }
 
+void TModuleBuilder::InterpretMakefile() {
+    const auto stageScope = TModuleStagesStatsManager::Current().Measure();
+    AssertEx(ModuleDef != nullptr, "Makefile is not provided for processing");
+    TScopedContext context(Module.GetName());
+    if (const auto dllDirIt = OrigVars().find("DLL_FOR_DIR")) {
+        const auto& dir_for = dllDirIt->second;
+        AddSrcdir(dir_for);
+        AddIncdir(dir_for, EIncDirScope::Local, false);
+    } else if (const auto pyDirIt = OrigVars().find("PY_PROTOS_FOR_DIR")) {
+        const auto& dir_for = pyDirIt->second;
+        TVector<TStringBuf> callargs;
+        ModuleDef->AddStatement("CREATE_INIT_PY_STRUCTURE", callargs);
+        AddSrcdir(dir_for);
+        AddIncdir(dir_for, EIncDirScope::Local, false);
+    }
+
+    ApplyVarAsMacro(NMacro::PEERDIR);
+    ApplyVarAsMacro(NMacro::SRCDIR);
+    ApplyVarAsMacro(NMacro::ADDINCL);
+
+    for (const auto& statement : ModuleDef->GetMakeFileMap()) {
+        const TStringBuf& name = statement.first.second;
+        const TVector<TStringBuf>& args = statement.second;
+        TryProcessStatement(name, args);
+    }
+
+    // These functions perform some macro substitution inside and it is not guaranteed that
+    // values are known at the time of arrival. Here we know all the VARs, so reapply forcefully just in case.
+    // Internal de-duplication code ensures that directies are not added twice.
+    ApplyVarAsMacro(NMacro::PEERDIR, true);
+    ApplyVarAsMacro(NMacro::SRCDIR, true);
+    ApplyVarAsMacro(NMacro::ADDINCL, true);
+
+
+    //  FIXME(spreis) Some Dirs are added with inputs, so call to AddDirsToProps() here
+    //                loses some dirs in props. On the other hand late call leaves GlIncDirs
+    //                unpopulated for re-entrants via PEERDIR+RECURSE loops. To make the latter
+    //                happy we should call AddDirsToProps() twice but this is currently impossible
+    //                due to missing property node update support.
+    //    AddDirsToProps();
+}
+
 void TModuleBuilder::TryProcessStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
     try {
         ProcessStatement(name, args);
@@ -530,43 +574,7 @@ void TModuleBuilder::ApplyVarAsMacro(const TStringBuf& name, bool force) {
 }
 
 bool TModuleBuilder::ProcessMakeFile() {
-    AssertEx(ModuleDef != nullptr, "Makefile is not provided for processing");
-    TScopedContext context(Module.GetName());
-    if (const auto dllDirIt = OrigVars().find("DLL_FOR_DIR")) {
-        const auto& dir_for = dllDirIt->second;
-        AddSrcdir(dir_for);
-        AddIncdir(dir_for, EIncDirScope::Local, false);
-    } else if (const auto pyDirIt = OrigVars().find("PY_PROTOS_FOR_DIR")) {
-        const auto& dir_for = pyDirIt->second;
-        TVector<TStringBuf> callargs;
-        ModuleDef->AddStatement("CREATE_INIT_PY_STRUCTURE", callargs);
-        AddSrcdir(dir_for);
-        AddIncdir(dir_for, EIncDirScope::Local, false);
-    }
-
-    ApplyVarAsMacro(NMacro::PEERDIR);
-    ApplyVarAsMacro(NMacro::SRCDIR);
-    ApplyVarAsMacro(NMacro::ADDINCL);
-
-    for (const auto& statement : ModuleDef->GetMakeFileMap()) {
-        const TStringBuf& name = statement.first.second;
-        const TVector<TStringBuf>& args = statement.second;
-        TryProcessStatement(name, args);
-    }
-
-    // These functions perform some macro substitution inside and it is not guaranteed that
-    // values are known at the time of arrival. Here we know all the VARs, so reapply forcefully just in case.
-    // Internal de-duplication code ensures that directies are not added twice.
-    ApplyVarAsMacro(NMacro::PEERDIR, true);
-    ApplyVarAsMacro(NMacro::SRCDIR, true);
-    ApplyVarAsMacro(NMacro::ADDINCL, true);
-
-//  FIXME(spreis) Some Dirs are added with inputs, so call to AddDirsToProps() here
-//                loses some dirs in props. On the other hand late call leaves GlIncDirs
-//                unpopulated for re-entrants via PEERDIR+RECURSE loops. To make the latter
-//                happy we should call AddDirsToProps() twice but this is currently impossible
-//                due to missing property node update support.
-//    AddDirsToProps();
+    InterpretMakefile();
 
     if (!Node.HasAnyDeps()) {
         RecursiveAddInputs();

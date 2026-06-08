@@ -321,3 +321,14 @@ message TCacheIsExpectedToBeEmpty {
     option (message_id) = 52;
     required string CachePath = 1;
 }
+
+message TModStageStats {
+    option (message_id) = 53;
+    required string Name = 1;
+    required uint32 TotalUs = 2;
+    required uint32 Count = 3;
+    required uint32 MinUs = 4;
+    required string MinModule = 5;
+    required uint32 MaxUs = 6;
+    required string MaxModule = 7;
+}

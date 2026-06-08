@@ -58,6 +58,10 @@ public:
         return NameStore_.GetIdNx(name);
     }
 
+    const TNameStore& GetNameStore() const noexcept {
+        return NameStore_;
+    }
+
     void Save(TMultiBlobBuilder& builder) {
         TMultiBlobBuilder* multi = new TMultiBlobBuilder();
         NameStore_.Save(*multi);

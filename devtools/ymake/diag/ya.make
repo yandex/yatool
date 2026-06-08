@@ -15,11 +15,12 @@ SRCS(
     debug_log_writer.cpp
     diag.cpp
     display.cpp
+    manager.cpp
+    mod_stats_manager.cpp
+    progress_manager.cpp
+    stats.cpp
     trace.ev
     trace.cpp
-    manager.cpp
-    stats.cpp
-    progress_manager.cpp
 )
 
 GENERATE_ENUM_SERIALIZATION_WITH_HEADER(
@@ -41,3 +42,5 @@ IF (OS_WINDOWS)
 ENDIF()
 
 END()
+
+RECURSE_FOR_TESTS(ut)

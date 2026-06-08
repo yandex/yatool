@@ -26,6 +26,7 @@
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/display.h>
+#include <devtools/ymake/diag/mod_stats_manager.h>
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/common/uniq_vector.h>
 #include <devtools/ymake/diag/trace.ev.pb.h>
@@ -854,6 +855,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
     }
 
     result = co_await asio::co_spawn(exec, ConfigureStage(yMake, conf, serial_exec), asio::use_awaitable);
+    TModuleStagesStatsManager::Current().Report(yMake->Names.FileConf.GetNameStore());
     if (result.Defined()) {
         co_return result.GetRef();
     }
