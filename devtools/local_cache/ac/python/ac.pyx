@@ -287,7 +287,8 @@ def synchronous_gc(
     timeout: float|None = None,
     wait_for_ready: bool = False
 ):
-    assert sum(1 for x in (total_size, min_last_access, max_object_size) if x is not None) < 2, "Only one of the limits must be specified"
+    passed_limits = [total_size, min_last_access, max_object_size]
+    assert sum(1 for x in passed_limits if x is not None) < 2, "Only one of the limits must be specified"
     return SynchronousGC(
         get_address(paddress),
         _none_as_negative(total_size),
