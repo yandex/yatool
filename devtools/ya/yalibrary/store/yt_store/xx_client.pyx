@@ -16,7 +16,9 @@ from util.generic.vector cimport TVector
 from util.system.types cimport i64, ui64
 
 import atexit
+import collections
 import logging
+import threading
 import time
 
 from devtools.ya.core import config as core_config
@@ -59,21 +61,32 @@ LOG_PRIORITY_TO_LEVEL = {
 }
 
 
+thread_names = collections.defaultdict(lambda: threading.current_thread().name)
+
+
+def restore_thread_name():
+    threading.current_thread().name = thread_names[threading.get_ident()]
+
+
 cdef extern void YaYtStoreLoggingHook(ELogPriority priority, const char *msg, size_t size) with gil:
+    restore_thread_name()
     # Note: msg is not a null-terminated string
     logger.log(LOG_PRIORITY_TO_LEVEL[priority], PyUnicode_DecodeUTF8(msg, size, 'replace'))
 
 
 cdef extern void YaYtStoreReportError(void* owner, const TString& errorType, const TString& errorMessage) with gil:
+    restore_thread_name()
     (<YtStoreImpl>owner)._report_yt_error(errorType, errorMessage)
 
 
 cdef extern void YaYtStoreStartStage(void* owner, const TString& name) with gil:
+    restore_thread_name()
     if (<YtStoreImpl>owner)._stager:
         (<YtStoreImpl>owner)._stager.start(name)
 
 
 cdef extern void YaYtStoreFinishStage(void* owner, const TString& name) with gil:
+    restore_thread_name()
     if (<YtStoreImpl>owner)._stager:
         (<YtStoreImpl>owner)._stager.finish(name)
 

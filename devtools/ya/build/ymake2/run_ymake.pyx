@@ -8,6 +8,7 @@ from util.generic.vector cimport TVector
 from devtools.ya.build.ccgraph.cpp_string_wrapper cimport CppStringWrapper
 from cpython.ref cimport PyObject
 
+import collections
 import cython
 import logging
 import six
@@ -52,6 +53,12 @@ arg_collection = dict()
 result_ready_event = threading.Event()
 cdef THashMap[int, TRunYMakeResultPtr] results
 exception = dict()  # it is mandatory to have a container type here to sync between threads
+thread_names = collections.defaultdict(lambda: threading.current_thread().name)
+
+
+cdef extern void RestoreThreadName():
+    threading.current_thread().name = thread_names[threading.get_ident()]
+
 
 def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_provider=None, multiconfig=False, order=None, check_error_fn=None):
     cdef TString binary_c = six.ensure_binary(binary)

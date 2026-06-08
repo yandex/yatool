@@ -23,10 +23,13 @@
 constexpr bool BORROW = true;
 using NPyBind::TPyObjectPtr;
 
+extern void RestoreThreadName();
+
 namespace {
     void CallReader(PyObject* stderrLineReader, const TString& line) {
         PyGILState_STATE gilState = PyGILState_Ensure();
         Y_DEFER {PyGILState_Release(gilState);};
+        RestoreThreadName();
 
         TPyObjectPtr s{PyUnicode_FromStringAndSize(line.c_str(), line.size()), BORROW};
         if (!s.Get()) {
@@ -81,6 +84,7 @@ namespace {
     TString CallProvider(PyObject* lineProvider) {
         PyGILState_STATE gilState = PyGILState_Ensure();
         Y_DEFER {PyGILState_Release(gilState);};
+        RestoreThreadName();
         TPyObjectPtr result{PyObject_CallFunctionObjArgs(lineProvider, nullptr)};
         if (!result.Get()) {
             throw yexception() << "lineProvider() failed";
