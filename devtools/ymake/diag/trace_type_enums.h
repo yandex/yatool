@@ -10,12 +10,12 @@ enum class ETraceEvent: ui64 {
     S = 0x020,
     P = 0x040,
     C = 0x200,
-    d = L | U | E | D | S | P | C,
+    M = 0x400, // Events related to aggregated statistics for modules
+    d = L | U | E | D | S | P | C | M,
 
     H = 0x004,
     G = 0x080,
     T = 0x100,
-    M = 0x400, // Events related to aggregated statistics for modules
 
     a = ~0u,
     A = a,
