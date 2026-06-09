@@ -1282,6 +1282,33 @@ def _stable_dir_outputs(suite, opts):
     return not _need_random_uid(suite, opts) and opts.dir_outputs_test_mode
 
 
+def _build_test_paths_hashes_detail(paths):
+    # Introspection for `test_paths_hashes`: this hash is a combination of a per-path
+    # imprint for every path, and each path imprint is in turn a combination of the
+    # relative path + content hash of every (sub)file. When a suite's uid changes
+    # unexpectedly, this breakdown lets us pinpoint *which* path and *which* file moved
+    # the hash, instead of seeing only the final opaque digest.
+    lines = []
+    try:
+        imprints_by_path = imprint(*paths)
+        for path in sorted(paths):
+            lines.append("      {} -> {}".format(path, imprints_by_path.get(path)))
+            try:
+                for detailed_path, kind, size_or_count, detailed_imprint in imprint.generate_detailed_imprints(path):
+                    if detailed_path == path:
+                        # The root path itself is re-yielded by generate_detailed_imprints;
+                        # it is already printed above on the per-path line.
+                        continue
+                    lines.append(
+                        "          {} [{}, {}] -> {}".format(detailed_path, kind, size_or_count, detailed_imprint)
+                    )
+            except Exception as e:
+                lines.append("          <failed to expand {}: {}>".format(path, e))
+    except Exception as e:
+        return "      <failed to compute test_paths_hashes detail: {}>".format(e)
+    return "\n".join(lines)
+
+
 def get_suite_uid(
     suite,
     arc_root,
@@ -1376,12 +1403,14 @@ def get_suite_uid(
         uid = '-'.join(map(str, [_f for _f in ['test', imprint.combine_imprints(*imprint_parts)] if _f]))
 
         if getattr(opts, 'log_uid_calc', False):
+            test_paths_hashes_detail = _build_test_paths_hashes_detail(paths)
             logger.debug(
                 "Suite uid for %s/%s: %s\n"
                 "  [suite imprint]\n"
                 "    name: %s\n"
                 "    project_path: %s\n"
                 "    test_paths_hashes: %s\n"
+                "    test_paths_hashes detail (path/file -> imprint):\n%s\n"
                 "    timeout: %s\n"
                 "    fork_mode: %s\n"
                 "    split_factor: %s\n"
@@ -1410,6 +1439,7 @@ def get_suite_uid(
                 suite.name,
                 suite.project_path,
                 test_paths_hashes,
+                test_paths_hashes_detail,
                 suite.timeout,
                 suite.get_fork_mode(),
                 suite.get_split_factor(opts),
