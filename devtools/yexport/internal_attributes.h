@@ -11,11 +11,12 @@ namespace NInternalAttrs {
     inline static const std::string MacroArgs = "macro_args";///< Macro arguments of target
     inline static const std::string IsTest = "is_test";///< This target is test
     inline static const std::string TestRelDir = "test_reldir";///< Relative to main target subdirectory of test
-    inline static const std::string TestLib = "test_lib";///< This test is library for other tests in module
     inline static const std::string Subdirs = "subdirs";///< Subdirectories of directory
     inline static const std::string Curdir = "curdir";///< Current directory (relative to export root)
     inline static const std::string Target = "target";///< Main target of directory
     inline static const std::string ExtraTargets = "extra_targets";///< Extra targets of directory
+    inline static const std::string ExtraDepends = "extra_depends";///< Depends from extra target to other extra targets: list of TestRelDir's of depends
+    inline static const std::string ExtraUsages = "extra_usages";///< Usages from extra target from other extra targets: list of TestRelDir's of usages
     inline static const std::string HasTest = "has_test";///< Extra targets of directory has at least one test
     inline static const std::string Tools = "tools";///< Relative paths to tool binaries
     inline static const std::string ProjectName = "project_name";///< Project name of export

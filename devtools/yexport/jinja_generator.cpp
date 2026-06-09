@@ -177,22 +177,36 @@ public:
         const auto& dep = state.Top().CurDep();
         if (IsDirectPeerdirDep(dep)) {
             // Note: This part checks dependence of the test on the library in the same dir, because for java we should not distribute attributes
-            bool isSameDir = false;
+            bool isExtraDepend = false;
             const auto* toTarget = Mod2Target_[dep.To().Id()];
             if (auto* curSubdir = ProjectBuilder_->CurrentSubdir(); curSubdir) {
                 for (auto& target: curSubdir->Targets) {
                     if (target.Get() == toTarget) {
-                        isSameDir = true;
-                        if (ProjectBuilder_->CurrentTarget()->IsTest() && target->IsTest()) {
-                            // test use other test in module as depend, detected test library
-                            NInternalAttrs::EmplaceAttr(target->Attrs->GetWritableMap(), NInternalAttrs::TestLib, true);
+                        isExtraDepend = true; // depends between extra targets
+                        const auto& currentAttrs = ProjectBuilder_->CurrentTarget()->Attrs->GetMap();
+                        const auto fromTestRelDirIt = currentAttrs.find(NInternalAttrs::TestRelDir);
+                        if (fromTestRelDirIt != currentAttrs.end()) {
+                            const auto& fromTestRelDir = fromTestRelDirIt->second;
+                            if (!fromTestRelDir.isEmpty()) {
+                                auto [extraUsagesIt, _] = NInternalAttrs::EmplaceAttr(target->Attrs->GetWritableMap(), NInternalAttrs::ExtraUsages, jinja2::ValuesList{});
+                                auto& extraUsages = extraUsagesIt->second.asList();
+                                extraUsages.emplace_back(fromTestRelDir);
+                            }
+                        }
+                        const auto& toAttrs = target->Attrs->GetMap();
+                        const auto toTestRelDirIt = toAttrs.find(NInternalAttrs::TestRelDir);
+                        if (toTestRelDirIt != toAttrs.end()) {
+                            const auto& toTestRelDir = toTestRelDirIt->second;
+                            auto [extraDependsIt, _] = NInternalAttrs::EmplaceAttr(ProjectBuilder_->CurrentTarget()->Attrs->GetWritableMap(), NInternalAttrs::ExtraDepends, jinja2::ValuesList{});
+                            auto& extraDepends = extraDependsIt->second.asList();
+                            extraDepends.emplace_back(toTestRelDir);
                         }
                         break;
                     }
                 }
             }
             const auto libIt = InducedAttrs_.find(dep.To().Id());
-            if (!isSameDir && libIt != InducedAttrs_.end()) {
+            if (!isExtraDepend && libIt != InducedAttrs_.end()) {
                 const TSemNodeData& data = dep.To().Value();
 /*
     Generating induced attributes and excludes< for example, project is
@@ -475,7 +489,7 @@ const jinja2::ValuesMap& TJinjaGenerator::FinalizeRootAttrs() {
     }
     NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::ProjectName, ProjectName);
     std::unordered_set<std::string> existsSubdirs;
-    auto [subdirsIt, subdirsInserted] = NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Subdirs, jinja2::ValuesList{});
+    auto [subdirsIt, _] = NInternalAttrs::EmplaceAttr(attrs, NInternalAttrs::Subdirs, jinja2::ValuesList{});
     auto& subdirs = subdirsIt->second.asList();
     for (const auto& platform : Platforms) {
         for (const auto& subdir: platform->Project->GetSubdirs()) {
