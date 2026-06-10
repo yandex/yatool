@@ -879,5 +879,8 @@ def pair(ratio: tuple[int, int]) -> str:
 
 
 def pretty_file(filename: str) -> str:
-    """Return a prettier version of `filename` for display."""
-    return re.sub(r"[/\\]", "\N{THIN SPACE}\\g<0>\N{THIN SPACE}", filename)
+    """Return a prettier version of `filename` for display.
+
+    This is a filter for the template engine, so HTML output is literal.
+    """
+    return re.sub(r"[/\\]", '<span class="sep">\\g<0></span>', filename)
