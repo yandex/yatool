@@ -144,8 +144,8 @@ class YaStoredCache(BaseFileCache):
 
         for abs_path in abs_paths:
             # clean child files
-            index = items_indexes.get(abs_path, None)
-            if index:
+            index = items_indexes.get(abs_path)
+            if index is not None:
                 to_invalidate.add(abs_path)
                 index += 1
 
