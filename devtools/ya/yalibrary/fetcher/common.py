@@ -21,7 +21,7 @@ def clean_dir(dir):
         os.unlink(dir)
     except OSError:
         pass
-    fs.remove_tree_safe(dir)
+    fs.remove_tree_with_perm_update(dir)
     fs.create_dirs(dir)
 
 
