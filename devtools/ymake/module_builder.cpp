@@ -707,17 +707,40 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
     return true;
 }
 
-bool TModuleBuilder::PeerQueryInvoke(const TStringBuf& name, const TStringBuf& arg) {
-    if (GenStatement(name, {arg})) // for macros with straight up .CMDs inside
-        return true;
-    ProcessConfigMacroCalls(name, {arg}); // for macros calling other macros
-    return true;
+void TModuleBuilder::PeerQueryStore(TStringBuf sink, TYVar&& result) {
+    Vars[sink] = std::move(result);
 }
 
-bool TModuleBuilder::PeerQueryInvoke(const TStringBuf& name, const TVector<TStringBuf>& args) {
-    if (name == "SRCS")
-        return SrcStatement(name, args);
-    return false;
+void TModuleBuilder::PeerQueryInvoke(TStringBuf sink, const TVector<TString>& sinkArgs, const TYVar& result) {
+    TVector<TStringBuf> args;
+    args.reserve(sinkArgs.size() + result.size());
+    args.insert(args.begin(), sinkArgs.begin(), sinkArgs.end());
+    for (auto& val : result)
+        args.push_back(val.Name);
+
+    if (
+        SrcStatement(sink, args) ||
+        PluginStatement(sink, args)
+    )
+        return;
+    ythrow TError() << "Could not invoke " << sink;
+}
+
+void TModuleBuilder::PeerQueryInvokeForEach(TStringBuf sink, const TVector<TString>& sinkArgs, const TYVar& result) {
+    TVector<TStringBuf> args;
+    args.reserve(sinkArgs.size() + 1);
+    args.insert(args.begin(), sinkArgs.begin(), sinkArgs.end());
+    args.emplace_back();
+
+    for (auto& val : result) {
+        args.back() = val.Name;
+        if (
+            GenStatement(sink, args) || // for macros with straight up .CMDs inside
+            PluginStatement(sink, args)
+        )
+            continue;
+        ProcessConfigMacroCalls(sink, args); // for macros calling other macros
+    }
 }
 
 bool TModuleBuilder::SrcStatement(const TStringBuf& name, const TVector<TStringBuf>& args) {
@@ -1048,31 +1071,45 @@ bool TModuleBuilder::PeerFlowStatement(const TStringBuf& name, const TVector<TSt
         return true;
     } else if (name == NMacro::_PEER_QUERY) {
         static auto sig = TSignature{
-            {"SINK", "PEER", "VIEW", "ARGS..."},
+            {"PEER", "VIEW", "ARGS..."},
             TSignature::TKeywords()
-                .AddFlagKeyword("INVOKE", "yes", "no")
-                .AddFlagKeyword("INVOKE_FOR_EACH", "yes", "no")
+                .AddScalarKeyword("STORE", "", "")
+                .AddArrayKeyword("INVOKE", "")
+                .AddArrayKeyword("INVOKE_FOR_EACH", "")
         };
         TVars _args = AddMacroArgsToLocals(sig, args).value();
 
-        bool invoke = NYMake::IsTrue(Get1(&_args["INVOKE"]));
-        bool invoke_for_each = NYMake::IsTrue(Get1(&_args["INVOKE_FOR_EACH"]));
-        if (invoke && invoke_for_each)
-            ythrow TError() << "In peer queries, INVOKE and INVOKE_FOR_EACH are mutually exclusive";
-        TVector<TString> queryArgs;
-        for (auto& val : _args["ARGS"])
-            queryArgs.push_back(val.Name);
-
-        PeerQueries.push_back(TPeerQuery{
-            .Sink{Get1(&_args["SINK"])},
+        auto query = TPeerQuery{
             .Peers{Get1(&_args["PEER"])},
             .View{Get1(&_args["VIEW"])},
-            .Args{queryArgs},
-            .Action
-                = invoke_for_each ? TModuleBuilder::TPeerQuery::EAction::InvokeForEach
-                : invoke ? TModuleBuilder::TPeerQuery::EAction::Invoke
-                : TModuleBuilder::TPeerQuery::EAction::Store
-        });
+        };
+        for (auto& val : _args["ARGS"])
+            query.ViewArgs.push_back(val.Name);
+
+        auto sink_count = 0;
+        if (auto store = Get1(&_args["STORE"]); !store.empty()) {
+            ++sink_count;
+            query.Action = TModuleBuilder::TPeerQuery::EAction::Store;
+            query.Sink = store;
+        }
+        if (auto& invoke = _args["INVOKE"]; !invoke.empty()) {
+            ++sink_count;
+            query.Action = TModuleBuilder::TPeerQuery::EAction::Invoke;
+            query.Sink = invoke.front().Name;
+            for (auto& it : std::span(invoke).subspan(1))
+                query.SinkArgs.emplace_back(it.Name);
+        }
+        if (auto& invoke_for_each = _args["INVOKE_FOR_EACH"]; !invoke_for_each.empty()) {
+            ++sink_count;
+            query.Action = TModuleBuilder::TPeerQuery::EAction::InvokeForEach;
+            query.Sink = invoke_for_each.front().Name;
+            for (auto& it : std::span(invoke_for_each).subspan(1))
+                query.SinkArgs.emplace_back(it.Name);
+        }
+        if (sink_count != 1)
+            ythrow TError() << "In peer queries, exactly one of the STORE, INVOKE and INVOKE_FOR_EACH actions must be specified";
+
+        PeerQueries.push_back(query);
         return true;
     }
     return false;

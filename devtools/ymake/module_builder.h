@@ -40,10 +40,11 @@ class TModuleBuilder : public TModuleDirBuilder, public TModuleWrapper
 public:
     struct TPeerQuery {
         enum class EAction {Store, Invoke, InvokeForEach};
-        TString Sink; // variable or macro
         TString Peers; // only a single peer supported so far (TODO)
         TString View;
-        TVector<TString> Args;
+        TVector<TString> ViewArgs;
+        TString Sink;
+        TVector<TString> SinkArgs;
         EAction Action;
     };
 public:
@@ -155,9 +156,14 @@ public:
     /// @brief Process directory macros: PEERDIR, ADDINCL, SRCDIR
     bool DirStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
 
-    /// @brief The action part of the INVOKE* forms of a peer query
-    bool PeerQueryInvoke(const TStringBuf& name, const TStringBuf& args);
-    bool PeerQueryInvoke(const TStringBuf& name, const TVector<TStringBuf>& args);
+    /// @brief The action part of the STORE form of a peer query
+    void PeerQueryStore(TStringBuf sink, TYVar&& result);
+
+    /// @brief The action part of the INVOKE form of a peer query
+    void PeerQueryInvoke(TStringBuf sink, const TVector<TString>& sinkArgs, const TYVar& result);
+
+    /// @brief The action part of the INVOKE_FOR_EACH form of a peer query
+    void PeerQueryInvokeForEach(TStringBuf sink, const TVector<TString>& sinkArgs, const TYVar& result);
 
 private:
     enum class EModuleCmdKind {

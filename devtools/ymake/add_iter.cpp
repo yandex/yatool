@@ -218,12 +218,14 @@ namespace {
         auto result = ForSomePeer(node, query, [&](TConstDepNodeRef to) {
             var.SetSingleVal(node->Graph.GetFileName(to).GetTargetStr(), false);
         });
-        node->ModuleBldr->Vars[query.Sink] = std::move(var);
+        if (query.Action != TModuleBuilder::TPeerQuery::EAction::Store)
+            ythrow TError() << "Querying a target supports only the store action";
+        node->ModuleBldr->PeerQueryStore(query.Sink, std::move(var));
         return result;
     }
 
     TFileElemId DoQueryVariable(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
-        if (query.Args.size() != 1)
+        if (query.ViewArgs.size() != 1)
             ythrow TError() << "Querying a variable requires exactly one argument: its name";
         TYVar var;
         auto result = ForSomePeer(node, query, [&](TConstDepNodeRef to) {
@@ -235,7 +237,7 @@ namespace {
                 TStringBuf varName;
                 TStringBuf varValue;
                 ParseLegacyCommandOrSubst(varData, id, varName, varValue);
-                if (varName == query.Args[0]) {
+                if (varName == query.ViewArgs[0]) {
                     TVars vars;
                     auto vals = [&]() {
                         // TBD: obtaining context variables;
@@ -261,7 +263,9 @@ namespace {
                 }
             }
         });
-        node->ModuleBldr->Vars[query.Sink] = std::move(var);
+        if (query.Action != TModuleBuilder::TPeerQuery::EAction::Store)
+            ythrow TError() << "Querying a variable supports only the store action";
+        node->ModuleBldr->PeerQueryStore(query.Sink, std::move(var));
         return result;
     }
 
@@ -273,7 +277,7 @@ namespace {
             TYVar var;
             for (auto& input : visitor.Result) {
                 auto name = node->Graph.GetFileName(node->Graph.Get(input)).GetTargetStr();
-                if (!std::any_of(query.Args.begin(), query.Args.end(), [&](const auto& arg) {
+                if (!std::any_of(query.ViewArgs.begin(), query.ViewArgs.end(), [&](const auto& arg) {
                     return name.ends_with(arg);
                 }))
                     continue;
@@ -284,22 +288,15 @@ namespace {
                     // TODO investigate: we should set var.DontParse here
                     // to avoid paths becoming like `Terms($S, '/source.cpp')` after getting parsed,
                     // but for some reason this flag is not propagated to the instance the expression compiler sees
-                    node->ModuleBldr->Vars[query.Sink] = std::move(var);
+                    node->ModuleBldr->PeerQueryStore(query.Sink, std::move(var));
                     break;
                 }
                 case TModuleBuilder::TPeerQuery::EAction::Invoke: {
-                    TVector<TStringBuf> args;
-                    args.reserve(var.size());
-                    for (auto& val : var)
-                        args.push_back(val.Name);
-                    if (!node->ModuleBldr->PeerQueryInvoke(query.Sink, args))
-                        ythrow TError() << "Could not invoke " << query.Sink;
+                    node->ModuleBldr->PeerQueryInvoke(query.Sink, query.SinkArgs, var);
                     break;
                 }
                 case TModuleBuilder::TPeerQuery::EAction::InvokeForEach: {
-                    for (auto& val : var)
-                        if (!node->ModuleBldr->PeerQueryInvoke(query.Sink, val.Name))
-                            ythrow TError() << "Could not invoke " << query.Sink << " on " << val.Name;
+                    node->ModuleBldr->PeerQueryInvokeForEach(query.Sink, query.SinkArgs, var);
                     break;
                 }
             }
