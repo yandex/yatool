@@ -9,6 +9,7 @@ PEERDIR(
     devtools/ymake/common
     devtools/ymake/diag
     devtools/ymake/lang/makelists
+    devtools/ymake/libs/clocks
     devtools/ymake/options
     devtools/ymake/polexpr
     devtools/ymake/symbols

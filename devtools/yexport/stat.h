@@ -1,6 +1,7 @@
 #pragma once
 
-#include <devtools/ymake/common/cyclestimer.h>
+#include <devtools/ymake/libs/clocks/checkpoint.h>
+#include <devtools/ymake/libs/clocks/hp_clock.h>
 
 #include <util/generic/ptr.h>
 
@@ -26,7 +27,7 @@ namespace NYexport {
         ~TStageCall();
     private:
         TStage& Stage_;
-        TCyclesTimer Timer_;
+        TCheckPoint<THPClock> Checkpoint_;
     };
 }
 

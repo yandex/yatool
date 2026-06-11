@@ -2,7 +2,6 @@ LIBRARY()
 
 SRCS(
     content_holder.cpp
-    cyclestimer.cpp
     iterable_tuple.cpp
     iter_pair.cpp
     memory_pool.cpp

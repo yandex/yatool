@@ -3,6 +3,8 @@
 #include "stats_enums.h"
 
 #include <devtools/ymake/diag/stats_enums.h_serialized.h>
+#include <devtools/ymake/libs/clocks/fractional_duration.h>
+
 
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -77,6 +79,7 @@ namespace NStats {
         static void MonEvent(const TString& indexName, ui64 value);
         static void MonEvent(const TString& indexName, double value);
         static void MonEvent(const TString& indexName, bool value);
+        static void MonEvent(const TString& indexName, TDoubleSeconds value);
     };
 
     template<class TIndex>

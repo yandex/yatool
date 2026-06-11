@@ -12,6 +12,8 @@
 #include <devtools/ymake/macro_string.h>
 #include <devtools/ymake/plugins/cpp_plugins.h>
 #include <devtools/ymake/lang/plugin_facade.h>
+#include <devtools/ymake/libs/clocks/checkpoint.h>
+#include <devtools/ymake/libs/clocks/hp_clock.h>
 #include <devtools/ymake/python_runtime.h>
 #include <devtools/ymake/vardefs.h>
 #include <devtools/ymake/yndex/builtin.h>
@@ -227,7 +229,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
             Display()->SetCutoff(warnLevel);
     }
 
-    TCyclesTimer runStageTimer;
+    const auto runStageChekpoint = MakeCheckpoint<THPClock>();
 
     Diag()->Init(WarnFlags);
 
@@ -249,7 +251,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     TStartUpOptions::PostProcess(freeArgs);
     // We must not trace anything before trace stream initialization
     // which is done in StartUpOptions::PostProcess
-    RunStageWithTimer = MakeHolder<TTraceStageWithTimer>("ymake run", MON_NAME(EYmakeStats::RunTime), runStageTimer);
+    RunStageWithTimer = MakeHolder<TTraceStageWithTimer>("ymake run", MON_NAME(EYmakeStats::RunTime), runStageChekpoint);
     TDebugOptions::PostProcess(freeArgs);
     PostProcessCacheOptions();
 

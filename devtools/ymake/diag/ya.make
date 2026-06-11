@@ -7,6 +7,7 @@ PEERDIR(
     devtools/ymake/common
     devtools/ymake/diag/common_display
     devtools/ymake/diag/common_msg
+    devtools/ymake/libs/clocks
     devtools/ymake/libs/name_store
 )
 

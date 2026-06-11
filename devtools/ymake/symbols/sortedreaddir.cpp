@@ -1,7 +1,8 @@
 #include "sortedreaddir.h"
 
-#include <devtools/ymake/common/cyclestimer.h>
 #include <devtools/ymake/diag/display.h>
+#include <devtools/ymake/libs/clocks/checkpoint.h>
+#include <devtools/ymake/libs/clocks/hp_clock.h>
 
 #include <util/generic/algorithm.h>
 #include <util/string/builder.h>
@@ -13,16 +14,16 @@ TSortedReadDir::TSortedReadDir() {
 TSortedReadDir::TDirItems& TSortedReadDir::ReadDir(const TString& fullPath, bool forceStat, NStats::TFileConfStats& stats) {
     Clear();
     try {
-        TCyclesTimer openTimer;
+        const auto openCheckpoint = MakeCheckpoint<THPClock>();
         TReadDir readdir(fullPath, TReadDir::TOptions().SetForceStat(forceStat));
-        auto openUs = openTimer.GetUs();
-        SumUsStat(stats, openUs, NStats::EFileConfStats::OpendirCount, NStats::EFileConfStats::OpendirSumUs, NStats::EFileConfStats::OpendirMinUs, NStats::EFileConfStats::OpendirMaxUs);
-        TCyclesTimer readTimer;
+        const auto openTime = std::chrono::duration_cast<std::chrono::microseconds>(TimeSince(openCheckpoint));
+        SumUsStat(stats, openTime.count(), NStats::EFileConfStats::OpendirCount, NStats::EFileConfStats::OpendirSumUs, NStats::EFileConfStats::OpendirMinUs, NStats::EFileConfStats::OpendirMaxUs);
+        auto readCheckpoint = MakeCheckpoint<THPClock>();
         for (auto [filename, isDir, stat]: readdir) {
-            auto readUs = readTimer.GetUs();
-            TCyclesTimerRestarter readTimerRestarter(readTimer);
-            SumUsStat(stats, readUs, NStats::EFileConfStats::ReaddirCount, NStats::EFileConfStats::ReaddirSumUs, NStats::EFileConfStats::ReaddirMinUs, NStats::EFileConfStats::ReaddirMaxUs);
+            auto readUs = std::chrono::duration_cast<std::chrono::microseconds>(TimeSince(readCheckpoint));
+            SumUsStat(stats, readUs.count(), NStats::EFileConfStats::ReaddirCount, NStats::EFileConfStats::ReaddirSumUs, NStats::EFileConfStats::ReaddirMinUs, NStats::EFileConfStats::ReaddirMaxUs);
             AddItem(filename, isDir, TFileElemId(), stat);
+            readCheckpoint = MakeCheckpoint<THPClock>();
         }
     } catch (const TReadDir::TError& error) {
         ReadFailedMessage_ = TStringBuilder() << "Can't read directory content: " << error.what();

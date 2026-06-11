@@ -39,6 +39,7 @@ PEERDIR(
     devtools/ymake/compact_graph
     devtools/ymake/common
     devtools/ymake/lang/makelists
+    devtools/ymake/libs/clocks
 )
 
 GENERATE_ENUM_SERIALIZATION(generator_spec_enum.h)

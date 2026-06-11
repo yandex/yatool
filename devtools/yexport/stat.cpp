@@ -44,12 +44,12 @@ namespace {
             spdlog::info("--- Stages stat");
             spdlog::info("Format: <Stage> <Summary> sec [<Min> sec, <Avr> sec, <Max> sec], <Count> times");
             PrintSubStages(RootStage_);
-            spdlog::info("=== {:.3f} sec", Timer_.GetSeconds());
+            spdlog::info("=== {:.3f} sec", TimeSince(Checkpoint_).count());
         }
 
     private:
         TStage RootStage_;
-        TCyclesTimer Timer_;
+        TCheckPoint<THPClock> Checkpoint_ = MakeCheckpoint<THPClock>();
 
         void FillStage(TStage& stage) {
             FillSubStages(stage);
@@ -104,21 +104,21 @@ namespace {
 
 TStageCall::TStageCall(std::string_view stagePath)
     : Stage_(StagesStat.CreateStage(stagePath))
-    , Timer_()
+    , Checkpoint_(MakeCheckpoint<THPClock>())
 {}
 
 TStageCall::TStageCall(const char* stagePath) : TStageCall(std::string_view(stagePath))
 {}
 
 TStageCall::~TStageCall() {
-    auto sec = Timer_.GetSeconds();
+    auto sec = TimeSince(Checkpoint_);
     Stage_.Calls++;
-    Stage_.SumSec += sec;
-    if (sec < Stage_.MinSec) {
-        Stage_.MinSec = sec;
+    Stage_.SumSec += sec.count();
+    if (sec.count() < Stage_.MinSec) {
+        Stage_.MinSec = sec.count();
     }
-    if (sec > Stage_.MaxSec) {
-        Stage_.MaxSec = sec;
+    if (sec.count() > Stage_.MaxSec) {
+        Stage_.MaxSec = sec.count();
     }
 }
 

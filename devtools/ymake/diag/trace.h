@@ -3,7 +3,8 @@
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/stats.h>
 #include <devtools/ymake/diag/trace.ev.pb.h>
-#include <devtools/ymake/common/cyclestimer.h>
+#include <devtools/ymake/libs/clocks/checkpoint.h>
+#include <devtools/ymake/libs/clocks/hp_clock.h>
 
 #include <google/protobuf/message.h>
 
@@ -45,23 +46,17 @@ namespace NYMake {
 
     class [[nodiscard]] TTraceStageWithTimer : public TTraceStage {
     public:
-        TTraceStageWithTimer(const TString& stage, const TString& monName)
+        TTraceStageWithTimer(const TString& stage, const TString& monName, TCheckPoint<THPClock> cp = MakeCheckpoint<THPClock>())
             : TTraceStage(stage)
             , MonName_(monName)
-            , Timer_()
-        {}
-
-        TTraceStageWithTimer(const TString& stage, const TString& monName, TCyclesTimer realStart)
-            : TTraceStage(stage)
-            , MonName_(monName)
-            , Timer_(realStart)
+            , Checkpoint_(cp)
         {}
 
         ~TTraceStageWithTimer() {
-            NStats::TStatsBase::MonEvent(MonName_, Timer_.GetSeconds());
+            NStats::TStatsBase::MonEvent(MonName_, TimeSince(Checkpoint_));
         }
     private:
         const TString MonName_;
-        TCyclesTimer Timer_;
+        TCheckPoint<THPClock> Checkpoint_;
     };
 }

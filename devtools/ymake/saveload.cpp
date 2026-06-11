@@ -1,12 +1,12 @@
 #include "saveload.h"
-#include <cstdlib>
-
 #include "graph_changes_predictor.h"
 #include "ymake.h"
 
 #include <devtools/ymake/diag/display.h>
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/libs/clocks/checkpoint.h>
+#include <devtools/ymake/libs/clocks/hp_clock.h>
 
 #include <library/cpp/json/json_reader.h>
 #include <library/cpp/svnversion/svnversion.h>
@@ -22,6 +22,8 @@
 #include <util/system/execpath.h>
 #include <util/system/fs.h>
 #include <util/system/fstat.h>
+
+#include <cstdlib>
 
 namespace {
     const ui64 ImageVersion = 59;
@@ -274,23 +276,23 @@ namespace {
 
             TString modulesData;
 
-            double prepareTime = 0.0;
+            auto prepareTime = TDoubleSeconds::zero();
             if (!SaveFsCacheOnly) {
-                TCyclesTimer prepareSaveTimer;
+                const auto prepareSaveCheckpoint = MakeCheckpoint<THPClock>();
                 PrepareModules(modulesData);  // This writes to Names: don't move down
-                prepareTime = prepareSaveTimer.GetSeconds();
+                prepareTime = TimeSince(prepareSaveCheckpoint);
             }
 
             {
-                TCyclesTimer fsCacheSaveTimer;
+                const auto fsCacheSaveCheckpoint = MakeCheckpoint<THPClock>();
                 SaveSymbolsTable();
                 SaveTimesTable();
                 SaveParsersCache();
-                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheSaveTime), fsCacheSaveTimer.GetSeconds());
+                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheSaveTime), TimeSince(fsCacheSaveCheckpoint));
             }
 
             if (!SaveFsCacheOnly) {
-                TCyclesTimer depsCacheSaveTimer;
+                const auto depsCacheSaveCheckpoint = MakeCheckpoint<THPClock>();
                 SaveModules(modulesData);
                 SaveCommands();
                 SaveInternalGraph();
@@ -299,7 +301,7 @@ namespace {
                 SaveDiagnostics();
                 YMake.SaveStartDirs(Writer);
                 YMake.SaveStartTargets(Writer);
-                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheSaveTime), prepareTime + depsCacheSaveTimer.GetSeconds());
+                NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheSaveTime), prepareTime + TimeSince(depsCacheSaveCheckpoint));
             }
 
             Stats.Set(NStats::EInternalCacheSaverStats::TotalCacheSize, Writer.GetBuilder().GetLength());
@@ -767,11 +769,11 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     }
 
     if (loadFsCache) {
-        TCyclesTimer fsCacheLoadTimer;
+        const auto fsCacheLoadCheckpoint = MakeCheckpoint<THPClock>();
         if (loadFsCacheFromBlobs()) {
             YDebug() << "FS cache has been loaded..." << Endl;
             FSCacheLoaded_ = true;
-            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheLoadTime), fsCacheLoadTimer.GetSeconds());
+            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheLoadTime), TimeSince(fsCacheLoadCheckpoint));
         } else {
             return false;
         }
@@ -780,12 +782,12 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     }
 
     if (loadDepsCache && cacheReader.HasNextBlob()) {
-        TCyclesTimer depsCacheLoadTimer;
+        const auto depsCacheLoadCheckpoint = MakeCheckpoint<THPClock>();
         if (loadDepsCacheFromBlobs()) {
             YDebug() << "Deps cache has been loaded..." << Endl;
             PrevDepsFingerprint = prevDepsFingerprint;
             DepsCacheLoaded_ = true;
-            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheLoadTime), depsCacheLoadTimer.GetSeconds());
+            NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheLoadTime), TimeSince(depsCacheLoadCheckpoint));
         } else {
             return false;
         }

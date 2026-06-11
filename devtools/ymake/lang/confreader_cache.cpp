@@ -7,6 +7,8 @@
 #include <devtools/ymake/conf.h>
 #include <devtools/ymake/config/config.h>
 #include <devtools/ymake/lang/confreader.h>
+#include <devtools/ymake/libs/clocks/checkpoint.h>
+#include <devtools/ymake/libs/clocks/hp_clock.h>
 #include <devtools/ymake/saveload.h>
 
 #include <library/cpp/digest/md5/md5.h>
@@ -85,7 +87,7 @@ namespace {
     }
 
     ELoadStatus LoadCache(TBuildConfiguration& conf, TMd5Sig& confMd5) {
-        TCyclesTimer confCacheLoadTimer;
+        const auto confCacheLoadCheckpoint = MakeCheckpoint<THPClock>();
         const TFsPath& cacheFile = conf.YmakeConfCache;
         if (!cacheFile.Exists()) {
             return ELoadStatus::DoesNotExist;
@@ -118,12 +120,12 @@ namespace {
 
         conf.SetFromCache(true);
 
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::ConfCacheLoadTime), confCacheLoadTimer.GetSeconds());
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::ConfCacheLoadTime), TimeSince(confCacheLoadCheckpoint));
         return ELoadStatus::Success;
     }
 
     ESaveStatus SaveCache(TBuildConfiguration& conf, const TMd5Sig& confMd5) {
-        TCyclesTimer confCacheSaveTimer;
+        const auto checkpoint = MakeCheckpoint<THPClock>();
         const TFsPath& cachePathTemp = TString::Join(conf.YmakeConfCache.GetPath(), "."sv, ToString(GetPID()));
         TFile tempFile{cachePathTemp, CreateAlways | WrOnly};
         {
@@ -136,7 +138,7 @@ namespace {
         }
         tempFile.Close();
         cachePathTemp.RenameTo(conf.YmakeConfCache);
-        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::ConfCacheSaveTime), confCacheSaveTimer.GetSeconds());
+        NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::ConfCacheSaveTime), TimeSince(checkpoint));
         return ESaveStatus::Success;
     }
 

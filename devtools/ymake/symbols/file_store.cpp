@@ -4,7 +4,6 @@
 #include <devtools/ymake/diag/stats.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/diag/progress_manager.h>
-#include <devtools/ymake/common/cyclestimer.h>
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/options/debug_options.h>
 #include <devtools/ymake/options/roots_options.h>
@@ -485,13 +484,13 @@ int TFileConf::FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind
     }
 
     TString realPath = Configuration.RealPath(name);
-    TCyclesTimer timer;
+    const auto checkpoint = MakeCheckpoint<THPClock>();
 
     ClearLastSystemError();
     result = TFileStat(realPath, true);  // nofollow = true
     int err = LastSystemError();         // run back-to-back with above to avoid error owerwite
-    auto us = timer.GetUs();
-    SumUsStat(us, NStats::EFileConfStats::LstatCount, NStats::EFileConfStats::LstatSumUs, NStats::EFileConfStats::LstatMinUs, NStats::EFileConfStats::LstatMaxUs);
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(TimeSince(checkpoint));
+    SumUsStat(us.count(), NStats::EFileConfStats::LstatCount, NStats::EFileConfStats::LstatSumUs, NStats::EFileConfStats::LstatMinUs, NStats::EFileConfStats::LstatMaxUs);
 
     return result.IsNull() ? err : 0;
 }

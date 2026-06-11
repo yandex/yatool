@@ -39,6 +39,14 @@ namespace NStats {
         FORCE_TRACE(U, event);
     }
 
+    void TStatsBase::MonEvent(const TString& indexName, TDoubleSeconds value) {
+        NEvent::TMonitoringStat event;
+        event.SetName(indexName);
+        event.SetType("double");
+        event.SetDoubleValue(value.count());
+        FORCE_TRACE(U, event);
+    }
+
     void TStatsBase::MonEvent(const TString& indexName, bool value) {
         NEvent::TMonitoringStat event;
         event.SetName(indexName);
