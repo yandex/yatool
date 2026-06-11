@@ -34,8 +34,8 @@ class HostHealth:
         if self._watcher:
             self._watcher.stop()
 
-    def get_host_state(self) -> dict:
-        return self._watcher.get_host_state()
+    def get_host_state(self) -> dict | None:
+        return self._watcher.get_host_state() if self._watcher else None
 
 
 class HostWatcher:

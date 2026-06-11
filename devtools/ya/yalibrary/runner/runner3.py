@@ -92,7 +92,10 @@ class CapCalculator:
     def __call__(self) -> worker_threads.ResInfo:
         if not self._mem_limit:
             return self._max_cap
-        cur_mem_state = self._host_health.get_host_state()["mem_limit"]
+        host_state = self._host_health.get_host_state()
+        if host_state is None:
+            return self._max_cap
+        cur_mem_state = host_state["mem_limit"]
         memory_is_over = any(
             (
                 self._mem_limit["abs"] and cur_mem_state["used"] > self._mem_limit["abs"],
