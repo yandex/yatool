@@ -1,6 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/symbols/elem_id.h>
+#include <devtools/ymake/libs/clocks/checkpoint.h>
 
 #include <util/generic/hash.h>
 
@@ -27,7 +28,7 @@ public:
     explicit TScopedMeasurer(TModStageStats& dest, TFileElemId mod) noexcept;
     ~TScopedMeasurer() noexcept;
 private:
-    std::chrono::steady_clock::time_point Start_;
+    TCheckPoint<std::chrono::steady_clock> Checkpoint_;
     TFileElemId Mod_;
     TModStageStats& Dest_;
 };

@@ -11,13 +11,13 @@
 namespace NDetail {
 
 TScopedMeasurer::TScopedMeasurer(TModStageStats& dest, TFileElemId mod) noexcept
-    : Start_{std::chrono::steady_clock::now()}
+    : Checkpoint_{MakeCheckpoint<std::chrono::steady_clock>()}
     , Mod_{mod}
     , Dest_{dest}
 {}
 
 TScopedMeasurer::~TScopedMeasurer() noexcept {
-    const auto time = std::chrono::steady_clock::now() - Start_;
+    const auto time = TimeSince(Checkpoint_);
     ++Dest_.Count;
     Dest_.Total += time;
     if (time < Dest_.Min.Value) {
