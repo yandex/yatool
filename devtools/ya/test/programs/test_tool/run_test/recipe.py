@@ -269,27 +269,51 @@ def append_traceback_to_file(path: str) -> None:
         logger.warning("Failed to append traceback to %s", path)
 
 
+def _make_log_safe_name(package_path: str, uid8: str) -> str:
+    """Build a human-readable, filesystem-safe name for recipe log files.
+
+    Uses safe_path (slashes replaced with '__') truncated to 200 chars plus
+    '_<uid8>' suffix for uniqueness when truncated.  The resulting name fits
+    within PC_NAME_MAX=255 even with the 'recipe_persistent_start_' prefix and
+    '.err' extension (24 + 200 + 1 + 8 + 4 = 237 chars).
+    """
+    safe_path = package_path.replace('/', '__')
+    return '{}_{}'.format(safe_path[:200], uid8)
+
+
 def _copy_recipe_logs(
     src_dir: str,
     out_dir: str,
-    uid8: str,
+    safe_name: str,
     action: str = 'start',
 ) -> tuple[str, str]:
-    """Скопировать recipe_{action}.out/err из src_dir в out_dir.
+    """Copy recipe_{action}.out/err from src_dir to out_dir.
 
-    Возвращает (out_dst, err_dst) — пути назначения (в out_dir, т.е. в build root).
-    Если src-файл не существует — dst создаётся пустым, чтобы RecipeError
-    всегда получал валидные пути.
+    Also copies any flat files from src_dir/output/ into out_dir so that
+    additional logs written by the recipe via output_path become available.
+
+    Returns (out_dst, err_dst) — destination paths in out_dir (build root).
+    If a src file does not exist, an empty dst is created so that RecipeError
+    always receives valid paths.
     """
     result = []
     for suffix in ('out', 'err'):
         src = os.path.join(src_dir, 'recipe_{}.{}'.format(action, suffix))
-        dst = os.path.join(out_dir, 'recipe_persistent_{}_{}.{}'.format(action, uid8, suffix))
+        dst = os.path.join(out_dir, 'recipe_persistent_{}_{}.{}'.format(action, safe_name, suffix))
         if os.path.exists(src):
             shutil.copy2(src, dst)
         else:
             open(dst, 'a').close()
         result.append(dst)
+
+    # Copy flat files from output/ — recipe may write extra logs there.
+    output_dir = os.path.join(src_dir, 'output')
+    if os.path.isdir(output_dir):
+        for name in os.listdir(output_dir):
+            src_file = os.path.join(output_dir, name)
+            if os.path.isfile(src_file):
+                shutil.copy2(src_file, os.path.join(out_dir, name))
+
     return result[0], result[1]  # out_dst, err_dst
 
 
@@ -395,6 +419,11 @@ def _do_start(
             retry_count=1,
             env=env,
             timeout=rm_timeout,
+        )
+        import app_ctx
+
+        app_ctx.display.emit_message(
+            "Persistent recipe [[imp]]{}[[rst]] launched in [[path]]{}[[rst]]\n".format(package_path, shallow_dir)
         )
     except Exception as exc:
         append_traceback_to_file(start_err)
@@ -602,7 +631,7 @@ def run_all_persistent_recipes(
             shallow_dir = _shallow_recipe_dir(options.shallow_root, pkg)
             os.makedirs(shallow_dir, exist_ok=True)
             lock = FileLock(os.path.join(shallow_dir, '.lock'))
-            uid8 = uid[:8]
+            safe_name = _make_log_safe_name(pkg, uid[:8])
 
             if lock.acquire(blocking=False):
                 try:
@@ -610,8 +639,8 @@ def run_all_persistent_recipes(
                     _start_one_recipe(pkg, options, rm_timeout=rm_timeout)
                     done_uids.add(uid)
                     made_progress = True
-                    # Успех — копируем start-логи в out_dir
-                    _copy_recipe_logs(shallow_dir, out_dir, uid8, action='start')
+                    # Успех — копируем start-логи и output/ в out_dir
+                    _copy_recipe_logs(shallow_dir, out_dir, safe_name, action='start')
                 except RecipeConflictError:
                     # Нет err/out файлов рецепта — пробрасываем как есть
                     raise
@@ -620,7 +649,7 @@ def run_all_persistent_recipes(
                     # e.err_filename/out_filename указывают на shallow_dir — копируем логи
                     # в out_dir и пересоздаём исключение того же типа с правильными путями.
                     action = 'stop' if isinstance(e, RecipeTearDownError) else 'start'
-                    out_dst, err_dst = _copy_recipe_logs(shallow_dir, out_dir, uid8, action=action)
+                    out_dst, err_dst = _copy_recipe_logs(shallow_dir, out_dir, safe_name, action=action)
                     raise type(e)(pkg, err_dst, out_dst) from None
                 finally:
                     lock.release()
@@ -709,20 +738,12 @@ def run_all_persistent_recipes_embedded(
     if not packages:
         return {}, []
 
-    import app_ctx
-
-    app_ctx.display.emit_message(
-        "WARNING: Persistent recipes are running in embedded fallback mode "
-        "(Recipe Manager is not available in this environment). "
-        "Recipes will NOT survive the build completion.\n"
-    )
-
     result_env: dict[str, str | None] = {}
     started_persistent_embedded_recipes: list[str] = []
 
     for package_path in packages:
         recipe_uid = _make_recipe_uid(package_path)
-        uid8 = recipe_uid[:8]
+        safe_name = _make_log_safe_name(package_path, recipe_uid[:8])
         tmp_dir = _get_build_root_tmp_recipe_dir(package_path)
         os.makedirs(tmp_dir, exist_ok=True)
 
@@ -764,11 +785,11 @@ def run_all_persistent_recipes_embedded(
             )
             # Рецепт поднялся — фиксируем в списке поднятых
             started_persistent_embedded_recipes.append(package_path)
-            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, uid8, action='start')
+            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, safe_name, action='start')
         except Exception as e:
             # Записываем трейсбек, копируем логи в out_dir, конвертируем ошибку
             append_traceback_to_file(err_filename)
-            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, uid8, action='start')
+            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, safe_name, action='start')
             from devtools.ya.test.system import process as _process
 
             if isinstance(e, _process.ExecutionTimeoutError):
@@ -812,7 +833,7 @@ def stop_persistent_recipes_embedded(
     errors = []
     for package_path in reversed(started_persistent_embedded_recipes):
         recipe_uid = _make_recipe_uid(package_path)
-        uid8 = recipe_uid[:8]
+        safe_name = _make_log_safe_name(package_path, recipe_uid[:8])
         tmp_dir = _get_build_root_tmp_recipe_dir(package_path)
         ctx_path = os.path.join(tmp_dir, RECIPE_CONTEXT_FILE)
 
@@ -835,7 +856,7 @@ def stop_persistent_recipes_embedded(
                 chunk_time_left,
             )
             logger.debug("Persistent recipe %s stopped (embedded fallback)", package_path)
-            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, uid8, action='stop')
+            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, safe_name, action='stop')
         except Exception as e:
             logger.warning(
                 "Failed to stop persistent recipe %s in embedded fallback: %s",
@@ -843,7 +864,7 @@ def stop_persistent_recipes_embedded(
                 e,
             )
             append_traceback_to_file(err_filename)
-            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, uid8, action='stop')
+            out_dst, err_dst = _copy_recipe_logs(tmp_dir, out_dir, safe_name, action='stop')
             from devtools.ya.test.system import process as _process
 
             if isinstance(e, _process.ExecutionTimeoutError):

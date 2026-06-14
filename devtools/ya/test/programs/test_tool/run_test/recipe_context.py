@@ -19,18 +19,20 @@ def write_recipe_context(shallow_recipe_dir: str, options: object) -> str:
     YA_TEST_CONTEXT_FILE env variable).
     """
     work_path = os.path.join(shallow_recipe_dir, 'work')
+    output_path = os.path.join(shallow_recipe_dir, 'output')
     env_file = os.path.join(shallow_recipe_dir, 'env.json.txt')
 
     os.makedirs(work_path, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
 
     context = {
         'runtime': {
             'build_root': os.path.join(shallow_recipe_dir, 'package'),
             'work_path': work_path,
-            # XXX: must set output_path and source_root otherwise they will get
-            # detected automatically, we don't want that
-            'output_path': 'n/a',
-            'source_root': 'n/a',
+            'output_path': output_path,
+            # XXX: must set source_root otherwise it will get detected
+            # automatically, we don't want that
+            'source_root': 'nowhere',
             'test_tool_path': sys.argv[0],
             'python_bin': options.python_bin,
         },
