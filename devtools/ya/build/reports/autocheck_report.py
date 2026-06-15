@@ -33,6 +33,7 @@ TEST_SIZES = [TestSize.Small, TestSize.Medium, TestSize.Large]
 TIMEOUT_TARGETS_MARKER = "Process exceeds time limit"
 DEPENDS_ON_BROKEN_TARGETS_MARKER = "Depends on broken targets"
 IMPORTANT_FIELDS = {'path', 'toolchain', 'duration'}
+_ARCHIVE_SUFFIXES = (".tar", ".tar.gz", ".tar.zstd")
 
 
 def remove_empty_field(entry):
@@ -54,17 +55,18 @@ def is_configure_node(entry):
 
 def _fix_link_prefix_and_quote(link, fix_from, fix_to):
     assert link, locals()
-    if link.startswith(fix_from):
-        tail = link[len(fix_from) :]
-        url = "/".join([_f for _f in [fix_to.rstrip("/"), formatter.html.quote_url(tail)] if _f])
-        scheme, netloc, path, qs, anchor = urllib.parse.urlsplit(url)
-        if path.endswith((".tar", ".tar.gz", ".tar.zstd")):
-            path += "/"
-            return urllib.parse.urlunsplit((scheme, netloc, path, qs, anchor))
-        else:
-            return url
-    else:
+    if not link.startswith(fix_from):
         return formatter.html.quote_url(link)
+
+    base = fix_to.rstrip("/")
+    tail = formatter.html.quote_url(link[len(fix_from) :])
+    url = "/".join([part for part in (base, tail) if part])
+
+    scheme, netloc, path, qs, anchor = urllib.parse.urlsplit(url)
+    if path.endswith(_ARCHIVE_SUFFIXES):
+        return urllib.parse.urlunsplit((scheme, netloc, path + "/", qs, anchor))
+    else:
+        return url
 
 
 def _fix_links_entry(entry, name, fix_from, fix_to):
