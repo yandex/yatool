@@ -5,6 +5,7 @@ import copy
 import exts.yjson as json
 import logging
 import threading
+import urllib
 
 from collections import defaultdict
 from itertools import chain
@@ -56,9 +57,12 @@ def _fix_link_prefix_and_quote(link, fix_from, fix_to):
     if link.startswith(fix_from):
         tail = link[len(fix_from) :]
         url = "/".join([_f for _f in [fix_to.rstrip("/"), formatter.html.quote_url(tail)] if _f])
-        if url.endswith((".tar", ".tar.gz", ".tar.zstd")):
-            return url + "/"
-        return url
+        scheme, netloc, path, qs, anchor = urllib.parse.urlsplit(url)
+        if path.endswith((".tar", ".tar.gz", ".tar.zstd")):
+            path += "/"
+            return urllib.parse.urlunsplit((scheme, netloc, path, qs, anchor))
+        else:
+            return url
     else:
         return formatter.html.quote_url(link)
 
