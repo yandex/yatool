@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.junit.platform.engine.FilterResult;
@@ -13,6 +14,10 @@ import org.junit.platform.engine.TestTag;
 import org.junit.platform.launcher.PostDiscoveryFilter;
 
 public class RuntimeTagFilter implements PostDiscoveryFilter {
+
+    private static final Pattern WHITESPACE_AROUND_PLUS = Pattern.compile("\\s*\\+\\s*");
+    private static final Pattern WHITESPACE_TOKENS = Pattern.compile("\\s+");
+    private static final Pattern PLUS_ALTERNATIVES = Pattern.compile("\\+");
 
     private final YaTestNameBase testName;
     private final List<JunitTagsClause> clauses;
@@ -71,16 +76,25 @@ public class RuntimeTagFilter implements PostDiscoveryFilter {
                 if (raw == null) {
                     continue;
                 }
-                String trimmed = raw.trim();
+                String trimmed = unquote(raw.trim());
                 if (trimmed.isEmpty()) {
                     continue;
                 }
-                JunitTagsClause clause = parseOne(trimmed);
-                if (clause != null) {
-                    out.add(clause);
-                }
+                out.add(parseOne(trimmed));
             }
             return out;
+        }
+
+        private static String unquote(String value) {
+            if (value.length() < 2) {
+                return value;
+            }
+            char first = value.charAt(0);
+            char last = value.charAt(value.length() - 1);
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+                return value.substring(1, value.length() - 1).trim();
+            }
+            return value;
         }
 
         static JunitTagsClause parseOne(String expr) {
@@ -91,24 +105,34 @@ public class RuntimeTagFilter implements PostDiscoveryFilter {
         }
 
         private static List<TagSegment> parseSegments(String expr) {
-            String normalized = expr.trim().replaceAll("\\s*\\+\\s*", "+");
+            String normalized = WHITESPACE_AROUND_PLUS.matcher(unquote(expr.trim())).replaceAll("+");
             if (normalized.isEmpty()) {
                 throw invalidExpression(expr, "required part is empty");
             }
 
-            List<TagSegment> segments = new ArrayList<>();
-            List<String> currentTerms = new ArrayList<>();
-            boolean parsingRequiredPart = true;
-            for (String token : normalized.split("\\s+")) {
-                if ("-".equals(token)) {
-                    segments.add(TagSegment.parse(currentTerms, expr, parsingRequiredPart ? "required part" : "exclusion part"));
-                    currentTerms = new ArrayList<>();
-                    parsingRequiredPart = false;
+            List<String> positiveTerms = new ArrayList<>();
+            List<TagSegment> forbiddenSegments = new ArrayList<>();
+            for (String token : WHITESPACE_TOKENS.split(normalized)) {
+                if (token.startsWith("!")) {
+                    String forbiddenTerm = token.substring(1);
+                    if (forbiddenTerm.isEmpty()) {
+                        throw invalidExpression(expr, "exclusion tag is empty");
+                    }
+                    forbiddenSegments.add(TagSegment.parse(List.of(forbiddenTerm), expr, "exclusion part"));
                     continue;
                 }
-                currentTerms.add(token);
+                positiveTerms.add(token);
             }
-            segments.add(TagSegment.parse(currentTerms, expr, parsingRequiredPart ? "required part" : "exclusion part"));
+            List<TagSegment> segments = new ArrayList<>();
+            if (positiveTerms.isEmpty()) {
+                if (forbiddenSegments.isEmpty()) {
+                    throw invalidExpression(expr, "required part is empty");
+                }
+                segments.add(TagSegment.matchAll());
+            } else {
+                segments.add(TagSegment.parse(positiveTerms, expr, "required part"));
+            }
+            segments.addAll(forbiddenSegments);
             return segments;
         }
 
@@ -126,9 +150,15 @@ public class RuntimeTagFilter implements PostDiscoveryFilter {
 
         @Override
         public String toString() {
-            StringBuilder builder = new StringBuilder(positiveSegment.toString());
+            StringBuilder builder = new StringBuilder();
+            if (!positiveSegment.isMatchAll()) {
+                builder.append(positiveSegment);
+            }
             for (TagSegment forbiddenSegment : forbiddenSegments) {
-                builder.append(" - ").append(forbiddenSegment);
+                if (builder.length() > 0) {
+                    builder.append(' ');
+                }
+                builder.append('!').append(forbiddenSegment);
             }
             return builder.toString();
         }
@@ -136,9 +166,19 @@ public class RuntimeTagFilter implements PostDiscoveryFilter {
 
     private static final class TagSegment {
         private final List<TagTerm> terms;
+        private final boolean matchAll;
 
-        private TagSegment(List<TagTerm> terms) {
+        private TagSegment(List<TagTerm> terms, boolean matchAll) {
             this.terms = terms;
+            this.matchAll = matchAll;
+        }
+
+        static TagSegment matchAll() {
+            return new TagSegment(List.of(), true);
+        }
+
+        boolean isMatchAll() {
+            return matchAll;
         }
 
         static TagSegment parse(List<String> rawTerms, String expression, String partName) {
@@ -150,10 +190,13 @@ public class RuntimeTagFilter implements PostDiscoveryFilter {
             for (String rawTerm : rawTerms) {
                 terms.add(TagTerm.parse(rawTerm, expression));
             }
-            return new TagSegment(terms);
+            return new TagSegment(terms, false);
         }
 
         boolean matches(Set<String> tagsOnTest) {
+            if (matchAll) {
+                return true;
+            }
             for (TagTerm term : terms) {
                 if (!term.matches(tagsOnTest)) {
                     return false;
@@ -178,7 +221,7 @@ public class RuntimeTagFilter implements PostDiscoveryFilter {
         }
 
         static TagTerm parse(String rawTerm, String expression) {
-            List<String> alternativeTags = Arrays.stream(rawTerm.split("\\+"))
+            List<String> alternativeTags = Arrays.stream(PLUS_ALTERNATIVES.split(rawTerm))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toList());
