@@ -8,6 +8,7 @@ import os
 import sys
 import time
 from hashlib import new
+from typing import NamedTuple
 import six
 
 from dateutil import parser as date_parser
@@ -25,6 +26,18 @@ from devtools.ya.test.programs.test_tool.run_test import run_test
 from devtools.ya.test.programs.test_tool.lib import secret
 
 logger = logging.getLogger(__name__)
+
+
+class YtexecLogInfo(NamedTuple):
+    operation_creation_time: str | None
+    request_errors: set[str]
+
+    def request_errors_str(self):
+        if not self.request_errors:
+            return ""
+        errors = "\n".join(self.request_errors)
+        return f"Request failures:\n{errors}\n"
+
 
 OUTPUT_TTL = 1 * 24 * 60 * 60 * 1000**3  # 1 day in nanoseconds
 BLOB_TTL = 1 * 24 * 60 * 60 * 1000**3  # 1 day in nanoseconds
@@ -664,16 +677,25 @@ def extract_operation_url(output_dir):
     return load_prepared_info(output_dir).get("operation_url", None)
 
 
-def get_operation_creation_time(output_dir):
+def parse_exec_log(output_dir: str) -> YtexecLogInfo:
     exec_log_path = os.path.join(output_dir, "exec.log")
     op_id = extract_operation_id(output_dir)
-    # Check exec log only when operation was registered as started
-    if op_id:
-        with open(exec_log_path, 'r') as afile:
-            for line in afile:
-                entry = json.loads(line)
-                if entry.get("method", None) == "start_operation":
-                    return entry.get("ts", None)
+    if not op_id or not os.path.exists(exec_log_path):
+        return YtexecLogInfo(operation_creation_time=None, request_errors=set())
+
+    operation_creation_time = None
+    request_errors = set()
+
+    with open(exec_log_path, 'r') as afile:
+        for line in afile:
+            entry = json.loads(line)
+            if entry.get("method") == "start_operation":
+                operation_creation_time = entry.get("ts")
+            if entry.get("msg") in ("request failed", "failed to upload blob"):
+                if error := entry.get("error"):
+                    request_errors.add(error)
+
+    return YtexecLogInfo(operation_creation_time=operation_creation_time, request_errors=request_errors)
 
 
 def get_upload_size(ytexec_config):
@@ -706,6 +728,8 @@ def process_test_results(args, ytexec_config: YtexecConfig, exit_code, start_tim
         op_url_msg = "For more info see operation: [[imp]]{}[[rst]]\n".format(op_url)
     else:
         op_url_msg = ""
+    exec_log_info = parse_exec_log(args.output_dir)
+
     if os.path.exists(result_path):
         # Job either failed or succeeded
         with open(result_path, 'r') as res_file:
@@ -722,6 +746,8 @@ def process_test_results(args, ytexec_config: YtexecConfig, exit_code, start_tim
                 else:
                     parts = ["Unknown yt error"]
                     status = const.Status.FAIL
+                if request_errors_msg := exec_log_info.request_errors_str():
+                    parts.append(request_errors_msg)
                 if op_url_msg:
                     parts.append(op_url_msg)
                 suite = dump_test_info(args, yt_metrics, ". ".join(parts), status)
@@ -731,7 +757,7 @@ def process_test_results(args, ytexec_config: YtexecConfig, exit_code, start_tim
         # Operation timed out or artifacts upload took too long and operation
         # wasn't created at all
         run_test.dump_meta(args, exit_code, start_time, time.time())
-        operation_creation_time = get_operation_creation_time(args.output_dir)
+        operation_creation_time = exec_log_info.operation_creation_time
         if operation_creation_time:
             start_time_obj = datetime.datetime.fromtimestamp(start_time)
             creation_time_obj = date_parser.parse(operation_creation_time).replace(tzinfo=None)
@@ -783,6 +809,7 @@ def process_test_results(args, ytexec_config: YtexecConfig, exit_code, start_tim
         msg += op_creation_delay_msg
         msg += f"Operation timeout: {int(ytexec_config.operation_fields.timeout / 1000**3)}s\n"
         msg += f"ytexec timeout: {yt_exec_timeout or 'No timeout'}\n"
+        msg += exec_log_info.request_errors_str()
         msg += op_url_msg
         suite = dump_test_info(args, metrics=yt_metrics, error=msg, status=status)
 
