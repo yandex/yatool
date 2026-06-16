@@ -75,6 +75,9 @@ def _do_export(
         exporter = _Exporter(config, sem_graph)
         exporter.export()
 
+        if config.has_project_root():
+            return ''
+
         with tracer.scope('export & build>||export>make symlinks'):
             new_symlinks = _NewSymlinkCollector(exists_symlinks, remove_symlinks)
             new_symlinks.collect()

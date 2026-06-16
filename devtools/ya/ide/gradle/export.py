@@ -107,6 +107,11 @@ class _Exporter:
             ]
 
     def _fill_common_dir(self) -> None:
+        if self.config.has_project_root():
+            self.attrs_for_all_templates += [
+                "common_dir = '/'",
+            ]
+            return
         common_dir = os.path.commonpath(self.config.params.rel_targets)
         if not common_dir:
             return
@@ -134,6 +139,8 @@ class _Exporter:
                         f'disable_test_errorprone = {'true' if self.config.params.disable_test_errorprone else 'false'}',
                         f'disable_lombok_plugin = {'true' if self.config.params.disable_lombok_plugin else 'false'}',
                         f'jdk11_compatibility_mode = {'true' if self.config.params.jdk11_compatibility_mode else 'false'}',
+                        f'idea_content_root = {'true' if self.config.has_project_root() else 'false'}',
+                        f'use_full_source_sets_path = {'true' if self.config.has_project_root() else 'false'}',
                         '',
                         '[add_attrs.target]',
                         *self.attrs_for_all_templates,

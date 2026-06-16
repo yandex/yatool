@@ -185,7 +185,10 @@ class _JavaSemConfig(SemConfig):
 
     def _get_export_root(self) -> Path:
         """Create export_root path by hash of targets"""
-        if self.params.settings_root_as_hash_base:
+        if self.params.project_output:
+            export_root = self.params.project_output
+            return Path(export_root)
+        elif self.params.settings_root_as_hash_base:
             export_hash = hashing.fast_hash(str(self.settings_root))  # based on settings_root only
             all_abs_targets = ':'.join(sorted(self.params.abs_targets))
             old_export_hash0 = hashing.fast_hash(all_abs_targets)  # based on targets
@@ -345,3 +348,6 @@ class _JavaSemConfig(SemConfig):
         sign = self._get_sign()
         self.new_sign: bool = self._load_sign() != sign
         self._save_sign(sign)
+
+    def has_project_root(self) -> bool:
+        return self.params.project_output is not None

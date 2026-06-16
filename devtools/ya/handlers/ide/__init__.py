@@ -368,6 +368,7 @@ class GradleOptions(yarg.Options):
 
     OPT_GRADLE_NAME = '--gradle-name'
     OPT_SETTINGS_ROOT = '--settings-root'
+    OPT_PROJECT_ROOT = '--project-output'
     OPT_DISABLE_ERRORPRONE = '--disable-errorprone'
     OPT_DISABLE_TEST_ERRORPRONE = '--disable-test-errorprone'
     OPT_DISABLE_LOMBOK_PLUGIN = '--disable-lombok-plugin'
@@ -401,6 +402,7 @@ class GradleOptions(yarg.Options):
     def __init__(self):
         self.gradle_name: str = None
         self.settings_root: str = None
+        self.project_output: str = None
         self.disable_errorprone: bool = False
         self.disable_test_errorprone: bool = False
         self.disable_lombok_plugin: bool = False
@@ -438,6 +440,12 @@ class GradleOptions(yarg.Options):
                 [GradleOptions.OPT_SETTINGS_ROOT],
                 help='Directory in Arcadia to place Gradle project settings (by default, if one target use target dir, else current dir or first target dir (if current dir not in arcadia))',
                 hook=yarg.SetValueHook('settings_root'),
+                group=GradleOptions.YGRADLE_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                [GradleOptions.OPT_PROJECT_ROOT],
+                help='Directory outside Arcadia to place Gradle files and build directory',
+                hook=yarg.SetValueHook('project_output'),
                 group=GradleOptions.YGRADLE_OPT_GROUP,
             ),
             yarg.ArgConsumer(

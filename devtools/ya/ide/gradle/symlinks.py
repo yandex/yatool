@@ -120,6 +120,8 @@ class _ExistsSymlinkCollector(_SymlinkCollector):
         if not self.config.export_root.exists():
             return
 
+        if self.config.has_project_root():
+            return
         try:
             if self._load():  # always check symlinks from saved for remove invalid symlinks
                 if (
@@ -207,6 +209,8 @@ class _RemoveSymlinkCollector(_SymlinkCollector):
         del self.symlinks[arcadia_file]
 
     def remove_invalid_symlinks(self):
+        if self.config.has_project_root():
+            return
         _RemoveSymlinkCollector._remove_invalid_symlinks(
             self.config.settings_root, self.config.export_root, -1
         )  # Check only top level for settings
@@ -248,6 +252,8 @@ class _NewSymlinkCollector(_SymlinkCollector):
 
     def collect(self) -> None:
         """Collect new symlinks for creating, skip already exists symlinks"""
+        if self.config.has_project_root():
+            return
         for export_file, arcadia_file in self.collect_symlinks(False):
             self._collect_symlink(export_file, arcadia_file)
 
