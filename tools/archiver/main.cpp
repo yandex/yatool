@@ -109,7 +109,6 @@ namespace {
         }
 
     private:
-        // width in source chars
         static const size_t Columns = 10;
         ui64 Count_ = 0;
         IOutputStream* Slave_ = nullptr;
@@ -196,7 +195,6 @@ namespace {
         }
 
         void DoFinish() override {
-            //*O << ";\nextern const unsigned char* " << B << " = (const unsigned char*)" << B << "Array;\n";
             *O << ";\nextern const unsigned int " << B << "Size = sizeof(" << B << ") / sizeof(" << B << "[0]) - 1;\n}\n";
         }
 
@@ -302,7 +300,11 @@ static inline bool IsDelim(char ch) noexcept {
     return ch == '/' || ch == '\\';
 }
 
+// FIX: защита от UB при пустой строке
 static inline TString GetFile(const TString& s) {
+    if (s.empty()) {
+        return {};
+    }
     const char* e = s.end();
     const char* b = s.begin();
     const char* c = e - 1;
@@ -414,58 +416,12 @@ namespace {
     };
 }
 
+// FIX: защита от UB при пустом ключе архива
 static TString CutFirstSlash(const TString& fileName) {
-    if (fileName[0] == '/') {
+    if (!fileName.empty() && fileName[0] == '/') {
         return fileName.substr(1);
-    } else {
-        return fileName;
     }
-}
-
-// ============================================================
-// FIX: Безопасная сборка пути — защита от Path Traversal (Zip Slip).
-//
-// Проблема оригинального кода:
-//   const TFsPath path(dir / fileName);
-// Если fileName содержит "../../etc/passwd" или аналогичное,
-// итоговый путь выходит за пределы целевой директории dir.
-//
-// Решение:
-//   1. Собираем кандидата: base / fileName
-//   2. Лексически нормализуем путь (убираем "..", ".", лишние слеши)
-//      без обращения к файловой системе — это важно, потому что
-//      директория ещё может не существовать в момент проверки.
-//   3. Проверяем, что нормализованный путь начинается с base.
-//      Если нет — бросаем исключение.
-// ============================================================
-static TFsPath SafeJoin(const TFsPath& base, const TString& fileName) {
-    // Собираем сырой путь
-    const TFsPath candidate = base / fileName;
-
-    // Лексическая нормализация через стандартную библиотеку C++17.
-    // std::filesystem::path::lexically_normal() раскрывает все ".." и "."
-    // без обращения к ФС, поэтому работает даже если путь ещё не существует.
-    const std::filesystem::path normalizedCandidate =
-        std::filesystem::path(candidate.GetPath().c_str()).lexically_normal();
-
-    const std::filesystem::path normalizedBase =
-        std::filesystem::path(base.GetPath().c_str()).lexically_normal();
-
-    // Проверка: нормализованный кандидат должен начинаться с base.
-    // Используем mismatch по компонентам пути — это надёжнее,
-    // чем сравнение строк (нет риска ложного совпадения вроде /tmp/evil vs /tmp/ev).
-    auto [baseEnd, _] = std::mismatch(
-        normalizedBase.begin(), normalizedBase.end(),
-        normalizedCandidate.begin(), normalizedCandidate.end()
-    );
-
-    if (baseEnd != normalizedBase.end()) {
-        ythrow yexception()
-            << "Path traversal detected: key '" << fileName
-            << "' escapes destination directory '" << base.GetPath() << "'";
-    }
-
-    return TFsPath(normalizedCandidate.string());
+    return fileName;
 }
 
 struct TMappingReader {
@@ -486,9 +442,10 @@ static void UnpackArchive(const TString& archive, const TFsPath& dir = TFsPath()
     const TArchiveReader& reader = mappingReader.Reader;
     const size_t count = reader.Count();
 
-    // Определяем и нормализуем базовую директорию один раз до цикла.
-    // Если dir не задан — используем текущую рабочую директорию.
-    const TFsPath baseDir = dir.IsDefined() ? dir : TFsPath::Cwd();
+    // FIX: Path Traversal (Zip Slip).
+    // Приводим целевую директорию к абсолютному пути один раз до цикла.
+    // Это необходимо для корректной работы IsChildOf().
+    const TFsPath targetDir = (dir.IsDefined() ? dir : TFsPath::Cwd()).Absolute();
 
     for (size_t i = 0; i < count; ++i) {
         const TString key = reader.KeyByIndex(i);
@@ -497,12 +454,16 @@ static void UnpackArchive(const TString& archive, const TFsPath& dir = TFsPath()
             Cerr << archive << " --> " << fileName << Endl;
         }
 
-        // БЫЛО (уязвимо):
-        //   const TFsPath path(dir / fileName);
-        //
-        // СТАЛО (безопасно): SafeJoin проверяет, что fileName
-        // не уводит за пределы baseDir, и бросает исключение если да.
-        const TFsPath path = SafeJoin(baseDir, fileName);
+        // Собираем итоговый путь и приводим к абсолютному виду
+        const TFsPath path = (targetDir / fileName).Absolute();
+
+        // Защита от Path Traversal: IsChildOf() делает покомпонентное сравнение
+        // путей и гарантирует что файл не запишется за пределы targetDir.
+        // Атака вида "../../etc/passwd" будет поймана здесь.
+        if (!path.IsChildOf(targetDir)) {
+            ythrow yexception()
+                << "Security: Path Traversal attempt detected in archive entry: " << key;
+        }
 
         path.Parent().MkDirs();
         TAutoPtr<IInputStream> in = reader.ObjectByKey(key);
@@ -675,7 +636,8 @@ int main(int argc, char** argv) {
         const auto& path = files[i];
         size_t off = 0;
 #ifdef _win_
-        if (path[0] > 0 && isalpha(path[0]) && path[1] == ':')
+        // FIX: проверка размера строки перед обращением к path[1]
+        if (path.size() >= 2 && path[0] > 0 && isalpha(path[0]) && path[1] == ':')
             off = 2; // skip drive letter ("d:")
 #endif               // _win_
         const size_t pos = path.find(':', off);
