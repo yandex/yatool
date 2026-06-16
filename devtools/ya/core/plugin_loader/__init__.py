@@ -23,14 +23,6 @@ class PluginMap(object):
 
         return loader
 
-    def __add__(self, other):
-        res = PluginMap()
-        res._plugins.update(self._plugins)
-        res._plugins.update(other._plugins)
-        res._loaded_plugins.update(other._loaded_plugins)
-        res._loaded_plugins.update(other._loaded_plugins)
-        return res
-
 
 def explore_plugins(loader_hook, suffix):
     def make_loader(path):
