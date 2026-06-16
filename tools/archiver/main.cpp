@@ -422,6 +422,52 @@ static TString CutFirstSlash(const TString& fileName) {
     }
 }
 
+// ============================================================
+// FIX: Безопасная сборка пути — защита от Path Traversal (Zip Slip).
+//
+// Проблема оригинального кода:
+//   const TFsPath path(dir / fileName);
+// Если fileName содержит "../../etc/passwd" или аналогичное,
+// итоговый путь выходит за пределы целевой директории dir.
+//
+// Решение:
+//   1. Собираем кандидата: base / fileName
+//   2. Лексически нормализуем путь (убираем "..", ".", лишние слеши)
+//      без обращения к файловой системе — это важно, потому что
+//      директория ещё может не существовать в момент проверки.
+//   3. Проверяем, что нормализованный путь начинается с base.
+//      Если нет — бросаем исключение.
+// ============================================================
+static TFsPath SafeJoin(const TFsPath& base, const TString& fileName) {
+    // Собираем сырой путь
+    const TFsPath candidate = base / fileName;
+
+    // Лексическая нормализация через стандартную библиотеку C++17.
+    // std::filesystem::path::lexically_normal() раскрывает все ".." и "."
+    // без обращения к ФС, поэтому работает даже если путь ещё не существует.
+    const std::filesystem::path normalizedCandidate =
+        std::filesystem::path(candidate.GetPath().c_str()).lexically_normal();
+
+    const std::filesystem::path normalizedBase =
+        std::filesystem::path(base.GetPath().c_str()).lexically_normal();
+
+    // Проверка: нормализованный кандидат должен начинаться с base.
+    // Используем mismatch по компонентам пути — это надёжнее,
+    // чем сравнение строк (нет риска ложного совпадения вроде /tmp/evil vs /tmp/ev).
+    auto [baseEnd, _] = std::mismatch(
+        normalizedBase.begin(), normalizedBase.end(),
+        normalizedCandidate.begin(), normalizedCandidate.end()
+    );
+
+    if (baseEnd != normalizedBase.end()) {
+        ythrow yexception()
+            << "Path traversal detected: key '" << fileName
+            << "' escapes destination directory '" << base.GetPath() << "'";
+    }
+
+    return TFsPath(normalizedCandidate.string());
+}
+
 struct TMappingReader {
     TMemoryMap Map;
     TBlob Blob;
@@ -439,13 +485,25 @@ static void UnpackArchive(const TString& archive, const TFsPath& dir = TFsPath()
     TMappingReader mappingReader(archive);
     const TArchiveReader& reader = mappingReader.Reader;
     const size_t count = reader.Count();
+
+    // Определяем и нормализуем базовую директорию один раз до цикла.
+    // Если dir не задан — используем текущую рабочую директорию.
+    const TFsPath baseDir = dir.IsDefined() ? dir : TFsPath::Cwd();
+
     for (size_t i = 0; i < count; ++i) {
         const TString key = reader.KeyByIndex(i);
         const TString fileName = CutFirstSlash(key);
         if (!Quiet) {
             Cerr << archive << " --> " << fileName << Endl;
         }
-        const TFsPath path(dir / fileName);
+
+        // БЫЛО (уязвимо):
+        //   const TFsPath path(dir / fileName);
+        //
+        // СТАЛО (безопасно): SafeJoin проверяет, что fileName
+        // не уводит за пределы baseDir, и бросает исключение если да.
+        const TFsPath path = SafeJoin(baseDir, fileName);
+
         path.Parent().MkDirs();
         TAutoPtr<IInputStream> in = reader.ObjectByKey(key);
         TFixedBufferFileOutput out(path);
