@@ -2,12 +2,14 @@ import os
 import six
 import logging
 import multiprocessing
+import enum
 
 from humanfriendly import parse_size, parse_timespan, InvalidSize, InvalidTimespan
 
 import app_config
 import exts.path2
 from library.python import func
+from library.python.fs import supports_clone
 import yalibrary.upload.consts as upload_consts
 from devtools.ya.core.yarg.groups import (
     OPERATIONAL_CONTROL_GROUP,
@@ -82,7 +84,6 @@ from devtools.ya.core.yarg import (
     NoValueDummyHook,
 )
 
-from library.python.fs import supports_clone
 from devtools.ya.yalibrary.store.yt_store.opts_helper import parse_yt_max_cache_size
 
 logger = logging.getLogger(__name__)
@@ -1067,12 +1068,37 @@ class FindPathOptions(Options):
         ]
 
 
+class ClonefileMode(enum.Enum):
+    no = 'no'
+    mixed = 'mixed'
+    full = 'full'
+
+    def __str__(self):
+        return self.value
+
+
+CLONEFILE_MODES = {mode for mode in ClonefileMode}
+CLONEFILE_MODES_STR = {mode.value for mode in ClonefileMode}
+
+
+def clonefile_mode_from_string(value):
+    if isinstance(value, ClonefileMode):
+        return value
+    if isinstance(value, str):
+        if value in ClonefileMode:
+            return ClonefileMode[value]
+        raise ValueError(
+            "{} is not a valid clonefile mode. Available options are {}".format(value, CLONEFILE_MODES_STR)
+        )
+    raise TypeError("Expected clonefile_mode or str, got {}".format(type(value)))
+
+
 class ExecutorOptions(Options):
     def __init__(self):
         self.local_executor = True
         self.executor_address = None
         self.eager_execution = False
-        self.use_clonefile = True
+        self.clonefile_mode = ClonefileMode.no
         self.runner_dir_outputs = True
         self.dir_outputs_test_mode = False
         self.schedule_strategy = None
@@ -1135,20 +1161,36 @@ class ExecutorOptions(Options):
             ArgConsumer(
                 ['--use-clonefile'],
                 help='Use clonefile instead of hardlink on macOS',
-                hook=SetConstValueHook('use_clonefile', True),
+                hook=SetConstValueHook('clonefile_mode', ClonefileMode.mixed),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.NONE,
+                deprecated=True,
             ),
-            EnvConsumer('YA_USE_CLONEFILE', hook=SetValueHook('use_clonefile', return_true_if_enabled)),
-            ConfigConsumer('use_clonefile'),
             ArgConsumer(
                 ['--no-clonefile'],
                 help='Disable clonefile option',
-                hook=SetConstValueHook('use_clonefile', False),
+                hook=SetConstValueHook('clonefile_mode', ClonefileMode.no),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.NONE,
+                deprecated=True,
+            ),
+            EnvConsumer(
+                'YA_CLONEFILE_MODE',
+                hook=SetValueHook('clonefile_mode', transform=clonefile_mode_from_string, values=CLONEFILE_MODES),
+            ),
+            ConfigConsumer(
+                'clonefile_mode',
+                hook=SetValueHook('clonefile_mode', transform=clonefile_mode_from_string, values=CLONEFILE_MODES),
+            ),
+            ArgConsumer(
+                ['--clonefile-mode'],
+                help='Specify strategy for sharing artifacts during build process. '
+                'no - use hardlinks only (WARNING: CAN CRASH ON MACOS PLATFORM, use "mixed" instead). '
+                'mixed - use clonefile for ad-hoc binaries built from source. full - use clonefile for all artifacts',
+                hook=SetValueHook('clonefile_mode', transform=clonefile_mode_from_string, values=CLONEFILE_MODES),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.ADVANCED,
             ),
-            EnvConsumer('YA_NO_CLONEFILE', hook=SetValueHook('use_clonefile', False)),
             ConfigConsumer('schedule_strategy'),
             ArgConsumer(
                 ['--schedule-strategy'],
@@ -1185,10 +1227,11 @@ class ExecutorOptions(Options):
             and not getattr(params, 'continue_on_fail', True)
         ):
             raise ArgsValidatingException("eager_execution with testing should be used with -k, see DEVTOOLS-7068")
-        if self.use_clonefile and supports_clone():
+
+        if self.clonefile_mode != ClonefileMode.no and supports_clone():
             import yalibrary.runner.fs as yrfs
 
-            yrfs.enable_clonefile()
+            yrfs.set_clonefile_mode(self.clonefile_mode)
 
 
 class GraphFilterOutputResultOptions(Options):

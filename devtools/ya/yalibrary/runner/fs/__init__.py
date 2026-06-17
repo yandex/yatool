@@ -1,14 +1,19 @@
 import errno
 import logging
+import os
 import os.path
 import filecmp
+import stat
 
 import exts.fs
 from library.python import windows
 import six
 from six.moves import xrange
+from devtools.ya.build.build_opts import ClonefileMode
 
 logger = logging.getLogger(__name__)
+
+__selected_clonefile_mode = ClonefileMode.no
 
 
 def write_into_file(src, data):
@@ -82,6 +87,18 @@ def enable_clonefile_copy():
     clone_file = clone_file_copy
 
 
+def set_clonefile_mode(mode):
+    global __selected_clonefile_mode
+    global clone_file
+    __selected_clonefile_mode = mode
+    if mode == ClonefileMode.full:
+        enable_clonefile()
+    elif mode == ClonefileMode.mixed:
+        enable_clonefile_with_copy_fallback()
+    else:
+        clone_file = clone_file_idle
+
+
 def make_hardlink(target, link, retries=10, prepare=False):
     assert target and link
 
@@ -90,7 +107,7 @@ def make_hardlink(target, link, retries=10, prepare=False):
             if prepare:
                 prepare_parent_dir(link)
                 exts.fs.ensure_removed(link)
-            return clone_file(target, link) or exts.fs.hardlink_or_copy(target, link)
+            return exts.fs.hardlink_or_copy(target, link)
         except OSError:
             if i == 0:
                 logger.warning('Can\'t create hardlink or copy of %s as %s', target, link)
@@ -100,6 +117,26 @@ def make_hardlink(target, link, retries=10, prepare=False):
             exts.fs.ensure_removed(link)
 
     raise RuntimeError('Invalid state')
+
+
+def __needs_cloning(target):
+    try:
+        st_mode = os.stat(target).st_mode
+    except OSError:
+        return False
+    return (st_mode & stat.S_IXUSR) != 0
+
+
+def make_clone_or_hardlink(target, link, retries=10, prepare=False, prefer_clone=False):
+    if (__selected_clonefile_mode == ClonefileMode.full) or (
+        __selected_clonefile_mode == ClonefileMode.mixed and (prefer_clone or __needs_cloning(target))
+    ):
+        if prepare:
+            prepare_parent_dir(link)
+            exts.fs.ensure_removed(link)
+        if clone_file(target, link):
+            return True
+    return make_hardlink(target, link, retries=retries, prepare=prepare)
 
 
 @windows.win_disabled

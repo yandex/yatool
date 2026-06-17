@@ -74,7 +74,7 @@ class UidStore(object):
             for rel_path, file_hash in six.iteritems(kv):
                 f_path = os.path.join(into_dir, rel_path)
 
-                yalibrary.runner.fs.make_hardlink(self._file_store.get(file_hash), f_path)
+                yalibrary.runner.fs.make_clone_or_hardlink(self._file_store.get(file_hash), f_path, prefer_clone=True)
                 ret.append(f_path)
         except file_store.NotInCacheError as e:
             logger.error(

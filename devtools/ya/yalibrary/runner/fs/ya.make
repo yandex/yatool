@@ -7,6 +7,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/exts
+    devtools/ya/build/build_opts
 )
 
 END()

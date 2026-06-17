@@ -344,6 +344,18 @@ class BuildRoot(object):
                         os.environ.get("LANG"),
                     )
 
+    @func.lazy_property
+    def _executable_outputs(self):
+        """Set of output paths that are executable — computed once, used in every steal() call."""
+        result = set()
+        for x in self._outputs:
+            try:
+                if os.stat(x).st_mode & stat.S_IXUSR:
+                    result.add(x)
+            except OSError:
+                pass
+        return result
+
     def steal(self, into, dec=True):
         if not self._ok:
             return False
@@ -357,8 +369,12 @@ class BuildRoot(object):
                     # We don't need to copy file with hash info
                     continue
                 try:
-                    runner_fs.make_hardlink(
-                        x, os.path.join(into, fs.fast_relpath(x, self.path)), retries=1, prepare=True
+                    runner_fs.make_clone_or_hardlink(
+                        x,
+                        os.path.join(into, fs.fast_relpath(x, self.path)),
+                        retries=1,
+                        prepare=True,
+                        prefer_clone=x in self._executable_outputs,
                     )
                 except (
                     OSError

@@ -1,6 +1,7 @@
 import binascii
 import typing as tp  # noqa: F401
 import six
+import enum
 
 import base64
 import logging
@@ -22,6 +23,14 @@ FILES = ['_files']
 
 def counter_name(name):
     return '_{}_counter'.format(name)
+
+
+def convert_value(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, enum.Enum):
+        return value.value
+    raise TypeError("Supported value types are str and enum.Enum, got {}".format(type(value)))
 
 
 class CaseInsensitiveValues(list):
@@ -89,7 +98,9 @@ class SetValueHook(ValueHook):
 
         if self.values != FILES and value not in self.values:
             raise ArgsValidatingException(
-                "Invalid choice ({}): {} (choose from '{}')".format(self.name, value, "', '".join(self.values))
+                "Invalid choice ({}): {} (choose from '{}')".format(
+                    self.name, value, "', '".join(map(convert_value, self.values))
+                )
             )
 
         setattr(to, self.name, value)
@@ -117,7 +128,7 @@ class SetValueHook(ValueHook):
 
     def available_options(self, to):
         if hasattr(to, self.name) and self.values is not FILES:
-            return "(available options: '{}')".format("', '".join(self.values))
+            return "(available options: '{}')".format("', '".join(map(convert_value, self.values)))
         else:
             return None
 
@@ -167,7 +178,9 @@ class SetAppendHook(ValueHook):
         if self.values != FILES and any(value not in self.values for value in lst):
             raise ArgsValidatingException(
                 "Invalid choice ({}): {} (choose from '{}')".format(
-                    self.name, str([value for value in lst if value not in self.values]), "', '".join(self.values)
+                    self.name,
+                    str([value for value in lst if value not in self.values]),
+                    "', '".join(map(convert_value, self.values)),
                 )
             )
 
@@ -198,7 +211,7 @@ class ExtendHook(ValueHook):
                     "Invalid choice ({}): {} (choose from '{}')".format(
                         self.name,
                         str(bad_values),
-                        "', '".join(self.values),
+                        "', '".join(map(convert_value, self.values)),
                     )
                 )
 
@@ -223,7 +236,9 @@ class DictPutHook(ValueHook):
 
         if self.values != FILES and value not in self.values:
             raise ArgsValidatingException(
-                "Invalid choice ({}): {} (choose from '{}')".format(self.name, value, "', '".join(self.values))
+                "Invalid choice ({}): {} (choose from '{}')".format(
+                    self.name, value, "', '".join(map(convert_value, self.values))
+                )
             )
 
         dct[key] = value
@@ -271,7 +286,9 @@ class SetRawParamsHook(ValueHook):
         for name, value in six.iteritems(params_dict):
             if self.values != FILES and value not in self.values:
                 raise ArgsValidatingException(
-                    "Invalid choice ({}): {} (choose from '{}')".format(self.name, value, "', '".join(self.values))
+                    "Invalid choice ({}): {} (choose from '{}')".format(
+                        self.name, value, "', '".join(map(convert_value, self.values))
+                    )
                 )
             setattr(obj, name, value)
 
