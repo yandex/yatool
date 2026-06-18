@@ -216,6 +216,12 @@ public:
     T* rawpointer() {
         return arr;
     }
+    T* data() {
+        return arr;
+    }
+    const T* data() const {
+        return arr;
+    }
     const T* operator~() const {
         return arr;
     }
