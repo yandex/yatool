@@ -27,7 +27,7 @@ public:
         return TFieldCalculatorBase::CondById(&d, condNumber);
     }
     size_t CondsQuantity() {
-        return +conditions;
+        return conditions.size();
     }
 };
 
