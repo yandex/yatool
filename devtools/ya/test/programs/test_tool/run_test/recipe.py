@@ -242,7 +242,7 @@ def _build_recipe_cmd(shallow_dir: str, extra_args: list[str], action: str) -> l
     читает их из контекстного файла (YA_TEST_CONTEXT_FILE).
     """
     bin_path = os.path.join(shallow_dir, 'package', RECIPE_BIN_NAME)
-    return [bin_path] + extra_args + [action]
+    return [bin_path] + [action] + extra_args
 
 
 # ---------------------------------------------------------------------------
