@@ -325,6 +325,7 @@ cdef class YtStoreImpl:
         gsid: str | None,
         stager: stage_tracer.StageTracer.GroupStageTracer | None,
         allow_tar: bool,
+        allow_go: bool,
     ):
         self._proxy = proxy
         self._data_dir = data_dir
@@ -332,6 +333,7 @@ cdef class YtStoreImpl:
         self._stager = stager
         self._exiting = False
         self._allow_tar = allow_tar
+        self._yt_cache_excluded_p = YT_CACHE_EXCLUDED_P - {'GO'} if allow_go else YT_CACHE_EXCLUDED_P
 
         cdef TString c_proxy = proxy
         cdef TString c_data_dir = data_dir
@@ -406,7 +408,7 @@ cdef class YtStoreImpl:
             return False
 
         p = kv.get('p')
-        if p in YT_CACHE_EXCLUDED_P:
+        if p in self._yt_cache_excluded_p:
             return False
         for o in outputs:
             if o.startswith('$(BUILD_ROOT)/library/cpp/build_info'):

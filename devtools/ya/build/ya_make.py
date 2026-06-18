@@ -421,6 +421,7 @@ class CacheFactory:
             gsid=devtools.ya.core.gsid.flat_session_id(),
             stager=stager,
             allow_tar=('.tar' in self._opts.add_result),
+            allow_go=self._opts.yt_store_allow_go,
         )
 
     def _can_use_bazel_remote_cache(self):

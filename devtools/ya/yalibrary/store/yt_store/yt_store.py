@@ -37,6 +37,7 @@ class YtStore(xx_client.YtStoreImpl, DistStore):
         gsid: str | None = None,
         stager: stage_tracer.StageTracer.GroupStageTracer | None = None,
         allow_tar=False,
+        allow_go=False,
         **kwargs
     ):
         xx_client.YtStoreImpl.__init__(
@@ -60,6 +61,7 @@ class YtStore(xx_client.YtStoreImpl, DistStore):
             gsid=gsid,
             stager=stager,
             allow_tar=allow_tar,
+            allow_go=allow_go,
         )
         DistStore.__init__(
             self,

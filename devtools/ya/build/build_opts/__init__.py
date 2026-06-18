@@ -2590,6 +2590,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_threads = max(get_cpu_count() // 2, 1)
         self.yt_store_wt = True
         self.yt_store_refresh_on_read = False
+        self.yt_store_allow_go = False
         self.yt_store_cpp_client = True
         self.yt_store_cpp_prepare_data = False
         self.yt_store_probe_before_put = False
@@ -2828,6 +2829,19 @@ class DistCacheOptions(DistCacheSetupOptions):
                     'YA_YT_STORE_REFRESH_ON_READ', hook=SetValueHook('yt_store_refresh_on_read', return_true_if_enabled)
                 ),
             ]
+            + make_opt_consumers(
+                'yt_store_allow_go',
+                help='Store and reuse Go build artifacts in the YT store (excluded by default)',
+                arg_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                env_opts=dict(
+                    hook=lambda n: SetConstValueHook(n, True),
+                ),
+                cfg_opts={},
+            )
             + make_opt_consumers(
                 'yt_replace_result',
                 help='Build only targets that need to be uploaded to the YT store',
