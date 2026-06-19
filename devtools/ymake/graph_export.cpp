@@ -570,10 +570,11 @@ bool TGraphExporter::AcceptDep(TState& state) {
         << Endl;
     TBase::AcceptDep(state);
     const auto& dep = state.NextDep();
-    bool isStartModuleDep = !state.HasIncomingDep() && IsDirToModuleDep(dep);
-    if (isStartModuleDep && !StartTargets_.contains(dep.To().Id())) {
+    if (IsPropertyDep(dep))
         return false;
-    }
+    bool isStartModuleDep = !state.HasIncomingDep() && IsDirToModuleDep(dep);
+    if (isStartModuleDep && !StartTargets_.contains(dep.To().Id()))
+        return false;
     if (!IsReachableManagedDependency(RestoreContext_, dep))
         return false;
     if (PrunePeerDirs_ && IsPeerdirDep(dep))
