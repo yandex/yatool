@@ -23,6 +23,14 @@ bool IsBuilderNode(TConstDepNodeRef node) {
     return false;
 }
 
+// A "$L/ACTION/" node is the OutTogether grouping anchor of a multi-output command:
+// it carries the command's shared properties but is not itself an artifact. Its real
+// outputs hang off it via EDT_OutTogetherBack, so the marker must not be exported as
+// an output (doing so leaks "$L/ACTION/" and duplicates the main output in the xid).
+bool IsActionMarker(TConstDepNodeRef node) {
+    return TDepGraph::GetFileName(node).GetContextType() == ELT_Action;
+}
+
 TStringBuf ToString(NPath::ERoot root) {
     switch (root) {
         case NPath::Source: return "source";
@@ -376,7 +384,9 @@ void TWriter::DumpBuilder(
     TVector<TConstDepNodeRef> tools;
     enum EInputSection {Skip, Implicit, Explicit};
     EInputSection inputSection = IsModuleType(builder->NodeType) ? EInputSection::Skip : EInputSection::Explicit;
-    outputs.push_back(builder);
+    if (!IsActionMarker(builder)) {
+        outputs.push_back(builder);
+    }
     for (const auto& edge : builder.Edges()) {
         if (*edge == EDT_OutTogetherBack) {
             outputs.push_back(edge.To());
@@ -611,7 +621,7 @@ void TGraphExporter::Leave(TState& state) {
         const auto incDep = state.IncomingDep();
         auto parent = state.Parent();
 
-        if (IsFileType(topNode->NodeType)) {
+        if (IsFileType(topNode->NodeType) && !IsActionMarker(topNode)) {
             Formatter_.DumpFile(topNode);
         }
         if (IsBuilderNode(topNode)) {
