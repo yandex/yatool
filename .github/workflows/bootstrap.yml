@@ -70,7 +70,7 @@ jobs:
       #   default-linux-aarch64  <- check existence only                   #
       #                                                                     #
       # Main binaries (stage2/<platform>/):                                 #
-      #   ya-bin, ymake, server (toolscache), test_tool                    #
+      #   ya-bin, ymake, ya-tc (toolscache), test_tool                    #
       #                                                                     #
       # Additional binaries (stage2/additional/<platform>/):               #
       #   yexport                                                           #
@@ -82,7 +82,8 @@ jobs:
           STAGE2="$RESULT_ROOT/stage2"
           PLATFORM_LIST="$GITHUB_WORKSPACE/devtools/ya/bootstrap/platform_list"
 
-          MAIN_BINS="ya-bin ymake server test_tool"
+          MAIN_BINS="ya-bin ymake ya-tc"
+          EXISTENCE_ONLY_BINS="test_tool"
           ADDITIONAL_BINS="yexport"
 
           LINUX_X86_PLATFORM="default-linux-x86_64"
@@ -95,6 +96,16 @@ jobs:
 
             # Check main binaries exist
             for bin in $MAIN_BINS; do
+              path="$STAGE2/$platform/$bin"
+              if [ ! -f "$path" ]; then
+                echo "ERROR: $path not found"
+                exit 1
+              fi
+              echo "EXISTS: $path"
+            done
+
+            # Check existence-only binaries (no --help)
+            for bin in $EXISTENCE_ONLY_BINS; do
               path="$STAGE2/$platform/$bin"
               if [ ! -f "$path" ]; then
                 echo "ERROR: $path not found"
