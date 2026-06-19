@@ -15,8 +15,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        # uses: actions/checkout@v4
-        uses: actions/checkout@6b11591fb4834403b6f5a49d7891bfd5bb29ad53
+        uses: actions/checkout@v4
+        with:
+          ref: '6b11591fb4834403b6f5a49d7891bfd5bb29ad53'
 
       # ------------------------------------------------------------------ #
       # Stage 1 + Stage 2 bootstrap via run_bootstrap.py                   #
