@@ -1,0 +1,153 @@
+name: Bootstrap ya-bin
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # daily at 00:00 UTC
+  workflow_dispatch:       # allow manual runs for debugging
+
+jobs:
+  bootstrap:
+    runs-on: self-hosted
+    timeout-minutes: 180  # stage1 ~1h + stage2 varies; 3h is a safe upper bound
+
+    env:
+      RESULT_ROOT: /tmp/ya-bootstrap-result
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: '6b11591fb4834403b6f5a49d7891bfd5bb29ad53'
+
+      # ------------------------------------------------------------------ #
+      # Stage 1 + Stage 2 bootstrap via run_bootstrap.py                   #
+      # Requires on the runner:                                             #
+      #   - Docker (latest stable)                                          #
+      #   - Python 3.9+ (asyncio.to_thread used in graph_executor.py)      #
+      #   - ~100 GB free disk space                                         #
+      #   - Internet access to devtools-registry.s3.yandex.net             #
+      #     and apt.llvm.org (used inside stage1.Dockerfile)               #
+      # ------------------------------------------------------------------ #
+      - name: Run bootstrap (stage 1 + stage 2)
+        run: |
+          mkdir -p "$RESULT_ROOT"
+          python3 devtools/ya/bootstrap/run_bootstrap.py \
+            --source-root "$GITHUB_WORKSPACE" \
+            --result-root "$RESULT_ROOT" \
+            --all-platforms-build \
+            --cleanup
+
+      # ------------------------------------------------------------------ #
+      # Verify stage 1 artifacts: ya-bin and ymake for linux-x86_64        #
+      # Both binaries must exist and respond to --help with exit code 0    #
+      # ------------------------------------------------------------------ #
+      - name: Verify stage 1 artifacts
+        run: |
+          set -euo pipefail
+
+          STAGE1="$RESULT_ROOT/stage1"
+
+          echo "=== Checking stage1 artifacts in $STAGE1 ==="
+
+          for bin in ya-bin ymake; do
+            path="$STAGE1/$bin"
+
+            if [ ! -f "$path" ]; then
+              echo "ERROR: $path not found"
+              exit 1
+            fi
+
+            echo "--- Running $bin --help ---"
+            "$path" --help
+            echo "OK: $bin exited with code $?"
+          done
+
+      # ------------------------------------------------------------------ #
+      # Verify stage 2 artifacts                                            #
+      #                                                                     #
+      # platform_list contains:                                             #
+      #   default-linux-x86_64   <- binaries are runnable on this runner   #
+      #   default-linux-aarch64  <- check existence only                   #
+      #                                                                     #
+      # Main binaries (stage2/<platform>/):                                 #
+      #   ya-bin, ymake, ya-tc (toolscache), test_tool                    #
+      #                                                                     #
+      # Additional binaries (stage2/additional/<platform>/):               #
+      #   yexport                                                           #
+      # ------------------------------------------------------------------ #
+      - name: Verify stage 2 artifacts
+        run: |
+          set -euo pipefail
+
+          STAGE2="$RESULT_ROOT/stage2"
+          PLATFORM_LIST="$GITHUB_WORKSPACE/devtools/ya/bootstrap/platform_list"
+
+          MAIN_BINS="ya-bin ymake ya-tc"
+          EXISTENCE_ONLY_BINS="test_tool"
+          ADDITIONAL_BINS="yexport"
+
+          LINUX_X86_PLATFORM="default-linux-x86_64"
+
+          echo "=== Checking stage2 artifacts in $STAGE2 ==="
+
+          while IFS= read -r platform || [ -n "$platform" ]; do
+            [ -z "$platform" ] && continue
+            echo "--- Platform: $platform ---"
+
+            # Check main binaries exist
+            for bin in $MAIN_BINS; do
+              path="$STAGE2/$platform/$bin"
+              if [ ! -f "$path" ]; then
+                echo "ERROR: $path not found"
+                exit 1
+              fi
+              echo "EXISTS: $path"
+            done
+
+            # Check existence-only binaries (no --help)
+            for bin in $EXISTENCE_ONLY_BINS; do
+              path="$STAGE2/$platform/$bin"
+              if [ ! -f "$path" ]; then
+                echo "ERROR: $path not found"
+                exit 1
+              fi
+              echo "EXISTS: $path"
+            done
+
+            # Check additional binaries exist
+            for bin in $ADDITIONAL_BINS; do
+              path="$STAGE2/additional/$platform/$bin"
+              if [ ! -f "$path" ]; then
+                echo "ERROR: $path not found"
+                exit 1
+              fi
+              echo "EXISTS: $path"
+            done
+
+            # For linux-x86_64 also run --help and check exit code
+            if [ "$platform" = "$LINUX_X86_PLATFORM" ]; then
+              echo "--- Running --help checks for $platform ---"
+
+              for bin in $MAIN_BINS; do
+                path="$STAGE2/$platform/$bin"
+                echo "Running: $path --help"
+                "$path" --help
+                echo "OK: $bin exited with code $?"
+              done
+
+              for bin in $ADDITIONAL_BINS; do
+                path="$STAGE2/additional/$platform/$bin"
+                echo "Running: $path --help"
+                "$path" --help
+                echo "OK: $bin exited with code $?"
+              done
+            fi
+
+          done < "$PLATFORM_LIST"
+
+      # ------------------------------------------------------------------ #
+      # Always clean up the result directory to free ~100 GB of disk space #
+      # ------------------------------------------------------------------ #
+      - name: Cleanup result directory
+        if: always()
+        run: rm -rf "$RESULT_ROOT"
