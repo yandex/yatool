@@ -752,7 +752,7 @@ bool TModuleBuilder::SrcStatement(const TStringBuf& name, const TVector<TStringB
     const TBlockData& data = macroBlockData->second;
     size_t firstSimple = 0;
     if (HasNamedArgs(&data)) {
-        firstSimple = ConvertArgsToPositionalArrays(data.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), *ModuleDef->GetMakeFileMap().Pool);
+        firstSimple = ConvertArgsToPositionalArrays(data.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), ModuleDef->GetMakeFileMap().MemPool());
     }
 
     TVector<TStringBuf> srcArgs;
@@ -901,7 +901,7 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
     auto i = Conf.BlockData.find(name);
     if (i && i->second.IsFileGroupMacro) {
         if (HasNamedArgs(&i->second)) {
-            ConvertArgsToPositionalArrays(i->second.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), *ModuleDef->GetMakeFileMap().Pool);
+            ConvertArgsToPositionalArrays(i->second.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), ModuleDef->GetMakeFileMap().MemPool());
         }
         Y_ASSERT(args.size() > 1);
 
@@ -923,7 +923,7 @@ bool TModuleBuilder::GenStatement(const TStringBuf& name, const TVector<TStringB
         FileGroupCmds.emplace_back(varId, cmdInfo);
     } else if (i && i->second.IsUserMacro) {
         if (HasNamedArgs(&i->second)) {
-            ConvertArgsToPositionalArrays(i->second.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), *ModuleDef->GetMakeFileMap().Pool);
+            ConvertArgsToPositionalArrays(i->second.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), ModuleDef->GetMakeFileMap().MemPool());
         }
         TVarStrEx cmd(name);
         cmd.IsMacro = true;
@@ -1130,7 +1130,7 @@ void TModuleBuilder::CallMacro(TStringBuf name, const TVector<TStringBuf>& args,
         return;
 
     if (HasNamedArgs(&i->second)) {
-        ConvertArgsToPositionalArrays(i->second.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), *ModuleDef->GetMakeFileMap().Pool);
+        ConvertArgsToPositionalArrays(i->second.CmdProps->Signature(), const_cast<TVector<TStringBuf>&>(args), ModuleDef->GetMakeFileMap().MemPool());
     }
     TVarStrEx cmd(name);
     cmd.IsMacro = true;

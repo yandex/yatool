@@ -21,7 +21,6 @@
 #include <devtools/ymake/diag/stats.h>
 #include <devtools/ymake/diag/stats_enums.h>
 #include <devtools/ymake/diag/trace.h>
-#include <devtools/ymake/common/memory_pool.h>
 
 #include <util/generic/strbuf.h>
 #include <util/generic/vector.h>
@@ -114,6 +113,8 @@ namespace {
 TBuildConfiguration::TBuildConfiguration() {
     StrPool = IMemoryPool::Construct();
 }
+
+TBuildConfiguration::~TBuildConfiguration() = default;
 
 void TBuildConfiguration::AddOptions(NLastGetopt::TOpts& opts) {
     TCommandLineOptions::AddOptions(opts);

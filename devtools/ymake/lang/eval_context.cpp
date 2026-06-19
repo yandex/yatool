@@ -1,16 +1,17 @@
 #include "eval_context.h"
 
-#include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/builtin_macro_consts.h>
+#include <devtools/ymake/common/memory_pool.h>
+#include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/out.h>
 
 #include <library/cpp/case_insensitive_string/case_insensitive_string.h>
+
 #include <util/string/builder.h>
 #include <util/string/split.h>
 #include <util/string/vector.h>
 
 #include <algorithm>
-
 
 using TVersion = std::vector<ui32>;
 

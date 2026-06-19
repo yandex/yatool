@@ -6,7 +6,6 @@
 #include "vars.h"
 #include "out.h"
 
-#include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/common/split_string.h>
 #include <devtools/ymake/common/uniq_vector.h>
 #include <devtools/ymake/diag/dbg.h>
@@ -18,6 +17,7 @@
 
 class TYMake;
 class TModules;
+struct IMemoryPool;
 
 struct TModuleGlobInfo {
     TCmdElemId GlobPatternId;
@@ -34,32 +34,17 @@ class TModuleDef : private TNonCopyable {
 private:
     using TPrioStatement = std::pair<size_t, TStringBuf> ;
 
-    struct TMakeFileMap: public TMultiMap<TPrioStatement, TVector<TStringBuf>> {
-        mutable TAutoPtr<IMemoryPool> Pool = IMemoryPool::Construct();
+    class TMakeFileMap: public TMultiMap<TPrioStatement, TVector<TStringBuf>> {
+    public:
+        TMakeFileMap();
+        ~TMakeFileMap();
 
-        void Add(size_t prio, const TStringBuf& name, TArrayRef<const TStringBuf> args, bool multi) {
-            prio = (prio << 24) + (multi ? size() : 0);
-            TPrioStatement key(prio, Pool->Append(name));
-            iterator i;
-            if (multi || (i = find(key)) == end()) {
-                i = insert(std::make_pair(key, TVector<TStringBuf>()));
-            }
-            TVector<TStringBuf>& dstArgs = i->second;
-            size_t oldSize = dstArgs.size();
-            dstArgs.resize(args.size() + oldSize);
-            for (size_t n = 0; n < args.size(); n++) {
-                dstArgs[oldSize + n] = Pool->Append(args[n]);
-            }
-        }
+        void Add(size_t prio, const TStringBuf& name, TArrayRef<const TStringBuf> args, bool multi);
+        void Print() const;
+        IMemoryPool& MemPool() const {return *Pool_;}
 
-        void Print() const {
-            for (const auto& stmt: *this) {
-                YDIAG(DG) << "Key: " << stmt.first.first << " " << stmt.first.second << Endl;
-                for (const auto& arg: stmt.second) {
-                    YDIAG(DG) << arg << Endl;
-                }
-            }
-        }
+    private:
+        mutable TAutoPtr<IMemoryPool> Pool_;
     };
 
     TYMake& YMake;

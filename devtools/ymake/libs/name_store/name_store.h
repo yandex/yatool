@@ -1,6 +1,5 @@
 #pragma once
 
-#include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/common/path_definitions.h>
 
 #include <library/cpp/on_disk/multi_blob/multiblob_builder.h>
@@ -13,15 +12,11 @@
 
 class MD5;
 class IOutputStream;
+struct IMemoryPool;
 
 class TNameStore {
 public:
-    TNameStore() {
-        // pray 64bit hash never be 0
-        //Name2Id.set_empty_key(0);
-        Clear();
-    }
-
+    TNameStore();
     ~TNameStore();
 
     size_t Size() const {

@@ -8,6 +8,7 @@
 #include "prop_names.h"
 #include "ymake.h"
 
+#include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/lang/plugin_facade.h>
 
 #include <devtools/ymake/diag/manager.h>
@@ -17,6 +18,35 @@
 
 #include <library/cpp/iterator/mapped.h>
 
+TModuleDef::TMakeFileMap::TMakeFileMap()
+    : Pool_{IMemoryPool::Construct()}
+{}
+
+TModuleDef::TMakeFileMap::~TMakeFileMap() = default;
+
+void TModuleDef::TMakeFileMap::Add(size_t prio, const TStringBuf& name, TArrayRef<const TStringBuf> args, bool multi) {
+    prio = (prio << 24) + (multi ? size() : 0);
+    TPrioStatement key(prio, Pool_->Append(name));
+    iterator i;
+    if (multi || (i = find(key)) == end()) {
+        i = insert(std::make_pair(key, TVector<TStringBuf>()));
+    }
+    TVector<TStringBuf>& dstArgs = i->second;
+    size_t oldSize = dstArgs.size();
+    dstArgs.resize(args.size() + oldSize);
+    for (size_t n = 0; n < args.size(); n++) {
+        dstArgs[oldSize + n] = Pool_->Append(args[n]);
+    }
+}
+
+void TModuleDef::TMakeFileMap::Print() const {
+    for (const auto& stmt: *this) {
+        YDIAG(DG) << "Key: " << stmt.first.first << " " << stmt.first.second << Endl;
+        for (const auto& arg: stmt.second) {
+            YDIAG(DG) << arg << Endl;
+        }
+    }
+}
 
 TModuleDef::TModuleDef(TYMake& yMake, TModule& module, const TModuleConf& conf)
     : YMake(yMake)

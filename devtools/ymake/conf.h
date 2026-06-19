@@ -75,7 +75,7 @@ public:
 
 public:
     TBuildConfiguration();
-    ~TBuildConfiguration() = default;
+    ~TBuildConfiguration();
 
     TMacroImpl* FindPluginMacro(TStringBuf name) const {
         return MacroFacade.FindMacro(name);

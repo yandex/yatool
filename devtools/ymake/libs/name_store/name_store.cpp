@@ -1,5 +1,6 @@
 #include "name_store.h"
 
+#include <devtools/ymake/common/memory_pool.h>
 #include <devtools/ymake/common/npath.h>
 
 #include <util/generic/buffer.h>
@@ -64,8 +65,13 @@ bool TNameStore::CheckId(ui32 id) const {
     return true;
 }
 
-TNameStore::~TNameStore() {
+TNameStore::TNameStore() {
+    // pray 64bit hash never be 0
+    //Name2Id.set_empty_key(0);
+    Clear();
 }
+
+TNameStore::~TNameStore() = default;
 
 void TNameStore::Clear() {
     IMemoryPool::Construct().Swap(Pool_);
