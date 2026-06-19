@@ -268,8 +268,11 @@ int YMakeMain(int argc, char** argv) {
 
     SetAsyncSignalHandler(SIGINT, SigInt);
 #if !defined(_win_)
+    SetAsyncSignalHandler(SIGHUP, SigInt);
     SetupSignalHandler(SIGSEGV, PrintBackTraceOnSignal);
+    SetupSignalHandler(SIGQUIT, PrintBackTraceOnSignal);
     SetupSignalHandler(SIGABRT, PrintBackTraceOnSignal);
+    SetupSignalHandler(SIGTERM, PrintBackTraceOnSignal);
 #endif // !_win_
 
     int threads = 0;
