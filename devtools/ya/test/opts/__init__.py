@@ -120,6 +120,7 @@ class RunTestOptions(devtools.ya.core.yarg.Options):
         self.force_restart_recipe_manager = False
         self._is_ya_test = is_ya_test
         self.cpu_detect_via_ram = True
+        self.cleanup_child_processes = False
 
     def consumer(self):
         peerdirs_test_types = ['none', 'gen', 'all']
@@ -213,6 +214,19 @@ class RunTestOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.ADVANCED,
             ),
             devtools.ya.core.yarg.ConfigConsumer('cpu_detect_via_ram'),
+            TestArgConsumer(
+                ['--cleanup-child-processes'],
+                help="Cleanup child processes on end test",
+                hook=devtools.ya.core.yarg.SetConstValueHook('cleanup_child_processes', True),
+                subgroup=RUN_TEST_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_TEST_CLEANUP_CHILD_PROCESSES',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'cleanup_child_processes', devtools.ya.core.yarg.return_true_if_enabled
+                ),
+            ),
         ]
 
     def postprocess(self):

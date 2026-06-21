@@ -20,6 +20,7 @@ import stat
 import sys
 import time
 import traceback
+import psutil
 
 from . import test_context
 from .stages import Stages
@@ -51,10 +52,10 @@ import exts.archive
 import exts.fs
 import devtools.ya.test.common
 import devtools.ya.test.reports
-import devtools.ya.test.result
 import devtools.ya.test.test_types.common
 import devtools.ya.test.util.shared
 from library.python import windows
+from typing import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -538,6 +539,12 @@ def parse_args(args=None):
         action='store_true',
         default=False,
         help="force restart all persistent recipes ignoring hash",
+    )
+    parser.add_argument(
+        '--cleanup-child-processes',
+        action='store_true',
+        default=False,
+        help='Cleanup child processes on end test',
     )
 
     args = parser.parse_args(args)
@@ -1023,6 +1030,35 @@ def become_subreaper():
             return None
     except Exception as e:
         return e
+
+
+def iter_child_processes(root: psutil.Process) -> Iterator[psutil.Process]:
+    try:
+        children = root.children(recursive=True)
+    except psutil.NoSuchProcess:
+        return
+    yield from filter(lambda c: c.pid != os.getpid(), reversed(children))
+
+
+def terminate_children_processes(is_subreaper_set: bool):
+    try:
+        root = psutil.Process(os.getppid() if is_subreaper_set else os.getpid())
+    except psutil.NoSuchProcess:
+        return
+
+    targets = list(iter_child_processes(root))
+
+    for proc in targets:
+        try:
+            proc.suspend()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+
+    for proc in targets:
+        try:
+            proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
 
 
 def extract_param_value(cmd, prefix):
@@ -2215,10 +2251,20 @@ def main():
             options.disable_memory_snippet,
         )
 
-        finalize(options, suite, work_dir, test_rc, main_start_timestamp, time.time(), {}, backup_map)
+        finalize(options, suite, work_dir, test_rc, main_start_timestamp, time.time(), {}, backup_map, is_subreaper_set)
         return get_exit_code(suite)
 
-    finalize(options, suite, work_dir, exit_status, main_start_timestamp, testing_finished, coverage, backup_map)
+    finalize(
+        options,
+        suite,
+        work_dir,
+        exit_status,
+        main_start_timestamp,
+        testing_finished,
+        coverage,
+        backup_map,
+        is_subreaper_set,
+    )
     return get_exit_code(suite)
 
 
@@ -2343,7 +2389,7 @@ def finalize_node(suite):
         chunk_result.generate_report(suite.chunk, filename)
 
 
-def finalize(options, suite, work_dir, test_rc, start_time, end_time, coverage, backup_map):
+def finalize(options, suite, work_dir, test_rc, start_time, end_time, coverage, backup_map, is_subreaper_set: bool):
     out_dir = os.path.join(work_dir, const.TESTING_OUT_DIR_NAME)
     trace_report = os.path.join(work_dir, const.TRACE_FILE_NAME)
     if options.stdout:
@@ -2444,6 +2490,10 @@ def finalize(options, suite, work_dir, test_rc, start_time, end_time, coverage, 
     stages.flush()
     stages.stage("generate_trace_file")
     suite.generate_trace_file(trace_report)
+    stages.flush()
+    stages.stage("terminate_children_processes")
+    if options.cleanup_child_processes:
+        terminate_children_processes(is_subreaper_set)
     stages.flush()
     logger.debug("Stages:\n{}".format(json.dumps(stages.dump(), indent=4, sort_keys=True)))
 

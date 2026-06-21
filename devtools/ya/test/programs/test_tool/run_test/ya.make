@@ -10,6 +10,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/psutil
     devtools/recipe_manager/client
     devtools/ya/app_config
     devtools/ya/exts

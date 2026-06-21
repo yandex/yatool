@@ -902,6 +902,10 @@ def create_test_node(
         if not dir_outputs or _stable_dir_outputs(suite, opts):
             runner_cmd += ["--tar", testing_out_tar]
             outputs.append(testing_out_tar)
+
+    if opts and getattr(opts, "cleanup_child_processes"):
+        runner_cmd += ["--cleanup-child-processes"]
+
     runner_cmd = runner_cmd + suite.get_run_cmd(opts, retry, is_for_distbuild)
 
     if opts.use_command_file_in_testtool:
