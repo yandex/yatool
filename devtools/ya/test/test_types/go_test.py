@@ -115,11 +115,10 @@ class GoTestSuite(common_types.AbstractTestSuite):
             ]
             + (
                 [
-                    '--go-coverage-per-pkg',
                     '--go-toolchain',
                     self.global_resources.get(devtools.ya.test.const.GO_TOOLS_RESOURCE),
                 ]
-                if opts.go_coverage_per_pkg
+                if opts.go_coverage
                 else []
             )
         )

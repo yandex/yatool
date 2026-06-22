@@ -88,7 +88,6 @@ def parse_args():
     )
     parser.add_argument("--allure", action="store_true")
 
-    parser.add_argument("--go-coverage-per-pkg", action="store_true", help="Enable Go >= 1.25 coverage per package")
     parser.add_argument("--go-toolchain", help="Path to the go toolchain")
 
     args = parser.parse_args()
@@ -101,8 +100,8 @@ def parse_args():
         parser.error("--gdb-debug and --dlv-debug are mutually exclusive")
     if args.dlv_args:
         args.dlv_args = shlex.split(args.dlv_args)
-    if args.go_coverage_per_pkg and not args.go_toolchain:
-        parser.error("--go-coverage-per-pkg requires --go-toolchain")
+    if os.environ.get(const.COVERAGE_GO_ENV_NAME) and not args.go_toolchain:
+        parser.error("Go coverage requires --go-toolchain")
     return args
 
 
@@ -592,8 +591,7 @@ def run_tests(opts):
     if cov_path:
         cov_path = cov_path.format(pid=os.getpid(), time=time.time())
         cmd += [f"-test.coverprofile={cov_path}"]
-        if opts.go_coverage_per_pkg:
-            cmd += [f"-test.gocoverdir={os.path.dirname(cov_path)}"]
+        cmd += [f"-test.gocoverdir={os.path.dirname(cov_path)}"]
 
     #  here we get only Test names without benchmarks, subbenchmarks and subtests. thus we can't detect not launched subtests
     tests, deselected = get_tests(opts, opts.wine_path)
@@ -735,7 +733,7 @@ def run_tests(opts):
             suite.chunk.tests.append(test_case)
     shared.dump_trace_file(empty_suite, opts.tracefile)
 
-    if exit_code == 0 and cov_path and opts.go_coverage_per_pkg and opts.go_toolchain:
+    if exit_code == 0 and cov_path and opts.go_toolchain:
         exit_code = covdata_textfmt(opts, cov_path)  # inplace convert Go 1.25 binary coverage data to text format
 
     if exit_code not in [0, const.TestRunExitCode.TimeOut]:
