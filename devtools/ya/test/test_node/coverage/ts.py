@@ -10,15 +10,19 @@ TS_PREFIX = "ts"
 COVERAGE_TAR_RESULT = "ts.coverage.tar"
 
 
+def suite_has_coverage(suite):
+    suite_type = suite.get_type()
+    has_type = suite_type == "jest" or suite_type.startswith("ts_test") or suite_type.startswith("ts_lint")
+
+    return has_type and suite.supports_coverage
+
+
 def inject_ts_coverage_nodes(graph, suites, resolvers_map, opts, platform_descriptor):
     added_uids = []
+    suites_with_coverage = [s for s in suites if suite_has_coverage(s)]
 
-    # For each suite we are to collect coverage data info, so injecting a coverage_resolve nodes
-    # Jest suite nodes will produce initial coverage info files in jest format
-    # and then in the coverage_resolve nodes we will produce the required data structure based on that
-    jest_suites = [s for s in suites if s.get_type() == "jest"]
-    if jest_suites:
-        for suite in jest_suites:
+    if suites_with_coverage:
+        for suite in suites_with_coverage:
             suite_res_cov_filename = suite.work_dir(COVERAGE_TAR_RESULT)
             cov_resolved_filename = devtools.ya.test.const.TS_COVERAGE_RESOLVED_FILE_NAME
             cov_resolve_uid = inject_ts_coverage_resolve_node(
@@ -34,7 +38,7 @@ def inject_ts_coverage_nodes(graph, suites, resolvers_map, opts, platform_descri
                 resolvers_map[cov_resolve_uid] = (cov_resolved_filename, suite)
 
         if getattr(opts, "build_coverage_report", False):
-            report_node_uid = inject_create_ts_coverage_report_node(graph, jest_suites, added_uids, opts)
+            report_node_uid = inject_create_ts_coverage_report_node(graph, suites_with_coverage, added_uids, opts)
             added_uids.append(report_node_uid)
 
     return added_uids
