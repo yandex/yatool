@@ -8,6 +8,7 @@ PY_SRCS(
     __init__.py
     cpp_string_wrapper.pyx
     ccgraph.pyx
+    compile_commands.pyx
 )
 
 PEERDIR(

@@ -187,15 +187,11 @@ def gen_compile_commands(params, compile_commands_path):
     build_params.dont_strip_compiler_path = True
 
     def gen(prms):
-        try:
-            # noinspection PyUnresolvedReferences
-            import app_ctx  # pyright: ignore[ reportMissingImports]
-        except ImportError:
-            # Tests doesn't contain app_ctx
-            app_ctx = ide_common.FakeAppCtx()
-        return bc.gen_compilation_database(prms, app_ctx)
+        bc.dump_compilation_database(prms)
 
-    return devtools.ya.app.execute(action=gen, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
+    devtools.ya.app.execute(action=gen, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
+    with open(compile_commands_path) as f:
+        return json.load(f)
 
 
 def gen_run_configurations(params, modules, args, YA_PATH):

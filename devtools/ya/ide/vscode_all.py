@@ -155,11 +155,11 @@ class VSCodeProject:
         build_params.dont_strip_compiler_path = True
 
         def gen(prms):
-            return bc.gen_compilation_database(prms, self.app_ctx)
+            bc.dump_compilation_database(prms)
 
-        compilation_database = devtools.ya.app.execute(action=gen, respawn=devtools.ya.app.RespawnType.NONE)(
-            build_params
-        )
+        devtools.ya.app.execute(action=gen, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
+        with open(compile_commands_path) as f:
+            compilation_database = json.load(f)
 
         tools_root = devtools.ya.core.config.tool_root(toolscache_version())
         is_windows = pm.is_windows()

@@ -1,6 +1,7 @@
 LIBRARY()
 
 SRCS(
+    compile_commands.cpp
     graph.cpp
     intern_string.cpp
 )
@@ -11,6 +12,7 @@ PEERDIR(
     devtools/ya/cpp/lib/edl/common
     devtools/ya/cpp/lib/edl/json
     library/cpp/digest/md5
+    library/cpp/json
     library/cpp/json/common
     library/cpp/json/fast_sax
     library/cpp/json/writer

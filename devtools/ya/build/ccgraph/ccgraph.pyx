@@ -9,9 +9,6 @@ import itertools
 
 
 cdef extern from "devtools/ya/cpp/graph/graph.h" namespace "NYa::NGraph":
-    cdef cppclass TGraphPtr:
-        pass
-
     cdef cppclass TGlobalResource:
         pass
 
@@ -60,8 +57,6 @@ cdef extern from "devtools/ya/build/ccgraph/ccgraph.h" namespace "NYa::NCCGraph"
 
 
 cdef class Graph:
-    cdef TGraphPtr graph
-
     def __cinit__(self, init_graph=True, *args, **kwargs):
         if init_graph:
             self.graph = CreateGraph()
