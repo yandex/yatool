@@ -1,3 +1,4 @@
+import gzip
 import os
 import sys
 import json
@@ -6,6 +7,7 @@ import random
 import string
 import asyncio
 import hashlib
+import pathlib
 import tempfile
 import subprocess
 
@@ -15,8 +17,9 @@ from urllib.request import Request
 SOURCE_ROOT = sys.argv[1]
 BUILD_ROOT = sys.argv[2]
 
-URL = "https://devtools-registry.s3.yandex.net/11393818885"
-SHA256 = "0e1a09b8fdca5ae5598e1012f6880035fb7b77929d0c1516ffc878c1aeeeb921"
+_graph_meta = json.loads((pathlib.Path(__file__).parent / 'graph.json').read_text())
+URL = _graph_meta['url']
+SHA256 = _graph_meta['sha256']
 
 
 _ssl_is_tuned = False
@@ -123,8 +126,12 @@ except IndexError:
     file = None
 
 
-with open(file or _get(URL, SHA256), 'r') as f:
-    graph = json.loads(f.read())
+def _open_graph(path):
+    with gzip.open(path, 'rt') as f:
+        return json.loads(f.read())
+
+
+graph = _open_graph(file or _get(URL, SHA256))
 
 by_platform = {}
 
@@ -148,13 +155,6 @@ REMOVAL_CANDIDATES = ["--ya-start-command-file", "--ya-end-command-file"]
 
 
 PATH_SUBSTITUTES = {
-    '$(DEFAULT_LINUX_X86_64)/bin/': '',
-    '$(PYTHON)/python': 'python3',
-    '$(ANTLR4-sbr:1861632725)': BUILD_ROOT,
-    '$(YMAKE_PYTHON3-212672652)/bin/python3': 'python3',
-    '$(BINUTILS_ROOT-sbr:360916612)/bin/': '',
-    '$(CLANG-2403293607)/bin/': '',
-    '$(LLD_ROOT-3107549726)/bin/': '',
     '$(RESOURCE_ROOT)': BUILD_ROOT,
     '$(SOURCE_ROOT)': SOURCE_ROOT,
     '$(BUILD_ROOT)': f'{BUILD_ROOT}/@uid@',

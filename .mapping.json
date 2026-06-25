@@ -1,4 +1,5 @@
 {
+  ".github/workflows/bootstrap.yml":"devtools/ya/opensource/github/bootstrap.yml",
   "CODE_OF_CONDUCT.md":"devtools/ya/opensource/github/CODE_OF_CONDUCT.md",
   "CONTRIBUTING.md":"devtools/ya/opensource/github/CONTRIBUTING.md",
   "LICENSE":"devtools/ya/opensource/github/LICENSE",

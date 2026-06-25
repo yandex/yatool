@@ -6,6 +6,7 @@ cd $source_root
 # NOTE: must use release build type with musl, otherwise doesn't work
 # with tcmalloc
 # NOTE: don't set --c-compiler, otherwise get segfault
+# NOTE: Delete python2 deps - they are not required by ya-bin
 ./ya make \
     --host-platform-flag=USE_ICONV=static -DUSE_ICONV=static \
     --musl --host-platform-flag=MUSL \
@@ -18,6 +19,7 @@ cd $source_root
     --host-platform-flag=OS_SDK=local -DOS_SDK=local \
     --host-platform-flag=EMBED_SBOM=no -DEMBED_SBOM=no \
     --host-platform-flag=USE_PREBUILT_TOOLS=no -DUSE_PREBUILT_TOOLS=no \
+    --host-platform-flag=USE_GRAND_BYPASS=no -DUSE_GRAND_BYPASS=no \
     -DBUILD_PYTHON3_BIN=python3 \
     -DBUILD_PYTHON_BIN=python3 \
     -DUSE_SYSTEM_JDK=/usr \
@@ -35,4 +37,10 @@ cd $source_root
     -e 's|"/.*python|"python|' \
     -e 's|"/.*clang|"clang|' \
     -e 's|-B.*/usr/bin|-DXXXX|' \
-    -e 's|/usr/bin/java|java|'
+    -e 's|/usr/bin/java|java|' \
+    -e 's|\$(CLANG-[0-9]\{10\})/bin/||g' \
+    -e 's|\$(LLD_ROOT-[0-9]\{10\})/bin/||g' \
+    -e 's|\$(YMAKE_PYTHON3-[0-9]\{10\})/bin/python3|python3|g' \
+    | grep -v -E \
+    '\$\(SOURCE_ROOT\)/contrib/tools/python/|\$\(SOURCE_ROOT\)/contrib/python/.*/py2/|\$\(SOURCE_ROOT\)/yt/python_py2/'
+
