@@ -1304,6 +1304,10 @@ def main():
         logger.debug('Available memory unknown: %s', e)
 
     env = system_env.Environ()
+    # XXX Remove when YA-714 is done
+    for name in ['CLIENT_TOKEN']:
+        env.pop(name)
+
     # We can't redefine tmp env.vars because some tests would fail to create unix sockets
     # hitting filename length limit.
     env.adopt_update_mandatory(["TEMP", "TMP", "TMPDIR"])
