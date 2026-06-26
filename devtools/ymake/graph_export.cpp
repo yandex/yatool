@@ -8,6 +8,7 @@
 
 #include <fmt/format.h>
 #include <util/generic/scope.h>
+#include <util/generic/yexception.h>
 
 namespace {
 
@@ -29,6 +30,16 @@ bool IsBuilderNode(TConstDepNodeRef node) {
 // an output (doing so leaks "$L/ACTION/" and duplicates the main output in the xid).
 bool IsActionMarker(TConstDepNodeRef node) {
     return TDepGraph::GetFileName(node).GetContextType() == ELT_Action;
+}
+
+bool IsLateGlobCommand(TConstDepNodeRef node) {
+    if (node->NodeType != EMNT_BuildCommand)
+        return false;
+    // need to verify externally that this is an old-style command-like property, not an `S:#`
+    ui64 modId;
+    TStringBuf name, val;
+    ParseCommandLikeProperty(TDepGraph::GetCmdName(node).GetStr(), modId, name, val);
+    return name == NProps::LATE_GLOB;
 }
 
 TStringBuf ToString(NPath::ERoot root) {
@@ -108,6 +119,16 @@ auto MkBuilderId(TConstDepNodeRef builder, TStringBuf platform, bool unhash) {
     return unhash ? result : MkMD5(result);
 }
 
+auto MkLateGlobId(TConstDepNodeRef glob, TConstDepNodeRef component, TStringBuf platform, bool unhash) {
+    // late glob nodes have component scopes
+    Y_ASSERT(IsLateGlobCommand(glob));
+    Y_ASSERT(IsModuleType(component->NodeType));
+    auto scope = MkComponentId(component, platform, unhash);
+    auto globStr = TDepGraph::GetCmdName(glob).GetStr();
+    auto result = TString::Join("lateglob//", scope, "//", GetPropertyValue(globStr));
+    return unhash ? result : MkMD5(result);
+}
+
 //
 //
 //
@@ -133,11 +154,17 @@ public:
     );
     void DumpBuilder(
         TConstDepNodeRef builder,
+        TConstDepNodeRef component,
         TStringBuf platform,
         auto xidEval
     );
     void DumpFile(
         TConstDepNodeRef file
+    );
+    void DumpLateGlob(
+        TConstDepNodeRef glob,
+        TConstDepNodeRef component,
+        TStringBuf platform
     );
 
 private:
@@ -375,6 +402,7 @@ void TWriter::DumpComponent(
 
 void TWriter::DumpBuilder(
     TConstDepNodeRef builder,
+    TConstDepNodeRef component,
     TStringBuf platform,
     auto xidEval
 ) {
@@ -387,6 +415,29 @@ void TWriter::DumpBuilder(
     if (!IsActionMarker(builder)) {
         outputs.push_back(builder);
     }
+    auto collectInput = [&](TConstDepNodeRef to, TVector<TConstDepNodeRef>& sink) {
+        if (IsSrcFileType(to->NodeType)) { // TODO can it be a module type?
+            sink.push_back(to);
+        } else if (IsLateGlobCommand(to)) {
+            sink.push_back(to);
+        }
+    };
+    auto emitInputRef = [&](TConstDepNodeRef input) {
+        if (IsSrcFileType(input->NodeType)) {
+            JsonWriter.BeginObject();
+            JsonWriter.WriteKey("kind");
+            JsonWriter.WriteString("file");
+            EmitPathKV(JsonWriter, TDepGraph::GetFileName(input));
+            JsonWriter.EndObject();
+        } else if (IsLateGlobCommand(input)) {
+            JsonWriter.BeginObject();
+            JsonWriter.WriteKey("kind");
+            JsonWriter.WriteString("files");
+            JsonWriter.WriteKey("id");
+            JsonWriter.WriteString(MkLateGlobId(input, component, platform, Unhash));
+            JsonWriter.EndObject();
+        }
+    };
     for (const auto& edge : builder.Edges()) {
         if (*edge == EDT_OutTogetherBack) {
             outputs.push_back(edge.To());
@@ -402,12 +453,10 @@ void TWriter::DumpBuilder(
         if (*edge == EDT_BuildFrom) {
             switch (inputSection) {
             case EInputSection::Implicit:
-                if (IsSrcFileType(edge.To()->NodeType)) // TODO can it be a module type?
-                    implicitInputs.push_back(edge.To());
+                collectInput(edge.To(), implicitInputs);
                 break;
             case EInputSection::Explicit:
-                if (IsSrcFileType(edge.To()->NodeType)) // TODO can it be a module type?
-                    explicitInputs.push_back(edge.To());
+                collectInput(edge.To(), explicitInputs);
                 break;
             default:
                 break;
@@ -446,14 +495,14 @@ void TWriter::DumpBuilder(
                 JsonWriter.WriteKey("implicit");
                 JsonWriter.BeginList();
                 for (auto& input : implicitInputs)
-                    EmitPath(JsonWriter, TDepGraph::GetFileName(input));
+                    emitInputRef(input);
                 JsonWriter.EndList();
             }
             if (!explicitInputs.empty()) {
                 JsonWriter.WriteKey(IsModuleType(builder->NodeType) ? "explicit" : "artifacts");
                 JsonWriter.BeginList();
                 for (auto& input : explicitInputs)
-                    EmitPath(JsonWriter, TDepGraph::GetFileName(input));
+                    emitInputRef(input);
                 JsonWriter.EndList();
             }
         }
@@ -492,6 +541,34 @@ void TWriter::DumpFile(
         JsonWriter.BeginList();
         for (const auto& import : imports)
             EmitPath(JsonWriter, TDepGraph::GetFileName(import));
+        JsonWriter.EndList();
+    }
+    JsonWriter.EndObject();
+    JsonWriter.Reset(ZeroState);
+    JsonWriter.UnsafeWriteRawBytes("\n");
+}
+
+void TWriter::DumpLateGlob(
+    TConstDepNodeRef glob,
+    TConstDepNodeRef component,
+    TStringBuf platform
+) {
+    TVector<TConstDepNodeRef> items;
+
+    for (const auto& globEdge : glob.Edges())
+        if (IsPropertyFileDep(globEdge))
+            items.push_back(globEdge.To());
+
+    JsonWriter.BeginObject();
+    JsonWriter.WriteKey("kind");
+    JsonWriter.WriteString("files");
+    JsonWriter.WriteKey("id");
+    JsonWriter.WriteString(MkLateGlobId(glob, component, platform, Unhash));
+    if (!items.empty()) {
+        JsonWriter.WriteKey("items");
+        JsonWriter.BeginList();
+        for (const auto& item : items)
+            EmitPath(JsonWriter, TDepGraph::GetFileName(item));
         JsonWriter.EndList();
     }
     JsonWriter.EndObject();
@@ -625,14 +702,21 @@ void TGraphExporter::Leave(TState& state) {
         if (IsFileType(topNode->NodeType) && !IsActionMarker(topNode)) {
             Formatter_.DumpFile(topNode);
         }
-        if (IsBuilderNode(topNode)) {
-            auto mod = state.FindRecent([](auto& item) {
-                return IsModuleType(item.Node()->NodeType);
-            });
-            Formatter_.DumpBuilder(topNode, Platform, [&](auto& outputs) {
-                if (mod == state.end())
-                    return TString();
 
+        if (hasIncDep && IsIndirectSrcDep(incDep) && IsLateGlobCommand(topNode)) {
+            auto component = FindModule(state);
+            if (component == state.end())
+                ythrow TError() << "A late glob without a component detected";
+            Formatter_.DumpLateGlob(topNode, component->Node(), Platform);
+        }
+
+        if (IsBuilderNode(topNode)) {
+            auto component = state.FindRecent([](auto& item) {
+                return IsModuleType(item.Node()->NodeType);
+            }); // like FindModule, but non-const
+            if (component == state.end())
+                ythrow TError() << "A builder without a component detected";
+            Formatter_.DumpBuilder(topNode, component->Node(), Platform, [&](auto& outputs) {
                 // a crude (and partial) imitation of ya-bin's stats_uid computation
 
                 TVector<TString> tags = Tags;
@@ -658,7 +742,7 @@ void TGraphExporter::Leave(TState& state) {
                 TKeyValueFormatter formatter{};
                 TMakeCommand mkcmd{ModulesStatesCache_, RestoreContext_, Commands_, nullptr, &RestoreContext_.Conf.CommandConf};
                 mkcmd.CmdInfo.MkCmdAcceptor = formatter.GetAcceptor();
-                mkcmd.GetFromGraph(topNode.Id(), mod->Node().Id());
+                mkcmd.GetFromGraph(topNode.Id(), component->Node().Id());
                 kvs.swap(formatter.KeyValue);
 
                 auto dump_single_quoted = [](TStringStream& ss, TStringBuf s) {ss << "'" << s << "'";};
@@ -685,15 +769,17 @@ void TGraphExporter::Leave(TState& state) {
 
                 return Unhash ? ss.Str() : MkMD5(ss.Str());
             });
-            if (mod != state.end())
-                mod->Builders.push_back(topNode);
+            if (component != state.end())
+                component->Builders.push_back(topNode);
         }
+
         if (IsModuleType(nodeType)) {
             const TModule* mod = RestoreContext_.Modules.Get(AssumeFile(topNode->ElemId));
             Formatter_.DumpComponent(topNode, *mod, top.Builders, Platform, RestoreContext_);
             if (PrunePeerDirs_)
                 DumpedComponents_.insert(AssumeFile(topNode->ElemId));
         }
+
         if (IsMakeFileType(nodeType) && hasIncDep && incDep.From()->NodeType == EMNT_Directory && *incDep == EDT_Include) {
             Y_ASSERT(parent != state.end());
             Formatter_.DumpModule(topNode, parent->Node(), nullptr, Platform);
