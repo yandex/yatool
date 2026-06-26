@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import os
+import select
 import subprocess
 import sys
 import typing as tp
@@ -16,6 +17,14 @@ import devtools.ya.handlers.style.styler as stlr
 STDIN_FILENAME = 'source.cpp'
 
 logger = logging.getLogger(__name__)
+
+
+def _stdin_has_data() -> bool:
+    try:
+        ready, _, _ = select.select([sys.stdin], [], [], 0)
+        return bool(ready)
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
 
 
 class MineOptions(tp.NamedTuple):
@@ -123,12 +132,15 @@ def _mine_targets_smart(paths: Sequence[Path], only_staged: bool = False) -> Gen
 
 
 def _mine_targets(mine_opts: MineOptions) -> Generator[Target]:
-    # read stdin if not tty and no explicit targets provided
-    if not mine_opts.tty and not mine_opts.targets:
+    stdin_ready = _stdin_has_data()
+    # read stdin if not tty and no explicit targets provided.
+    # Also require that stdin actually has data ready
+    # to avoid blocking forever when stdin is opened in pseudo-terminal with no data
+    if not mine_opts.tty and not mine_opts.targets and stdin_ready:
         yield Target(PurePath(mine_opts.stdin_filename), sys.stdin.buffer.read, stdin=True)
 
-    # read cwd if target is not specified
-    if not mine_opts.targets and mine_opts.tty:
+    # read cwd if no explicit targets and stdin has no data (or is a tty)
+    if not mine_opts.targets and (mine_opts.tty or not stdin_ready):
         paths = (Path.cwd(),)
     else:
         paths = mine_opts.targets
