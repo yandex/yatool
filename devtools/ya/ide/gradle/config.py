@@ -53,6 +53,7 @@ class _JavaSemConfig(SemConfig):
         if not self.params.remove:
             self._setup_gradle_props()
         self.ya_gradle_config_files: list[str] = []
+        self.global_ya_gradle_config: ConfigParser = None
         self.ya_gradle_config: ConfigParser = None
         self.yexport_toml_checked = False
         self._update_params()
@@ -165,7 +166,9 @@ class _JavaSemConfig(SemConfig):
         norm_yexport_toml: dict[str, str] = {}
         for kv in self.params.yexport_toml:
             if str(kv).count('=') != 1:
-                raise SemException(f"Invalid --yexport-toml value: {kv}, waited 'key=value'")
+                raise SemException(
+                    f"Invalid --yexport-toml value '{kv}', waited space separated list of 'key=value' in {' '.join(self.params.yexport_toml)}"
+                )
             k, v = kv.split('=', 2)
             norm_yexport_toml[k.strip()] = v.strip()
         self.params.yexport_toml = [k + " = " + v for k, v in norm_yexport_toml.items()]
@@ -263,6 +266,13 @@ class _JavaSemConfig(SemConfig):
         """Get directory with ya ide gradle configs"""
         return self.arcadia_root / "build" / "yandex_specific" / "gradle"
 
+    @staticmethod
+    def _value2list(value: str) -> list[str]:
+        value = value.strip()
+        if not value:
+            return []
+        return re.split(r'[\s\t\n,]+', value)
+
     def _update_params(self) -> None:
         props = self._get_section(self._YA_IDE_GRADLE).items()
         if not props:
@@ -271,6 +281,7 @@ class _JavaSemConfig(SemConfig):
         printedSetFrom = False
         merge_params = ['yexport_toml']
         default_true_params = ['collect_contribs', 'build_foreign']
+        global_params = None
         for prop, value in props:
             param = self._prop2param(prop)
             default_value = True
@@ -280,8 +291,22 @@ class _JavaSemConfig(SemConfig):
             if not hasattr(self.params, param):
                 raise YaIdeGradleException(f"Unknown ya ide gradle param {param}")
             if param in merge_params:  # Merge lists, and config values prepend command line values
-                value = re.split(r'[\s\t\n,]+', value)
-                setattr(self.params, param, value + getattr(self.params, param))
+                if global_params is None:
+                    global_params = {}
+                    global_ya_ide_gradle = (
+                        self.global_ya_gradle_config[self._YA_IDE_GRADLE]
+                        if self.global_ya_gradle_config.has_section(self._YA_IDE_GRADLE)
+                        else {}
+                    )
+                    for global_prop, global_value in global_ya_ide_gradle.items():
+                        global_params[self._prop2param(global_prop)] = global_value
+                setattr(
+                    self.params,
+                    param,
+                    self._value2list(value)
+                    + getattr(self.params, param)
+                    + self._value2list(global_params[param] if param in global_params else ''),
+                )
                 if param == 'yexport_toml':
                     self._check_yexport_toml()
             else:
@@ -290,7 +315,7 @@ class _JavaSemConfig(SemConfig):
                 ):  # already overwrote by command line opts
                     continue  # skip config value
                 if isinstance(getattr(self.params, param), list):  # this param must be list
-                    value = re.split(r'[\s\t\n,]+', value)
+                    value = self._value2list(value)
                 elif value is None:  # prop without value, some flag, for example, disable-lombok-plugin
                     value = default_value
                 setattr(self.params, param, value)
@@ -315,13 +340,16 @@ class _JavaSemConfig(SemConfig):
     def _load_ya_gradle_config(self) -> None:
         if self.ya_gradle_config is not None:
             return
-        self.ya_gradle_config = ConfigParser(allow_no_value=True)
-        ya_gradle_config_files = [
+        self.global_ya_gradle_config = ConfigParser(allow_no_value=True)
+        global_ya_gradle_config_files = [
             str(self.get_configs_dir() / self._YA_GRADLE_CONFIG),
-            str(self.settings_root / self._YA_GRADLE_CONFIG),
         ]
+        self.ya_gradle_config = ConfigParser(allow_no_value=True)
+        ya_gradle_config_files = global_ya_gradle_config_files + [str(self.settings_root / self._YA_GRADLE_CONFIG)]
         try:
+            self.global_ya_gradle_config.read(global_ya_gradle_config_files, 'UTF-8')
             self.ya_gradle_config_files = self.ya_gradle_config.read(ya_gradle_config_files, 'UTF-8')
+            self.ya_gradle_config_files.reverse()
         except Exception as e:
             raise YaIdeGradleException(f"Can't read config files {ya_gradle_config_files}: {e}") from e
 
