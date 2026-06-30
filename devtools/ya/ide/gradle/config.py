@@ -171,7 +171,7 @@ class _JavaSemConfig(SemConfig):
                 )
             k, v = kv.split('=', 2)
             norm_yexport_toml[k.strip()] = v.strip()
-        self.params.yexport_toml = [k + " = " + v for k, v in norm_yexport_toml.items()]
+        self.params.yexport_toml = [k + " = " + norm_yexport_toml[k] for k in sorted(norm_yexport_toml.keys())]
         self.yexport_toml_checked = True
 
     def is_exclude_target(self, rel_target: Path | str) -> bool:
