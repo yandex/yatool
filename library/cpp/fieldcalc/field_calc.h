@@ -2,7 +2,6 @@
 
 #include <cstdio>
 
-#include <library/cpp/deprecated/autoarray/autoarray.h>
 #include <util/generic/map.h>
 #include <util/generic/vector.h>
 #include <util/memory/segmented_string_pool.h>
@@ -23,7 +22,7 @@ private:
     void MarkLocalVarsAsUncalculated();
 
 protected:
-    autoarray<dump_item> printouts, conditions;
+    TVector<dump_item> printouts, conditions;
     int out_el, out_cond;
     TVector<calc_op> calc_ops; // operands for calculator, indexed by arr_ind for DIT_math_result
 

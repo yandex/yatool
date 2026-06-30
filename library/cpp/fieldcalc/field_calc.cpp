@@ -907,8 +907,8 @@ Operators get_oper(char*& c, bool unary_op_near) {
 
 void TFieldCalculatorBase::Compile(char** field_names, int field_count) {
     out_el = 0, out_cond = 0;
-    autoarray<dump_item>(field_count).swap(printouts);
-    autoarray<dump_item>(field_count).swap(conditions);
+    TVector<dump_item>(field_count).swap(printouts);
+    TVector<dump_item>(field_count).swap(conditions);
     local_vars.clear();
 
     // parse arguments into calculator's "pseudo-code"
