@@ -65,13 +65,11 @@ PEERDIR(
 IF (NOT YA_OPENSOURCE)
     PY_SRCS(
         NAMESPACE package
-        sandbox_fetcher.py
         sandbox_source.py
         sandbox_postprocessor.py
     )
     PEERDIR(
         devtools/ya/yalibrary/checkout
-        devtools/ya/yalibrary/fetcher
         devtools/ya/yalibrary/upload
         devtools/ya/yalibrary/yandex/sandbox
     )
