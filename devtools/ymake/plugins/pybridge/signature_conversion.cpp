@@ -55,14 +55,13 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
         return std::unexpected(ESignatureDeductionError::IndistinguishableKwArg);
     auto kwargs = PyFunction_GetKwDefaults(&func);
 
-    const auto& codeObj = *reinterpret_cast<PyCodeObject*>(PyFunction_GetCode(&func));
-    const auto kwOnlyArgsNum = codeObj.co_kwonlyargcount;
+    const auto kwOnlyArgsNum = reinterpret_cast<PyCodeObject*>(PyFunction_GetCode(&func))->co_kwonlyargcount;
     const auto kwOnlyWithDefaultsNum = kwargs ? PyDict_GET_SIZE(kwargs) : 0;
     if (kwOnlyWithDefaultsNum != kwOnlyArgsNum) {
         return std::unexpected(ESignatureDeductionError::KwArgWithoutDefaults);
     }
 
-    const bool hasVararg = (codeObj.co_flags & CO_VARARGS);
+    bool varargFound = false;
     TVector<TString> positionals;
     TSignature::TKeywords keywords;
     while (PyDict_Next(signature, &pos, &key, &val)) {
@@ -84,16 +83,13 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
             continue;
         }
 
-        const bool isVararg = hasVararg && pos == codeObj.co_argcount + 1;
         if (IsScalarArgTypeAnnotation(*val)) {
-            if (isVararg) {
-                positionals.push_back(TString{StrContent(*key)} + NStaticConf::ARRAY_SUFFIX);
-            } else {
-                positionals.push_back(TString{StrContent(*key)});
-            }
-        } else if (IsArrayArgTypeAnnotation(*val) && isVararg) {
-            // TODO(YMAKE-2151): remove support of `tuple[str, ...]` on `*args`
+            if (varargFound)
+                return std::unexpected(ESignatureDeductionError::PositionalAfterVararg);
+            positionals.push_back(TString{StrContent(*key)});
+        } else if (IsArrayArgTypeAnnotation(*val)) {
             positionals.push_back(TString{StrContent(*key)} + NStaticConf::ARRAY_SUFFIX);
+            varargFound = true;
         } else
             return std::unexpected(ESignatureDeductionError::WrongArgType);
     }
