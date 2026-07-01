@@ -1070,6 +1070,7 @@ def create_package(package_context, output_root, builds):
                     params.docker_use_buildx,
                     params.docker_pull,
                     params.docker_labels,
+                    params.docker_ssh,
                 )
                 package_context.set_context("docker_image", info.image_tag)
                 if info.digest:

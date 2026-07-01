@@ -42,6 +42,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.docker_dest_remote_image_version = None
         self.docker_export_cache_to_registry = False
         self.docker_use_buildx = False
+        self.docker_ssh = None
         self.dump_build_targets = None
         self.dump_inputs = None
         self.ignore_fail_tests = False
@@ -319,6 +320,13 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                 subgroup=DOCKER_SUBGROUP,
             ),
             devtools.ya.core.yarg.ConfigConsumer("docker_use_buildx"),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-ssh'],
+                help='SSH agent socket or keys to expose to the build (format: default|<id>[=<socket>|<key>[,<key>]])',
+                hook=devtools.ya.core.yarg.SetValueHook('docker_ssh'),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
+            ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--nanny-release'],
                 help='Notify nanny about new release',

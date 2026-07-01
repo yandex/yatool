@@ -73,6 +73,7 @@ def create_package(
     docker_use_buildx,
     docker_pull,
     labels,
+    docker_ssh,
 ):
     package_name = package_context.package_name
     package_version = package_context.version
@@ -137,6 +138,9 @@ def create_package(
         if push_use_buildx:
             build_command += ["--push"]
         build_command = ["buildx"] + build_command
+
+    if docker_ssh:
+        build_command += ["--ssh", docker_ssh]
 
     build_out, _ = package.process.run_process(
         get_docker_binary(),
