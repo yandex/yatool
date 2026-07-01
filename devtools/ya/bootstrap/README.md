@@ -41,7 +41,7 @@ It has several flags, as follows:
 
 ### How does it work?
 
-Before running the script checkout to the commit when the graph was last updated. Blame a line with `URL` variable in `run_bootstrap.py` to find out.
+Before running the script checkout to the commit when the graph was last updated: `git rev-list -1 HEAD -- devtools/ya/bootstrap/graph.json`
 
 Bootstrap can be described in two stages
 
