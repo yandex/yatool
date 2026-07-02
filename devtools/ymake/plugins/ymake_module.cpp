@@ -480,6 +480,9 @@ namespace {
                     case WrongArgType:
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only bool, str or tuple[str, ...] types are allowed for macro arguments.");
                         break;
+                    case WrongReturnType:
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only None is allowed for macro retrun type.");
+                        break;
                     case WrongFlagDefault:
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only False is allowed as default value of a flag (bool) KW argument.");
                         break;

@@ -69,6 +69,13 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
         if (PyErr_Occurred())
             return std::unexpected(ESignatureDeductionError::PyException);
 
+        if (StrContent(*key) == "return") {
+            if (val == Py_None) {
+                continue;
+            }
+            return std::unexpected(ESignatureDeductionError::WrongReturnType);
+        }
+
         if (defaultVal) {
             if (IsFlagArgTypeAnnotation(*val)) {
                 if (Py_IsTrue(defaultVal))

@@ -13,6 +13,7 @@ enum class ESignatureDeductionError {
     MissingTypeHints,
     MissingUnitArg,
     WrongArgType,
+    WrongReturnType,
     WrongFlagDefault,
     PositionalAfterVararg,
     KwArgWithoutDefaults,
