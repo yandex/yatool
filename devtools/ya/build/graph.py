@@ -1444,7 +1444,7 @@ class _GraphMaker:
         self._allow_changelist = True
         self._cl_generator = cl_generator
         self.ymakes_scheduled = 0
-        self.has_cmdline_generation_error = False
+        self.cmdline_generation_error = None
 
     def disable_changelist(self):
         self._allow_changelist = False
@@ -1562,9 +1562,9 @@ class _GraphMaker:
                         pic_queue_putter=no_pic_queue_putter,
                         ymake_opts=ymake_opts_nopic,
                     )
-                except Exception:
+                except Exception as e:
                     # this is merely a workaround to stop multiconfig if there is an error in ymake command generation
-                    self.has_cmdline_generation_error = True
+                    self.cmdline_generation_error = str(e)
                     raise
 
             no_pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_no_pic).result))
@@ -1633,9 +1633,9 @@ class _GraphMaker:
                         ymake_opts=ymake_opts_pic,
                         pic_only=pic_only,
                     )
-                except Exception:
+                except Exception as e:
                     # this is merely a workaround to stop multiconfig if there is an error in ymake command generation
-                    self.has_cmdline_generation_error = True
+                    self.cmdline_generation_error = str(e)
                     raise
 
             pic = self._exit_stack.enter_context(_AsyncContext(self._platform_threadpool.submit(gen_pic).result))
@@ -2307,10 +2307,10 @@ def _build_graph_and_tests(
     tool_targets_queue = create_tool_event_queue(opts)
     enabled_events = EVENTS_WITH_PROGRESS + YmakeEvents.PREFETCH.value if opts.prefetch else EVENTS_WITH_PROGRESS
 
-    def has_cmdline_generation_error_fn():
-        return graph_maker.has_cmdline_generation_error
+    def cmdline_generation_error_fn():
+        return graph_maker.cmdline_generation_error
 
-    ymake_opts = {'multiconfig': opts.ymake_multiconfig, 'check_error_fn': has_cmdline_generation_error_fn}
+    ymake_opts = {'multiconfig': opts.ymake_multiconfig, 'check_error_fn': cmdline_generation_error_fn}
     for i, tc in enumerate(target_tcs, start=1):
         targets = []
         for target in tc.get('targets', []):
@@ -3066,7 +3066,7 @@ def _get_tools(tool_targets_queue, graph_maker: _GraphMaker, arc_root, host_tc, 
         )
         if opts.ymake_multiconfig:
             ymake2.run_ymake_scheduled(
-                graph_maker.ymakes_scheduled, opts.ya_threads, lambda: graph_maker.has_cmdline_generation_error
+                graph_maker.ymakes_scheduled, opts.ya_threads, lambda: graph_maker.cmdline_generation_error
             )
         graph_tools = tg.pic().graph
 

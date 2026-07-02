@@ -94,8 +94,9 @@ def run(binary, args, env, stderr_line_reader, raw_cpp_stdout=False, stdin_line_
         # So we making waiting threads to wakeup sometimes and check for external errors. Note that we cannot just check
         # for error one time before waiting since it will be the race between different calls of checking function.
         while not result_ready_event.wait(timeout=0.1):
-            if check_error_fn():
-                raise RuntimeError('some of ymakes cannot start')
+            error = check_error_fn() if check_error_fn else None
+            if error:
+                raise RuntimeError(f'some of ymakes cannot start ({error})')
         if exception:
             raise exception['e']
         res = results[order]
@@ -126,8 +127,9 @@ def run_scheduled(count, threads, check_error_fn):
 
     try:
         while len(arg_collection) < count:
-            if check_error_fn():
-                raise RuntimeError('some of ymakes cannot start')
+            error = check_error_fn() if check_error_fn else None
+            if error:
+                raise RuntimeError(f'some of ymakes cannot start ({error})')
             time.sleep(0.005)
         for _, v in sorted(arg_collection.items()):
             param.Binary = six.ensure_binary(v['binary'])
