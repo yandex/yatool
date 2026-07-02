@@ -1045,7 +1045,7 @@ def _configure_recipe_manager_client(ctx):
     """
     import devtools.ya.core.gsid as gsid
     import devtools.ya.core.config as core_config
-    from devtools.recipe_manager.client.client import RecipeManagerClient, get_shallow_root_path
+    from devtools.recipe_manager.client import client as rm_client
 
     arc_root = getattr(ctx.params, 'arc_root', None)
     if not arc_root:
@@ -1057,18 +1057,18 @@ def _configure_recipe_manager_client(ctx):
         # See devtools/ya/app/modules/params/__init__.py::resolve_and_respawn.
         raise RuntimeError("Cannot start recipe manager: arc_root unknown")
 
-    shallow_root = get_shallow_root_path(core_config.build_root(), arc_root)
-
-    rm_client = RecipeManagerClient(shallow_root=shallow_root)
+    recipes_shallow_root = rm_client.get_recipes_shallow_root_path(core_config.shallow_root(), arc_root)
+    rm_client = rm_client.RecipeManagerClient(recipes_shallow_root)
     # start_manager raises on failure — that's intentional (fail fast)
     rm_client.start_manager(
         invocation_id=gsid.uid(),
         logs_root=core_config.logs_root(),
         timeout=10,
         force_restart=getattr(ctx.params, 'force_restart_recipe_manager', False),
+        source_root=arc_root,
     )
     ctx.display.emit_message(
-        "[[good]]Persistent recipes enabled[[rst]] (Recipe Manager at [[path]]{}[[rst]])\n".format(shallow_root)
+        "[[good]]Persistent recipes enabled[[rst]] (Recipe Manager at [[path]]{}[[rst]])\n".format(recipes_shallow_root)
     )
 
     try:

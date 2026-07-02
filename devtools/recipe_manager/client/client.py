@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass, field
 
 from library.python.filelock import FileLock
+from library.python import fs
 from devtools.recipe_manager.proto import manager_pb2, manager_pb2_grpc
 from yalibrary.loggers import file_log
 
@@ -20,7 +21,7 @@ __all__ = [
     "RecipeInfo",
     "UserRef",
     "get_socket_path",
-    "get_shallow_root_path",
+    "get_recipes_shallow_root_path",
     "get_shallow_root_meta_path",
     "get_shallow_root_data_path",
 ]
@@ -97,6 +98,8 @@ class RecipeManagerClient:
         log_file: str | None = None,
         timeout: float = 5,
         force_restart: bool = False,
+        # TODO: Delete after August 31st
+        source_root: str = '',
     ) -> None:
         assert bool(logs_root) ^ bool(log_file), "One of 'logs_root' or 'log_file' should be specified"
         self._log_file = log_file or self._get_log_file_path(logs_root)
@@ -105,11 +108,15 @@ class RecipeManagerClient:
         os.makedirs(get_shallow_root_data_path(self._shallow_root), exist_ok=True)
         lock_path = os.path.join(get_shallow_root_meta_path(self._shallow_root), _VERSION_LOCK)
         with FileLock(lock_path):
-            self._start_manager_locked(invocation_id, timeout, force_restart)
+            self._start_manager_locked(invocation_id, timeout, force_restart, source_root)
         # Heartbeat runs outside the lock — it's a long-lived thread
         self._start_heartbeat(invocation_id)
 
-    def _start_manager_locked(self, invocation_id: str, timeout: float, force_restart: bool) -> None:
+    def _start_manager_locked(self, invocation_id: str, timeout: float, force_restart: bool, source_root: str) -> None:
+        # FIXME: We changed the location of shallow_root, this is temporary code
+        # to shut down the manager that lives in the old location.
+        # TODO: Delete after August 31st
+        self._shutdown_old_manager(source_root)
         current_version = _get_binary_version()
         if self.is_alive():
             saved_version = self._read_version_file()
@@ -147,6 +154,19 @@ class RecipeManagerClient:
         else:
             self._launch_manager(timeout)
         self._write_version_file(current_version)
+
+    def _shutdown_old_manager(self, source_root: str):
+        # If we got to this function then there is a new version of the manager
+        # and the old manager must be shutdown.
+        import hashlib
+
+        # new: ~/.ya/build/shallow_root/recipes/<md5>
+        # old: ~/.ya/build/shallow_root/<sha256>
+        base = os.path.dirname(os.path.dirname(self._shallow_root))
+        digest = hashlib.sha256(source_root.encode()).hexdigest()[:32]
+        shallow_root = os.path.join(base, digest)
+        # Manager is capable of gracefully handling shallow root removal
+        fs.remove_tree_safe(shallow_root)
 
     def _wait_for_manager_lock_release(self, meta_dir: str, timeout: float) -> None:
         """Poll manager.lock until the old RM process releases it.
@@ -388,8 +408,8 @@ def get_socket_path(shallow_root: str) -> str:
     return os.path.join(get_shallow_root_meta_path(shallow_root), "manager.sock")
 
 
-def get_shallow_root_path(build_dir: str, arcadia_path: str) -> str:
-    # Use first 32 hex chars (128 bits) to keep the socket path under the
+def get_recipes_shallow_root_path(shallow_root: str, arcadia_path: str) -> str:
+    # Use first 8 hex chars (32 bits) to keep the socket path under the
     # 103-char UNIX_PATH_MAX limit on macOS / Linux.
-    digest = hashlib.sha256(arcadia_path.encode()).hexdigest()[:32]
-    return os.path.join(build_dir, "shallow_root", digest)
+    digest = hashlib.md5(arcadia_path.encode()).hexdigest()[:8]
+    return os.path.join(shallow_root, "recipes", digest)

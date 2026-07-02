@@ -1266,10 +1266,7 @@ class Context:
 
     @property
     def shallow_dir(self):
-        """Path to shallow root for persistent recipes: <bld_dir>/shallow_root/<sha256(arc_root)>"""
-        from devtools.recipe_manager.client.client import get_shallow_root_path
-
-        return get_shallow_root_path(self.garbage_dir, self.src_dir)
+        return core_config.shallow_root()
 
     @property
     def output_dir(self):

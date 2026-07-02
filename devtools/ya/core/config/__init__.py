@@ -75,6 +75,11 @@ def build_root():
     return os.path.realpath(fs.create_dirs(os.path.join(misc_root(), 'build')))
 
 
+@func.lazy
+def shallow_root():
+    return os.path.realpath(fs.create_dirs(os.path.join(build_root(), 'shallow_root')))
+
+
 def main_file():
     return os.path.abspath(sys.modules['__main__'].__file__)
 
