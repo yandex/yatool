@@ -45,7 +45,7 @@ public:
     }
 
 private:
-    constexpr static TElemId_Underlying NEW_FORMAT_MASK = (1 << 31);
+    constexpr static TElemId::TUnderlying NEW_FORMAT_MASK = (1 << 31);
     TCmdElemId ElemId_;
 };
 
@@ -62,7 +62,7 @@ public:
         : Table(table), Id(elemId)
     {}
 
-    TCmdView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
+    TCmdView(const TNameStore* table, TElemId::TUnderlying elemId) // TODO make this unnecessary
         : Table(table), Id(TCmdElemId(elemId))
     {}
 

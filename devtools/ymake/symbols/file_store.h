@@ -258,7 +258,7 @@ public:
         , Table(table)
     {}
 
-    TFileView(const TNameStore* table, TElemId_Underlying elemId) // TODO make this unnecessary
+    TFileView(const TNameStore* table, TElemId::TUnderlying elemId) // TODO make this unnecessary
         : TFileId(TFileElemId(elemId))
         , Table(table)
     {}
