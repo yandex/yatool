@@ -16,7 +16,7 @@ PEERDIR(
     devtools/ymake/options
     devtools/ymake/diag
     devtools/ymake/libs/name_store
-    library/cpp/containers/absl_flat_hash
+    library/cpp/containers/absl
     library/cpp/on_disk/multi_blob
     library/cpp/on_disk/st_hash
     library/cpp/digest/crc32c

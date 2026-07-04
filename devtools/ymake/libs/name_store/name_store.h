@@ -8,7 +8,7 @@
 #include <util/generic/strbuf.h>
 #include <util/generic/utility.h>
 
-#include <library/cpp/containers/absl_flat_hash/flat_hash_map.h>
+#include <library/cpp/containers/absl/flat_hash_map.h>
 
 class MD5;
 class IOutputStream;

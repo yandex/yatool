@@ -7,7 +7,7 @@ SRCS(
 
 PEERDIR(
     devtools/ymake/common
-    library/cpp/containers/absl_flat_hash
+    library/cpp/containers/absl
     library/cpp/on_disk/multi_blob
 )
 

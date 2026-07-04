@@ -6,7 +6,7 @@
 #include <devtools/ymake/polexpr/ids.h>
 
 #include <library/cpp/on_disk/multi_blob/multiblob_builder.h>
-#include <library/cpp/containers/absl_flat_hash/flat_hash_map.h>
+#include <library/cpp/containers/absl/flat_hash_map.h>
 
 class IOutputStream;
 

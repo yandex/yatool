@@ -5,7 +5,7 @@ PEERDIR(
     library/cpp/json
     library/cpp/on_disk/multi_blob
     library/cpp/protobuf/json
-    library/cpp/containers/absl_flat_hash
+    library/cpp/containers/absl
     devtools/ymake/diag/common_msg
 )
 

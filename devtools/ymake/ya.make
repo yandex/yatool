@@ -29,7 +29,7 @@ PEERDIR(
     devtools/ymake/symbols
     devtools/ymake/yndex
     library/cpp/blockcodecs
-    library/cpp/containers/absl_flat_hash
+    library/cpp/containers/absl
     library/cpp/containers/comptrie
     library/cpp/containers/top_keeper
     library/cpp/string_utils/levenshtein_diff
