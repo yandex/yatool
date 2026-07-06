@@ -80,6 +80,8 @@ private:
     TVector<std::pair<TFileElemId, TMd5Sig>> Inputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> NodesInputs;
     THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> LoopsInputs;
+    THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> NodesIncludedInputs;
+    THashMap<TNodeId, TSimpleSharedPtr<TUniqVector<TNodeId>>> LoopsIncludedInputs;
     TVector<TString> HostResources;
     THashMap<TString, TString> Resources;
     THashMap<TNodeId, TNodeId> Node2Module;
@@ -111,6 +113,8 @@ public:
     // Results.
     THashMap<TString, TMd5Sig> GetInputs(const TDepGraph& graph) const;
     TSimpleSharedPtr<TUniqVector<TNodeId>>& GetNodeInputs(TNodeId node);
+    TSimpleSharedPtr<TUniqVector<TNodeId>>& GetNodeIncludedInputs(TNodeId node);
+
     const TVector<TString>& GetHostResources() const;
     const THashMap<TString, TString>& GetResources() const;
     TNodeId GetModuleByNode(TNodeId nodeId);
