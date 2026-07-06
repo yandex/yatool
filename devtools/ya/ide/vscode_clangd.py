@@ -411,7 +411,7 @@ def gen_vscode_workspace(params):
     if not params.allow_project_inside_arc and (
         project_root == params.arc_root or project_root.startswith(params.arc_root + os.path.sep)
     ):
-        raise vscode.YaIDEError(
+        raise vscode.errors.YaIDEError(
             'You should not create VS Code project inside Arc repository. '
             'Use "-P=PROJECT_OUTPUT, --project-output=PROJECT_OUTPUT" to set the project directory outside of Arc root (%s)'
             % params.arc_root

@@ -21,6 +21,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.debug_enabled = True
         self.tests_enabled = True
         self.skip_modules = []
+        self.helpers_enabled = False
         self.black_formatter_enabled = True
         self.ruff_formatter_enabled = False
         self.write_pyright_config = True
@@ -294,6 +295,20 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 help="Generate workspace for Cursor IDE",
                 hook=devtools.ya.core.yarg.SetConstValueHook("ide_name", IDEName.CURSOR),
                 group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--ide-helpers"],
+                help="Enable support for helper scripts",
+                hook=devtools.ya.core.yarg.SetConstValueHook("helpers_enabled", True),
+                group=cls.GROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.INTERNAL,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--no-ide-helpers"],
+                help="Disable support for helper scripts",
+                hook=devtools.ya.core.yarg.SetConstValueHook("helpers_enabled", False),
+                group=cls.GROUP,
+                visible=devtools.ya.core.yarg.HelpLevel.INTERNAL,
             ),
         ]
 

@@ -41,8 +41,10 @@ PY_SRCS(
     vscode/configurations.py
     vscode/consts.py
     vscode/dump.py
+    vscode/errors.py
     vscode/excludes.py
     vscode/graph.py
+    vscode/helpers.py
     vscode/opts.py
     vscode/tasks.py
     vscode/workspace.py

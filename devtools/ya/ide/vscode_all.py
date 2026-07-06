@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import re
+
 from collections import OrderedDict
 
 import devtools.ya.app
@@ -20,6 +21,7 @@ import yalibrary.tools
 from yalibrary.toolscache import lock_resource, toolscache_version
 
 from devtools.ya.ide import ide_common, venv, vscode
+from devtools.ya.ide.vscode.helpers import fetch_ide_helpers, IDEHelperPrerunArgs, IDEHelperPostrunArgs
 from devtools.ya.ide.vscode.opts import IDEName
 
 
@@ -49,7 +51,7 @@ class VSCodeProject:
         if not params.allow_project_inside_arc and (
             self.project_root == params.arc_root or self.project_root.startswith(params.arc_root + os.path.sep)
         ):
-            raise vscode.YaIDEError(
+            raise vscode.errors.YaIDEError(
                 "You should not create VS Code project inside Arc repository. "
                 "Use \"-P=PROJECT_OUTPUT, --project-output=PROJECT_OUTPUT\" to set the project directory outside of Arc root (%s)"
                 % params.arc_root
@@ -575,15 +577,29 @@ class VSCodeProject:
                 f"[[good]]{self.params.ide_name.value}://vscode-remote/ssh-remote+{platform.node()}{workspace_path}?windowId=_blank[[rst]]"
             )
 
+        return workspace_path
+
 
 def gen_vscode_workspace(params):
     # noinspection PyUnresolvedReferences
     import app_ctx  # pyright: ignore[reportMissingImports]
 
     if '.' in params.rel_targets and 'WHOLE_ARCADIA_BUILD' not in params.flags:
-        raise vscode.YaIDEError(
+        raise vscode.errors.YaIDEError(
             "You have attempted to generate workspace for whole arcadia. Use -DWHOLE_ARCADIA_BUILD if this is your desire."
         )
 
+    helpers = None
+    if params.helpers_enabled:
+        helpers = fetch_ide_helpers(params)
+
+        if helpers.pre_run:
+            pre_run_result = helpers.pre_run(IDEHelperPrerunArgs(params))
+            if pre_run_result:
+                params = pre_run_result
+
     project = VSCodeProject(app_ctx, params)
-    project.gen_workspace()
+    workspace_path = project.gen_workspace()
+
+    if helpers and helpers.post_run:
+        helpers.post_run(IDEHelperPostrunArgs(workspace_path, params))
