@@ -23,6 +23,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.use_clang_format_18_vanilla = False
         self.internal_enable_implicit_taxi_formatters = False
         self.internal_paths_with_integrations: list[str] = []
+        self.internal_ruff_auto_discovery = False
         self.smart = False
         self.smart_staged = False
 
@@ -112,6 +113,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ConfigConsumer('internal_enable_implicit_taxi_formatters'),
             devtools.ya.core.yarg.ConfigConsumer('internal_paths_with_integrations'),
+            devtools.ya.core.yarg.ConfigConsumer('internal_ruff_auto_discovery'),
         ]
 
 

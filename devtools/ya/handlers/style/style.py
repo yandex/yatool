@@ -164,7 +164,7 @@ def run_style(args) -> int:
         check=args.check,
         full_output=args.full_output,
     )
-    styler_opts = stlr.StylerOptions(py2=args.py2)
+    styler_opts = stlr.StylerOptions(py2=args.py2, ruff_auto_discovery=args.internal_ruff_auto_discovery)
 
     rc = 0
     disamb_errors: list[str] = []

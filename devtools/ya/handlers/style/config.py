@@ -22,6 +22,7 @@ type MaybeConfig = Config | None
 class Config(tp.NamedTuple):
     path: ConfigPath
     pretty: str
+    kind: type[DefaultConfig | AutoincludeConfig] | None = None
 
 
 @functools.cache
@@ -57,9 +58,9 @@ class DefaultConfig:
         assert defaults_file or resource_name, "At least one of 'defaults_file' or 'resource_name' must be provided"
 
         if config := self._from_file(linter_name, defaults_file):
-            self._default_config = Config(config, str(config.relative_to(find_root())))
+            self._default_config = Config(config, str(config.relative_to(find_root())), kind=type(self))
         elif config := self._from_resource(resource_name):
-            self._default_config = Config(config, f'{resource_name} (from resource)')
+            self._default_config = Config(config, f'{resource_name} (from resource)', kind=type(self))
         else:
             self._default_config = None
 
@@ -137,7 +138,7 @@ class AutoincludeConfig:
                 config: Path = Path(path) / config_tuple[0]
 
                 if config.exists():
-                    map_[path] = Config(config, str(config.relative_to(self._root)))
+                    map_[path] = Config(config, str(config.relative_to(self._root)), kind=type(self))
         return map_
 
     def lookup(self, path: PurePath) -> MaybeConfig:
