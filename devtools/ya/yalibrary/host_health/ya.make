@@ -2,6 +2,7 @@ PY3_LIBRARY()
 
 PEERDIR(
     contrib/python/psutil
+    contrib/python/humanize
     devtools/ya/core
 )
 
