@@ -122,13 +122,27 @@ namespace NYa::NGraph {
                 char esc = 0;
                 bool needsUEscape = false;
                 switch (c) {
-                    case '"':  esc = '"';  break;
-                    case '\\': esc = '\\'; break;
-                    case '\n': esc = 'n';  break;
-                    case '\r': esc = 'r';  break;
-                    case '\t': esc = 't';  break;
-                    case '\b': esc = 'b';  break;
-                    case '\f': esc = 'f';  break;
+                    case '"':
+                        esc = '"';
+                        break;
+                    case '\\':
+                        esc = '\\';
+                        break;
+                    case '\n':
+                        esc = 'n';
+                        break;
+                    case '\r':
+                        esc = 'r';
+                        break;
+                    case '\t':
+                        esc = 't';
+                        break;
+                    case '\b':
+                        esc = 'b';
+                        break;
+                    case '\f':
+                        esc = 'f';
+                        break;
                     default:
                         if (c < 0x20) {
                             needsUEscape = true;
@@ -163,14 +177,16 @@ namespace NYa::NGraph {
 
         TString QuoteSingleArg(TStringBuf arg) {
             const bool needQuote = arg.empty() ||
-                                   arg.find(' ')  != TStringBuf::npos ||
+                                   arg.find(' ') != TStringBuf::npos ||
                                    arg.find('\t') != TStringBuf::npos;
 
             TString result;
             result.reserve(arg.size() + 4);
 
             auto appendBackslashes = [&](size_t n) {
-                for (size_t i = 0; i < n; ++i) { result += '\\'; }
+                for (size_t i = 0; i < n; ++i) {
+                    result += '\\';
+                }
             };
 
             if (!needQuote) {
@@ -218,7 +234,13 @@ namespace NYa::NGraph {
         // ---------------------------------------------------------------------------
 
         constexpr TStringBuf SOURCE_EXTS[] = {
-            ".cpp", ".c", ".cc", ".cxx", ".cu", ".m", ".mm",
+            ".cpp",
+            ".c",
+            ".cc",
+            ".cxx",
+            ".cu",
+            ".m",
+            ".mm",
         };
 
         bool IsSourceFile(TStringBuf path) {
@@ -230,12 +252,19 @@ namespace NYa::NGraph {
             return false;
         }
 
-        bool HasPrefix(const TString& path, const TVector<TString>& prefixes) {
+        bool HasPrefix(
+            const TString& path,
+            const TVector<TString>& prefixes,
+            const TString& sourceRoot)
+        {
             if (prefixes.empty()) {
                 return true;
             }
             for (const auto& prefix : prefixes) {
-                if (path.StartsWith(prefix)) {
+                const TString absPrefix = prefix.StartsWith('/')
+                                              ? prefix
+                                              : sourceRoot + "/" + prefix;
+                if (path.StartsWith(absPrefix)) {
                     return true;
                 }
             }
@@ -248,7 +277,7 @@ namespace NYa::NGraph {
             out.Write(lit, N - 1);
         }
 
-    }  // namespace
+    } // namespace
 
     // ---------------------------------------------------------------------------
     // BuildPatterns
@@ -263,8 +292,8 @@ namespace NYa::NGraph {
     {
         TPatternMap patterns;
         patterns["SOURCE_ROOT"] = sourceRoot;
-        patterns["BUILD_ROOT"]  = buildRoot.empty() ? sourceRoot : buildRoot;
-        patterns["TOOL_ROOT"]   = toolRoot;
+        patterns["BUILD_ROOT"] = buildRoot.empty() ? sourceRoot : buildRoot;
+        patterns["TOOL_ROOT"] = toolRoot;
 
         for (const auto& res : graph.Conf.Resources) {
             TString uri;
@@ -316,7 +345,7 @@ namespace NYa::NGraph {
             }
             TArgEntry entry;
             entry.Resolved = Resolve(raw, patterns);
-            entry.Quoted   = QuoteSingleArg(entry.Resolved);
+            entry.Quoted = QuoteSingleArg(entry.Resolved);
             return resolveCache.emplace(raw, std::move(entry)).first->second;
         };
 
@@ -418,7 +447,7 @@ namespace NYa::NGraph {
             }
 
             // --files-in: prefix filter after resolution.
-            if (!HasPrefix(resolvedFile, opts.FilePrefixes)) {
+            if (!HasPrefix(resolvedFile, opts.FilePrefixes, directory)) {
                 continue;
             }
 
@@ -431,8 +460,8 @@ namespace NYa::NGraph {
                     const TStringBuf resolved = e.Resolved;
                     const auto slashPos = resolved.rfind('/');
                     const TStringBuf basename = (slashPos != TStringBuf::npos)
-                        ? resolved.SubStr(slashPos + 1)
-                        : resolved;
+                                                    ? resolved.SubStr(slashPos + 1)
+                                                    : resolved;
                     compilerQuoted = QuoteSingleArg(basename);
                     totalLen += compilerQuoted.size();
                 } else {
@@ -458,9 +487,9 @@ namespace NYa::NGraph {
             }
 
             TCompileCommand cmd;
-            cmd.Command   = std::move(command);
+            cmd.Command = std::move(command);
             cmd.Directory = directory;
-            cmd.File      = resolvedFile;
+            cmd.File = resolvedFile;
             result.push_back(std::move(cmd));
         }
 
@@ -528,12 +557,12 @@ namespace NYa::NGraph {
                         continue;
                     }
                     if (newFiles.contains(file)) {
-                        continue;  // superseded by new result
+                        continue; // superseded by new result
                     }
                     TCompileCommand cmd;
-                    cmd.File      = file;
+                    cmd.File = file;
                     cmd.Directory = entry["directory"].GetStringSafe(TString{});
-                    cmd.Command   = entry["command"].GetStringSafe(TString{});
+                    cmd.Command = entry["command"].GetStringSafe(TString{});
                     merged.push_back(std::move(cmd));
                 }
             }
@@ -547,4 +576,4 @@ namespace NYa::NGraph {
         WriteCompileCommands(out, merged);
     }
 
-}  // namespace NYa::NGraph
+} // namespace NYa::NGraph
