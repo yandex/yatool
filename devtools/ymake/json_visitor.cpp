@@ -92,6 +92,14 @@ namespace {
             YDebug() << "No incorrect loops found" << Endl;
         }
     }
+
+    inline bool NeedToPassInputs(const TConstDepRef& dep) {
+        if (dep.To()->NodeType == EMNT_Program || dep.To()->NodeType == EMNT_Library) {
+            return false;
+        }
+
+        return true;
+    }
 }
 
 TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget> startDirs)
@@ -458,10 +466,11 @@ bool TJSONVisitor::Enter(TState& state) {
         if (IsModule(*CurrState)) {
             CurrData->IsGlobalVarsCollectorStarted = GlobalVarsCollector.Start(*CurrState);
         }
+    }
 
-        if (RestoreContext.Conf.DumpInputsInJSON && CurrType == EMNT_File) {
-            AddTo(CurrNode.Id(), GetNodeIncludedInputs(CurrNode.Id()));
-        }
+    // TODO: Этот код выполняется при каждом Enter, а возможно нужно только при первом.
+    if (RestoreContext.Conf.DumpInputsInJSON && CurrType == EMNT_File) {
+        AddTo(CurrNode.Id(), GetNodeInputs(CurrNode.Id()));
     }
 
     CurrData->WasFresh = fresh;
@@ -567,14 +576,6 @@ TSimpleSharedPtr<TUniqVector<TNodeId>>& TJSONVisitor::GetNodeInputs(TNodeId node
         return LoopsInputs[*loop];
     } else {
         return NodesInputs[node];
-    }
-}
-
-TSimpleSharedPtr<TUniqVector<TNodeId>>& TJSONVisitor::GetNodeIncludedInputs(TNodeId node) {
-    if (const auto* loop = Loops.FindLoopForNode(node)) {
-        return LoopsIncludedInputs[*loop];
-    } else {
-        return NodesIncludedInputs[node];
     }
 }
 
@@ -784,13 +785,8 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
         }
 
-
-        if (tool == TNodeId::Invalid && RestoreContext.Conf.DumpInputsInJSON) {
-            if (IsIncludeFileDep(incDep)) {
-                AddTo(GetNodeIncludedInputs(CurrNode.Id()), GetNodeIncludedInputs(prntNode.Id()));
-            } else if (*incDep == EDT_BuildFrom && IsFileType(CurrNode->NodeType)) {
-                AddTo(GetNodeIncludedInputs(CurrNode.Id()), GetNodeInputs(prntNode.Id()));
-            }
+        if (tool == TNodeId::Invalid && RestoreContext.Conf.DumpInputsInJSON && NeedToPassInputs(incDep)) {
+            AddTo(GetNodeInputs(CurrNode.Id()), GetNodeInputs(prntNode.Id()));
         }
     }
 
@@ -1365,7 +1361,7 @@ void TJSONVisitor::AddGlobalSrcs() {
                 TConstDepNodeRef srcNode = Graph[globalSrcNodeId];
                 Y_ASSERT(srcNode->NodeType == EMNT_File);
                 if (srcNode->NodeType == EMNT_File) {
-                    AddTo(globalSrcNodeId, GetNodeIncludedInputs(CurrNode.Id()));
+                    AddTo(globalSrcNodeId, GetNodeInputs(CurrNode.Id()));
                 }
             }
         }
