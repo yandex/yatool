@@ -702,6 +702,9 @@ class RunNodeTask(object):
 
     def res(self):
         p = self._node.kv.get('p')
+        if p == 'CU' and self._node.kv.get('local_ram_limiter', False):
+            ram = self._node.requirements.get('ram', 1)  # 1 Gb
+            return worker_threads.ResInfo(cpu=1, ram=ram)
         if p in (
             'AR',
             'LD',

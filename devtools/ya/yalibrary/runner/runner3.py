@@ -560,6 +560,8 @@ class TaskContext(object):
         net_threads = self.opts.yt_store_threads + self.opts.dist_store_threads
         io_limit = min(self.opts.link_threads, self._threads)
 
+        from psutil import virtual_memory
+
         max_cap = worker_threads.ResInfo(
             io=io_limit,
             cpu=self._threads,
@@ -567,6 +569,7 @@ class TaskContext(object):
             download=self._threads + net_threads,
             upload=net_threads,
             mem=self._threads,
+            ram=(virtual_memory().total >> 30),  # Gigabytes
         )
         worker_pools = {WorkerPoolType.BASE: self._threads + 1, WorkerPoolType.SERVICE: net_threads}
         strategy = schedule_strategy.Strategies.pick(self.opts.schedule_strategy, build_time_cache_availability)
