@@ -60,7 +60,6 @@ class StylerKind(StrEnum):
 class StylerOptions(tp.NamedTuple):
     py2: bool = False
     config_loaders: tuple[cfg.ConfigLoader, ...] | None = None
-    ruff_auto_discovery: bool = False
 
 
 class StylerOutput(tp.NamedTuple):
@@ -301,7 +300,6 @@ class Ruff:
 
     def __init__(self, styler_opts: StylerOptions) -> None:
         self._tool: str = yalibrary.tools.tool("ruff")  # type: ignore
-        self._auto_discovery: bool = styler_opts.ruff_auto_discovery
         self.config_finder = cfg.ConfigFinder(
             styler_opts.config_loaders
             if styler_opts.config_loaders
@@ -315,13 +313,8 @@ class Ruff:
             )
         )
 
-    def _run_ruff(self, content: str, path: PurePath, config: cfg.Config, cmd_args: list[str]) -> str:
-        # TODO: This temporary code for migration. Delete _auto_discovery flag.
-        use_config_flag = not self._auto_discovery or config.kind is not cfg.AutoincludeConfig
-        ruff_args = [self._tool] + cmd_args
-        if use_config_flag:
-            ruff_args += ["--config", config.path]
-        ruff_args.append("-")
+    def _run_ruff(self, content: str, path: PurePath, config_path: cfg.ConfigPath, cmd_args: list[str]) -> str:
+        ruff_args = [self._tool] + cmd_args + ["--config", config_path, "-"]
 
         p = subprocess.Popen(
             ruff_args,
@@ -362,9 +355,9 @@ class Ruff:
         # non-zero exit code and error message which we print and then abort by raising StylingError.
         # If it succeeds, we run `ruff check --fix-only`. It always returns zero code.
         # So we catch and show only critical errors such as SyntaxError but don't notify about any linting errors.
-        out = self._run_ruff(content, path, ruff_config, ["format"] + stdin_filename)
+        out = self._run_ruff(content, path, ruff_config.path, ["format"] + stdin_filename)
         # launch check fix to sort imports
-        out = self._run_ruff(out, path, ruff_config, ["check", "--fix-only"] + stdin_filename)
+        out = self._run_ruff(out, path, ruff_config.path, ["check", "--fix-only"] + stdin_filename)
         return StylerOutput(out, ruff_config)
 
 
