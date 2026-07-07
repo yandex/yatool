@@ -10,7 +10,7 @@ import devtools.ya.core.report
 import exts.archive
 import exts.deepget as deepget
 from library.python import windows
-import exts.http_client
+import yalibrary.user_agent
 import app_config
 
 logger = logging.getLogger(__name__)
@@ -35,13 +35,6 @@ DEFAULT_SKY_PATH = "/skynet/tools/sky"
 
 class UnableToFetchError(Exception):
     mute = True
-
-
-def _get_user_agent() -> str:
-    user_agent = exts.http_client.make_user_agent(prefix="universal_fetcher")
-    if distbuild_task_uid := os.getenv("DISTBUILD_TASK_UID"):
-        user_agent += f" task_uid={distbuild_task_uid}"
-    return user_agent
 
 
 def _get_sandbox_token() -> str:
@@ -122,7 +115,7 @@ def get_ufetcher(
     )
 
     http_params = universal_fetcher.HttpParams(
-        user_agent=_get_user_agent(),
+        user_agent=yalibrary.user_agent.make_user_agent(prefix="universal_fetcher"),
         socket_timeout_ms=30_000,
         connect_timeout_ms=30_000,
     )

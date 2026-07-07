@@ -1034,7 +1034,7 @@ def configure_exit_code_definition():
 
 
 def configure_handler_info():
-    yield {}
+    yield {'handler': {'args': [], 'prefix': []}}
 
 
 def _configure_recipe_manager_client(ctx):

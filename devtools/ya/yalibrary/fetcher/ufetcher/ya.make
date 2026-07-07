@@ -5,6 +5,7 @@ PEERDIR(
     devtools/ya/core/config
     devtools/ya/core/report
     devtools/ya/app_config
+    devtools/ya/yalibrary/user_agent
     devtools/libs/universal_fetcher/py
 )
 
