@@ -259,7 +259,7 @@ class _CgroupMemoryInfo:
             v2_path = None
             for line in f:
                 line = line.rstrip()
-                id, controllers, path = line.split(":")
+                id, controllers, path = line.split(":", 2)
                 if id == '0':
                     v2_path = path
                 elif 'memory' in controllers:
