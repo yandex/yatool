@@ -13,6 +13,23 @@ class UserClass(enum.StrEnum):
     SANDBOX = enum.auto()
     USER = enum.auto()
     ZOMB = enum.auto()
+    AGENT = enum.auto()
+
+
+USER_CLASS_BY_NAME = {
+    '': UserClass.ROBOT,
+    'loadbase': UserClass.ROBOT,
+    'sandbox': UserClass.SANDBOX,
+    'isandbox': UserClass.SANDBOX,
+    'root': UserClass.ROOT_USER,
+}
+
+USER_CLASS_BY_PREFIX = {
+    'teamcity': UserClass.ROBOT,
+    'robot-': UserClass.ROBOT,
+    'db-runner': UserClass.DISTBUILD,
+    'zomb-': UserClass.ZOMB,
+}
 
 
 def get_user() -> str:
@@ -32,23 +49,19 @@ def get_user() -> str:
 
 
 def classify_user(username: str) -> UserClass:
-    if not username:
-        return UserClass.ROBOT
-    if username.startswith('teamcity'):
-        return UserClass.ROBOT
-    if username == 'loadbase':
-        return UserClass.ROBOT
-    if username.startswith('robot-'):
-        return UserClass.ROBOT
-    if username in ('sandbox', 'isandbox'):
-        return UserClass.SANDBOX
-    if username in ('root'):
-        return UserClass.ROOT_USER
-    if username.startswith('db-runner'):
-        return UserClass.DISTBUILD
-    if username.startswith('zomb-'):
-        return UserClass.ZOMB
+    if username in USER_CLASS_BY_NAME:
+        return USER_CLASS_BY_NAME[username]
+    for prefix, user_class in USER_CLASS_BY_PREFIX.items():
+        if username.startswith(prefix):
+            return user_class
     if username.isdigit():
         return UserClass.ROBOT
 
     return UserClass.USER
+
+
+def classify_invocation_user(username: str, caller_info: dict | None = None) -> UserClass:
+    if caller_info and caller_info.get('agent') not in (None, '', 'unknown'):
+        return UserClass.AGENT
+
+    return classify_user(username)

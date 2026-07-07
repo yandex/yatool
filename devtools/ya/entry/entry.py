@@ -134,6 +134,10 @@ def main(args):
         '--profile', action='store_const', const=True, default=False, help='run python profiler for ya binary'
     )
     p.add_argument('--error-file')
+    # Free-form intent of the invocation (e.g. an agent's task description). Stored
+    # in the caller_info telemetry record. Takes a value -> also listed in
+    # `skippable_flags` in the /ya wrapper script.
+    p.add_argument('--intent', default=os.environ.get('YA_INTENT'))
     p.add_argument('--keep-tmp', action='store_const', const=True, default=False)
     p.add_argument(
         '--no-logs', action='store_const', const=True, default=True if os.environ.get('YA_NO_LOGS') else False
@@ -255,6 +259,7 @@ def main(args):
             no_logs=a.no_logs,
             no_tmp_dir=a.no_tmp_dir,
             precise=a.precise,
+            intent=a.intent,
             extra_help='\n'.join(format_help()),
         )
 

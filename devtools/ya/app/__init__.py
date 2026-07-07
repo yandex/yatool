@@ -5,6 +5,7 @@ import os
 import re
 import six
 import sys
+import threading
 import time
 import typing  # noqa: F401
 
@@ -33,6 +34,7 @@ from yalibrary.display import build_term_display
 from .modules import evlog
 from .modules import params
 from .modules import token_suppressions
+from .modules import caller_info
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer(stage_tracer.StagerGroups.OVERALL_EXECUTION)
@@ -67,6 +69,7 @@ def execute_early(action):
         no_logs=False,
         no_tmp_dir=False,
         precise=False,
+        intent=None,
         **kwargs,
     ):
         modules_initialization_early_stage = stager.start("modules-initialization-early")
@@ -104,7 +107,10 @@ def execute_early(action):
             modules.extend(
                 [
                     ('metrics_reporter', configure_metrics_reporter(ctx)),
-                    ('report', configure_report_interceptor(ctx, report_events if no_report else 'all')),
+                    ('report', configure_report_interceptor(ctx, report_events if no_report else 'all', intent=intent)),
+                    # After `report`: the detection thread emits the CALLER_INFO record
+                    # itself, so the telemetry reporter must already be initialized.
+                    ('caller_info', configure_caller_info(ctx)),
                 ]
             )
 
@@ -764,7 +770,7 @@ def _resources_report():
     return stat
 
 
-def configure_report_interceptor(ctx, report_events):
+def configure_report_interceptor(ctx, report_events, intent=None):
     # we can only do that after respawn with valid python
     from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args, parse_events_filter
 
@@ -780,6 +786,8 @@ def configure_report_interceptor(ctx, report_events):
         ReportTypes.EXECUTION,
         {
             'cmd_args': mine_cmd_args(),
+            # Caller-supplied label for the invocation, reported next to the command.
+            'intent': intent,
             'env_vars': mine_env_vars(),
             'cwd': os.getcwd(),
             '__file__': __file__,
@@ -890,6 +898,31 @@ def configure_report_interceptor(ctx, report_events):
         telemetry.stop_reporter()  # flush urgent reports
 
 
+def configure_caller_info(ctx):
+    # Detect what launched ya in a background thread so later consumers (metrics,
+    # telemetry) can read whatever is ready without blocking startup. The thread also
+    # emits the CALLER_INFO record itself once detection finishes -- reporting it here
+    # (right when the data is ready) rather than from the main exit path, which the
+    # exit interceptor can short-circuit before it runs.
+    from devtools.ya.core.report import telemetry, ReportTypes
+
+    provider = caller_info.CallerInfoProvider()
+
+    def detect_and_report():
+        provider.run()
+        data = provider.get_nowait()
+        if caller_info.has_data(data):
+            telemetry.report(ReportTypes.CALLER_INFO, data)
+
+    threading.Thread(target=detect_and_report, name="CallerInfo", daemon=True).start()
+    logger.debug("caller_info module configured")
+
+    try:
+        yield provider
+    finally:
+        logger.debug("caller_info data (ready=%s): %s", provider.ready(), provider.get_nowait())
+
+
 def configure_metrics_reporter(ctx):
     from devtools.ya.core.report import telemetry, compact_system_info
 
@@ -897,7 +930,15 @@ def configure_metrics_reporter(ctx):
         {
             'platform': compact_system_info(),
             'version': ctx.revision,
-            'userclass': user.classify_user(ctx.username),
+            'userclass': user.classify_user(ctx.username).value,
+            # Lazy: caller info is filled by a background thread, so this must be
+            # resolved at report time (see MetricStore._resolve_labels), not now.
+            'invocation_userclass': lambda: user.classify_invocation_user(
+                ctx.username,
+                caller_info.get_caller_info_from_context(ctx),
+            ).value,
+            # None when nothing was detected -- keeps the query simple downstream.
+            'shell': lambda: (caller_info.get_caller_info_from_context(ctx) or {}).get('shell'),
         },
         telemetry,
     )

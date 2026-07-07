@@ -5,7 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
-    devtools/ya/core/report
+    contrib/python/psutil
 )
 
 END()

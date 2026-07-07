@@ -10,6 +10,7 @@ PEERDIR(
     devtools/ya/app/modules/evlog
     devtools/ya/app/modules/params
     devtools/ya/app/modules/token_suppressions
+    devtools/ya/app/modules/caller_info
     devtools/ya/app_config
     devtools/ya/build/targets
     devtools/ya/core/config
