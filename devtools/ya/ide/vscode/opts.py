@@ -163,6 +163,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                     default_value=lambda _: "full",
                 ),
                 help="Configure clangd background indexing",
+                group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--clangd-index-threads"],
@@ -301,14 +302,19 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 help="Enable support for helper scripts",
                 hook=devtools.ya.core.yarg.SetConstValueHook("helpers_enabled", True),
                 group=cls.GROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.INTERNAL,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--no-ide-helpers"],
                 help="Disable support for helper scripts",
                 hook=devtools.ya.core.yarg.SetConstValueHook("helpers_enabled", False),
                 group=cls.GROUP,
-                visible=devtools.ya.core.yarg.HelpLevel.INTERNAL,
+                visible=devtools.ya.core.yarg.HelpLevel.ADVANCED,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer(
+                "helpers_enabled",
+                help="Enable support for helper scripts",
+                group=cls.GROUP,
             ),
         ]
 

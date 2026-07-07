@@ -69,7 +69,7 @@ def fetch_ide_helpers(params) -> IDEHelperFunctions:
 
 def get_helper_module(helper_path, arc_root):
     module_name = '.'.join(os.path.relpath(helper_path, arc_root).split(os.path.sep)[:-1])
-    module_spec = importlib.util.spec_from_file_location(module_name, helper_path)
+    module_spec = importlib.util.spec_from_file_location(module_name, os.path.join(arc_root, helper_path))
     if module_spec and module_spec.loader:
         module = importlib.util.module_from_spec(module_spec)
         try:
