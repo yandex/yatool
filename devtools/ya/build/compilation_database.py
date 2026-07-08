@@ -1,6 +1,7 @@
 import logging
 
 from yalibrary import platform_matcher
+from yalibrary.fetcher import resource_fetcher
 
 import devtools.ya.core.yarg
 import devtools.ya.core.config
@@ -92,12 +93,43 @@ COMPILATION_DATABASE_OPTS = devtools.ya.build.build_opts.ya_make_options(free_bu
 ]
 
 
+def _fetch_graph_resources(graph, tool_root, sandbox_fetcher):
+    """Download all sbr: resources referenced in the graph's conf section.
+
+    Only "sbr:" URIs are fetched. Failures are not suppressed: a missing or
+    inaccessible resource raises an exception and causes the dump command
+    to exit with a non-zero code rather than silently producing a cc.json
+    with dangling paths.
+    """
+    for item in graph.get_resources():
+        resource_desc = resource_fetcher.select_resource(item)
+        uri = resource_desc['resource']
+        if not uri.startswith('sbr:'):
+            logger.debug(
+                "Skipping non-sbr graph resource %s (pattern %s): only sbr: resources "
+                "are fetched, so $(%s) will be left unresolved in the output",
+                uri,
+                item.get('pattern'),
+                item.get('pattern'),
+            )
+            continue
+        strip_prefix = resource_desc.get('strip_prefix')
+        logger.debug('Fetching graph resource %s to %s', uri, tool_root)
+        resource_fetcher.fetch_resource_if_need(
+            sandbox_fetcher,
+            tool_root,
+            uri,
+            strip_prefix=strip_prefix,
+        )
+
+
 def _dump_compilation_database_cpp(params):
     """Dump the compilation database using the in-process C++ graph parser.
 
     Graph extraction and JSON serialization happen entirely in C++, avoiding
     the cost of deserializing the full graph into Python dicts.
     """
+    import app_ctx
     import devtools.ya.app
     import devtools.ya.build.gen_plan2
     from devtools.ya.build.ccgraph import dump_compile_commands
@@ -110,6 +142,8 @@ def _dump_compilation_database_cpp(params):
     cpp_platform = platform_matcher.my_platform().split('-')[0]
 
     graph = devtools.ya.build.gen_plan2.ya_make_cpp_graph(params, devtools.ya.app)
+
+    _fetch_graph_resources(graph, tool_root, app_ctx.legacy_sandbox_fetcher)
 
     dump_compile_commands(
         graph=graph,
