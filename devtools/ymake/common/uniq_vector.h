@@ -54,6 +54,11 @@ protected:
     using TUniqMap = typename std::conditional_t<UseAbseil, TAbslUniqMap, TUtilUniqMap>;
     using TReturnType = typename std::conditional_t<IsIndexed, std::pair<size_t, bool>, bool>;
 
+    // Simple-ref move just steals the members; the non-simple-ref path goes through swap()
+    // which may allocate an empty placeholder map (hence potentially throwing).
+    //static constexpr bool IsNothrowMovable = IsSimpleRef && std::is_nothrow_move_assignable_v<TContainer> && std::is_nothrow_move_assignable_v<THolder<TUniqMap>>;
+    static constexpr bool IsNothrowMovable = true; // TODO investigate performance implications of the above
+
 public:
     using const_iterator = typename TContainer::const_iterator;
 
@@ -307,8 +312,14 @@ public:
 
     TUniqContainerImpl& operator=(const TUniqContainerImpl&) = delete;
 
-    TUniqContainerImpl(TUniqContainerImpl&& from) = default;
-    TUniqContainerImpl& operator=(TUniqContainerImpl&&) = default;
+    TUniqContainerImpl(TUniqContainerImpl&& from) noexcept(IsNothrowMovable) {
+        MoveFrom(from);
+    }
+
+    TUniqContainerImpl& operator=(TUniqContainerImpl&& from) noexcept(IsNothrowMovable) {
+        MoveFrom(from);
+        return *this;
+    }
 
     TUniqContainerImpl() = default;
 
@@ -319,6 +330,20 @@ public:
 private:
     TContainer Container;
     THolder<TUniqMap> UniqMap;
+
+    void MoveFrom(TUniqContainerImpl& from) noexcept(IsNothrowMovable) {
+        if constexpr (IsSimpleRef) {
+            // Refs are self-contained (they don't point into Container), so the map can
+            // simply be stolen along with the elements: O(1), no placeholder allocation.
+            Container = std::move(from.Container);
+            UniqMap = std::move(from.UniqMap);
+        } else {
+            // Refs are bound to Container by address. swap() transfers the buckets in O(1)
+            // while keeping each map bound to its own (address-stable) Container, so the
+            // moved-to map ends up referring to the elements it now owns.
+            swap(from);
+        }
+    }
 
     template <class U>
     auto InContainerPred(const U& val) const {
