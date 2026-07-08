@@ -1,12 +1,12 @@
 Metadata-Version: 2.4
 Name: coverage
-Version: 7.14.1
+Version: 7.14.2
 Summary: Code coverage measurement for Python
 Home-page: https://github.com/coveragepy/coveragepy
-Author: Ned Batchelder and 255 others
+Author: Ned Batchelder and 256 others
 Author-email: ned@nedbatchelder.com
 License: Apache-2.0
-Project-URL: Documentation, https://coverage.readthedocs.io/en/7.14.1
+Project-URL: Documentation, https://coverage.readthedocs.io/en/7.14.2
 Project-URL: Funding, https://tidelift.com/subscription/pkg/pypi-coverage?utm_source=pypi-coverage&utm_medium=referral&utm_campaign=pypi
 Project-URL: Issues, https://github.com/coveragepy/coveragepy/issues
 Project-URL: Mastodon, https://hachyderm.io/@coveragepy
@@ -83,7 +83,7 @@ Coverage.py runs on these versions of Python:
 Documentation is on `Read the Docs`_.  Code repository and issue tracker are on
 `GitHub`_.
 
-.. _Read the Docs: https://coverage.readthedocs.io/en/7.14.1/
+.. _Read the Docs: https://coverage.readthedocs.io/en/7.14.2/
 .. _GitHub: https://github.com/coveragepy/coveragepy
 
 
@@ -112,7 +112,7 @@ Getting Started
 Looking to run ``coverage`` on your test suite? See the `Quick Start section`_
 of the docs.
 
-.. _Quick Start section: https://coverage.readthedocs.io/en/7.14.1/#quick-start
+.. _Quick Start section: https://coverage.readthedocs.io/en/7.14.2/#quick-start
 
 
 Change history
@@ -120,7 +120,7 @@ Change history
 
 The complete history of changes is on the `change history page`_.
 
-.. _change history page: https://coverage.readthedocs.io/en/7.14.1/changes.html
+.. _change history page: https://coverage.readthedocs.io/en/7.14.2/changes.html
 
 
 Code of Conduct
@@ -139,7 +139,7 @@ Contributing
 Found a bug? Want to help improve the code or documentation? See the
 `Contributing section`_ of the docs.
 
-.. _Contributing section: https://coverage.readthedocs.io/en/7.14.1/contributing.html
+.. _Contributing section: https://coverage.readthedocs.io/en/7.14.2/contributing.html
 
 
 Security
@@ -167,7 +167,7 @@ Licensed under the `Apache 2.0 License`_.  For details, see `NOTICE.txt`_.
     :target: https://github.com/coveragepy/coveragepy/actions/workflows/quality.yml
     :alt: Quality check status
 .. |docs| image:: https://readthedocs.org/projects/coverage/badge/?version=latest&style=flat
-    :target: https://coverage.readthedocs.io/en/7.14.1/
+    :target: https://coverage.readthedocs.io/en/7.14.2/
     :alt: Documentation
 .. |kit| image:: https://img.shields.io/pypi/v/coverage
     :target: https://pypi.org/project/coverage/
