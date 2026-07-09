@@ -32,6 +32,7 @@ public:
     PyObject* Impl() const noexcept {
         return Func_.get();
     }
+    const TSignature& Signature() const noexcept { return Sign_; }
 
 private:
     TFFIMacro(OwnedRef<>&& func, TSignature&& sign) noexcept

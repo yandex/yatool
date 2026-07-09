@@ -22,6 +22,7 @@ namespace {
             auto pyUnit = NYMake::NPlugins::CreateContextObject(&unit);
             Macro_.Call(*pyUnit, args);
         }
+        const TSignature* Signature() const override { return &Macro_.Signature(); }
 
         TStringBuf Name() const noexcept {
             return Macro_.Name();

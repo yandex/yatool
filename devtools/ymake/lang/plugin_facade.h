@@ -13,6 +13,7 @@
 class TBuildConfiguration;
 
 class TYMake;
+class TSignature;
 
 class TResolveFile;
 
@@ -66,6 +67,10 @@ public:
 class TMacroImpl {
 public:
     virtual void Execute(TPluginUnit& unit, const TVector<TStringBuf>& params) = 0;
+    // Plugin macro using prgumtnts parser based on formal signature may override the member function bellow to expose
+    // it's own signature. Once upon a time in the future all of the plugins must be ported to signature based argument
+    // parsing as a part of the YMAKE-1796 story and pointer shopuld be turned into reference.
+    virtual const TSignature* Signature() const { return nullptr; }
 
     virtual ~TMacroImpl() noexcept = default;
 
