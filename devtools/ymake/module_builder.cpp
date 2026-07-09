@@ -1071,19 +1071,26 @@ bool TModuleBuilder::PeerFlowStatement(const TStringBuf& name, const TVector<TSt
         return true;
     } else if (name == NMacro::_PEER_QUERY) {
         static auto sig = TSignature{
-            {"PEER", "VIEW", "ARGS..."},
+            {},
             TSignature::TKeywords()
+                .AddArrayKeyword("FROM", "")
+                .AddArrayKeyword("SELECT", "")
                 .AddScalarKeyword("STORE", "", "")
                 .AddArrayKeyword("INVOKE", "")
                 .AddArrayKeyword("INVOKE_FOR_EACH", "")
         };
         TVars _args = AddMacroArgsToLocals(sig, args).value();
 
-        auto query = TPeerQuery{
-            .Peers{Get1(&_args["PEER"])},
-            .View{Get1(&_args["VIEW"])},
-        };
-        for (auto& val : _args["ARGS"])
+        if (_args["FROM"].empty())
+            ythrow TError() << "Peer queries require at least one peer in the FROM clause";
+        if (_args["SELECT"].empty())
+            ythrow TError() << "Peer queries require at least one argument in the SELECT clause";
+
+        auto query = TPeerQuery{};
+        for (auto& val : _args["FROM"])
+            query.Peers.push_back(val.Name);
+        query.View = Get1(&_args["SELECT"]);
+        for (auto& val : std::span(_args["SELECT"]).subspan(1))
             query.ViewArgs.push_back(val.Name);
 
         auto sink_count = 0;

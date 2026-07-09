@@ -24,6 +24,7 @@
 #include <devtools/ymake/symbols/elem_id.h>
 
 #include <util/generic/algorithm.h>
+#include <util/generic/hash_set.h>
 #include <util/generic/scope.h>
 #include <util/string/builder.h>
 #include <util/string/cast.h>
@@ -198,25 +199,27 @@ namespace {
         TUniqVector<TNodeId> Result;
     };
 
-    TFileElemId ForSomePeer(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query, auto action) {
+    TVector<TFileElemId> ForMatchingPeers(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query, auto action) {
+        THashSet<TStringBuf> peerSet(query.Peers.begin(), query.Peers.end());
+        TVector<TFileElemId> result;
         for (auto& dep : node->Deps) {
             if (!IsDirectPeerdirDep(node->NodeType, dep.DepType, dep.NodeType))
                 continue;
             auto peerMod = node->YMake.GetRestoreContext().Modules.Get(AssumeFile(dep.ElemId));
             auto peerDir = peerMod->GetDir();
-            if (!(peerDir.InSrcDir() && peerDir.CutType() == query.Peers))
+            if (!(peerDir.InSrcDir() && peerSet.contains(peerDir.CutType())))
                 continue;
             action(node->YMake.Graph.GetNodeById(dep.NodeType, dep.ElemId));
-            return peerMod->GetDirId(); // multimatches not supported yet
+            result.push_back(peerMod->GetDirId());
         }
-        return TFileElemId();
+        return result;
     };
 
 
-    TFileElemId DoQueryTarget(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
+    TVector<TFileElemId> DoQueryTarget(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
         TYVar var;
-        auto result = ForSomePeer(node, query, [&](TConstDepNodeRef to) {
-            var.SetSingleVal(node->Graph.GetFileName(to).GetTargetStr(), false);
+        auto result = ForMatchingPeers(node, query, [&](TConstDepNodeRef to) {
+            var.push_back(TVarStr(node->Graph.GetFileName(to).GetTargetStr()));
         });
         if (query.Action != TModuleBuilder::TPeerQuery::EAction::Store)
             ythrow TError() << "Querying a target supports only the store action";
@@ -224,11 +227,11 @@ namespace {
         return result;
     }
 
-    TFileElemId DoQueryVariable(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
+    TVector<TFileElemId> DoQueryVariable(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
         if (query.ViewArgs.size() != 1)
             ythrow TError() << "Querying a variable requires exactly one argument: its name";
         TYVar var;
-        auto result = ForSomePeer(node, query, [&](TConstDepNodeRef to) {
+        auto result = ForMatchingPeers(node, query, [&](TConstDepNodeRef to) {
             for (const auto& peerDep : to.Edges()) {
                 if (!IsLocalVariableDep(peerDep))
                     continue;
@@ -269,12 +272,12 @@ namespace {
         return result;
     }
 
-    TFileElemId DoQueryInputs(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
-        return ForSomePeer(node, query, [&](TConstDepNodeRef to) {
+    TVector<TFileElemId> DoQueryInputs(TNodeAddCtx* node, const TModuleBuilder::TPeerQuery& query) {
+        TYVar var;
+        auto result = ForMatchingPeers(node, query, [&](TConstDepNodeRef to) {
             // cf. TMakeCommand::MineInputsAndOutputs
             TMineInputsVisitor visitor;
             ::IterateAll(to, visitor);
-            TYVar var;
             for (auto& input : visitor.Result) {
                 auto name = node->Graph.GetFileName(node->Graph.Get(input)).GetTargetStr();
                 if (!std::any_of(query.ViewArgs.begin(), query.ViewArgs.end(), [&](const auto& arg) {
@@ -283,24 +286,25 @@ namespace {
                     continue;
                 var.push_back(TVarStr(name));
             }
-            switch (query.Action) {
-                case TModuleBuilder::TPeerQuery::EAction::Store: {
-                    // TODO investigate: we should set var.DontParse here
-                    // to avoid paths becoming like `Terms($S, '/source.cpp')` after getting parsed,
-                    // but for some reason this flag is not propagated to the instance the expression compiler sees
-                    node->ModuleBldr->PeerQueryStore(query.Sink, std::move(var));
-                    break;
-                }
-                case TModuleBuilder::TPeerQuery::EAction::Invoke: {
-                    node->ModuleBldr->PeerQueryInvoke(query.Sink, query.SinkArgs, var);
-                    break;
-                }
-                case TModuleBuilder::TPeerQuery::EAction::InvokeForEach: {
-                    node->ModuleBldr->PeerQueryInvokeForEach(query.Sink, query.SinkArgs, var);
-                    break;
-                }
-            }
         });
+        switch (query.Action) {
+            case TModuleBuilder::TPeerQuery::EAction::Store: {
+                // TODO investigate: we should set var.DontParse here
+                // to avoid paths becoming like `Terms($S, '/source.cpp')` after getting parsed,
+                // but for some reason this flag is not propagated to the instance the expression compiler sees
+                node->ModuleBldr->PeerQueryStore(query.Sink, std::move(var));
+                break;
+            }
+            case TModuleBuilder::TPeerQuery::EAction::Invoke: {
+                node->ModuleBldr->PeerQueryInvoke(query.Sink, query.SinkArgs, var);
+                break;
+            }
+            case TModuleBuilder::TPeerQuery::EAction::InvokeForEach: {
+                node->ModuleBldr->PeerQueryInvokeForEach(query.Sink, query.SinkArgs, var);
+                break;
+            }
+        }
+        return result;
     }
 }
 
@@ -2208,17 +2212,18 @@ void TUpdIter::DoPeerQueries(TNodeAddCtx* modNode) {
     while (!_queries.empty()) {
         auto query = std::move(_queries.front());
         _queries.pop_front();
-        auto peer = TFileElemId();
+        TVector<TFileElemId> peers;
         if (query.View == "target") {
-            peer = DoQueryTarget(modNode, query);
+            peers = DoQueryTarget(modNode, query);
         } else if (query.View == "variable") {
-            peer = DoQueryVariable(modNode, query);
+            peers = DoQueryVariable(modNode, query);
         } else if (query.View == "inputs") {
-            peer = DoQueryInputs(modNode, query);
+            peers = DoQueryInputs(modNode, query);
         } else {
             // TODO default
         }
-        if (peer)
+        for (auto peer : peers) {
             modNode->Module->QueriedPeers.insert(peer);
+        }
     }
 }

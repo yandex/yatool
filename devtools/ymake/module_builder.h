@@ -40,7 +40,7 @@ class TModuleBuilder : public TModuleDirBuilder, public TModuleWrapper
 public:
     struct TPeerQuery {
         enum class EAction {Store, Invoke, InvokeForEach};
-        TString Peers; // only a single peer supported so far (TODO)
+        TVector<TString> Peers;
         TString View;
         TVector<TString> ViewArgs;
         TString Sink;
