@@ -1079,7 +1079,12 @@ bool TModuleBuilder::PeerFlowStatement(const TStringBuf& name, const TVector<TSt
                 .AddArrayKeyword("INVOKE", "")
                 .AddArrayKeyword("INVOKE_FOR_EACH", "")
         };
-        TVars _args = AddMacroArgsToLocals(sig, args).value();
+        TVars _args = AddMacroArgsToLocals(sig, args).or_else(
+            [&](const TMapMacroVarsErr& err) -> std::expected<TVars, TMapMacroVarsErr> {
+                err.Report(name, JoinSeq(" ", args));
+                throw yexception() << "bad arguments";
+            }
+        ).value();
 
         if (_args["FROM"].empty())
             ythrow TError() << "Peer queries require at least one peer in the FROM clause";
