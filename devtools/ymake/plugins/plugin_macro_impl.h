@@ -9,6 +9,5 @@
 class TBuildConfiguration;
 
 namespace NYMake::NPlugins {
-    void RegisterMacro(TBuildConfiguration& conf, const TString& name, NYMake::NPy::OwnedRef<PyObject>&& func);
     void RegisterMacro(TBuildConfiguration& conf, NPy::TFFIMacro&& macro);
 }

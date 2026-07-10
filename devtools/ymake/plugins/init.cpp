@@ -15,37 +15,6 @@
 
 using namespace NYMake::NPlugins;
 
-namespace {
-    void RegisterMacrosFromModule(TBuildConfiguration& conf, PyObject* mod) {
-        NYMake::NPy::OwnedRef attrs{PyObject_Dir(mod)};
-        if (attrs == nullptr) {
-            return;
-        }
-
-        Py_ssize_t size = PyList_Size(attrs.get());
-        for (Py_ssize_t i = 0; i < size; i++) {
-            NYMake::NPy::OwnedRef attr{PyList_GetItem(attrs.get(), i)};
-            if (!PyUnicode_Check(attr.get())) {
-                continue;
-            }
-            NYMake::NPy::OwnedRef asciiAttrName{PyUnicode_AsASCIIString(attr.get())};
-            if (!PyBytes_Check(asciiAttrName.get())) {
-                continue;
-            }
-            TStringBuf attrName = PyBytes_AsString(asciiAttrName.get());
-            constexpr TStringBuf pluginMacroPreffix = "on"sv;
-            if (attrName.StartsWith(pluginMacroPreffix)) {
-                NYMake::NPy::OwnedRef func{PyObject_GetAttr(mod, attr.get())};
-                if (!PyFunction_Check(func.get())) {
-                    continue;
-                }
-                auto macroName = ToUpperUTF8(attrName.SubStr(pluginMacroPreffix.size()));
-                RegisterMacro(conf, macroName, std::move(func));
-            }
-        }
-    }
-}
-
 void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &pluginFiles, const TFsPath& pycache, TBuildConfiguration *conf) {
     if (pluginsRoots.empty()) {
         return;
@@ -81,11 +50,6 @@ void LoadPlugins(const TVector<TFsPath> &pluginsRoots, const TVector<TFsPath> &p
             PyErr_Print();
             continue;
         }
-
-        // Parsers registration is implemented via decorator and happens inside `PyImport_ImportModule`. No explicit
-        // registration here required.
-        // TODO(YMAKE-1797) reimplement macro registration via decorator as well and remove the line bellow.
-        RegisterMacrosFromModule(*conf, mod.get());
     }
 
     CheckForError();
