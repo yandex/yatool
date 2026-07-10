@@ -522,7 +522,6 @@ namespace {
                     auto strand = asio::make_strand(exec);
                     using TChannel = asio::experimental::concurrent_channel<void(asio::error_code)>;
                     TDeque<TChannel> writeChannels;
-                    TDeque<TString> jsonStrings;
                     for (const auto& [_, nodes]: cmdbuilder.GetTopoGenerations()) {
                         size_t chunkSize = 10;
                         // group nodes by module preserving order
@@ -541,9 +540,8 @@ namespace {
                             auto& renderChannel = renderChannels.back();
                             writeChannels.push_back({exec, 1u});
                             auto& writeChannel = writeChannels.back();
-                            jsonStrings.push_back(TString{});
-                            auto& jsonString = jsonStrings.back();
-                            asio::co_spawn(exec, [&cmdbuilder, &cache, &modulesStatesCache, &graph, &yMake, chunk, &renderChannel, &plan, strand, &writeChannel, &jsonString]() -> asio::awaitable<void> {
+                            asio::co_spawn(exec, [&cmdbuilder, &cache, &modulesStatesCache, &graph, &yMake, chunk, &renderChannel, &plan, strand, &writeChannel]() -> asio::awaitable<void> {
+                                auto jsonString = TString{};
                                 TStringOutput ss(jsonString);
                                 NYMake::TJsonWriter writer{ss};
                                 NYMake::TJsonWriter::TOpenedArray nodesArr;
@@ -560,7 +558,7 @@ namespace {
                                 }
                                 co_await renderChannel.async_send(std::error_code{});
                                 writer.Flush();
-                                asio::co_spawn(strand, [&plan, &jsonString, &writeChannel]() -> asio::awaitable<void> {
+                                asio::co_spawn(strand, [&plan, jsonString = std::move(jsonString), &writeChannel]() -> asio::awaitable<void> {
                                     plan.Writer.WriteArrayJsonValue(plan.NodesArr, std::move(jsonString));
                                     co_await writeChannel.async_send(std::error_code{});
                                 }, asio::detached);

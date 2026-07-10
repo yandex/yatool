@@ -34,9 +34,6 @@ struct TRootsOptions {
 
         auto targetIdRaw = RawElemId(targetId);
         auto& cache = PathsCache.Get();
-        if (targetIdRaw >= cache.size()) {
-            cache.resize(targetIdRaw + 1);
-        }
 
         if (Y_UNLIKELY(cache[targetIdRaw].empty())) {
             TString res = RealPathByStr(view.GetTargetStr());
@@ -85,6 +82,6 @@ private:
     bool IsRealPathCacheEnabled() const { return RefNames != nullptr; }
     TString RealPathByStr(TStringBuf p) const;
 
-    mutable Y_THREAD(TVector<TString>) PathsCache;
+    mutable ::NTls::TValue<THashMap<TElemId::TUnderlying, TString>> PathsCache;
     const TFileConf* RefNames = nullptr;
 };

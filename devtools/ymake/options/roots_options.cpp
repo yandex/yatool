@@ -139,9 +139,6 @@ void TRootsOptions::EnableRealPathCache(TFileConf* refNames) {
     auto& cache = PathsCache.Get();
     cache.clear();
     RefNames = refNames;
-    if (RefNames != nullptr) {
-        cache.resize(RefNames->Size());
-    }
 }
 
 bool TRootsOptions::CanonPath(const TStringBuf& abspath, TString& result) const {
