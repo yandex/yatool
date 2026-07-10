@@ -73,8 +73,8 @@ namespace NYa {
                 if (!handler && CanBeHandler(arg)) {
                     // first arg that can be handler is a handler
                     handler = arg;
-                    // stop expansion if `tool` or `run` handler is met
-                    halt = handler == "tool" || handler == "run";
+                    // stop expansion if any of the following handlers is met
+                    halt = handler == "tool" || handler == "run" || handler == "curl";
                 }
                 if (halt) {
                     for (size_t j = i; j < args.size(); ++j) {
