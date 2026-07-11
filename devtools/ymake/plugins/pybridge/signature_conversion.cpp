@@ -41,14 +41,22 @@ bool IsArrayArgTypeAnnotation(PyObject& annotation) noexcept {
 
 namespace NYMake::NPy {
 
-std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject& func, PyTypeObject& unitType) {
+std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(
+    PyObject& func,
+    PyTypeObject& unitType,
+    const THashSet<std::string>& ignoreArgs
+) {
     PyObject* signature = PyFunction_GetAnnotations(&func);
     if (!signature)
         return std::unexpected(ESignatureDeductionError::MissingTypeHints);
 
     PyObject *key=nullptr, *val=nullptr;
     Py_ssize_t pos = 0;
-    if (!PyDict_Next(signature, &pos, &key, &val) || !IsUnitTypeAnnotation(*val, unitType))
+    while (PyDict_Next(signature, &pos, &key, &val)) {
+        if (!ignoreArgs.contains(StrContent(*key)))
+            break;
+    }
+    if (!key || !IsUnitTypeAnnotation(*val, unitType))
         return std::unexpected(ESignatureDeductionError::MissingUnitArg);
 
     if (PyFunction_GetDefaults(&func))
@@ -69,22 +77,25 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
         if (PyErr_Occurred())
             return std::unexpected(ESignatureDeductionError::PyException);
 
-        if (StrContent(*key) == "return") {
+        const auto argName = StrContent(*key);
+        if (argName == "return") {
             if (val == Py_None) {
                 continue;
             }
             return std::unexpected(ESignatureDeductionError::WrongReturnType);
         }
+        if (ignoreArgs.contains(argName))
+            continue;
 
         if (defaultVal) {
             if (IsFlagArgTypeAnnotation(*val)) {
                 if (Py_IsTrue(defaultVal))
                     return std::unexpected(ESignatureDeductionError::WrongFlagDefault);
-                keywords.AddFlagKeyword(TString{StrContent(*key)}, {}, {});
+                keywords.AddFlagKeyword(TString{argName}, {}, {});
             } else if (IsScalarArgTypeAnnotation(*val))
-                keywords.AddScalarKeyword(TString{StrContent(*key)}, StrContent(*defaultVal), {});
+                keywords.AddScalarKeyword(TString{argName}, StrContent(*defaultVal), {});
             else if (IsArrayArgTypeAnnotation(*val))
-                keywords.AddArrayKeyword(TString{StrContent(*key)}, {});
+                keywords.AddArrayKeyword(TString{argName}, {});
             else
                 return std::unexpected(ESignatureDeductionError::WrongArgType);
             continue;
@@ -93,9 +104,9 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(PyObject
         if (IsScalarArgTypeAnnotation(*val)) {
             if (varargFound)
                 return std::unexpected(ESignatureDeductionError::PositionalAfterVararg);
-            positionals.push_back(TString{StrContent(*key)});
+            positionals.push_back(TString{argName});
         } else if (IsArrayArgTypeAnnotation(*val)) {
-            positionals.push_back(TString{StrContent(*key)} + NStaticConf::ARRAY_SUFFIX);
+            positionals.push_back(TString{argName} + NStaticConf::ARRAY_SUFFIX);
             varargFound = true;
         } else
             return std::unexpected(ESignatureDeductionError::WrongArgType);

@@ -428,9 +428,7 @@ namespace {
         }
 
         NYMake::NPy::OwnedRef<> CreateContextObject(TPluginUnit* unit) {
-            NYMake::NPy::OwnedRef args{Py_BuildValue("()")};
-            CheckForError();
-            PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(ContextType_.Get()), args.get());
+            PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(ContextType_.Get()), EmptyTuple_.get());
             if (obj) {
                 Context* context = reinterpret_cast<Context*>(obj);
                 context->Unit = unit;
@@ -491,13 +489,55 @@ namespace {
             }).Release();
         }
 
-        PyObject* MacroDecorator(std::span<PyObject* const> args) {
-            if (args.size() != 1 || !PyFunction_Check(args[0])) {
+        PyObject* MacroDecorator(PyObject* args, PyObject* kwargs) {
+            PyObject* func = nullptr;
+            if (!PyArg_ParseTuple(args, "|O", &func))
+                return nullptr;
+
+            PyObject* ignoredArgs = nullptr;
+            const char* keys[] = {"ignored_args", nullptr};
+            if (!PyArg_ParseTupleAndKeywords(EmptyTuple_.get(), kwargs, "|$O:ymake.macro", keys, &ignoredArgs))
+                return nullptr;
+
+            if (ignoredArgs) {
+                if (!PySet_Check(ignoredArgs)) {
+                    PyErr_Format(PyExc_TypeError, "ymake.macro decorator 'ignored_args' expected to be a set of strings but got '%N'.", Py_TYPE(ignoredArgs));
+                    return nullptr;
+                }
+
+                THashSet<std::string> ignore;
+                NYMake::NPy::OwnedRef iter{PyObject_GetIter(ignoredArgs)};
+                PyObject* item = nullptr;
+                while ((item = PyIter_Next(iter.get())) != nullptr) {
+                    NYMake::NPy::OwnedRef itemRef{std::exchange(item, nullptr)};
+                    if (!PyUnicode_Check(itemRef.get())) {
+                        PyErr_Format(PyExc_TypeError, "ymake.macro decorator 'ignored_args' expected to be a set of strings but got item of type '%N'.", Py_TYPE(itemRef.get()));
+                        return nullptr;
+                    }
+
+                    ignore.insert(std::string{NYMake::NPy::StrContent(*itemRef)});
+                }
+
+                return NYMake::NPy::MakePyLambda([this, ignore = std::move(ignore)](std::span<PyObject* const> args) -> PyObject* {
+                    if (args.size() != 1) {
+                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single decorated function to register as a macro");
+                        return nullptr;
+                    }
+                    return DoDecorateMacro(args[0], ignore);
+                }).Release();
+            }
+
+            return DoDecorateMacro(func);
+        }
+
+    private:
+        PyObject* DoDecorateMacro(PyObject* func, const THashSet<std::string>& ignoreArgs = {}) {
+            if (!func || !PyFunction_Check(func)) {
                 PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single function to register as a macro");
                 return nullptr;
             }
 
-            auto macro = NYMake::NPy::TFFIMacro::Wrap(NYMake::NPy::FromBorrowedRef(args[0]), *ContextType_);
+            auto macro = NYMake::NPy::TFFIMacro::Wrap(NYMake::NPy::FromBorrowedRef(func), *ContextType_, ignoreArgs);
             if (!macro.has_value()) {
                 using enum NYMake::NPy::ESignatureDeductionError;
                 switch (macro.error()) {
@@ -539,13 +579,14 @@ namespace {
                 YErr() << "ymake.macro decorator called without active build configuration! Macro will not be registered!" << Endl;
             }
 
-            Py_INCREF(args[0]);
-            return args[0];
+            Py_INCREF(func);
+            return func;
         }
 
     private:
         NYMake::NPy::OwnedRef<PyTypeObject> ContextType_;
         NYMake::NPy::OwnedRef<PyTypeObject> CmdContextType_;
+        NYMake::NPy::OwnedRef<> EmptyTuple_{PyTuple_New(0)};
         TBuildConfiguration* Conf_ = nullptr;
     };
 
@@ -597,7 +638,7 @@ namespace {
 
     PyMethodDef YMakeMethods[] = {
         {"parser", (PyCFunction)WrapMember<&TYMakeMod::ParserDecorator>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Use class as a parser for files with the given extension")},
-        {"macro", (PyCFunction)WrapMember<&TYMakeMod::MacroDecorator>, METH_FASTCALL, PyDoc_STR("Register function as ya.make macro")},
+        {"macro", (PyCFunction)WrapMember<&TYMakeMod::MacroDecorator>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Register function as ya.make macro")},
         {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS, PyDoc_STR("Report configure error")},
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},
         {"get_artifact_id_from_pom_xml", (PyCFunction)MethodGetArtifactIdFromPomXml, METH_FASTCALL, PyDoc_STR("Get artifactId from pom.xml")},

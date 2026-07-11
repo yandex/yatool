@@ -18,8 +18,12 @@ public:
 
     TFFIMacro() noexcept = default;
 
-    static std::expected<TFFIMacro, ESignatureDeductionError> Wrap(OwnedRef<> func, PyTypeObject& unitType) {
-        auto sign = DeduceConfSignature(*func, unitType);
+    static std::expected<TFFIMacro, ESignatureDeductionError> Wrap(
+        OwnedRef<> func,
+        PyTypeObject& unitType,
+        const THashSet<std::string>& ignoredArgs = {}
+    ) {
+        auto sign = DeduceConfSignature(*func, unitType, ignoredArgs);
         if (!sign)
             return std::unexpected(sign.error());
         return TFFIMacro{std::move(func), std::move(sign.value())};
