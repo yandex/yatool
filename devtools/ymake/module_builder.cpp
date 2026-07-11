@@ -946,6 +946,7 @@ bool TModuleBuilder::LateGlobStatement(const TStringBuf& name, const TVector<TSt
     if (name != NMacro::_LATE_GLOB) {
         return false;
     }
+    auto measuredScope = TModuleStagesStatsManager::Current().Measure();
 
     if (args.empty()) {
         YConfErr(Syntax) << "empty argument in [[alt1]]" << name << "[[rst]]" << Endl;

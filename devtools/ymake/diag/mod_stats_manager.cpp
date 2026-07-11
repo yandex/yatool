@@ -8,6 +8,16 @@
 
 #include <devtools/ymake/context_executor.h>
 
+namespace {
+
+std::string_view ModName(const TNameStore& names, TFileElemId mod) {
+    if (!mod)
+        return TDiagCtrl::TWhere::TOP_LEVEL;
+    return names.GetStringBufName(RawElemId(mod));
+}
+
+}
+
 namespace NDetail {
 
 TScopedMeasurer::TScopedMeasurer(TModStageStats& dest, TFileElemId mod) noexcept
@@ -54,12 +64,12 @@ void TModuleStagesStatsManager::Report(const TNameStore& names) {
         auto& min = *msg.MutableMin();
         min.SetWallUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Min.Value).count());
         min.SetCpuUs(stats.Min.CpuValue.count());
-        min.SetModule(TString{names.GetStringBufName(RawElemId(stats.Min.Mod))});
+        min.SetModule(TString{ModName(names, stats.Min.Mod)});
 
         auto& max = *msg.MutableMax();
         max.SetWallUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Max.Value).count());
         max.SetCpuUs(stats.Max.CpuValue.count());
-        max.SetModule(TString{names.GetStringBufName(RawElemId(stats.Max.Mod))});
+        max.SetModule(TString{ModName(names, stats.Max.Mod)});
 
         FORCE_TRACE(M, msg)
     }

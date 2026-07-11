@@ -12,6 +12,7 @@
 #include <devtools/ymake/lang/plugin_facade.h>
 
 #include <devtools/ymake/diag/manager.h>
+#include <devtools/ymake/diag/mod_stats_manager.h>
 #include <devtools/ymake/diag/trace.h>
 
 #include <util/string/cast.h>
@@ -308,6 +309,7 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
     if (name != NMacro::_GLOB) {
         return false;
     }
+    auto measuredScope = TModuleStagesStatsManager::Current().Measure();
 
     if (args.empty()) {
         YConfErrPrecise(Syntax, location.first, location.second) << "empty argument in [[alt1]]" << name << "[[rst]]" << Endl;
