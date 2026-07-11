@@ -71,11 +71,13 @@ namespace {
     struct Context {
         PyObject_HEAD
         TPluginUnit* Unit;
+
+        PyObject* CreateCmdContextObject(const char* attrName);
     };
 
     PyObject* ContextTypeGetAttrFunc(PyObject* self, char* attrname) {
         Context* context = reinterpret_cast<Context*>(self);
-        PyObject* obj = CreateCmdContextObject(context->Unit, attrname);
+        PyObject* obj = context->CreateCmdContextObject(attrname);
         CheckForError();
         return obj;
     }
@@ -410,25 +412,53 @@ namespace {
         return true;
     }
 
-    struct YMakeState {
-        NYMake::NPy::OwnedRef<PyTypeObject> ContextType;
-        NYMake::NPy::OwnedRef<PyTypeObject> CmdContextType;
-        TBuildConfiguration* Conf = nullptr;
+    class TYMakeMod {
+    public:
+        TYMakeMod(
+            NYMake::NPy::OwnedRef<PyTypeObject>&& contextType,
+            NYMake::NPy::OwnedRef<PyTypeObject>&& cmdContextType
+        ) noexcept
+            : ContextType_(std::move(contextType))
+            , CmdContextType_{std::move(cmdContextType)}
+        {}
+
+        void BindConf(TBuildConfiguration& conf) {
+            Y_ASSERT(!Conf_);
+            Conf_ = &conf;
+        }
+
+        NYMake::NPy::OwnedRef<> CreateContextObject(TPluginUnit* unit) {
+            NYMake::NPy::OwnedRef args{Py_BuildValue("()")};
+            CheckForError();
+            PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(ContextType_.Get()), args.get());
+            if (obj) {
+                Context* context = reinterpret_cast<Context*>(obj);
+                context->Unit = unit;
+            }
+            CheckForError();
+            return NYMake::NPy::OwnedRef<PyObject>{obj};
+        }
+
+        NYMake::NPy::OwnedRef<> CreateCmdContextObject(const char* attrName) {
+            NYMake::NPy::OwnedRef args{Py_BuildValue("(s)", attrName)};
+            CheckForError();
+            return NYMake::NPy::OwnedRef{PyObject_CallObject(reinterpret_cast<PyObject*>(CmdContextType_.Get()), args.get())};
+        }
 
         int Clear() noexcept {
-            Conf = nullptr;
-            ContextType.Reset();
-            CmdContextType.Reset();
+            Conf_ = nullptr;
+            ContextType_.Reset();
+            CmdContextType_.Reset();
             return 0;
         }
 
         int Traverse(visitproc visit, void* arg) noexcept {
-            Py_VISIT(ContextType.Get());
-            Py_VISIT(CmdContextType.Get());
+            Py_VISIT(ContextType_.Get());
+            Py_VISIT(CmdContextType_.Get());
             return 0;
         }
 
-        PyObject* DecoratorParser(PyObject* args, PyObject* kwargs) {
+        PyObject* ParserDecorator(PyObject* args, PyObject* kwargs) {
             const char* ext;
             PyObject* inducedDepsObj = nullptr;
             int passInducedIncludes = 0;
@@ -449,8 +479,8 @@ namespace {
                     PyErr_SetString(PyExc_RuntimeError, "ymake.parser decorator expects single decorated class to register as a parser");
                     return nullptr;
                 }
-                if (Conf) {
-                    AddParser(Conf, ext, args[0], inducedDeps, passInducedIncludes);
+                if (Conf_) {
+                    AddParser(Conf_, ext, args[0], inducedDeps, passInducedIncludes);
                 } else {
                     // Using YErr() here since it will fail build for case when this error happens inside ymake application but will not
                     // fail python code which tries to import plugins with ymake module being used as regular python module.
@@ -467,7 +497,7 @@ namespace {
                 return nullptr;
             }
 
-            auto macro = NYMake::NPy::TFFIMacro::Wrap(NYMake::NPy::FromBorrowedRef(args[0]), *ContextType);
+            auto macro = NYMake::NPy::TFFIMacro::Wrap(NYMake::NPy::FromBorrowedRef(args[0]), *ContextType_);
             if (!macro.has_value()) {
                 using enum NYMake::NPy::ESignatureDeductionError;
                 switch (macro.error()) {
@@ -475,7 +505,7 @@ namespace {
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro requires type hints on decorated function.");
                         break;
                     case MissingUnitArg:
-                        PyErr_Format(PyExc_RuntimeError, "ymake.macro: first argument type must be '%N'.", ContextType.get());
+                        PyErr_Format(PyExc_RuntimeError, "ymake.macro: first argument type must be '%N'.", ContextType_.get());
                         break;
                     case WrongArgType:
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only bool, str or tuple[str, ...] types are allowed for macro arguments.");
@@ -501,8 +531,8 @@ namespace {
                 return nullptr;
             }
 
-            if (Conf) {
-                NYMake::NPlugins::RegisterMacro(*Conf, std::move(macro.value()));
+            if (Conf_) {
+                NYMake::NPlugins::RegisterMacro(*Conf_, std::move(macro.value()));
             } else {
                 // Using YErr() here since it will fail build for case when this error happens inside ymake application but will not
                 // fail python code which tries to import plugins with ymake module being used as regular python module.
@@ -512,42 +542,43 @@ namespace {
             Py_INCREF(args[0]);
             return args[0];
         }
+
+    private:
+        NYMake::NPy::OwnedRef<PyTypeObject> ContextType_;
+        NYMake::NPy::OwnedRef<PyTypeObject> CmdContextType_;
+        TBuildConfiguration* Conf_ = nullptr;
     };
 
-    YMakeState* GetYMakeState(PyObject* mod) noexcept {
-        YMakeState* state = static_cast<YMakeState*>(PyModule_GetState(mod));
+    TYMakeMod* GetYMakeState(PyObject* mod) noexcept {
+        TYMakeMod* state = static_cast<TYMakeMod*>(PyModule_GetState(mod));
         Y_ASSERT(state != nullptr);
         return state;
     }
 
-    YMakeState* CreateYMakeState(PyObject* mod) {
+    int YMakeExec(PyObject* mod) {
+        NYMake::NPy::OwnedRef<PyTypeObject> contextType{reinterpret_cast<PyTypeObject*>(
+            PyType_FromModuleAndSpec(mod, &ContextTypeSpec, nullptr)
+        )};
+        if (contextType == nullptr) {
+            return -1;
+        }
+        if (PyModule_AddType(mod, contextType.Get())) {
+            return -1;
+        }
+
+        NYMake::NPy::OwnedRef<PyTypeObject> cmdContextType{reinterpret_cast<PyTypeObject*>(
+            PyType_FromModuleAndSpec(mod, &CmdContextTypeSpec, nullptr)
+        )};
+        if (cmdContextType == nullptr) {
+            return -1;
+        }
+        if (PyModule_AddType(mod, cmdContextType.Get())) {
+            return -1;
+        }
+
         void* stateMem = PyModule_GetState(mod);
         Y_ASSERT(stateMem != nullptr);
-        return new(stateMem) YMakeState{};
-    }
-
-    int YMakeExec(PyObject* mod) {
-        YMakeState* state = CreateYMakeState(mod);
-
-        state->ContextType.Reset(reinterpret_cast<PyTypeObject*>(
-            PyType_FromModuleAndSpec(mod, &ContextTypeSpec, nullptr)
-        ));
-        if (state->ContextType == nullptr) {
-            return -1;
-        }
-        if (PyModule_AddType(mod, state->ContextType.Get())) {
-            return -1;
-        }
-
-        state->CmdContextType.Reset(reinterpret_cast<PyTypeObject*>(
-            PyType_FromModuleAndSpec(mod, &CmdContextTypeSpec, nullptr)
-        ));
-        if (state->CmdContextType == nullptr) {
-            return -1;
-        }
-        if (PyModule_AddType(mod, state->CmdContextType.Get())) {
-            return -1;
-        }
+        new(stateMem) TYMakeMod{std::move(contextType), std::move(cmdContextType)};
 
         return 0;
     }
@@ -561,12 +592,12 @@ namespace {
     }
 
     void YMakeFree(void* mod) noexcept {
-        GetYMakeState(static_cast<PyObject*>(mod))->~YMakeState();
+        GetYMakeState(static_cast<PyObject*>(mod))->~TYMakeMod();
     }
 
     PyMethodDef YMakeMethods[] = {
-        {"parser", (PyCFunction)WrapMember<&YMakeState::DecoratorParser>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Use class as a parser for files with the given extension")},
-        {"macro", (PyCFunction)WrapMember<&YMakeState::MacroDecorator>, METH_FASTCALL, PyDoc_STR("Register function as ya.make macro")},
+        {"parser", (PyCFunction)WrapMember<&TYMakeMod::ParserDecorator>, METH_VARARGS | METH_KEYWORDS, PyDoc_STR("Use class as a parser for files with the given extension")},
+        {"macro", (PyCFunction)WrapMember<&TYMakeMod::MacroDecorator>, METH_FASTCALL, PyDoc_STR("Register function as ya.make macro")},
         {"report_configure_error", (PyCFunction)MethodReportConfigureError, METH_VARARGS, PyDoc_STR("Report configure error")},
         {"parse_cython_includes", MethodParseCythonIncludes, METH_VARARGS, PyDoc_STR("Parse Cython includes")},
         {"get_artifact_id_from_pom_xml", (PyCFunction)MethodGetArtifactIdFromPomXml, METH_FASTCALL, PyDoc_STR("Get artifactId from pom.xml")},
@@ -582,13 +613,24 @@ namespace {
         .m_base = PyModuleDef_HEAD_INIT,
         .m_name = "ymake",
         .m_doc = PyDoc_STR("Interface to YMake"),
-        .m_size = sizeof(YMakeState),
+        .m_size = sizeof(TYMakeMod),
         .m_methods = YMakeMethods,
         .m_slots = YMakeSlots,
         .m_traverse = YMakeTraverse,
         .m_clear = YMakeClear,
         .m_free = YMakeFree,
     };
+
+    PyObject* Context::CreateCmdContextObject(const char* attrName) {
+        NYMake::NPy::OwnedRef ymakeModule{PyImport_ImportModule("ymake")};
+        CheckForError();
+        auto obj = GetYMakeState(ymakeModule.get())->CreateCmdContextObject(attrName);
+        if (obj) {
+            CmdContext* cmdContext = reinterpret_cast<CmdContext*>(obj.get());
+            cmdContext->Unit = Unit;
+        }
+        return obj.Release();
+    }
 } // anonymous namespace
 
 namespace NYMake::NPlugins {
@@ -598,34 +640,12 @@ namespace NYMake::NPlugins {
 
     void BindYmakeConf(TBuildConfiguration& conf) {
         NYMake::NPy::OwnedRef mod{PyImport_ImportModule("ymake")};
-        Y_ASSERT(GetYMakeState(mod.get())->Conf == nullptr);
-        GetYMakeState(mod.get())->Conf = &conf;
+        GetYMakeState(mod.get())->BindConf(conf);
     }
 
     NYMake::NPy::OwnedRef<PyObject> CreateContextObject(TPluginUnit* unit) {
-        NYMake::NPy::OwnedRef args{Py_BuildValue("()")};
         NYMake::NPy::OwnedRef ymakeModule{PyImport_ImportModule("ymake")};
         CheckForError();
-        YMakeState* state = GetYMakeState(ymakeModule.get());
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->ContextType.Get()), args.get());
-        if (obj) {
-            Context* context = reinterpret_cast<Context*>(obj);
-            context->Unit = unit;
-        }
-        CheckForError();
-        return NYMake::NPy::OwnedRef<PyObject>{obj};
-    }
-
-    PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName) {
-        NYMake::NPy::OwnedRef args{Py_BuildValue("(s)", attrName)};
-        NYMake::NPy::OwnedRef ymakeModule{PyImport_ImportModule("ymake")};
-        CheckForError();
-        YMakeState* state = GetYMakeState(ymakeModule.get());
-        PyObject* obj = PyObject_CallObject(reinterpret_cast<PyObject*>(state->CmdContextType.Get()), args.get());
-        if (obj) {
-            CmdContext* cmdContext = reinterpret_cast<CmdContext*>(obj);
-            cmdContext->Unit = unit;
-        }
-        return obj;
+        return GetYMakeState(ymakeModule.get())->CreateContextObject(unit);
     }
 } // namespace NYMake::NPlugins

@@ -13,5 +13,4 @@ namespace NYMake::NPlugins {
     void BindYmakeConf(TBuildConfiguration& conf);
 
     NYMake::NPy::OwnedRef<PyObject> CreateContextObject(TPluginUnit*);
-    PyObject* CreateCmdContextObject(TPluginUnit* unit, const char* attrName);
 }
