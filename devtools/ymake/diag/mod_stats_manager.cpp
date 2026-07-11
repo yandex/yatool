@@ -12,21 +12,26 @@ namespace NDetail {
 
 TScopedMeasurer::TScopedMeasurer(TModStageStats& dest, TFileElemId mod) noexcept
     : Checkpoint_{MakeCheckpoint<std::chrono::steady_clock>()}
+    , CpuCheckpoint_{MakeCheckpoint<TThreadCPUClock>()}
     , Mod_{mod}
     , Dest_{dest}
 {}
 
 TScopedMeasurer::~TScopedMeasurer() noexcept {
     const auto time = TimeSince(Checkpoint_);
+    const auto cpuTime = TimeSince(CpuCheckpoint_);
     ++Dest_.Count;
     Dest_.Total += time;
+    Dest_.TotalCpu += cpuTime;
     if (time < Dest_.Min.Value) {
         Dest_.Min.Mod = Mod_;
         Dest_.Min.Value = time;
+        Dest_.Min.CpuValue = cpuTime;
     }
     if (time > Dest_.Max.Value) {
         Dest_.Max.Mod = Mod_;
         Dest_.Max.Value = time;
+        Dest_.Max.CpuValue = cpuTime;
     }
 }
 
@@ -40,18 +45,21 @@ void TModuleStagesStatsManager::Report(const TNameStore& names) {
     for (const auto& [stage, stats]: std::exchange(Stages_, {})) {
         NEvent::TModStageStats msg;
         msg.SetName(TString{stage});
-        msg.SetTotalUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Total).count());
         msg.SetCount(stats.Count);
 
-        TString modName;
+        auto& total = *msg.MutableTotal();
+        total.SetWallUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Total).count());
+        total.SetCpuUs(stats.TotalCpu.count());
 
-        msg.SetMinUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Min.Value).count());
-        modName = TString{names.GetStringBufName(RawElemId(stats.Min.Mod))};
-        msg.SetMinModule(modName);
+        auto& min = *msg.MutableMin();
+        min.SetWallUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Min.Value).count());
+        min.SetCpuUs(stats.Min.CpuValue.count());
+        min.SetModule(TString{names.GetStringBufName(RawElemId(stats.Min.Mod))});
 
-        msg.SetMaxUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Max.Value).count());
-        modName = TString{names.GetStringBufName(RawElemId(stats.Max.Mod))};
-        msg.SetMaxModule(modName);
+        auto& max = *msg.MutableMax();
+        max.SetWallUs(std::chrono::duration_cast<std::chrono::microseconds>(stats.Max.Value).count());
+        max.SetCpuUs(stats.Max.CpuValue.count());
+        max.SetModule(TString{names.GetStringBufName(RawElemId(stats.Max.Mod))});
 
         FORCE_TRACE(M, msg)
     }

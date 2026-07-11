@@ -2,6 +2,7 @@
 
 #include <devtools/ymake/symbols/elem_id.h>
 #include <devtools/ymake/libs/clocks/checkpoint.h>
+#include <devtools/ymake/libs/clocks/thread_cpu_clock.h>
 
 #include <util/generic/hash.h>
 
@@ -14,11 +15,13 @@ namespace NDetail {
 struct TModuleExtremum {
     TFileElemId Mod = {};
     std::chrono::nanoseconds Value = {};
+    std::chrono::microseconds CpuValue = {};
 };
 
 struct TModStageStats {
     size_t Count = 0;
     std::chrono::nanoseconds Total = {};
+    std::chrono::microseconds TotalCpu = {};
     TModuleExtremum Min = {{}, std::chrono::nanoseconds::max()};
     TModuleExtremum Max = {{}, std::chrono::nanoseconds::min()};
 };
@@ -29,6 +32,7 @@ public:
     ~TScopedMeasurer() noexcept;
 private:
     TCheckPoint<std::chrono::steady_clock> Checkpoint_;
+    TCheckPoint<TThreadCPUClock> CpuCheckpoint_;
     TFileElemId Mod_;
     TModStageStats& Dest_;
 };
