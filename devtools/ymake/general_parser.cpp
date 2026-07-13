@@ -13,7 +13,7 @@
 #include <devtools/ymake/diag/display.h>
 #include <devtools/ymake/diag/trace.h>
 
-#include <devtools/ymake/common/split.h>
+#include <devtools/ymake/libs/str_helpers/split.h>
 #include <devtools/ymake/common/uniq_vector.h>
 
 #include <devtools/ymake/lang/resolve_include.h>

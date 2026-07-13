@@ -21,6 +21,8 @@ PEERDIR(
     devtools/ymake/lang
     devtools/ymake/lang/makelists
     devtools/ymake/libs/clocks
+    devtools/ymake/libs/str_helpers
+    devtools/ymake/libs/spdx
     devtools/ymake/libs/ymakeyaml
     devtools/ymake/make_plan
     devtools/ymake/options
@@ -178,7 +180,6 @@ SRCS(
     saveload.cpp
     sem_graph.cpp
     shell_subst.cpp
-    spdx.cpp
     sysincl_conf.cpp
     sysincl_resolver.cpp
     tools_miner.cpp

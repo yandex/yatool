@@ -1,14 +1,13 @@
 #pragma once
 
-#include <devtools/ymake/diag/dbg.h>
-
 #include <util/generic/fwd.h>
+#include <util/generic/yexception.h>
 
 #include <bitset>
 
 namespace NSPDX {
 
-    struct TExpressionError: public TError {};
+    struct TExpressionError: public yexception {};
 
     using TPropSet = std::bitset<32>;
 

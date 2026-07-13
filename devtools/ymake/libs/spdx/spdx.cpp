@@ -1,9 +1,10 @@
-#include "spdx.h"
+#include <devtools/ymake/libs/spdx/spdx.h>
 
-#include <devtools/ymake/common/split.h>
+#include <devtools/ymake/libs/str_helpers/split.h>
 
 #include <util/generic/algorithm.h>
 #include <util/generic/array_ref.h>
+#include <util/generic/hash.h>
 
 namespace {
 

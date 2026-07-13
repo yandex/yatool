@@ -12,7 +12,7 @@
 
 #include <devtools/ymake/builtin_macro_consts.h>
 #include <devtools/ymake/module_state.h>
-#include <devtools/ymake/common/string.h>
+#include <devtools/ymake/libs/str_helpers/string.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/compact_graph/query.h>
 

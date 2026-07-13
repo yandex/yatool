@@ -6,7 +6,7 @@
 #include "vars.h"
 #include "out.h"
 
-#include <devtools/ymake/common/split_string.h>
+#include <devtools/ymake/libs/str_helpers/split_string.h>
 #include <devtools/ymake/common/uniq_vector.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/symbols/globs.h>

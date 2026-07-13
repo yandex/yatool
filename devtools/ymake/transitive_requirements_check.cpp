@@ -3,12 +3,12 @@
 #include "module_restorer.h"
 #include "module_store.h"
 
-#include <devtools/ymake/common/split.h>
+#include <devtools/ymake/libs/str_helpers/split.h>
 #include <devtools/ymake/compact_graph/iter_direct_peerdir.h>
 #include <devtools/ymake/compact_graph/query.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/macro_processor.h>
-#include <devtools/ymake/spdx.h>
+#include <devtools/ymake/libs/spdx/spdx.h>
 #include <devtools/ymake/ymake.h>
 #include <library/cpp/json/writer/json.h>
 #include <util/generic/array_ref.h>

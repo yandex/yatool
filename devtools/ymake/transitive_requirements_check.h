@@ -1,6 +1,6 @@
 #pragma once
 
-#include "spdx.h"
+#include <devtools/ymake/libs/spdx/spdx.h>
 
 #include <devtools/ymake/compact_graph/iter.h>
 #include <devtools/ymake/transitive_constraints.h>

@@ -4,8 +4,9 @@
 #include "node_printer.h"
 #include "ymake.h"
 #include "dependency_management.h"
-#include "spdx.h"
 #include "transitive_requirements_check.h"
+
+#include <devtools/ymake/libs/spdx/spdx.h>
 
 static void PrintAllFiles(const TYMake& ymake) {
     YInfo() << "All Files:" << Endl;

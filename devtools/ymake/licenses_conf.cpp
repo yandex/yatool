@@ -3,7 +3,7 @@
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/manager.h>
-#include <devtools/ymake/spdx.h>
+#include <devtools/ymake/libs/spdx/spdx.h>
 
 #include <library/cpp/digest/md5/md5.h>
 #include <library/cpp/json/fast_sax/parser.h>
