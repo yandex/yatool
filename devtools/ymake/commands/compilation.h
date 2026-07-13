@@ -1,7 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/common/uniq_vector.h>
-#include <devtools/ymake/polexpr/expression.h>
+#include <devtools/ymake/libs/polexpr/expression.h>
 #include <devtools/ymake/symbols/file_store.h>
 
 namespace NCommands {

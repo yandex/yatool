@@ -1,6 +1,6 @@
 #pragma once
 
-#include <devtools/ymake/polexpr/expression.h>
+#include <devtools/ymake/libs/polexpr/expression.h>
 #include <devtools/ymake/lang/macro_values.h>
 #include <devtools/ymake/commands/mod_registry.h>
 

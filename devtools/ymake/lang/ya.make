@@ -11,7 +11,7 @@ PEERDIR(
     devtools/ymake/lang/makelists
     devtools/ymake/libs/clocks
     devtools/ymake/options
-    devtools/ymake/polexpr
+    devtools/ymake/libs/polexpr
     devtools/ymake/symbols
     devtools/ymake/yndex
     library/cpp/case_insensitive_string

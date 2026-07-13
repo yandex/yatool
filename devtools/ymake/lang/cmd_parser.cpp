@@ -5,7 +5,7 @@
 #include <devtools/ymake/commands/mod_registry.h>
 #include <devtools/ymake/conf.h>
 
-#include <devtools/ymake/polexpr/variadic_builder.h>
+#include <devtools/ymake/libs/polexpr/variadic_builder.h>
 
 #include <util/generic/overloaded.h>
 #include <util/generic/scope.h>

@@ -2,7 +2,7 @@
 #include "mod_registry.h"
 #include <devtools/ymake/command_helpers.h>
 #include <devtools/ymake/diag/manager.h>
-#include <devtools/ymake/polexpr/evaluate.h>
+#include <devtools/ymake/libs/polexpr/evaluate.h>
 #include <fmt/format.h>
 #include <util/generic/overloaded.h>
 

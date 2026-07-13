@@ -229,7 +229,6 @@ RECURSE(
     lang/confreader_fuzz
     options
     plugins/pybridge
-    polexpr
     resolver
     stub
     symbols

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <devtools/ymake/polexpr/ids.h>
+#include <devtools/ymake/libs/polexpr/ids.h>
 #include <util/generic/cast.h>
 
 #include <cstdint>

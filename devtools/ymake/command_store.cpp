@@ -8,7 +8,7 @@
 #include <devtools/ymake/commands/script_evaluator.h>
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/lang/cmd_parser.h>
-#include <devtools/ymake/polexpr/evaluate.h>
+#include <devtools/ymake/libs/polexpr/evaluate.h>
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/common/string.h>
 #include <devtools/ymake/conf.h>

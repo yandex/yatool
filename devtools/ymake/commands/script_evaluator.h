@@ -3,7 +3,7 @@
 #include "evaluation.h"
 
 #include <devtools/ymake/command_store.h>
-#include <devtools/ymake/polexpr/expression.h>
+#include <devtools/ymake/libs/polexpr/expression.h>
 
 namespace NCommands {
 

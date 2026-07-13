@@ -1,7 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/exec.h>
-#include <devtools/ymake/polexpr/expression.h>
+#include <devtools/ymake/libs/polexpr/expression.h>
 #include <devtools/ymake/lang/cmd_parser.h>
 #include <devtools/ymake/lang/macro_values.h>
 #include <devtools/ymake/vars.h>
