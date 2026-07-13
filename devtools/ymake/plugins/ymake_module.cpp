@@ -498,39 +498,42 @@ namespace {
             const char* keys[] = {"ignored_args", nullptr};
             if (!PyArg_ParseTupleAndKeywords(EmptyTuple_.get(), kwargs, "|$O:ymake.macro", keys, &ignoredArgs))
                 return nullptr;
-
-            if (ignoredArgs) {
-                if (!PySet_Check(ignoredArgs)) {
-                    PyErr_Format(PyExc_TypeError, "ymake.macro decorator 'ignored_args' expected to be a set of strings but got '%N'.", Py_TYPE(ignoredArgs));
-                    return nullptr;
-                }
-
-                THashSet<std::string> ignore;
-                NYMake::NPy::OwnedRef iter{PyObject_GetIter(ignoredArgs)};
-                PyObject* item = nullptr;
-                while ((item = PyIter_Next(iter.get())) != nullptr) {
-                    NYMake::NPy::OwnedRef itemRef{std::exchange(item, nullptr)};
-                    if (!PyUnicode_Check(itemRef.get())) {
-                        PyErr_Format(PyExc_TypeError, "ymake.macro decorator 'ignored_args' expected to be a set of strings but got item of type '%N'.", Py_TYPE(itemRef.get()));
-                        return nullptr;
-                    }
-
-                    ignore.insert(std::string{NYMake::NPy::StrContent(*itemRef)});
-                }
-
-                return NYMake::NPy::MakePyLambda([this, ignore = std::move(ignore)](std::span<PyObject* const> args) -> PyObject* {
-                    if (args.size() != 1) {
-                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single decorated function to register as a macro");
-                        return nullptr;
-                    }
-                    return DoDecorateMacro(args[0], ignore);
-                }).Release();
+            if (ignoredArgs && !PySet_Check(ignoredArgs)) {
+                PyErr_Format(PyExc_TypeError, "ymake.macro decorator 'ignored_args' expected to be a set of strings but got '%N'.", Py_TYPE(ignoredArgs));
+                return nullptr;
             }
 
-            return DoDecorateMacro(func);
+            THashSet<std::string> ignore = ignoredArgs ? ConvertStrSet(*ignoredArgs) : THashSet<std::string>{};
+            if (func)
+                return DoDecorateMacro(func, ignore);
+
+            return NYMake::NPy::MakePyLambda([this, ignore = std::move(ignore)](std::span<PyObject* const> args) -> PyObject* {
+                if (args.size() != 1) {
+                    PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single decorated function to register as a macro");
+                    return nullptr;
+                }
+                return DoDecorateMacro(args[0], ignore);
+            }).Release();
         }
 
     private:
+        THashSet<std::string> ConvertStrSet(PyObject& pySet) const {
+            THashSet<std::string> res;
+
+            NYMake::NPy::OwnedRef iter{PyObject_GetIter(&pySet)};
+            PyObject* item = nullptr;
+            while ((item = PyIter_Next(iter.get())) != nullptr) {
+                NYMake::NPy::OwnedRef itemRef{std::exchange(item, nullptr)};
+                if (!PyUnicode_Check(itemRef.get())) {
+                    PyErr_Format(PyExc_TypeError, "ymake.macro decorator 'ignored_args' expected to be a set of strings but got item of type '%N'.", Py_TYPE(itemRef.get()));
+                    break;
+                }
+
+                res.insert(std::string{NYMake::NPy::StrContent(*itemRef)});
+            }
+            return res;
+        }
+
         PyObject* DoDecorateMacro(PyObject* func, const THashSet<std::string>& ignoreArgs = {}) {
             if (!func || !PyFunction_Check(func)) {
                 PyErr_SetString(PyExc_RuntimeError, "ymake.macro decorator expects single function to register as a macro");
