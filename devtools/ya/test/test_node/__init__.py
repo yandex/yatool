@@ -1579,9 +1579,11 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
     if opts.keep_temps or not opts.merge_split_tests:
         cmd += ["--keep-paths"]
 
+    cmd += ["--ya-start-command-file"]
     for node in test_nodes:
         output_path = os.path.dirname(node["outputs"][0])
         cmd += ["--output", output_path]
+    cmd += ["--ya-end-command-file"]
     if opts.save_test_outputs and not opts.merge_split_tests:
         for node in test_nodes:
             if not opts.dir_outputs or _stable_dir_outputs(suite, opts):
