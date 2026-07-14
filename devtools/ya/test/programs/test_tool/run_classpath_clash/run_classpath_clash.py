@@ -12,6 +12,20 @@ import exts.hashing as hashing
 
 _TAB = ' ' * 4
 
+# Interface jars (ijars) are compile-time only stubs produced by the split
+# JAVA_LIBRARY variant. Their .class entries have method bodies stripped, so a
+# class packed both into an ijar and into a full jar (e.g. an UBERJAR that
+# bundles the same library) always differs by content hash and would be
+# reported as a spurious clash. Such an interface-jar vs full-jar pair is not a
+# real runtime clash. Clashes between two interface jars (or two full jars) are
+# still genuine and must be reported.
+INTERFACE_JAR_SUFFIX = '-interface.jar'
+
+
+def is_interface_jar(filename):
+    return filename.endswith(INTERFACE_JAR_SUFFIX)
+
+
 # because reasons
 IGNORED_CLASSES_REGEX = re.compile(
     r'(.*(module|package)-info\.class$)|(ru/yandex/library/svnversion/SvnConstants\.class)'
@@ -112,6 +126,11 @@ def get_clashed_classes(build_root, jar_files, ignored, strict):
         for c2 in range(c1 + 1, len(classlist)):
             fst = classlist[c1]
             snd = classlist[c2]
+            # Suppress the interface-jar vs full-jar false positive: a stripped
+            # ijar class is not a runtime clash with the same class bundled in a
+            # full/uber jar. Pairs of two ijars or two full jars stay checked.
+            if is_interface_jar(fst['name']) != is_interface_jar(snd['name']):
+                continue
             intersect = [
                 i
                 for i in fst['classes']
