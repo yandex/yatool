@@ -253,7 +253,6 @@ class PyTestSuite(common.PythonTestSuite):
                     'RECURSE_PARTITION_INDEX',
                     'RECURSE_PARTITIONS_COUNT',
                     'CONSISTENT_DEBUG',
-                    'CONSISTENT_DEBUG_LIGHT',
                 ]:
                     continue
                 cmd += ['--flags', "{}={}".format(key, opts.flags[key])]
