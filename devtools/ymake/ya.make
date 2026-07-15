@@ -257,6 +257,7 @@ IF (OS_WINDOWS OR YA_OPENSOURCE OR OPENSOURCE)
     # For OpenSource some tests will be re-added back, but definitely not all
 ELSE()
     RECURSE(
+        build_test
         sandbox
         tests
     )
