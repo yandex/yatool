@@ -37,6 +37,14 @@ public abstract class CachedTestNames<K, V> {
                 key -> Shared.ensureUTF8(getMethodNameImpl(test)));
     }
 
+    public void putMethodName(K key, String methodName) {
+        methodNamesDesc.put(key, Shared.ensureUTF8(methodName));
+    }
+
+    public Map<K, String> getMethodNames() {
+        return new HashMap<>(methodNamesDesc);
+    }
+
     public Class<?> forName(String name) throws ClassNotFoundException {
         Class<?> clazz = classCache.get(name);
         if (clazz == null) {

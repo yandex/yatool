@@ -44,7 +44,7 @@ public class Shared {
     }
 
     //CHECKSTYLE:OFF
-    public static class Parameters {
+    public static class Parameters implements Cloneable {
         @Parameter(names = {"-o", "--output"})
         public String output;
 
@@ -101,6 +101,19 @@ public class Shared {
 
         @Parameter(names = {"--test-list-path"})
         public String testListPath = "";
+
+        @Override
+        public Parameters clone() {
+            try {
+                Parameters clone = (Parameters) super.clone();
+                clone.filters = new ArrayList<>(this.filters);
+                clone.junit_tags = new ArrayList<>(this.junit_tags);
+                clone.testParams = new ArrayList<>(this.testParams);
+                return clone;
+            } catch (CloneNotSupportedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
     //CHECKSTYLE:ON
 
