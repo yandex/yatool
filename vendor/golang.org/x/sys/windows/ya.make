@@ -2,7 +2,7 @@ GO_LIBRARY()
 
 LICENSE(BSD-3-Clause)
 
-VERSION(v0.43.0)
+VERSION(v0.45.0)
 
 IF (OS_WINDOWS)
     SRCS(
@@ -29,6 +29,7 @@ IF (OS_WINDOWS)
         env_windows_test.go
         syscall_test.go
         syscall_windows_test.go
+        xattr_test.go
     )
 ENDIF()
 
