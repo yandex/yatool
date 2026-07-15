@@ -963,8 +963,11 @@ namespace {
             const TVector<TNodeId>& rawPeers,
             const TDependencyManagementRules& rules) {
             TVector<TResolvedPeer> managedPeers;
-            auto& listsStore = RestoreContext.Modules.GetNodeListStore();
-            auto& parentPeerIds = RestoreContext.Modules.GetModuleNodeIds(parent.GetId());
+            // Set only when an EPeerResolution::Default entry is pushed below (a rare
+            // misconfiguration: PEERDIR to a contrib proxy without a matching
+            // DEPENDENCY_MANAGEMENT rule). Used to skip the cleanup pass at the end of
+            // this function in the (overwhelmingly common) case when it is not needed.
+            bool hasDefaultResolutionPeers = false;
             auto& fileConf = RestoreContext.Graph.Names().FileConf;
             const auto unittestDir = parent.Get("UNITTEST_DIR");
             for (const TNodeId peerId : rawPeers) {
@@ -987,12 +990,19 @@ namespace {
                     const auto rule = rules.GetRuleForPeer(peerDir, true);
                     if (rule.empty()) {
                         YConfErr(Misconfiguration) << "Dependency with [[alt1]]default[[rst]] version: [[imp]]" << GetModule(proxyIt->second)->GetDir().CutAllTypes() << "[[rst]]" << Endl;
+                        // NOTE(YMAKE-2117): The default version module (proxyIt->second) is kept in
+                        // managedPeers (with EPeerResolution::Default) only long enough for the
+                        // RequireDM diagnostic loop below to detect and report it. It must NOT end up
+                        // in the Direct/closure/UniqPeers sets that are consumed by DM-aware graph
+                        // visitors (e.g. TJSONVisitor), because there is no real graph edge from
+                        // `parent` to this module in this scenario (it is forbidden: default version
+                        // without an explicit DEPENDENCY_MANAGEMENT rule), so it is never visited by
+                        // the graph traversal. Entries with EPeerResolution::Default are stripped out
+                        // right before this function returns (guarded by hasDefaultResolutionPeers,
+                        // since this is a rare misconfiguration and the cleanup pass should not run
+                        // on every invocation), see below.
                         managedPeers.push_back({proxyIt->second, EPeerResolution::Default});
-                        // Add default versions to the list of managed peers closure to traverse Module -> Proxy -> DefaultVer
-                        // dependency chain in DM aware visitors. Default versions are forbidden but may appear in the selective
-                        // checkout case when dependency management is stored in some ya.make.inc file from not yes checked out
-                        // dir. TODO(svidyuk) need to investigate how to handle this situation in a better way.
-                        listsStore.AddToList(parentPeerIds.UniqPeers, peerId);
+                        hasDefaultResolutionPeers = true;
                         continue;
                     }
 
@@ -1033,6 +1043,25 @@ namespace {
                             << Endl;
                     }
                 }
+            }
+
+            // NOTE(YMAKE-2117): Strip out EPeerResolution::Default entries (forbidden dependencies
+            // resolved to a contrib proxy's default version without an explicit DEPENDENCY_MANAGEMENT
+            // rule). They only existed above to be picked up by the RequireDM diagnostic loop.
+            // They must not be returned to the caller: this vector becomes TManagedPeers::Direct and
+            // is used to build MANAGED_PEERS/MANAGED_PEERS_CLOSURE/UniqPeers and is fed into DM-aware
+            // graph visitors (e.g. TJSONVisitor), which assume every listed dependency is reachable
+            // via a real graph edge and has been visited by the traversal. The default version module
+            // has no such edge from `parent`, so keeping it here previously caused crashes.
+            // This is a rare misconfiguration, so only pay for the cleanup pass when it actually
+            // happened (hasDefaultResolutionPeers), instead of scanning managedPeers on every call.
+            if (hasDefaultResolutionPeers) {
+                managedPeers.erase(
+                    std::remove_if(
+                        managedPeers.begin(),
+                        managedPeers.end(),
+                        [](const TResolvedPeer& peer) { return peer.Resolution == EPeerResolution::Default; }),
+                    managedPeers.end());
             }
 
             return managedPeers;
