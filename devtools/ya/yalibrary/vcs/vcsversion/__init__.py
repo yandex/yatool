@@ -724,7 +724,7 @@ class _SystemInfo:  # TODO: (nkh) this is not class, it's a module (fix coming n
                 f'{INDENT}Build by: {_SystemInfo.get_user(fake_build_info)}',
                 f'{INDENT}Top src dir: {os.curdir if fake_build_info else src_dir}',
                 f'{INDENT}Top build dir: {os.curdir if fake_build_info else build_dir}',
-                f'{INDENT}Hostname: {_SystemInfo.get_hostname(fake_build_info)}'
+                f'{INDENT}Hostname: {_SystemInfo.get_hostname(fake_build_info)}',
                 f'{INDENT}Host information: \n{_SystemInfo._get_host_info(fake_build_info)}',
                 f'{INDENT} {_SystemInfo._get_local_data(src_dir, data_file)}',
             ],
