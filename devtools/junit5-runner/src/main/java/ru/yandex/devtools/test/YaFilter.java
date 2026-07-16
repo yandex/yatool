@@ -1,6 +1,7 @@
 package ru.yandex.devtools.test;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,7 @@ public class YaFilter {
         List<DiscoverySelector> selectors = new ArrayList<>();
         LinkedHashMap<String, String> searchableMap = getTestSearchableMap(classContainers);
 
-        List<String> notAppliedFilters = new ArrayList<>();
+        Set<String> notAppliedFilters = new HashSet<>();
         for (String filter : filters) {
             String uniqueId = searchableMap.get(filter);
             if (uniqueId != null) {

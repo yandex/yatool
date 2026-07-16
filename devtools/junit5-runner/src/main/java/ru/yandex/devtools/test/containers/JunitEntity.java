@@ -2,6 +2,8 @@ package ru.yandex.devtools.test.containers;
 
 import org.junit.platform.launcher.TestIdentifier;
 
+import ru.yandex.devtools.test.Shared;
+
 public abstract class JunitEntity {
     private final TestIdentifier testIdentifier;
 
@@ -10,7 +12,7 @@ public abstract class JunitEntity {
     }
 
     public String getDisplayName() {
-        return testIdentifier.getDisplayName();
+        return Shared.ensureUTF8(testIdentifier.getDisplayName());
     }
 
     public String getUniqueId() {
