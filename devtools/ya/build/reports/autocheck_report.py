@@ -69,14 +69,17 @@ def _fix_link_prefix_and_quote(link, fix_from, fix_to):
         return url
 
 
+def _ensure_posix_path(p):
+    # support windows host
+    return p.replace("\\", "/") if os.sep == "\\" else p
+
+
 def _fix_links_entry(entry, name, fix_from, fix_to):
     paths = entry["links"][name]
     assert isinstance(paths, list), entry
     for i in range(len(paths)):
         if fix_to.startswith("http") and not paths[i].startswith("http"):
-            p = paths[i]
-            if os.sep == "\\":  # windows host
-                p = p.replace("\\", "/")
+            p = _ensure_posix_path(paths[i])
             paths[i] = _fix_link_prefix_and_quote(p, fix_from, fix_to)
         else:
             paths[i] = paths[i].replace(fix_from, fix_to)
@@ -621,7 +624,7 @@ class ReportGenerator:
         target_id = rp.get_id(target_name, subtest=(module_tag or ''))
         target_hid = rp.get_hash_id(target_name, subtest=(module_tag or ''))
         return make_target_entry(
-            target_name,
+            _ensure_posix_path(target_name),
             target_id,
             target_hid,
             uid,
