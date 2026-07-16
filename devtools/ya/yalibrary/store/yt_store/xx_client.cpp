@@ -2029,8 +2029,8 @@ namespace NYa {
                 // For any other CritLevel value, the exception is escalated and results in program termination, so the log message is redundant
                 if (CritLevel_ == ECritLevel::NONE) {
                     TString messagePrefix{"Disabling dist cache. Last caught error: "};
-                    if (errMessage.size() > 100) {
-                        WARNING_LOG << messagePrefix << errMessage.substr(0, 100) << "...<Truncated. Complete message will be available in debug logs>";
+                    if (errMessage.size() > 400) {
+                        WARNING_LOG << messagePrefix << errMessage.substr(0, 400) << "...<Truncated. Complete message will be available in debug logs>";
                         DEBUG_LOG << messagePrefix << errMessage;
                     } else {
                         WARNING_LOG << messagePrefix << errMessage;
