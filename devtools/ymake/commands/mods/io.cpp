@@ -25,11 +25,7 @@ namespace {
             CheckArgCount(args);
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(name.Data); // TODO get rid of this
-                    if (names.size() == 1)
-                        return ProcessOne(names.front());
-                    else
-                        return ProcessMany(names);
+                    return ProcessOne(name.Data);
                 },
                 [&](const TMacroValues::TXStrings& names) -> TMacroValues::TValue {
                     if (names.Data.size() == 1)
@@ -44,6 +40,8 @@ namespace {
         }
     private:
         std::string ProcessPath(std::string_view path) const {
+            if (path.empty())
+                ythrow TConfigurationError() << "Unexpected empty path";
             // a combination of path normalization from TGeneralParser::AddCommandNodeDeps and tool name processing from MineVariables
             auto dir = NPath::IsExternalPath(path) ? TString{path} : NPath::ConstructYDir(path, TStringBuf(), ConstrYDirDiag);
             auto key = NPath::CutType(dir);
@@ -78,11 +76,7 @@ namespace {
             CheckArgCount(args);
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(name.Data); // TODO get rid of this
-                    if (names.size() == 1)
-                        return ProcessOne(names.front());
-                    else
-                        return ProcessMany(names);
+                    return ProcessOne(name.Data);
                 },
                 [&](const TMacroValues::TXStrings& names) -> TMacroValues::TValue {
                     if (names.Data.size() == 1)
@@ -97,6 +91,8 @@ namespace {
         }
     private:
         std::string ProcessPath(std::string_view path) const {
+            if (path.empty())
+                ythrow TConfigurationError() << "Unexpected empty path";
             // a combination of path normalization from TGeneralParser::AddCommandNodeDeps and tool name processing from MineVariables
             auto dir = NPath::IsExternalPath(path) ? TString{path} : NPath::ConstructYDir(path, TStringBuf(), ConstrYDirDiag);
             auto key = NPath::CutType(dir);
@@ -136,10 +132,7 @@ namespace {
 
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& name) {
-                    auto names = SplitArgs(name.Data); // TODO get rid of this
-                    if (names.size() == 1)
-                        return ProcessOne(ctx, names.front(), _args.Context, false, false);
-                    return ProcessMany(ctx, names, _args.Context, false, false);
+                    return ProcessOne(ctx, name.Data, _args.Context, false, false);
                 },
                 [&](const TMacroValues::TXStrings& names) {
                     if (names.Data.size() == 1)
@@ -165,6 +158,8 @@ namespace {
             TMacroValues::TValue Path;
         };
         auto ProcessCoord(const TPreevalCtx& ctx, std::string_view name, ELinkType context, bool isGlob, bool isLegacyGlob) const {
+            if (name.empty())
+                ythrow TConfigurationError() << "Unexpected empty path";
             if (!isLegacyGlob) {
                 // WORKAROUND[mixed LATE_GLOBs]
                 // see the respective note in `TCommands::TInliner::GetVariableDefinition`
@@ -211,10 +206,7 @@ namespace {
             auto& nameArg = args[0];
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(name.Data); // TODO get rid of this
-                    if (names.size() == 1)
-                        return ProcessOne(ctx, names.front());
-                    return ProcessMany(ctx, names);
+                    return ProcessOne(ctx, name.Data);
                 },
                 [&](const TMacroValues::TXStrings& names) -> TMacroValues::TValue {
                     if (names.Data.size() == 1)
@@ -228,6 +220,8 @@ namespace {
         }
     private:
         ui32 ProcessCoord(const TPreevalCtx& ctx, std::string_view name) const {
+            if (name.empty())
+                ythrow TConfigurationError() << "Unexpected empty path";
             auto pooledName = ctx.Values.Internalize(name);
             auto result = ctx.Sink.Outputs.CollectCoord(pooledName);
             if (Y_UNLIKELY(Id == EMacroFunction::Tmp))
@@ -266,11 +260,8 @@ namespace {
             CheckArgCount(args);
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(name.Data); // TODO get rid of this
                     auto result = TMacroValues::TXStrings();
-                    result.Data.reserve(names.size());
-                    for (auto& name : names)
-                        result.Data.push_back(ProcessOne(ctx, name));
+                    result.Data.push_back(ProcessOne(ctx, name.Data));
                     return result;
                 },
                 [&](TMacroValues::TXStrings names) -> TMacroValues::TValue {
@@ -285,6 +276,8 @@ namespace {
         }
     private:
         std::string ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
+            if (name.empty())
+                ythrow TConfigurationError() << "Unexpected empty path";
             auto pooledName = ctx.Values.Internalize(name);
             ctx.Sink.OutputIncludes.CollectCoord(pooledName);
             return std::string(pooledName);
@@ -303,11 +296,8 @@ namespace {
             CheckArgCount(args);
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(name.Data); // TODO get rid of this
                     auto result = TMacroValues::TXStrings();
-                    result.Data.reserve(names.size());
-                    for (auto& name : names)
-                        result.Data.push_back(ProcessOne(ctx, name));
+                    result.Data.push_back(ProcessOne(ctx, name.Data));
                     return result;
                 },
                 [&](TMacroValues::TXStrings names) -> TMacroValues::TValue {
@@ -322,9 +312,11 @@ namespace {
         }
     private:
         std::string ProcessOne(const TPreevalCtx& ctx, std::string_view name) const {
+            if (name.empty())
+                ythrow TConfigurationError() << "Unexpected empty path";
             auto pooledName = ctx.Values.Internalize(name);
             auto ix = ctx.Sink.OutputIncludes.Index(pooledName);
-            if (ix == NPOS) [[unlikely]]
+            if (ix == NPOS)
                 throw TConfigurationError() << "Unknown output-include [[bad]]" << name << "[[rst]], could not mark as from-input";
             ctx.Sink.OutputIncludes.Update(ix, [&](auto& var) {
                 var.OutInclsFromInput = true;
@@ -351,11 +343,8 @@ namespace {
             auto& dst = ctx.Sink.OutputIncludesForType[exts];
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& name) -> TMacroValues::TValue {
-                    auto names = SplitArgs(name.Data); // TODO get rid of this
                     auto result = TMacroValues::TXStrings();
-                    result.Data.reserve(names.size());
-                    for (auto& name : names)
-                        result.Data.push_back(ProcessOne(ctx, name, dst));
+                    result.Data.push_back(ProcessOne(ctx, name.Data, dst));
                     return result;
                 },
                 [&](TMacroValues::TXStrings names) -> TMacroValues::TValue {
@@ -370,6 +359,8 @@ namespace {
         }
     private:
         std::string ProcessOne(const TPreevalCtx& ctx, std::string_view name, NCommands::TCompiledCommand::TOutputIncludes& dst) const {
+            if (name.empty())
+                ythrow TConfigurationError() << "Unexpected empty path";
             auto pooledName = ctx.Values.Internalize(name);
             dst.CollectCoord(pooledName);
             return std::string(pooledName);

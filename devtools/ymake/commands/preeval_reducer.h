@@ -165,7 +165,10 @@ namespace NCommands {
             // TODO? support for TVarStr with .StructCmdForVars
             if (var->size() == 1) {
                 auto& val = var->front();
-                return TMacroValues::TXString{Evaluate(val)};
+                auto result = Evaluate(val);
+                if (result.empty())
+                    return TMacroValues::TXStrings{};
+                return TMacroValues::TXString{result};
             } else {
                 TMacroValues::TXStrings result;
                 result.Data.reserve(var->size());

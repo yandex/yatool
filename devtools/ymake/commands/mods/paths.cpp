@@ -161,10 +161,7 @@ namespace {
             CheckArgCount(args);
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& path) -> TMacroValues::TValue {
-                    auto names = SplitArgs(path.Data); // TODO get rid of this
-                    if (names.size() == 1)
-                        return ProcessOne(names.front());
-                    return ProcessMany(names);
+                    return ProcessOne(path.Data);
                 },
                 [&](const TMacroValues::TXStrings& paths) -> TMacroValues::TValue {
                     if (paths.Data.size() == 1)
@@ -237,10 +234,7 @@ namespace {
             CheckArgCount(args);
             return std::visit(TOverloaded{
                 [&](const TMacroValues::TXString& path) -> TMacroValues::TValue {
-                    auto names = SplitArgs(path.Data); // TODO get rid of this
-                    if (names.size() == 1)
-                        return ProcessOne(names.front());
-                    return ProcessMany(names);
+                    return ProcessOne(path.Data);
                 },
                 [&](const TMacroValues::TXStrings& paths) -> TMacroValues::TValue {
                     if (paths.Data.size() == 1)
