@@ -1158,7 +1158,16 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
         [&](TMacroValues::TTool val) {
             if (!ctx.CmdInfo.ToolPaths)
                 return NCommands::TTermValue(TString("TODO/unreachable?/tool/") + val.Data);
-            return NCommands::TTermValue(ctx.CmdInfo.ToolPaths->at(val.Data));
+            // The tool directory may be missing/invalid (e.g. reported as BadDir
+            // during configuration with -k/--keep-going): in that case no entry was
+            // mined into ToolPaths for it (see MineVariables/IsDirectToolDep), so we must not
+            // use THashMap::at() here (it would throw and crash the whole process).
+            // The configuration error has already been reported, so it is safe to fall
+            // back to a placeholder value and let the (failed) build continue.
+            if (const auto* toolPath = ctx.CmdInfo.ToolPaths->FindPtr(val.Data)) {
+                return NCommands::TTermValue(*toolPath);
+            }
+            return NCommands::TTermValue(TString("TODO/missing-tool-dir/") + val.Data);
         },
         [&](TMacroValues::TTools val) {
             if (val.Data.empty())
@@ -1166,8 +1175,14 @@ NCommands::TTermValue TCommands::EvalConst(const TMacroValues::TValue& value, co
             if (!ctx.CmdInfo.ToolPaths)
                 return NCommands::TTermValue(TString("TODO/unreachable?/tool/") + fmt::format("{}", fmt::join(val.Data, ", ")));
             TVector<TString> result;
-            for (auto& tool : val.Data)
-                result.push_back(ctx.CmdInfo.ToolPaths->at(tool));
+            for (auto& tool : val.Data) {
+                // See the comment above about missing tool directories: skip THashMap::at().
+                if (const auto* toolPath = ctx.CmdInfo.ToolPaths->FindPtr(tool)) {
+                    result.push_back(*toolPath);
+                } else {
+                    result.push_back(TString("TODO/missing-tool-dir/") + tool);
+                }
+            }
             return NCommands::TTermValue(result);
         },
         [&](TMacroValues::TResult val) {
