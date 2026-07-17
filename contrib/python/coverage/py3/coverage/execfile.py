@@ -91,7 +91,10 @@ class PyRunner:
         This needs to happen before any importing, and without importing anything.
         """
         path0: str | None
-        if getattr(sys.flags, "safe_path", False):
+        if getattr(sys.flags, "safe_path", False) or getattr(sys.flags, "isolated", False):
+            # PYVERSION
+            # Python 3.10 isolated mode predates sys.flags.safe_path.
+            # Remove the isolated fallback when coverage drops 3.10 support.
             # See https://docs.python.org/3/using/cmdline.html#cmdoption-P
             path0 = None
         elif self.as_module:
@@ -140,6 +143,7 @@ class PyRunner:
             if self.spec is not None:
                 self.modulename = self.spec.name
             self.loader = DummyLoader(self.modulename)
+            self.spec.loader = self.loader  # type: ignore[assignment]
             assert pathname is not None
             self.pathname = os.path.abspath(pathname)
             self.args[0] = self.arg0 = self.pathname
@@ -157,12 +161,17 @@ class PyRunner:
             else:
                 raise NoSource(f"Can't find '__main__' module in '{self.arg0}'")
 
-            # Make a spec. I don't know if this is the right way to do it.
             try_filename = python_reported_file(try_filename)
-            self.spec = importlib.machinery.ModuleSpec("__main__", None, origin=try_filename)
-            self.spec.has_location = True
             self.package = ""
             self.loader = DummyLoader("__main__")
+
+            # Make a spec. I don't know if this is the right way to do it.
+            self.spec = importlib.machinery.ModuleSpec(
+                "__main__",
+                self.loader,  # type: ignore[arg-type]
+                origin=try_filename,
+            )
+            self.spec.has_location = True
         else:
             self.loader = DummyLoader("__main__")
 
