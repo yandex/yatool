@@ -231,8 +231,15 @@ def fill_tracer_with_environ_stages():
     if stages:
         prev_stage = None
         for stage in stages.split(":"):
-            name, tstamp = stage.split("@")
-            tstamp = float(tstamp)
+            # Fail-safe: a malformed YA_STAGES entry must not crash ya on
+            # startup. E.g. `date +%s.%N` on BSD/macOS does not expand %N and
+            # yields '<sec>.N', which is not a valid float.
+            try:
+                name, tstamp = stage.split("@")
+                tstamp = float(tstamp)
+            except ValueError:
+                logger.warning("Skipping malformed YA_STAGES entry: %r", stage)
+                continue
             if prev_stage is not None:
                 prev_stage.finish(tstamp)
             prev_stage = stager.start(name, tstamp)
