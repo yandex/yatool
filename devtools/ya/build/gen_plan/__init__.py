@@ -303,6 +303,7 @@ def _gen_graph_file(opts, extra_dict=None):
             opts.vcs_file,
             opts.flags,
             custom_version=getattr(opts, 'custom_version', ''),
+            release_version=getattr(opts, 'release_version', ''),
         ),
         daemon=False,
     )

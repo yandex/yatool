@@ -743,20 +743,6 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 subgroup=DEB_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
-                names=['--custom-version'],
-                help='Custom package version',
-                hook=devtools.ya.core.yarg.SetValueHook('custom_version'),
-                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
-                names=['--release-version'],
-                help='Custom release version',
-                hook=devtools.ya.core.yarg.SetValueHook('release_version'),
-                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
-                subgroup=COMMON_SUBGROUP,
-            ),
-            devtools.ya.core.yarg.ArgConsumer(
                 names=['--debian-arch'],
                 help='Debian arch (passed to debuild as `-a`)',
                 hook=devtools.ya.core.yarg.SetValueHook('debian_arch'),
@@ -900,6 +886,7 @@ class PackageCustomizableOptions(devtools.ya.core.yarg.Options):
                 subgroup=COMMON_SUBGROUP,
                 visible=devtools.ya.core.yarg.HelpLevel.NONE,
             ),
+            *devtools.ya.build.build_opts.VersionsOptions().consumer(),
         ]
 
     def postprocess(self):

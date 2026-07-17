@@ -674,6 +674,31 @@ class ContinueOnFailOptions(Options):
         ]
 
 
+class VersionsOptions(Options):
+    def __init__(self):
+        self.custom_version = None
+        self.release_version = None
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--custom-version'],
+                help='Custom version string to embed into build info (CUSTOM_VERSION field in vcs.json)',
+                hook=SetValueHook('custom_version'),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+            ArgConsumer(
+                ['--release-version'],
+                help='Custom release version string to embed into build info (RELEASE_VERSION field in vcs.json)',
+                hook=SetValueHook('release_version'),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+        ]
+
+
 class PGOOptions(Options):
     def __init__(self):
         self.pgo_add = False
@@ -3351,6 +3376,7 @@ def ya_make_options(  # compat
             CustomSourceRootOptions(),
             CustomBuildRootOptions(),
             CustomMiscBuildInfoDirOptions(),
+            VersionsOptions(),
             YMakeDebugOptions(),
             ConfigureDebugOptions(),
             YMakeBinOptions(),
