@@ -1,12 +1,12 @@
 Metadata-Version: 2.4
 Name: humanize
-Version: 4.15.0
+Version: 4.16.0
 Summary: Python humanize utilities
+Project-URL: Issue tracker, https://github.com/python-humanize/humanize/issues
+Project-URL: Release notes, https://github.com/python-humanize/humanize/releases
 Project-URL: Documentation, https://humanize.readthedocs.io/
 Project-URL: Funding, https://tidelift.com/subscription/pkg/pypi-humanize?utm_source=pypi-humanize&utm_medium=pypi
 Project-URL: Homepage, https://github.com/python-humanize/humanize
-Project-URL: Issue tracker, https://github.com/python-humanize/humanize/issues
-Project-URL: Release notes, https://github.com/python-humanize/humanize/releases
 Project-URL: Source, https://github.com/python-humanize/humanize
 Author-email: Jason Moiron <jmoiron@jmoiron.net>
 Maintainer: Hugo van Kemenade
@@ -31,8 +31,10 @@ Classifier: Topic :: Text Processing :: General
 Requires-Python: >=3.10
 Provides-Extra: tests
 Requires-Dist: freezegun; extra == 'tests'
-Requires-Dist: pytest; extra == 'tests'
+Requires-Dist: pytest-benchmark; extra == 'tests'
+Requires-Dist: pytest-codspeed; extra == 'tests'
 Requires-Dist: pytest-cov; extra == 'tests'
+Requires-Dist: pytest>=9; extra == 'tests'
 Description-Content-Type: text/markdown
 
 # humanize
@@ -69,6 +71,7 @@ size or throughput. It is localized to:
 - Japanese
 - Klingon
 - Korean
+- Latvian
 - Norwegian
 - Persian
 - Polish

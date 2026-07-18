@@ -2,7 +2,7 @@
 
 PY3_LIBRARY()
 
-VERSION(4.15.0)
+VERSION(4.16.0)
 
 LICENSE(MIT)
 
@@ -41,6 +41,7 @@ RESOURCE_FILES(
     humanize/locale/it_IT/LC_MESSAGES/humanize.mo
     humanize/locale/ja_JP/LC_MESSAGES/humanize.mo
     humanize/locale/ko_KR/LC_MESSAGES/humanize.mo
+    humanize/locale/lv/LC_MESSAGES/humanize.mo
     humanize/locale/nb/LC_MESSAGES/humanize.mo
     humanize/locale/nl_NL/LC_MESSAGES/humanize.mo
     humanize/locale/pl_PL/LC_MESSAGES/humanize.mo

@@ -5,6 +5,8 @@ These are largely borrowed from Django's `contrib.humanize`.
 
 from __future__ import annotations
 
+__lazy_modules__ = {"humanize.i18n", "humanize.number"}
+
 from enum import Enum
 from functools import total_ordering
 
@@ -301,6 +303,9 @@ def _convert_aware_datetime(
     value: dt.datetime | dt.timedelta | float | None,
 ) -> Any:
     """Convert aware datetime to naive datetime and pass through any other type."""
+    if value is None:
+        return None
+
     import datetime as dt
 
     if isinstance(value, dt.datetime) and value.tzinfo is not None:
@@ -319,6 +324,12 @@ def naturalday(value: dt.date | dt.datetime, format: str = "%b %d") -> str:
     import datetime as dt
 
     try:
+        # When value is a tz-aware datetime, compute "today" in that timezone
+        # so the comparison uses the correct local date.
+        if isinstance(value, dt.datetime) and value.tzinfo is not None:
+            today = dt.datetime.now(value.tzinfo).date()
+        else:
+            today = dt.date.today()
         value = dt.date(value.year, value.month, value.day)
     except AttributeError:
         # Passed value wasn't date-ish
@@ -326,7 +337,7 @@ def naturalday(value: dt.date | dt.datetime, format: str = "%b %d") -> str:
     except (OverflowError, ValueError):
         # Date arguments out of range
         return str(value)
-    delta = value - dt.date.today()
+    delta = value - today
 
     if delta.days == 0:
         return _("today")
@@ -344,7 +355,12 @@ def naturaldate(value: dt.date | dt.datetime) -> str:
     """Like `naturalday`, but append a year for dates more than ~five months away."""
     import datetime as dt
 
+    original_value = value
     try:
+        if isinstance(value, dt.datetime) and value.tzinfo is not None:
+            today = dt.datetime.now(value.tzinfo).date()
+        else:
+            today = dt.date.today()
         value = dt.date(value.year, value.month, value.day)
     except AttributeError:
         # Passed value wasn't date-ish
@@ -352,10 +368,10 @@ def naturaldate(value: dt.date | dt.datetime) -> str:
     except (OverflowError, ValueError):
         # Date arguments out of range
         return str(value)
-    delta = _abs_timedelta(value - dt.date.today())
+    delta = _abs_timedelta(value - today)
     if delta.days >= 5 * 365 / 12:
-        return naturalday(value, "%b %d %Y")
-    return naturalday(value)
+        return naturalday(original_value, "%b %d %Y")
+    return naturalday(original_value)
 
 
 def _quotient_and_remainder(
@@ -541,9 +557,13 @@ def precisedelta(
     secs = delta.seconds
     usecs = delta.microseconds
 
-    MICROSECONDS, MILLISECONDS, SECONDS, MINUTES, HOURS, DAYS, MONTHS, YEARS = list(
-        Unit
-    )
+    MILLISECONDS = Unit.MILLISECONDS
+    SECONDS = Unit.SECONDS
+    MINUTES = Unit.MINUTES
+    HOURS = Unit.HOURS
+    DAYS = Unit.DAYS
+    MONTHS = Unit.MONTHS
+    YEARS = Unit.YEARS
 
     # Given DAYS compute YEARS and the remainder of DAYS as follows:
     #   if YEARS is the minimum unit, we cannot use DAYS so
@@ -620,14 +640,14 @@ def precisedelta(
         ("%d microsecond", "%d microseconds", usecs),
     ]
 
+    import math
+
     texts: list[str] = []
     for unit, fmt in zip(reversed(Unit), fmts):
         singular_txt, plural_txt, fmt_value = fmt
         if fmt_value > 0 or (not texts and unit == min_unit):
             _fmt_value = 2 if 1 < fmt_value < 2 else int(fmt_value)
             fmt_txt = _ngettext(singular_txt, plural_txt, _fmt_value)
-            import math
-
             if unit == min_unit and math.modf(fmt_value)[0] > 0:
                 fmt_txt = fmt_txt.replace("%d", format)
             elif unit == YEARS:
