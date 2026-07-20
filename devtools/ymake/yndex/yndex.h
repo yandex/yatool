@@ -173,9 +173,13 @@ namespace NYndex {
 
     class TYndex {
     public:
-        TYndex(const TDefinitions& Definitions, const TReferences& References);
+        TYndex(const TDefinitions& Definitions, const TReferences& References, const bool Enable = true);
 
         bool AddReference(const TString& name, const TString& file, const TSourceRange& range);
+
+        bool IsEnabled() const {
+            return Enabled;
+        }
 
         void WriteJSON(IOutputStream& out) const;
 
@@ -183,6 +187,7 @@ namespace NYndex {
         using TFileYndex = TVector<TYndexRecord>;
 
         const TDefinitions& Definitions;
+        const bool Enabled;
         THashMap<TString, TFileYndex> Files;
     };
 }

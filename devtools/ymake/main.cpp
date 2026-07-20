@@ -97,7 +97,7 @@ TYMake::TYMake(TBuildConfiguration& conf)
     , Names(Conf, Conf, TimeStamps)
     , TimeStamps(Names)
     , IncParserManager(conf, Names)
-    , Yndex(Conf.CommandDefinitions, Conf.CommandReferences)
+    , Yndex(Conf.CommandDefinitions, Conf.CommandReferences, /*Enabled = */ !Conf.WriteYdx.empty())
     , Modules(Names, conf.PeersRules, Conf)
 {
     TimeStamps.StartSession();

@@ -92,10 +92,15 @@ TYndexRecord::TYndexRecord(ERecordType type, const NYndex::TSourceRange& range, 
     }
 }
 
-TYndex::TYndex(const TDefinitions& definitions, const TReferences& references)
+TYndex::TYndex(const TDefinitions& definitions, const TReferences& references, const bool enable)
     : Definitions(definitions)
+    , Enabled(enable)
 {
-    for (auto it : definitions.GetDefinitions()) {
+    // Don't fill any vector unless you plan to use it later.
+    if (!Enabled) {
+        return;
+    }
+    for (const auto& it : definitions.GetDefinitions()) {
         const TDefinition& def = it.second;
         TFileYndex& fileYndex = Files[def.Link.File];
         fileYndex.emplace_back(ERecordType::Node, def.Link.Range, def);
@@ -127,9 +132,9 @@ void TYndex::WriteJSON(IOutputStream& out) const {
     Y_ASSERT(Definitions.AreEnabled());
     NJson::TJsonWriter jsonWriter(&out, true, true);
     jsonWriter.OpenMap();
-    for (auto file : Files) {
+    for (const auto& file : Files) {
         jsonWriter.OpenArray(file.first);
-        for (auto record : file.second) {
+        for (const auto& record : file.second) {
             jsonWriter.OpenMap();
 
             switch (record.Type) {
@@ -142,7 +147,7 @@ void TYndex::WriteJSON(IOutputStream& out) const {
             }
 
             jsonWriter.OpenMap("properties");
-            for (auto prop : record.Properties) {
+            for (const auto& prop : record.Properties) {
                 jsonWriter.Write(prop.first, prop.second);
             }
             jsonWriter.CloseMap();

@@ -291,9 +291,11 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     for (auto& var : ownVars)
         var.second.NoInline = true;
-    if (ExtraVars)
+    if (ExtraVars) {
         for (auto& v : *ExtraVars)
             ownVars[v.first] = std::move(v.second);
+        ExtraVars.Reset();
+    }
 
     if (blockData && blockData->CmdProps) {
 
@@ -1271,6 +1273,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
             auto varElemId = InitCmdNode(var, EStructCmd::Yes, EExprRole::Var);
             actionNode.AddUniqueDep(EDT_BuildCommand, EMNT_BuildVariable, varElemId);
         }
+        LocalVars.Reset();
     }
     if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
         if (GlobalVars) {
@@ -1284,6 +1287,7 @@ bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode
                 auto varElemId = InitCmdNode(var, EStructCmd::Yes, EExprRole::Var);
                 actionNode.AddUniqueDep(EDT_Include, EMNT_BuildCommand, varElemId);
             }
+            GlobalVars.Reset();
         }
     }
 

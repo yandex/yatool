@@ -33,11 +33,14 @@ public:
                 file.Skip(1);
             }
 
-            Yndex.AddReference(
-                ToString(command),
-                ToString(file),
-                range
-            );
+            // Do not fill the Yndex if you will not dumpt it later.
+            if (Yndex.IsEnabled()) {
+                Yndex.AddReference(
+                    ToString(command),
+                    ToString(file),
+                    range
+                );
+            }
         }
 
         Context->SetCurrentLocation(command, ctx.GetLocation());
