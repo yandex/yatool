@@ -250,7 +250,13 @@ namespace NYa::NGraph {
         TInternString(const TInternString& other) noexcept = default;
         TInternString(const TInternString&& other) noexcept = default;
 
-        inline operator TStringBuf() const {
+        template<typename TCharTraits>
+        inline operator TBasicStringBuf<char, TCharTraits>() const {
+            return Get();
+        }
+
+        template<typename TCharTraits>
+        inline operator std::basic_string_view<char, TCharTraits>() const {
             return Get();
         }
 
