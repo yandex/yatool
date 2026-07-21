@@ -12,6 +12,7 @@ import org.junit.jupiter.engine.config.DefaultJupiterConfiguration;
 import org.junit.jupiter.engine.config.JupiterConfiguration;
 import org.junit.jupiter.engine.descriptor.JupiterEngineDescriptor;
 import org.junit.jupiter.engine.descriptor.LauncherStoreFacade;
+import org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
@@ -37,7 +38,6 @@ public class Junit5TemplateTestLookupV_5_13 implements Junit5TemplateTestLookup 
     private final CachedTestNames<String, TestIdentifier> testName;
     private final JupiterConfiguration configuration;
     private final JupiterEngineExecutionContext executionContext;
-    private final LauncherDiscoveryRequest request;
 
     private Junit5TemplateTestLookupV_5_13(CachedTestNames<String, TestIdentifier> testName, LauncherDiscoveryRequest request, Path outputRoot) {
         this.testName = testName;
@@ -54,7 +54,6 @@ public class Junit5TemplateTestLookupV_5_13 implements Junit5TemplateTestLookup 
                     }
                 });
 
-        this.request = request;
         var launcherStore = new LauncherStoreFacade(
                 new NamespacedHierarchicalStore<>(new NamespacedHierarchicalStore<>(null)));
 
@@ -83,8 +82,8 @@ public class Junit5TemplateTestLookupV_5_13 implements Junit5TemplateTestLookup 
                 }
             }
             if (method != null) {
-                TestTemplateYaTestDescriptorV_5_13 descriptor = new TestTemplateYaTestDescriptorV_5_13(
-                        UniqueId.parse(test.getUniqueId()), clazz, method, List::of, configuration, request);
+                TestTemplateTestDescriptor descriptor = new TestTemplateTestDescriptor(
+                        UniqueId.parse(test.getUniqueId()), clazz, method, List::of, configuration);
                 JupiterEngineExecutionContext context = descriptor.prepare(executionContext);
                 descriptor.execute(context, new Node.DynamicTestExecutor() {
                     @Override

@@ -4,22 +4,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.junit.platform.engine.DiscoverySelector;
-import org.junit.platform.engine.TestSource;
 import org.junit.platform.engine.TestTag;
 import org.junit.platform.engine.discovery.ClassNameFilter;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
-import org.junit.platform.engine.support.descriptor.MethodSource;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.PostDiscoveryFilter;
@@ -31,12 +24,8 @@ import org.junit.platform.launcher.core.LauncherFactory;
 
 import ru.yandex.devtools.log.Logger;
 import ru.yandex.devtools.test.Shared.Parameters;
-import ru.yandex.devtools.test.containers.ClassContainer;
-import ru.yandex.devtools.test.containers.ParametrizedTestContainer;
-import ru.yandex.devtools.test.containers.TestContainer;
 import ru.yandex.devtools.util.StopWatch;
 
-import static java.util.Collections.emptyList;
 import static ru.yandex.devtools.test.Shared.GSON;
 
 public class Runner extends AbstractRunner {
@@ -77,89 +66,39 @@ public class Runner extends AbstractRunner {
     }
 
     @Override
-    protected int listTests(RunnerTask task) throws RuntimeException {
+    protected int listTests(RunnerTask task) throws IOException {
         Parameters params = task.getParams();
         Writer writer = task.getWriter();
 
         StopWatch cfg = task.getTiming().getConfiguration();
         cfg.start();
 
-        Map<Object, Object> subtestInfo = new HashMap<>();
-        Set<ClassContainer> classContainers = listTests(params);
-        classContainers.forEach(cls -> {
-            cls.getTests().forEach(test -> {
-                try {
-                    writeTestInfo(subtestInfo, writer, cls, test);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            cls.getParametrizedTests().forEach(param ->
-                    param.getTests().forEach(test -> {
-                        try {
-                            writeTestInfo(subtestInfo, writer, cls, test);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    })
-            );
-        });
-        cfg.stop();
-        return 0;
-    }
-
-    private static Set<ClassContainer> listTests(Parameters params) {
         YaTestNameBase baseName = new YaTestNameBase();
         Launcher launcher = LauncherFactory.create();
         LauncherDiscoveryRequest request = getRequestWithForkFilter(launcher, baseName, params);
         TestPlan plan = launcher.discover(request);
         YaTestName testName = new YaTestName(baseName, plan);
 
-        var templateLookup = Junit5TemplateTestLookupFactory.lazyLookup(testName, request, null).get();
-
-        Set<ClassContainer> classContainers = new LinkedHashSet<>();
+        Map<Object, Object> subtestInfo = new HashMap<>();
         for (TestIdentifier root : plan.getRoots()) {
-            for (TestIdentifier classIdentifier : plan.getChildren(root)) {
-                ClassContainer classContainer = new ClassContainer(classIdentifier);
-                classContainers.add(classContainer);
+            logger.info("Root: %s", root);
 
-                for (TestIdentifier methodIdentifier : plan.getChildren(classIdentifier)) {
-                    var templateInvocations = new ArrayList<TestIdentifier>();
-                    if(methodIdentifier.getSource().isPresent()) {
-                        TestSource source = methodIdentifier.getSource().get();
-                        if (methodIdentifier.isContainer() && source instanceof MethodSource) {
-                            templateLookup.discoverTemplateInvocation(methodIdentifier, (MethodSource) source,
-                                    templateInvocations::add);
-                        }
-                    }
+            for (TestIdentifier test : plan.getDescendants(root)) {
+                logger.info("Found test: %s", test);
 
-                    if (templateInvocations.isEmpty()) {
-                        classContainer.addTest(new TestContainer(methodIdentifier, classContainer));
-                    } else {
-                        var parametrized = new ParametrizedTestContainer(methodIdentifier);
-                        classContainer.addParametrized(parametrized);
-                        templateInvocations.forEach(invocation ->
-                                parametrized.addTest(new TestContainer(invocation, parametrized)));
-                    }
+                if (testName.isTest(test)) {
+                    subtestInfo.put("test", testName.getClassName(test));
+                    subtestInfo.put("subtest", testName.getMethodName(test));
+                    subtestInfo.put("tags", test.getTags().stream().map(TestTag::getName).collect(Collectors.toSet()));
+                    writer.write(GSON.toJson(subtestInfo));
+                    writer.write(System.lineSeparator());
                 }
             }
         }
-
-        return classContainers;
+        cfg.stop();
+        return 0;
     }
 
-    private static void writeTestInfo(Map<Object, Object> subtestInfo, Writer writer, ClassContainer classContainer,
-                                      TestContainer test) throws IOException {
-        subtestInfo.put("test", classContainer.getDisplayName());
-        subtestInfo.put("subtest", test.extractMethodDisplayName());
-        subtestInfo.put("tags", test.getTestIdentifier()
-                .getTags()
-                .stream()
-                .map(TestTag::getName)
-                .collect(Collectors.toSet()));
-        writer.write(GSON.toJson(subtestInfo));
-        writer.write(System.lineSeparator());
-    }
 
     @Override
     protected int executeTests(RunnerTask task) throws Exception {
@@ -219,36 +158,27 @@ public class Runner extends AbstractRunner {
         }
     }
 
+
     static LauncherDiscoveryRequest getRequest(YaTestNameBase baseName, Parameters params,
                                                PostDiscoveryFilter additionalFilter) {
         LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request();
-
-        List<DiscoverySelector> selectors = new ArrayList<>();
-
-        if (!params.filters.isEmpty()) {
-            var paramsForListing = params.clone();
-            paramsForListing.filters = emptyList();
-            Set<ClassContainer> classContainers = listTests(paramsForListing);
-
-            YaFilter filter = new YaFilter(classContainers);
-            selectors.addAll(filter.filtering(baseName, params.filters));
+        if (params.testsJar.startsWith("class:")) {
+            builder.selectors(DiscoverySelectors.selectClass(params.testsJar.substring("class:".length())));
         } else {
-            if (params.testsJar.startsWith("class:")) {
-                selectors.add(DiscoverySelectors.selectClass(params.testsJar.substring("class:".length())));
-            } else {
-                selectors.addAll((DiscoverySelectors.selectClasspathRoots(new HashSet<>(
-                        Collections.singletonList(new File(params.testsJar).toPath())))));
-            }
+            builder.selectors(DiscoverySelectors.selectClasspathRoots(new HashSet<>(
+                    Collections.singletonList(new File(params.testsJar).toPath()))));
         }
-        builder.selectors(selectors);
+
         return builder
                 .filters(
                         ClassNameFilter.includeClassNamePatterns(".*"),
+                        new YaFilter(baseName, params.filters),
                         new RuntimeTagFilter(baseName, params.junit_tags),
                         additionalFilter
                 )
                 .build();
     }
+
 
     static LauncherDiscoveryRequest getRequestWithForkFilter(Launcher launcher, YaTestNameBase baseName,
                                                              Parameters params) {
@@ -257,12 +187,11 @@ public class Runner extends AbstractRunner {
             return getRequest(baseName, params, filter);
         }
 
+        var request = getRequest(baseName, params, new AlwaysAcceptFilter());
         if (params.modulo <= 1) {
-            return getRequest(baseName, params, new AlwaysAcceptFilter());
+            return request;
         }
-        var copyParams = params.clone();
-        copyParams.filters = emptyList();
-        var request = getRequest(baseName, copyParams, new AlwaysAcceptFilter());
+
         var plan = launcher.discover(request);
         var testName = new YaTestName(baseName, plan);
 
@@ -272,7 +201,7 @@ public class Runner extends AbstractRunner {
                 .filter(testName::isTest)
                 .collect(Collectors.toList());
 
-        PostDiscoveryFilter filter;
+        PostDiscoveryFilter filter = null;
         if (params.forkSubtests) {
             filter = new ForkSubtestsFilter(testName, params.modulo, params.moduloIndex, testIdentifiers);
         } else {
@@ -281,6 +210,7 @@ public class Runner extends AbstractRunner {
 
         return getRequest(baseName, params, filter);
     }
+
 
     public static void main(String[] args) throws Exception {
         new Runner().run(args);

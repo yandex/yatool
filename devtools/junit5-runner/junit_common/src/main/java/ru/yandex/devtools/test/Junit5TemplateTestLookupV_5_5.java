@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.engine.config.DefaultJupiterConfiguration;
 import org.junit.jupiter.engine.config.JupiterConfiguration;
 import org.junit.jupiter.engine.descriptor.JupiterEngineDescriptor;
+import org.junit.jupiter.engine.descriptor.TestTemplateTestDescriptor;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
@@ -30,13 +31,11 @@ public class Junit5TemplateTestLookupV_5_5 implements Junit5TemplateTestLookup {
 
     private final CachedTestNames<String, TestIdentifier> testName;
     private final JupiterConfiguration configuration;
-    private final LauncherDiscoveryRequest request;
     private final JupiterEngineExecutionContext executionContext;
 
     private Junit5TemplateTestLookupV_5_5(CachedTestNames<String, TestIdentifier> testName, LauncherDiscoveryRequest request) {
         this.testName = testName;
         this.configuration = new DefaultJupiterConfiguration(request.getConfigurationParameters());
-        this.request = request;
 
         JupiterEngineExecutionContext context = new JupiterEngineExecutionContext(
                 new EmptyEngineExecutionListener(), configuration);
@@ -63,8 +62,8 @@ public class Junit5TemplateTestLookupV_5_5 implements Junit5TemplateTestLookup {
                 }
             }
             if (method != null) {
-                TestTemplateYaTestDescriptorV_5_5 descriptor = new TestTemplateYaTestDescriptorV_5_5(
-                        UniqueId.parse(test.getUniqueId()), clazz, method, configuration, request);
+                TestTemplateTestDescriptor descriptor = new TestTemplateTestDescriptor(
+                        UniqueId.parse(test.getUniqueId()), clazz, method, configuration);
                 JupiterEngineExecutionContext context = descriptor.prepare(executionContext);
                 descriptor.execute(context, new Node.DynamicTestExecutor() {
                     @Override
