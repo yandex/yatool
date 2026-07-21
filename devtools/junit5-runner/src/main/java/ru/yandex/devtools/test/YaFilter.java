@@ -34,10 +34,13 @@ public class YaFilter {
             String uniqueId = searchableMap.get(filter);
             if (uniqueId != null) {
                 var parsedUniqueId = UniqueId.parse(uniqueId);
+                if (Boolean.parseBoolean(System.getProperty("old.reruning.strategy", "false"))
+                        && parsedUniqueId.getLastSegment().getType().equals("test-template-invocation")) {
+                    parsedUniqueId = parsedUniqueId.removeLastSegment();
+                }
                 selectors.add(DiscoverySelectors.selectUniqueId(parsedUniqueId));
                 String[] testsPart = filter.split("::");
-                if (testsPart.length >= 2 && !parsedUniqueId.getLastSegment()
-                        .getType().equals("test-template-invocation")) {
+                if (testsPart.length >= 2) {
                     // for correct logic reporting if we can restart tests with duplicate Display name
                     baseName.putMethodName(parsedUniqueId, testsPart[1]);
                 }
@@ -93,7 +96,7 @@ public class YaFilter {
             searchableMap.put(classContainer.getReportingView() +
                             duplicateWatcher.getUniqueTestName(testContainer.extractMethodDisplayName()),
                     testContainer.getUniqueId());
-            String testParameterByIndex = testContainer.getParent().getDisplayName() + String.format("::[%d]", i + 1);
+            String testParameterByIndex = testContainer.getParent().getDisplayName() + String.format(":[%d]", i + 1);
             searchableMap.put(classContainer.getReportingView() + duplicateWatcher.getUniqueTestName(testParameterByIndex),
                     testContainer.getUniqueId());
 
