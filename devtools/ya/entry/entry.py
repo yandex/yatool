@@ -128,15 +128,13 @@ def main(args):
     opensource = not app_config.in_house
     p = ArgParse(prog='ya', add_help=False)
 
-    # Do not forget add arguments with value to `skippable_flags` into /ya script
     p.add_argument('--precise', action='store_const', const=True, default=False, help='show precise timings in log')
     p.add_argument(
         '--profile', action='store_const', const=True, default=False, help='run python profiler for ya binary'
     )
     p.add_argument('--error-file')
-    # Free-form intent of the invocation (e.g. an agent's task description). Stored
-    # in the caller_info telemetry record. Takes a value -> also listed in
-    # `skippable_flags` in the /ya wrapper script.
+    # Free-form intent of the invocation (e.g. an agent's task description).
+    # Stored in the caller_info telemetry record.
     p.add_argument('--intent', default=os.environ.get('YA_INTENT'))
     p.add_argument('--keep-tmp', action='store_const', const=True, default=False)
     p.add_argument(
