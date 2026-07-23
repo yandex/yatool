@@ -2344,7 +2344,9 @@ void DumpModulesInfo(IOutputStream& out, const TRestoreContext& restoreContext, 
         json.BeginList();
     }
     for (const auto& target: startTargets) {
-        if (!target.IsModuleTarget) {
+        const bool skipDependsTarget =
+            target.IsDependsTarget && !target.IsRecurseTarget && restoreContext.Conf.SkipDepends;
+        if (!target.IsModuleTarget || skipDependsTarget) {
             continue;
         }
         TDepthGraphIterator<TGraphConstIteratorState, TManagedPeerConstVisitor<>> it(restoreContext.Graph, state, visitor);
