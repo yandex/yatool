@@ -434,18 +434,17 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
     except ImportError:
         pass
 
-    with temp_dir() as tmp:
-        res = gen_func(
-            build_root=build_root or tmp,
-            build_type=params.build_type,
-            build_targets=params.abs_targets,
-            debug_options=debug_options,
-            flags=params.flags,
-            ymake_bin=getattr(params, 'ymake_bin', None),
-            host_platform=params.host_platform,
-            target_platforms=params.target_platforms,
-            **kwargs
-        )
+    res = gen_func(
+        build_root=build_root,
+        build_type=params.build_type,
+        build_targets=params.abs_targets,
+        debug_options=debug_options,
+        flags=params.flags,
+        ymake_bin=getattr(params, 'ymake_bin', None),
+        host_platform=params.host_platform,
+        target_platforms=params.target_platforms,
+        **kwargs
+    )
     if write_stdout:
         delay_stdout_write(res.stdout)
     return res
@@ -1197,13 +1196,15 @@ def do_conf(params):
 
 
 def do_conf_docs(params):
-    _do_dump(
-        dump_mmm_docs,
-        params,
-        dump_all_conf_docs=params.dump_all_conf_docs,
-        conf_docs_json=params.conf_docs_json,
-        replacements=params.replacements,
-    )
+    with temp_dir() as tmp:
+        _do_dump(
+            dump_mmm_docs,
+            params,
+            build_root=tmp,
+            dump_all_conf_docs=params.dump_all_conf_docs,
+            conf_docs_json=params.conf_docs_json,
+            replacements=params.replacements,
+        )
 
 
 def do_dump_raw_vcs_info(params):

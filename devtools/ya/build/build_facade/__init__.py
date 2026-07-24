@@ -12,7 +12,9 @@ import devtools.ya.build.gen_plan
 import devtools.ya.build.genconf
 import devtools.ya.build.targets
 import devtools.ya.build.ymake2
-from library.python.tmp import temp_file
+
+from contextlib import nullcontext
+from library.python.tmp import temp_file, temp_dir
 
 logger = logging.getLogger(__name__)
 
@@ -41,38 +43,56 @@ def _gen(
     custom_conf_dir=None,
     patch_path=None,
 ):
-    generation_conf = gen_conf(
-        build_root=custom_build_directory,
-        build_type=build_type,
-        build_targets=build_targets,
-        flags=flags,
-        host_platform=host_platform,
-        target_platforms=target_platforms,
-        custom_conf_dir=custom_conf_dir,
-    )
-    res, evlog_dump = devtools.ya.build.ymake2.ymake_dump(
-        custom_build_directory=custom_build_directory,
-        build_type=build_type,
-        abs_targets=build_targets,
-        debug_options=debug_options,
-        warn_mode=warn_mode,
-        flags=flags,
-        ymake_bin=ymake_bin,
-        grab_stderr=grab_stderr,
-        custom_conf=generation_conf,
-        evlog=evlog,
-        find_path_from=find_path_from,
-        find_path_to=find_path_to,
-        modules_info_file=modules_info_file,
-        modules_info_filter=modules_info_filter,
-        lic_link_type=lic_link_type,
-        lic_custom_tags=lic_custom_tags,
-        managed_dep_tree=managed_dep_tree,
-        classpaths=classpaths,
-        dump_file=dump_file,
-        patch_path=patch_path,
-        disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
-    )
+
+    if not custom_conf_dir:
+        try:
+            import app_ctx
+
+            bld_dir = getattr(app_ctx.params, 'bld_dir')
+            if bld_dir:
+                custom_conf_dir = os.path.join(bld_dir, 'conf')
+
+        except ImportError:
+            pass
+
+    conf_ctx = nullcontext(custom_conf_dir) if custom_conf_dir else temp_dir()
+
+    with conf_ctx as conf_dir:
+        generation_conf = gen_conf(
+            build_root=custom_build_directory,
+            build_type=build_type,
+            build_targets=build_targets,
+            flags=flags,
+            host_platform=host_platform,
+            target_platforms=target_platforms,
+            custom_conf_dir=conf_dir,
+        )
+
+        ya_cache_dir = custom_build_directory or os.path.dirname(generation_conf) + '_ymake_cache'
+
+        res, evlog_dump = devtools.ya.build.ymake2.ymake_dump(
+            custom_build_directory=ya_cache_dir,
+            build_type=build_type,
+            abs_targets=build_targets,
+            debug_options=debug_options,
+            warn_mode=warn_mode,
+            flags=flags,
+            ymake_bin=ymake_bin,
+            grab_stderr=grab_stderr,
+            custom_conf=generation_conf,
+            evlog=evlog,
+            find_path_from=find_path_from,
+            find_path_to=find_path_to,
+            modules_info_file=modules_info_file,
+            modules_info_filter=modules_info_filter,
+            lic_link_type=lic_link_type,
+            lic_custom_tags=lic_custom_tags,
+            managed_dep_tree=managed_dep_tree,
+            classpaths=classpaths,
+            dump_file=dump_file,
+            patch_path=patch_path,
+            disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
+        )
     return (res, evlog_dump) if evlog else res
 
 
