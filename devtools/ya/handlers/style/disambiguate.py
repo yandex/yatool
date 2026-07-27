@@ -15,6 +15,7 @@ class DisambiguationOptions(tp.NamedTuple):
     use_clang_format_yt: bool = False
     use_clang_format_15: bool = False
     use_clang_format_18_vanilla: bool = False
+    use_clang_format_user_sessions: bool = False
     autoinclude_files: tuple[str, ...] = const.AUTOINCLUDE_PATHS
 
 
@@ -105,6 +106,8 @@ def _clang_formats(
         return styler.ClangFormat15
     elif disambiguation_opts.use_clang_format_18_vanilla:
         return styler.ClangFormat18Vanilla
+    elif disambiguation_opts.use_clang_format_user_sessions:
+        return styler.ClangFormat18UserSessions
     return styler.ClangFormat
 
 
@@ -122,6 +125,7 @@ def disambiguate_targets(
         styler.ClangFormatYT,
         styler.ClangFormat15,
         styler.ClangFormat18Vanilla,
+        styler.ClangFormat18UserSessions,
     }:
         return _clang_formats(disambiguation_opts)
 

@@ -21,6 +21,7 @@ class StyleOptions(devtools.ya.core.yarg.Options):
         self.use_clang_format_yt = False
         self.use_clang_format_15 = False
         self.use_clang_format_18_vanilla = False
+        self.use_clang_format_user_sessions = False
         self.internal_enable_implicit_taxi_formatters = False
         self.internal_paths_with_integrations: list[str] = []
         self.smart = False
@@ -96,6 +97,12 @@ class StyleOptions(devtools.ya.core.yarg.Options):
                 ['--vanilla-cf18'],
                 help="Use vanilla clang-format-18 for cpp files. Only works with custom linter configs and linters.make.inc mechanism.",
                 hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_18_vanilla', True),
+                group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--cpp-us'],
+                help="Use user_sessions patched clang-format for cpp files. Only works with custom linter configs and linters.make.inc mechanism.",
+                hook=devtools.ya.core.yarg.SetConstValueHook('use_clang_format_user_sessions', True),
                 group=devtools.ya.core.yarg.ADVANCED_OPT_GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(

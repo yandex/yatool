@@ -194,7 +194,7 @@ def select_suitable_stylers(
             if ClangFormat in filtered and ClangFormat not in filtered2:
                 # XXX: We assume that linters.yaml can only contain common clang-format settings.
                 # So we apply it to every other clang-format flavor
-                filtered2 -= {ClangFormatYT, ClangFormat18Vanilla, ClangFormat15}
+                filtered2 -= {ClangFormatYT, ClangFormat18Vanilla, ClangFormat15, ClangFormat18UserSessions}
 
             filtered = filtered2
             if not filtered:
@@ -486,6 +486,21 @@ class ClangFormat18Vanilla(ClangFormat):
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
                 else (cfg.AutoincludeConfig.make(const.CppLinterName.ClangFormat18Vanilla),)
+            ),
+        )
+
+
+@_register
+class ClangFormat18UserSessions(ClangFormat):
+    name: tp.ClassVar = const.CppLinterName.ClangFormat18UserSessions
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("clang-format-user-sessions")  # type: ignore
+        self.config_finder = cfg.ConfigFinder(
+            (
+                styler_opts.config_loaders
+                if styler_opts.config_loaders
+                else (cfg.AutoincludeConfig.make(const.CppLinterName.ClangFormat18UserSessions),)
             ),
         )
 

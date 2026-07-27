@@ -156,6 +156,7 @@ def run_style(args) -> int:
         use_clang_format_yt=args.use_clang_format_yt,
         use_clang_format_15=args.use_clang_format_15,
         use_clang_format_18_vanilla=args.use_clang_format_18_vanilla,
+        use_clang_format_user_sessions=args.use_clang_format_user_sessions,
     )
 
     style_opts = StyleOptions(
