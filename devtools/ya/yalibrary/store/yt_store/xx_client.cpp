@@ -267,7 +267,6 @@ namespace NYa {
                 if (requestedChunks.empty()) {
                     return;
                 }
-                TNode::TListType rows = FetchDataFunc_(requestedChunks);
                 for (auto& row : FetchDataFunc_(requestedChunks)) {
                     Chunks_[row.ChildAsUint64("chunk_i")] = std::move(row);
                 }
