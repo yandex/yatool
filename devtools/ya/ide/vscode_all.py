@@ -16,6 +16,7 @@ import devtools.ya.core.config
 import devtools.ya.core.yarg
 import exts.asyncthread
 import exts.fs as fs
+from library.python.tmp import temp_dir
 import yalibrary.platform_matcher as pm
 import yalibrary.tools
 from yalibrary.toolscache import lock_resource, toolscache_version
@@ -193,7 +194,8 @@ class VSCodeProject:
         with open(compile_commands_path, "w") as f:
             json.dump(compilation_database, f, indent=4)
 
-    def do_codegen(self):
+    def do_codegen(self, module_info_dump_dir: str | None = None) -> bool:
+        module_info_dumped = False
         if self.is_cpp:
             build_params = copy.deepcopy(self.params)
             build_params.replace_result = True
@@ -204,9 +206,12 @@ class VSCodeProject:
             build_params.suppress_outputs = [ext for ext in vscode.consts.SUPRESS_EXTS_BY_LANG.get("CPP", [])]
             build_params.output_root = self.codegen_cpp_dir
             build_params.create_symlinks = False
+            if module_info_dump_dir is not None:
+                vscode.dump.configure_module_info_dump(build_params, module_info_dump_dir)
 
             ide_common.emit_message("Running codegen for C++")
             devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
+            module_info_dumped = module_info_dump_dir is not None
 
         languages = [lang for lang in self.params.languages if lang != "CPP"]
         if languages:
@@ -229,8 +234,14 @@ class VSCodeProject:
             if self.is_go:
                 build_params.flags["CGO_ENABLED"] = "0"
 
+            if module_info_dump_dir is not None and not module_info_dumped:
+                vscode.dump.configure_module_info_dump(build_params, module_info_dump_dir)
+
             ide_common.emit_message("Running codegen")
             devtools.ya.app.execute(action=bh.do_ya_make, respawn=devtools.ya.app.RespawnType.NONE)(build_params)
+            module_info_dumped = module_info_dump_dir is not None
+
+        return module_info_dumped
 
     def get_default_settings(self):
         python_params_prefixes = ["python"]
@@ -409,8 +420,14 @@ class VSCodeProject:
                 **params,
             }
 
-        if self.params.codegen_enabled:
-            self.do_codegen()
+        with temp_dir(prefix="ya-ide-vscode-module-info-") as module_info_dump_dir:
+            module_info_dumped = False
+            if self.params.codegen_enabled:
+                module_info_dumped = self.do_codegen(module_info_dump_dir)
+            ide_common.emit_message("Collecting modules info")
+            dump_module_info_res = vscode.dump.module_info(
+                self.params, module_info_dump_dir if module_info_dumped else None
+            )
 
         if self.is_cpp:
             if self.params.use_tool_clangd:
@@ -431,9 +448,6 @@ class VSCodeProject:
             if not os.path.exists(gobin_path):
                 ide_common.emit_message("[[bad]]Go binary not found in:[[rst]] %s" % gobin_path)
                 return
-
-        ide_common.emit_message("Collecting modules info")
-        dump_module_info_res = vscode.dump.module_info(self.params)
         modules = vscode.dump.get_modules(dump_module_info_res, skip_modules=self.params.skip_modules)
         if self.is_py3:
             ide_common.emit_message("Collecting python extra paths")

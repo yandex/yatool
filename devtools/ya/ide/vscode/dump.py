@@ -1,5 +1,6 @@
 import copy
 import hashlib
+import logging
 import os
 from functools import partial
 
@@ -15,8 +16,36 @@ from devtools.ya.ide import ide_common
 
 from . import consts
 
+logger = logging.getLogger(__name__)
 
-def module_info(params):
+
+def configure_module_info_dump(params: devtools.ya.core.yarg.Params, dump_dir: str) -> None:
+    params.debug_options.append("h")
+    params.dump_file_path = dump_dir
+
+
+def module_info_from_dumps(dump_dir: str) -> str:
+    dump_names = sorted(os.listdir(dump_dir))
+    if not dump_names:
+        raise RuntimeError("No module-info dumps were produced")
+
+    result = []
+    for dump_name in dump_names:
+        with open(os.path.join(dump_dir, dump_name)) as dump_file:
+            content = dump_file.read()
+        result.append(content if content.endswith("\n") else content + "\n")
+    return "".join(result)
+
+
+def module_info(params: devtools.ya.core.yarg.Params, dump_dir: str | None = None) -> str:
+    if dump_dir is not None:
+        try:
+            logger.info("Using precomputed module info")
+            return module_info_from_dumps(dump_dir)
+        except Exception as e:
+            # Fallback to generation
+            logger.error("Failed to get module info from %s: %s", dump_dir, e)
+
     from devtools.ya.handlers import dump
 
     dump_params = devtools.ya.core.yarg.merge_params(

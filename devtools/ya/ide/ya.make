@@ -25,6 +25,7 @@ PEERDIR(
     devtools/ya/yalibrary/qxml
     devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
+    library/python/tmp
 )
 
 PY_SRCS(
