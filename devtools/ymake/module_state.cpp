@@ -144,6 +144,12 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
 {
     DirId = saved.DirId;
     MakefileId = saved.MakefileId;
+    if (saved.Provides != TCmdElemId()) {
+        ProvidesId = saved.Provides;
+        TStringBuf prop = Symbols.CmdNameById(saved.Provides).GetStr();
+        Y_ASSERT(GetPropertyName(prop) == PROP_PROVIDES);
+        Provides = StringSplitter(GetPropertyValue(prop)).Split(' ');
+    }
     GhostPeers = std::move(saved.GhostPeers);
     QueriedPeers = std::move(saved.QueriedPeers);
     Y_ASSERT(Id != TElemId() && NodeType != EMNT_Deleted && DirId != TFileElemId());
@@ -160,8 +166,6 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
             SetFileName(propValue);
         } else if (propName == PROP_BASENAME) {
             BaseName = propValue;
-        } else if (propName == PROP_PROVIDES) {
-            Provides = StringSplitter(propValue).Split(' ');
         } else {
             Set(propName, propValue);
         }
@@ -242,6 +246,7 @@ void TModule::Save(TModuleSavedState& saved) const {
     saved.RawIncludes = RawIncludes;
 
     saved.ConfigVars = ConfigVars;
+    saved.Provides = ProvidesId;
 }
 
 TModule::TModule(TFileView dir, TStringBuf makefile, TStringBuf tag, TModulesSharedContext& context)
@@ -546,6 +551,10 @@ void TModule::TrimVars() {
 
 void TModule::OnBuildCompleted() {
     if (!IsLoaded()) {
+        if (!Provides.empty()) {
+            // Intern eagerly for consistency with ConfigVars, although cache saving technically allows AddName before SaveSymbolsTable.
+            ProvidesId = AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_PROVIDES, JoinStrings(Provides.begin(), Provides.end(), TStringBuf(" ")))));
+        }
         TrimVars();
     }
 }
@@ -557,9 +566,6 @@ void TModule::ComputeConfigVars() {
     }
     ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_FILENAME, FileName))));
     ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_BASENAME, BaseName))));
-    if (!Provides.empty()) {
-        ConfigVars.push_back(AssumeCmd(Symbols.AddName(EMNT_Property, FormatProperty(PROP_PROVIDES, JoinStrings(Provides.begin(), Provides.end(), TStringBuf(" "))))));
-    }
     for (const auto& name : CONFIG_VAR_NAMES) {
         const auto value = Get(name);
         if (!value.empty()) {

@@ -26,7 +26,7 @@
 #include <cstdlib>
 
 namespace {
-    const ui64 ImageVersion = 59;
+    const ui64 ImageVersion = 60;
     const ui64 DMCacheVersion = 1;
 
     template <size_t HashSize>

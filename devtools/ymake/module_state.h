@@ -156,6 +156,7 @@ private:
     // PeerdirTags=
     // ConfigVars ()
     TVector<TCmdElemId> ConfigVars;
+    TCmdElemId Provides;
 
     TModuleIncDirs::TSavedState IncDirs;
     TVector<TFileElemId> SrcsDirsIds;
@@ -196,6 +197,7 @@ public:
         PeerdirType,
         Attrs.AllBits,
         ConfigVars,
+        Provides,
         SrcsDirsIds,
         OwnEntries,
         ResolveResults,
@@ -531,6 +533,7 @@ private:
     THolder<TOwnEntries>& SharedEntries;
 
     TVector<TCmdElemId> ConfigVars;
+    TCmdElemId ProvidesId;
 
     TModule(TFileView dir, TStringBuf makefile, TStringBuf tag, TModulesSharedContext& context);
     TModule(TModuleSavedState&& saved, TModulesSharedContext& context);
