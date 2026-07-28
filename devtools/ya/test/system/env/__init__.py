@@ -7,6 +7,24 @@ from devtools.ya.test import const
 import library.python.func
 import devtools.ya.core.sec as sec
 
+# Prefix marking env vars that must be delivered into the app running on a device backend
+# (Android emulator, iOS simulator). The prefix is stripped on delivery, so a test-declared
+# "YA_EMULATOR_ENV_FOO" reaches the test as "FOO" on every backend (host in-process, iOS via
+# SIMCTL_CHILD_, Android via wrap.sh). Non-prefixed vars are not forwarded to the app, which
+# keeps host secrets (ARC_TOKEN, YA_TOKEN, SANDBOX_SESSION_TOKEN, ...) out of the emulator.
+# See devtools/ya/docs/agents/TEST_WRAPPERS.md.
+FORWARD_ENV_PREFIX = 'YA_EMULATOR_ENV_'
+
+
+def collect_forwarded_env(source_env):
+    """Return {name: value} for every FORWARD_ENV_PREFIX + name entry in source_env (prefix stripped)."""
+    prefix_len = len(FORWARD_ENV_PREFIX)
+    return {
+        key[prefix_len:]: value
+        for key, value in source_env.items()
+        if key.startswith(FORWARD_ENV_PREFIX) and len(key) > prefix_len
+    }
+
 
 # TODO get rid
 def extend_env_var(env, name, value, sep=":"):

@@ -10,6 +10,7 @@ import time
 import exts.fs
 import exts.archive
 import devtools.ya.test.system.process as process
+import devtools.ya.test.system.env as test_env
 
 from library.python.port_manager import PortManager
 from yatest.common.process import InvalidExecutionStateError
@@ -161,6 +162,35 @@ class AndroidEmulator(object):
             time.sleep(5)
             result = install_apk()
 
+    def push_env_wrapper(self, device_id, app_name, env_vars):
+        """Deliver env vars into the app process via the Android wrap.sh mechanism.
+
+        Requires a debuggable app and API level >= 27 (test emulator images qualify). The
+        values are written into an on-device script and injected via the `wrap.<package>`
+        property, so std::getenv() keeps working without any app-side change and the values
+        never appear on the `am start` command line (no leak into logcat/ps).
+
+        NOTE: the exact on-device delivery (script path, permissions, SELinux, the Android 12
+        `dalvik.vm.force-java-zygote-fork-loop` workaround) is image-dependent and must be
+        validated on the target emulator. Only the vars explicitly marked with
+        env.FORWARD_ENV_PREFIX reach this method, never the full host environment.
+        """
+        if not env_vars:
+            return
+        wrap_script = 'wrap.{}.sh'.format(app_name)
+        with open(wrap_script, 'w') as script:
+            script.write('#!/system/bin/sh\n')
+            for key, value in sorted(env_vars.items()):
+                # single-quote for the device shell, escaping any embedded quote
+                script.write("export {}='{}'\n".format(key, value.replace("'", "'\\''")))
+            script.write('exec "$@"\n')
+
+        device_path = '/data/local/tmp/' + wrap_script
+        self.run_cmd(device_id, ['push', wrap_script, device_path])
+        # the app process (its own uid) execs the wrapper on launch, hence world-exec
+        self.chmod(device_id, device_path, '755')
+        self.run_cmd(device_id, ['shell', 'setprop', 'wrap.' + app_name, '/system/bin/sh ' + device_path])
+
     def push_check_marker_script(self, device_id, app_name, end_marker):
         with open(self.check_marker_script, 'w') as check_script:
             check_script.write('while [[ ! -f {} ]]; do sleep 1; done;'.format(end_marker))
@@ -183,6 +213,7 @@ class AndroidEmulator(object):
 
     def run_test(self, device_name, entry_point, app_name, end_marker, args):
         device_id = self._get_device_id(device_name)
+        self.push_env_wrapper(device_id, app_name, test_env.collect_forwarded_env(self.env))
         try:
             process.execute(
                 self._get_adb_cmd(device_id) + ['shell', 'logcat', '-c'], check_exit_code=True, env=self.env, timeout=10
@@ -208,6 +239,7 @@ class AndroidEmulator(object):
 
     def run_list(self, device_name, entry_point, app_name, end_marker, args):
         device_id = self._get_device_id(device_name)
+        self.push_env_wrapper(device_id, app_name, test_env.collect_forwarded_env(self.env))
         try:
             process.execute(
                 self._get_adb_cmd(device_id) + ['shell', 'logcat', '-c'], check_exit_code=True, env=self.env, timeout=10

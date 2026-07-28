@@ -6,6 +6,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/exts
+    devtools/ya/test/system/env
     devtools/ya/test/system/process
 )
 

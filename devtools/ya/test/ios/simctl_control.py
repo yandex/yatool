@@ -5,6 +5,7 @@ import exts.fs
 import exts.archive
 
 import devtools.ya.test.system.process as process
+import devtools.ya.test.system.env as test_env
 
 
 def prepare(simctl_bin, profiles_path, test_cwd, device_name, ios_app_tar, device_type, runtime):
@@ -40,10 +41,17 @@ def prepare(simctl_bin, profiles_path, test_cwd, device_name, ios_app_tar, devic
 
 def run(simctl_bin, profiles_path, test_cwd, device_name, cmd_args):
     devices_dir = get_devices_dir(test_cwd)
+    # simctl forwards only host vars prefixed with SIMCTL_CHILD_ into the launched app
+    # (stripping the prefix). Re-export the test-declared forwarded vars under that prefix so
+    # the app sees them under their bare names, matching the host/Android backends.
+    launch_env = {}
+    for name, value in test_env.collect_forwarded_env(os.environ).items():
+        launch_env['SIMCTL_CHILD_' + name] = value
     res = process.execute(
         [simctl_bin, "--set", devices_dir, 'launch', '--console-pty', device_name, 'Yandex.devtools_ios_wraper']
         + cmd_args,
         #       Can't use stdout=subprocess.PIPE here! It leads to deadlocks! See MAPSMOBCORE-12317
+        env=launch_env,
     )
 
     sys.stdout.write(res.stdout)

@@ -14,6 +14,7 @@ import yalibrary.display
 import yalibrary.formatter
 
 from devtools.ya.test.system import process
+from devtools.ya.test.system import env as test_env
 from devtools.ya.test.common import get_test_log_file_path, strings_to_utf8
 from devtools.ya.test import facility
 from devtools.ya.test.const import Status
@@ -243,6 +244,11 @@ def load_tests_from_log(opts, suite, boost_log_path):
 def run_tests(opts):
     if opts.tracefile:
         open(opts.tracefile, "w").close()
+
+    # Deliver device-forwarded env vars (env.FORWARD_ENV_PREFIX) to the host test process under
+    # their stripped names. The iOS/Android backends deliver the same vars via their own channels
+    # (SIMCTL_CHILD_ / wrap.sh); the app there does not inherit this process environment.
+    os.environ.update(test_env.collect_forwarded_env(os.environ))
 
     binary = opts.binary
     log_path = os.path.join(opts.output_dir, "test_log.xml")
