@@ -74,7 +74,8 @@ private:
     }
 
     bool IsMacroAllowedInLintersMake(const TStringBuf& name) {
-        return Conf.BlockData.find(name)->second.CmdProps->IsAllowedInLintersMake();
+        const auto it = Conf.BlockData.find(name);
+        return it != Conf.BlockData.end() && it->second.CmdProps->IsAllowedInLintersMake();
     }
 
     size_t StatementPriority(const TStringBuf& s);
