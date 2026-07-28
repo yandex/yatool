@@ -689,12 +689,22 @@ class VersionsOptions(Options):
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.ADVANCED,
             ),
+            EnvConsumer(
+                'YA_CUSTOM_VERSION',
+                help='Custom version string to embed into build info (CUSTOM_VERSION field in vcs.json)',
+                hook=SetValueHook('custom_version'),
+            ),
             ArgConsumer(
                 ['--release-version'],
                 help='Custom release version string to embed into build info (RELEASE_VERSION field in vcs.json)',
                 hook=SetValueHook('release_version'),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.ADVANCED,
+            ),
+            EnvConsumer(
+                'YA_RELEASE_VERSION',
+                help='Custom release version string to embed into build info (RELEASE_VERSION field in vcs.json)',
+                hook=SetValueHook('release_version'),
             ),
         ]
 
