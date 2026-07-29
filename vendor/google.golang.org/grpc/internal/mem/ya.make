@@ -5,13 +5,10 @@ LICENSE(Apache-2.0)
 VERSION(v1.80.0)
 
 SRCS(
-    proto.go
+    buffer_pool.go
 )
 
-GO_TEST_SRCS(
-    proto_benchmark_test.go
-    proto_test.go
-)
+GO_TEST_SRCS(buffer_pool_test.go)
 
 END()
 
