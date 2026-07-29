@@ -154,9 +154,6 @@ void TMakeCommand::GetFromGraph(TNodeId nodeId, TNodeId modId, TDumpInfoEx* addI
         MineInputsAndOutputs(nodeId, modId);
         MineVarsAndExtras(addInfo, nodeId, modId);
         CmdInfo.KeepTargetPlatform = Graph.Names().CommandConf.GetById(TVersionedCmdId(AssumeCmd(Graph[CmdNode]->ElemId)).CmdId()).KeepTargetPlatform;
-        if (CmdInfo.KeepTargetPlatform) {
-            YDebug() << "TMakeCommand::GetFromGraph: KeepTargetPlatform is set for " << Graph.ToTargetStringBuf(nodeId) << Endl;
-        }
         if (!skipRender) {
             auto ignoreErrors = TErrorShowerState(TDebugOptions::EShowExpressionErrors::None);
             RenderCmdStr(&ignoreErrors);

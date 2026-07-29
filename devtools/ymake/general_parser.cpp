@@ -446,7 +446,6 @@ void TGeneralParser::AddCommandNodeDeps(TNodeAddCtx& node) {
         SBDIAG << "Result dep: " << tool << Endl;
         node.AddUniqueDep(EDT_Include, EMNT_Directory, tool);
         Graph.Names().CommandConf.GetById(TVersionedCmdId(AssumeCmd(node.ElemId)).CmdId()).KeepTargetPlatform = true;
-        YDebug() << "TGeneralParser::AddCommandNodeDeps: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << tool << Endl;
     }
 
     // a dirty copy-paste from ProcessBuildCommand
@@ -598,7 +597,6 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
                 node.AddUniqueDep(EDT_Include, EMNT_Directory, dir);
                 if (cmd.Result) {
                     Graph.Names().CommandConf.GetById(RawElemId(node.ElemId)).KeepTargetPlatform = true;
-                    YDebug() << "TGeneralParser::ProcessBuildCommand: KeepTargetPlatform is set for " << node.GetEntry().DumpDebugNode() << " due to " << dir << Endl;
                 }
             }
         }
