@@ -533,7 +533,11 @@ def configure_fetcher_params(app_ctx):
         custom_fetcher = getattr(app_ctx.params, 'custom_fetcher', None)
     fetcher_params = getattr(app_ctx.params, 'fetcher_params', [])
 
-    oauth_token = getattr(app_ctx.params, 'sandbox_oauth_token', None) or getattr(app_ctx.params, 'oauth_token', None)
+    oauth_token = (
+        os.getenv('SANDBOX_SESSION_TOKEN')
+        or getattr(app_ctx.params, 'sandbox_oauth_token', None)
+        or getattr(app_ctx.params, 'oauth_token', None)
+    )
 
     def custom_fetcher_is_top_priority():
         return custom_fetcher and fetcher_params and fetcher_params[0]['name'] == 'custom'
