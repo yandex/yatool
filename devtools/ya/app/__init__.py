@@ -784,10 +784,37 @@ def configure_report_interceptor(ctx, report_events, intent=None):
     params_dict = ctx.params.__dict__ if hasattr(ctx, "params") else None
     parsed_report_events = parse_events_filter.parse_events_filter(report_events)
 
-    telemetry.init_reporter(
-        suppressions=sec.mine_suppression_filter(params_dict),
-        report_events=parsed_report_events,
-    )
+    snowden_mode = None
+    if app_config.in_house:
+        from yalibrary import snowden
+        from yalibrary.snowden import SnowdenMode
+
+        user_class = user.classify_user(ctx.username)
+        snowden_mode = snowden.resolve_snowden_mode(user_class)
+
+        if snowden_mode == SnowdenMode.STANDALONE:
+            store_dir = snowden.snowden_dir()
+            snowden.touch_version_dir(store_dir)
+            snowden.ensure_daemon(store_dir, shard='report')
+            try:
+                snowden.cleanup_old_versions()
+            except Exception:
+                logger.debug('Failed to cleanup old snowden versions', exc_info=True)
+
+            from exts.process import register_pre_execve_hook
+
+            def _pre_execve_cleanup():
+                telemetry.stop_reporter()
+
+            register_pre_execve_hook(_pre_execve_cleanup)
+
+    init_reporter_kwargs = {
+        'suppressions': sec.mine_suppression_filter(params_dict),
+        'report_events': parsed_report_events,
+    }
+    if snowden_mode:
+        init_reporter_kwargs['snowden_mode'] = snowden_mode
+    telemetry.init_reporter(**init_reporter_kwargs)
 
     telemetry.report(
         ReportTypes.EXECUTION,

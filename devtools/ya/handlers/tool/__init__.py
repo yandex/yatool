@@ -260,6 +260,17 @@ def do_tool(params):
                 ' https://docs.yandex-team.ru/devtools/intro/quick-start-guide#arc-setup'
             )
             raise ArgsValidatingException(message)
+        from devtools.ya.core.report import telemetry, ReportTypes
+
+        telemetry.report(
+            ReportTypes.TOOL_EXECUTION,
+            {
+                'tool_launch_method': 'python_tool_launcher',
+                'tool_name': tool_name,
+                'tool_path': tool_path,
+                'extra_args': extra_args,
+            },
+        )
         exts.process.execve(tool_path, extra_args, env=env)
     else:
         raise ArgsValidatingException(

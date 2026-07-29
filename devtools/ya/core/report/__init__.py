@@ -24,6 +24,7 @@ SUPPRESSIONS = []  # type: list[str]
 class ReportTypes(object):
     ALL = 'all'  # <<< reserved for use in reports filter
     EXECUTION = 'execution'
+    TOOL_EXECUTION = 'tool_execution'
     RUN_YMAKE = 'run_ymake'
     FAILURE = 'failure'
     TIMEIT = 'timeit'
@@ -161,7 +162,7 @@ class CompositeTelemetry:
             )
         logger.debug('Reporting done')
 
-    def init_reporter(self, shard='report', suppressions=None, report_events=None):
+    def init_reporter(self, shard='report', suppressions=None, report_events=None, snowden_mode='embedded'):
         global SUPPRESSIONS
         if suppressions:
             SUPPRESSIONS = suppressions
@@ -180,15 +181,23 @@ class CompositeTelemetry:
 
         self._report_events = report_events
         logger.debug(
-            "Init reporter shard=%s events=%s",
+            "Init reporter shard=%s events=%s snowden_mode=%s",
             shard,
             repr(self._report_events),
+            snowden_mode,
         )
 
         for telemetry_name, telemetry in self.iter_backends():
             logger.debug("Initialize telemetry backend `%s`", telemetry_name)
-            telemetry.init(os.path.join(config.misc_root(), telemetry_name), shard)
-            logger.debug("Telemetry backend `%s` initialized", telemetry_name)
+            if telemetry_name == 'snowden':
+                # Always use the versioned snowden_dir() so that both embedded
+                # and standalone modes, as well as the ya-tool C++ fast-path,
+                # share the same storage location
+                store_dir = telemetry.snowden_dir()
+            else:
+                store_dir = os.path.join(config.misc_root(), telemetry_name)
+            telemetry.init(store_dir, shard, mode=snowden_mode)
+            logger.debug("Telemetry backend `%s` initialized (mode=%s)", telemetry_name, snowden_mode)
 
     def stop_reporter(self):
         if self.no_backends or not self._report_events:
