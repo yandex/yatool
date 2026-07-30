@@ -1166,34 +1166,69 @@ class _ToolTargetsQueue:
 
 
 class _ToolEventsQueueServerMode(_ToolTargetsQueue):
-    def __init__(self):
+    def __init__(self, marker):
         super().__init__()
+        self.marker = marker
         self.__bypasses_received = 0
         self.__finals_received = set()
 
     def done(self):
         return self._queue.qsize() == 0 and len(self.__finals_received) == len(self._sources_ids)
 
+    def add_source(self, func, debug_id):
+        _wrapper, _putter = super().add_source(func, debug_id)
+        self._logger.debug(
+            'Added %s reporter %s. %d reporters remains',
+            self.marker,
+            debug_id,
+            len(self._sources_ids) - len(self.__finals_received),
+        )
+
+        def __putter(val, async_result=None):
+            if self.done():
+                self._logger.warn(
+                    'source_id=%d reports %s related event after queue is done.\nEvent:\n\t%s',
+                    debug_id,
+                    self.marker,
+                    repr(val),
+                )
+            _putter(val, async_result)
+
+        return _wrapper, __putter
+
     def get(self):
         source_id, res, async_result = self._interruptable_queue_get()
         assert bool(res is None) != bool(async_result is None)
         if res is not None:
             assert source_id in self._sources_ids, "Unknown source_id={}".format(source_id)
-            self._logger.debug("Source_id={} ({}). Event: {}".format(source_id, self._sources_ids[source_id], res))
             typename = res["_typename"]
             if typename == "NEvent.TAllForeignPlatformsReported":
                 self.__finals_received.add(source_id)
+                self._logger.debug(
+                    "%s finished reporting %s. %d reporters remains",
+                    self._sources_ids[source_id],
+                    self.marker,
+                    len(self._sources_ids) - len(self.__finals_received),
+                )
                 if len(self.__finals_received) < len(self._sources_ids):
                     res = {}  # report AllForeignPlatformsReported only for last source (prone to races though)
             elif typename == "NEvent.TBypassConfigure":
+                bypass_disabled = res["Enabled"] is False
                 if self.__bypasses_received == len(self._sources_ids):
                     res = {}  # skip others if we already had False
-                elif res["Enabled"] is False:
+                elif bypass_disabled:
                     self.__bypasses_received = len(self._sources_ids)
                 else:
                     self.__bypasses_received += 1
                     if self.__bypasses_received < len(self._sources_ids):
                         res = {}  # report BypassConfigure only for last source when all was True
+                self._logger.debug(
+                    "%s bypass status %s for %s. %d bypass reporters remains",
+                    self._sources_ids[source_id],
+                    'Disabled' if bypass_disabled else 'Enabled',
+                    self.marker,
+                    len(self._sources_ids) - self.__bypasses_received,
+                )
         elif async_result is not None:
             if source_id in self.__finals_received:
                 res = {}
@@ -1204,6 +1239,12 @@ class _ToolEventsQueueServerMode(_ToolTargetsQueue):
                     # The thread is terminated with an error and hasn't sent TAllForeignPlatformsReported.
                     # So we must count thread termination as a final event too.
                     self.__finals_received.add(source_id)
+                    self._logger.debug(
+                        "%s %s reporting is terminated. %d tool reporters remains",
+                        self._sources_ids[source_id],
+                        self.marker,
+                        len(self._sources_ids) - len(self.__finals_received),
+                    )
                 else:
                     # The thread is terminated w/o errors but hasn't sent TAllForeignPlatformsReported.
                     # This should not happen, let's tell the user about that.
@@ -1224,7 +1265,7 @@ def create_tool_event_queue(opts):
         # it's enough for disabling external queues and listeners
         return None
     elif should_use_servermode_for_tools(opts):
-        return _ToolEventsQueueServerMode()
+        return _ToolEventsQueueServerMode('tools')
     else:
         return _ToolTargetsQueue()
 
@@ -1538,7 +1579,7 @@ class _GraphMaker:
                 if graph_kind == _GraphKind.TARGET:
                     ymake_opts_nopic.update(platform_id=platform_id, **nopic_servermode_opts)
             elif to_build_pic and should_use_servermode_for_pic(self._opts):
-                pic_queue = _ToolEventsQueueServerMode()
+                pic_queue = _ToolEventsQueueServerMode('pic')
                 no_pic_func, no_pic_queue_putter = pic_queue.add_source(
                     no_pic_func, self._make_debug_id(debug_id, 'nopic')
                 )

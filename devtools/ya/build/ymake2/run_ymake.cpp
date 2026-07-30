@@ -87,6 +87,9 @@ namespace {
         RestoreThreadName();
         TPyObjectPtr result{PyObject_CallFunctionObjArgs(lineProvider, nullptr)};
         if (!result.Get()) {
+            if (PyErr_Occurred()) {
+                PyErr_Print();
+            }
             throw yexception() << "lineProvider() failed";
         }
         return PyUnicode_AsUTF8(result.Get());
