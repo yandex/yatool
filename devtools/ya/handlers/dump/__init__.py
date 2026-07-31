@@ -130,7 +130,10 @@ class DumpYaHandler(CompositeHandler):
         ]
 
     def __init__(self):
-        CompositeHandler.__init__(self, description='Repository related information')
+        CompositeHandler.__init__(
+            self,
+            description='Inspect build and repository metadata and generate structured reports, including compilation databases',
+        )
         self['modules'] = OptsHandler(
             action=devtools.ya.app.execute(action=do_modules),
             description='All modules',

@@ -11,7 +11,9 @@ class YaTestYaHandler(devtools.ya.core.yarg.OptsHandler):
 
     extra_help = (
         "By default, [[imp]]ya test[[rst]] [[alt1]]doesn't build targets that tests do not need[[rst]].\n"
-        "To build all targets use [[imp]]-b[[rst]] / [[imp]]--build-all[[rst]] option."
+        "To build all targets use [[imp]]-b[[rst]] / [[imp]]--build-all[[rst]] option.\n"
+        "Detailed test outputs are linked under each test module's "
+        "[[imp]]test-results[[rst]] directory."
     )
 
     def __init__(self):

@@ -54,7 +54,7 @@ class CollectCacheOptions(LocalCacheOptions):
         self.symlinks_ttl = 0
 
     def consumer(self):
-        return super().consumer() + [
+        return super().consumer(strip_controls_visibility=False) + [
             devtools.ya.core.yarg.ArgConsumer(
                 ['--size-limit'],
                 help='Strip build cache to size (in GiB if not set explicitly)',

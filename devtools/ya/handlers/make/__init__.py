@@ -19,6 +19,7 @@ class MakeYaHandler(devtools.ya.core.yarg.OptsHandler):
                 devtools.ya.core.yarg.UsageExample(
                     '{prefix} -t -j16 library', 'Build and test library with 16 threads'
                 ),
+                devtools.ya.core.yarg.UsageExample('{prefix} -k', 'Continue independent build tasks after errors'),
             ],
             stderr_help=self.stderr_help,
             description=self.description,

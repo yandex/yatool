@@ -81,7 +81,7 @@ class DumpDebugProcessingOptions(Options):
             ),
             ArgConsumer(
                 ['--dry-run'],
-                help="Dry run",
+                help="Collect the selected bundle locally without uploading it to Sandbox",
                 hook=SetConstValueHook('dry_run', True),
                 visible=devtools.ya.core.yarg.help_level.HelpLevel.BASIC,
             ),
@@ -319,7 +319,7 @@ def _discovery_folder(tools_cache_root, base_name, item_key):
 
 debug_handler = OptsHandler(
     action=devtools.ya.app.execute(action=do_dump_debug, respawn=devtools.ya.app.RespawnType.OPTIONAL),
-    description="Utils for work with debug information stored by last ya runs",
+    description="List saved ya runs or collect and upload a selected run's diagnostic bundle for troubleshooting",
     opts=[
         DumpDebugCommonOptions(),
         DumpDebugProcessingOptions(),
@@ -330,9 +330,9 @@ debug_handler = OptsHandler(
     ],
     visible=True,
     examples=[
-        UsageExample('{prefix} last', 'Upload last debug item'),
-        UsageExample('{prefix} 3', 'Upload third from the end debug bundle'),
-        UsageExample('{prefix}', 'Show all items'),
-        UsageExample('{prefix} last --dry-run', 'Collect, but not upload last debug bundle'),
+        UsageExample('{prefix} last', 'Collect and upload the latest diagnostic bundle for troubleshooting'),
+        UsageExample('{prefix} 3', 'Collect and upload the third-latest diagnostic bundle'),
+        UsageExample('{prefix}', 'List saved runs without collecting or uploading a bundle'),
+        UsageExample('{prefix} last --dry-run', 'Collect the latest bundle locally without uploading it'),
     ],
 )

@@ -168,7 +168,11 @@ class BuildThreadsOptions(Options):
         return [
             ArgConsumer(
                 ['-j', '--threads'],
-                help='Build threads count',
+                help=(
+                    'Maximum number of concurrent local build tasks. '
+                    'Use a lower value when concurrent tasks exhaust host memory; '
+                    'lower values reduce peak memory usage but may slow the build'
+                ),
                 hook=SetValueHook('build_threads', int),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
@@ -177,7 +181,11 @@ class BuildThreadsOptions(Options):
             ConfigConsumer('build_threads'),
             ArgConsumer(
                 ['--link-threads'],
-                help='Link threads count',
+                help=(
+                    'Maximum number of concurrent link tasks. '
+                    'Use a lower value when OOM occurs during linking; '
+                    'it does not reduce concurrency in other build stages'
+                ),
                 hook=SetValueHook('link_threads', int),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.ADVANCED,
@@ -665,7 +673,11 @@ class ContinueOnFailOptions(Options):
         return [
             ArgConsumer(
                 ['-k', '--keep-going'],
-                help='Build as much as possible',
+                help=(
+                    'Continue independent build tasks after an error. '
+                    'Tasks that depend on a failed task remain blocked, '
+                    'and the build remains unsuccessful if errors occurred'
+                ),
                 hook=SetConstValueHook('continue_on_fail', True),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
@@ -1239,7 +1251,11 @@ class ExecutorOptions(Options):
             ),
             ArgConsumer(
                 ['--memory-limit'],
-                help='The upper limit above which no build tasks are started (Examples: 50GB, 92%)',
+                help=(
+                    'Restrict new build work when host memory usage exceeds this threshold '
+                    '(Examples: 50GB, 92%). This does not limit memory of an individual process '
+                    'or guarantee that OOM cannot occur'
+                ),
                 hook=SetValueHook('memory_limit'),
                 group=ADVANCED_OPT_GROUP,
                 visible=HelpLevel.EXPERT,
@@ -2315,7 +2331,7 @@ class LocalCacheOptions(ToolsOptions):
         self.auto_clean_results_cache = True
 
     @staticmethod
-    def consumer():
+    def consumer(strip_controls_visibility=HelpLevel.BASIC):
         return ToolsOptions.consumer() + [
             ArgConsumer(
                 ['--cache-stat'],
@@ -2329,14 +2345,14 @@ class LocalCacheOptions(ToolsOptions):
                 help='Remove all cache except uids from the current graph',
                 hook=SetConstValueHook('strip_cache', True),
                 group=CACHE_CONTROL_GROUP,
-                visible=HelpLevel.BASIC,
+                visible=strip_controls_visibility,
             ),
             ArgConsumer(
                 ['--gc-symlinks'],
                 help='Remove all symlink results except files from the current graph',
                 hook=SetConstValueHook('strip_symlinks', True),
                 group=CACHE_CONTROL_GROUP,
-                visible=HelpLevel.BASIC,
+                visible=strip_controls_visibility,
             ),
             ArgConsumer(
                 ['--symlinks-ttl'],

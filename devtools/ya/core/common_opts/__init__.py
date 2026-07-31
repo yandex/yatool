@@ -325,7 +325,7 @@ class PrintStatisticsOptions(Options):
         return [
             ArgConsumer(
                 ['--stat'],
-                help='Show build execution statistics',
+                help=('Show the critical path and wall time by execution stage, ' 'including aggregate test task time'),
                 hook=SetConstValueHook('print_statistics', True),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
@@ -817,7 +817,10 @@ class CrossCompilationOptions(Options):
             ),
             ArgConsumer(
                 ['--target-platform'],
-                help='Target platform',
+                help=(
+                    'Target platform name or toolchain alias, such as default-darwin-arm64, '
+                    'default-linux-x86_64, or default-win-x86_64'
+                ),
                 hook=CrossCompilationOptions.PlatformSetAppendHook(
                     'target_platforms',
                     values=CrossCompilationOptions.generate_target_platforms_cxx,

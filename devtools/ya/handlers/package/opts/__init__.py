@@ -149,7 +149,10 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["-O", "--package-output"],
-                help="Specifies directory for package output",
+                help=(
+                    "Directory for finished package artifacts. "
+                    "To set the unpacked content path use --raw-package-path instead"
+                ),
                 hook=devtools.ya.core.yarg.SetValueHook('package_output'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=COMMON_SUBGROUP,
@@ -202,7 +205,10 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--raw-package-path'],
-                help="Custom path for raw-package (implies --raw-package)",
+                help=(
+                    "Directory for unpacked raw-package content (implies --raw-package). "
+                    "Use this option, not --package-output, to choose the raw content location"
+                ),
                 hook=devtools.ya.core.yarg.SetValueHook('raw_package_path'),
                 group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
                 subgroup=TAR_SUBGROUP,

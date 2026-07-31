@@ -27,7 +27,12 @@ class PackageYaHandler(devtools.ya.core.yarg.OptsHandler):
                 devtools.ya.core.yarg.UsageExample(
                     cmd='{prefix} <path to json description>',
                     description='Create tarball package from json description',
-                )
+                ),
+                devtools.ya.core.yarg.UsageExample(
+                    cmd='{prefix} <path to json description> --tar --raw-package '
+                    '--raw-package-path <output directory>',
+                    description='Write unpacked package content to a directory without creating a tar archive',
+                ),
             ],
             opts=[
                 package_opts.PackageOperationalOptions(),

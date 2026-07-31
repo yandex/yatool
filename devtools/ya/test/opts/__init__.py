@@ -771,7 +771,10 @@ class DebuggingOptions(devtools.ya.core.yarg.Options):
             ),
             TestArgConsumer(
                 ['--test-stderr'],
-                help='Output test stderr to console online',
+                help=(
+                    'Stream suite and test start/result events and test process stderr; '
+                    'the final summary is still printed'
+                ),
                 hook=devtools.ya.core.yarg.SetConstValueHook('test_stderr', True),
                 subgroup=DEBUGGING_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,
