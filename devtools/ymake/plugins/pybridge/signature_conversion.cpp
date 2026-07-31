@@ -37,6 +37,21 @@ bool IsArrayArgTypeAnnotation(PyObject& annotation) noexcept {
     return itemType == reinterpret_cast<const PyObject*>(&PyUnicode_Type);
 }
 
+PyObject* UnwrapDecoratedFunction(PyObject& func) {
+    PyObject* inner = &func;
+    // The code bellow assumes that user decorators do not forget to use `@functools.wraps` properly.
+    while (PyObject_HasAttrString(inner, "__wrapped__")) {
+        inner = PyObject_GetAttrString(inner, "__wrapped__");
+        Py_DECREF(inner); // The object is owned directly or indirectly by `func` argument. We do not need to keep strong reference to it
+    }
+
+    if (!PyFunction_Check(inner)) {
+        PyErr_Format(PyExc_RuntimeError, "Can't deduce signature by object of type '%N'.", Py_TYPE(inner));
+        return nullptr;
+    }
+    return inner;
+}
+
 }
 
 namespace NYMake::NPy {
@@ -46,7 +61,11 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(
     PyTypeObject& unitType,
     const THashSet<std::string>& ignoreArgs
 ) {
-    PyObject* signature = PyFunction_GetAnnotations(&func);
+    auto nakedFunc = UnwrapDecoratedFunction(func);
+    if (!nakedFunc)
+        return std::unexpected(ESignatureDeductionError::PyException);
+
+    PyObject* signature = PyFunction_GetAnnotations(nakedFunc);
     if (!signature)
         return std::unexpected(ESignatureDeductionError::MissingTypeHints);
 
@@ -59,11 +78,11 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(
     if (!key || !IsUnitTypeAnnotation(*val, unitType))
         return std::unexpected(ESignatureDeductionError::MissingUnitArg);
 
-    if (PyFunction_GetDefaults(&func))
+    if (PyFunction_GetDefaults(nakedFunc))
         return std::unexpected(ESignatureDeductionError::IndistinguishableKwArg);
-    auto kwargs = PyFunction_GetKwDefaults(&func);
+    auto kwargs = PyFunction_GetKwDefaults(nakedFunc);
 
-    const auto kwOnlyArgsNum = reinterpret_cast<PyCodeObject*>(PyFunction_GetCode(&func))->co_kwonlyargcount;
+    const auto kwOnlyArgsNum = reinterpret_cast<PyCodeObject*>(PyFunction_GetCode(nakedFunc))->co_kwonlyargcount;
     const auto kwOnlyWithDefaultsNum = kwargs ? PyDict_GET_SIZE(kwargs) : 0;
     if (kwOnlyWithDefaultsNum != kwOnlyArgsNum) {
         return std::unexpected(ESignatureDeductionError::KwArgWithoutDefaults);
