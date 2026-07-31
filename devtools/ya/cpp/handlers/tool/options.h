@@ -6,7 +6,6 @@
 namespace NYa::NTool {
     struct TToolOptions {
         TString ProgramName;
-        TStringBuf UnsupportedOption;
         bool PrintPath;
         bool PrintToolChainPath;
         bool PrintFastPathError;

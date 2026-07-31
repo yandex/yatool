@@ -19,6 +19,7 @@ from devtools.ya.core.yarg import (
     NoValueDummyHook,
     UsageExample,
     ArgsValidatingException,
+    merge_opts,
 )
 
 import devtools.ya.app
@@ -46,10 +47,6 @@ Please contact owners of the tool to fix that issue."""
 class ToolYaHandler(CompositeHandler):
     description = 'Execute specific tool'
 
-    @staticmethod
-    def common_download_options():
-        return [SandboxAuthOptions(), CustomFetcherOptions(), UniversalFetcherOptions(), ToolsOptions()]
-
     def __init__(self):
         CompositeHandler.__init__(
             self,
@@ -64,17 +61,37 @@ class ToolYaHandler(CompositeHandler):
             ],
         )
         for x in tools():
-            self[x.name] = OptsHandler(
+            self[x.name] = ToolHandler(
                 action=devtools.ya.app.execute(action=do_tool, respawn=devtools.ya.app.RespawnType.OPTIONAL),
                 description=x.description,
                 visible=x.visible,
-                opts=[ToolOptions(x.name)] + self.common_download_options(),
+                opts=[],
                 unknown_args_as_free=True,
+                tool_name=x.name,
             )
 
 
+class ToolHandler(OptsHandler):
+    def __init__(self, *args, tool_name=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._tool_name = tool_name
+
+    def handle(self, root_handler, args, prefix):
+        free_args = None
+        if "--" in args:
+            i = args.index("--")
+            args, free_args = args[:i], args[i + 1 :]
+            self._unknown_args_as_free = False
+        self._opt = merge_opts([ToolOptions(self._tool_name, free_args)] + self.common_download_options())
+        return super().handle(root_handler, args, prefix)
+
+    @staticmethod
+    def common_download_options():
+        return [SandboxAuthOptions(), CustomFetcherOptions(), UniversalFetcherOptions(), ToolsOptions()]
+
+
 class ToolOptions(Options):
-    def __init__(self, tool):
+    def __init__(self, tool, free_args=None):
         Options.__init__(self)
         self.tool = tool
         self.print_path = None
@@ -85,7 +102,7 @@ class ToolOptions(Options):
         self.target_platforms = []
         self.need_resource_id = None
         self.show_help = False
-        self.tail_args = []
+        self.tail_args = free_args or []
         self.host_platform = None
         self.hide_arm64_host_warning = False
         self.force_update = False
