@@ -13,6 +13,7 @@
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/foreign_platforms/pipeline.h>
 #include <devtools/ymake/python_runtime.h>
+#include <devtools/ymake/symbols/reclaim.h>
 
 #include <library/cpp/getopt/small/last_getopt.h>
 #include <library/cpp/iterator/enumerate.h>
@@ -291,6 +292,12 @@ int YMakeMain(int argc, char** argv) {
     NYMake::TPythonRuntimeScope pythonRuntime(configs.size());
 
     asio::thread_pool configure_workers(threads);
+    TMaybe<asio::thread_pool::executor_type> reclaimExecutor;
+#if defined(__linux__)
+    asio::thread_pool reclaim_workers(4);
+    reclaimExecutor = reclaim_workers.get_executor();
+#endif
+    Reclaim::Init(reclaimExecutor);
     auto pipeline = CreatePipeline(configs, configure_workers.executor());
 
     TDeque<TAtomicSharedPtr<TChannel>> channels;
@@ -309,6 +316,9 @@ int YMakeMain(int argc, char** argv) {
         main_ret_code |= channels[i]->async_receive(asio::use_future).get();
     }
     configure_workers.wait();
+#if defined(__linux__)
+    reclaim_workers.wait();
+#endif
 
     return main_ret_code;
 }

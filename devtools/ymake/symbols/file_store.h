@@ -3,6 +3,7 @@
 #include "content_provider.h"
 #include "sortedreaddir.h"
 #include "base2fullnamer.h"
+#include "reclaim.h"
 
 #include <devtools/ymake/symbols/elem_id.h>
 #include <devtools/ymake/libs/name_store/name_data_store.h>

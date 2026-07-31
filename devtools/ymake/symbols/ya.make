@@ -9,6 +9,7 @@ SRCS(
     readdir.cpp
     base2fullnamer.cpp
     sortedreaddir.cpp
+    reclaim.cpp
 )
 
 PEERDIR(
@@ -24,6 +25,7 @@ PEERDIR(
     library/cpp/fieldcalc
     library/cpp/regex/pcre
     library/cpp/retry
+    contrib/libs/asio
     contrib/libs/sparsehash
 )
 

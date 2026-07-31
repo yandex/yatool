@@ -327,7 +327,8 @@ void TFileConf::ReadContent(TFileView view, TString&& realPath, TFileContentHold
             Stats.Inc(NStats::EFileConfStats::FromPatchSize, content.size());
         } else {
             const auto read = [&]() {
-                TFile f(realPath, RdOnly | Seq);
+                auto wrapped = Reclaim::Instance().OpenFile(realPath, RdOnly | Seq);
+                TFile& f = wrapped.GetFile();
 
                 if (data.Size < (64 << 10)) {
                     blob = TBlob::FromFileContentSingleThreaded(f);
@@ -337,6 +338,7 @@ void TFileConf::ReadContent(TFileView view, TString&& realPath, TFileContentHold
                     mapped = true;
                     blob = TBlob::FromFile(f);
                 }
+                Reclaim::Instance().MarkToRemove(std::move(wrapped));
             };
 
             const auto start = Now();
