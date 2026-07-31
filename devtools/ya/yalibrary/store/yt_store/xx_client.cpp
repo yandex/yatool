@@ -128,7 +128,7 @@ namespace {
 
 namespace NYa {
     // Note: overrides week functions declared in devtools/ya/cpp/entry/entry.cpp
-    void InitYt(int argc, char** argv) {
+    void InitYt() {
         TString oldLogLevel = NYT::TConfig::Get()->LogLevel;
         // Tune logging only if the process doesn't execute YT-operation
         if (GetEnv("YT_JOB_ID").empty()) {
@@ -146,7 +146,7 @@ namespace NYa {
 
         }
 
-        NYT::Initialize(argc, argv);
+        NYT::Initialize();
 
         // Now we can replace TStdErrLogger by TNullLogger and restore the log level
         NYT::SetLogger(nullptr);

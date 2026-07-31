@@ -20,7 +20,7 @@
 #endif
 
 namespace NYa {
-    __attribute__((weak)) void InitYt(int, char**) {
+    __attribute__((weak)) void InitYt() {
     }
 
     namespace {
@@ -245,7 +245,7 @@ namespace NYa {
             auto charArgv = BuildCharArgv(expandedArgs);
             int expandedArgc = static_cast<int>(charArgv.size());
 
-            ::NYa::InitYt(expandedArgc, charArgv.data());
+            ::NYa::InitYt();
             int newPgid = SetOwnProcessGroupId(expandedArgc, charArgv.data());
             InitWatchdogFromEnv();
 
