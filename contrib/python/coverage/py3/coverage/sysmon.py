@@ -12,6 +12,7 @@ import os
 import os.path
 import sys
 import threading
+import tokenize
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,11 +20,12 @@ from types import CodeType
 from typing import Any, NewType, Optional, cast
 
 from coverage import env
-from coverage.bytecode import TBranchTrails, always_jumps, branch_trails, bytes_to_lines
+from coverage.bytecode import BranchArcResolver, bytes_to_lines
 from coverage.debug import short_filename, short_stack
-from coverage.exceptions import NoSource, NotPython
+from coverage.exceptions import NoSource
 from coverage.misc import isolate_module
-from coverage.parser import PythonParser
+from coverage.parser import multiline_map_from_text
+from coverage.python import get_python_source
 from coverage.types import (
     AnyCallable,
     TFileDisposition,
@@ -175,17 +177,9 @@ class CodeInfo:
     file_data: TTraceFileData | None
     byte_to_line: dict[TOffset, TLineNo] | None
 
-    # Keys are start instruction offsets for branches.
-    # Values are dicts:
-    #   {
-    #       (from_line, to_line): {offset, offset, ...},
-    #       (from_line, to_line): {offset, offset, ...},
-    #   }
-    branch_trails: TBranchTrails
-
-    # Always-jumps are bytecode offsets that do no work but move
-    # to another offset.
-    always_jumps: dict[TOffset, TOffset]
+    # Lazily-created resolver of branch events to arcs, created on the
+    # first branch event in the code object.
+    branch_resolver: BranchArcResolver | None
 
 
 class SysMonitor(Tracer):
@@ -222,6 +216,9 @@ class SysMonitor(Tracer):
 
         # Map filename:__name__ -> set(id(code_object))
         self.filename_code_ids: dict[str, set[int]] = collections.defaultdict(set)
+
+        # Map filename -> multiline map, so each file is parsed at most once.
+        self.multiline_maps: dict[str, dict[TLineNo, TLineNo]] = {}
 
         self.sysmon_on = False
         self.lock = threading.Lock()
@@ -359,7 +356,8 @@ class SysMonitor(Tracer):
                 finally:
                     self.unlock_data()
                 file_data = self.data[tracename]
-                b2l = bytes_to_lines(code)
+                # byte_to_line is only read by the arc callbacks
+                b2l = bytes_to_lines(code) if self.trace_arcs else None
             else:
                 file_data = None
                 b2l = None
@@ -368,8 +366,7 @@ class SysMonitor(Tracer):
                 tracing=tracing_code,
                 file_data=file_data,
                 byte_to_line=b2l,
-                branch_trails={},
-                always_jumps={},
+                branch_resolver=None,
             )
             self.code_infos[id(code)] = code_info
             self.code_objects.append(code)
@@ -381,10 +378,12 @@ class SysMonitor(Tracer):
                 with self.lock:
                     if self.sysmon_on:
                         assert sys_monitoring is not None
-                        local_events = events.PY_RETURN | events.PY_RESUME | events.LINE
+                        local_events = events.LINE
                         if self.trace_arcs:
                             assert env.PYBEHAVIOR.branch_right_left
-                            local_events |= events.BRANCH_RIGHT | events.BRANCH_LEFT
+                            local_events |= (
+                                events.PY_RETURN | events.BRANCH_RIGHT | events.BRANCH_LEFT
+                            )
                         sys_monitoring.set_local_events(self.myid, code, local_events)
 
                         if LOG:  # pragma: debugging
@@ -452,34 +451,21 @@ class SysMonitor(Tracer):
         code_info = self.code_infos[id(code)]
         # code_info is not None and code_info.file_data is not None, since we
         # wouldn't have enabled this event if they were.
-        if not code_info.branch_trails:
+        resolver = code_info.branch_resolver
+        if resolver is None:
             if self.stats is not None:
                 self.stats["branch_trails"] += 1
-            multiline_map = get_multiline_map(code.co_filename)
-            code_info.branch_trails = branch_trails(code, multiline_map=multiline_map)
-            code_info.always_jumps = always_jumps(code)
-            # log(f"branch_trails for {code}:\n{ppformat(code_info.branch_trails)}")
-        added_arc = False
-        dest_info = code_info.branch_trails.get(instruction_offset)
-
-        # Re-map the destination offset through always-jumps to deal with NOP etc.
-        dests = {destination_offset}
-        while (dest := code_info.always_jumps.get(destination_offset)) is not None:
-            destination_offset = dest
-            dests.add(destination_offset)
-
-        # log(f"dest_info = {ppformat(dest_info)}")
-        if dest_info is not None:
-            for arc, offsets in dest_info.items():
-                if arc is None:
-                    continue
-                if dests & offsets:
-                    code_info.file_data.add(arc)  # type: ignore
-                    # log(f"adding {arc=}")
-                    added_arc = True
-                    break
-
-        if not added_arc:
+            assert code_info.byte_to_line is not None
+            resolver = code_info.branch_resolver = BranchArcResolver(
+                code,
+                code_info.byte_to_line,
+                self.get_multiline_map(code.co_filename),
+            )
+        arc = resolver.resolve(instruction_offset, destination_offset)
+        if arc is not None:
+            code_info.file_data.add(arc)  # type: ignore
+            # log(f"adding {arc=}")
+        else:
             # This could be an exception jumping from line to line.
             assert code_info.byte_to_line is not None
             l1 = code_info.byte_to_line.get(instruction_offset)
@@ -492,20 +478,26 @@ class SysMonitor(Tracer):
 
         return DISABLE
 
+    def get_multiline_map(self, filename: str) -> dict[TLineNo, TLineNo]:
+        """Get the multiline map for `filename`, computing it at most once."""
+        multiline_map = self.multiline_maps.get(filename)
+        if multiline_map is None:
+            multiline_map = self.multiline_maps[filename] = compute_multiline_map(filename)
+        return multiline_map
 
-@functools.lru_cache(maxsize=20)
-def get_multiline_map(filename: str) -> dict[TLineNo, TLineNo]:
-    """Get a PythonParser for the given filename, cached."""
+
+def compute_multiline_map(filename: str) -> dict[TLineNo, TLineNo]:
+    """Tokenize `filename` and return its multiline map."""
     try:
-        parser = PythonParser(filename=filename)
-        parser.parse_source()
-    except NotPython:
+        text = get_python_source(filename)
+    except (OSError, NoSource):
+        # This can happen if open() in python.py fails.
+        return {}
+    try:
+        return multiline_map_from_text(text)
+    except (tokenize.TokenError, IndentationError, SyntaxError):
         # The file was not Python. This can happen when the code object refers
         # to an original non-Python source file, like a Jinja template.
         # In that case, just return an empty map, which might lead to slightly
         # wrong branch coverage, but we don't have any better option.
         return {}
-    except NoSource:
-        # This can happen if open() in python.py fails.
-        return {}
-    return parser.multiline_map

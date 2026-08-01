@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import ast
 import collections
-import functools
 import os
 import re
 import token
@@ -25,6 +24,45 @@ from coverage.phystokens import generate_tokens
 from coverage.types import TArc, TLineNo
 
 os = isolate_module(os)
+
+
+def multiline_map_from_tokens(tokens: Iterable[tokenize.TokenInfo]) -> dict[TLineNo, TLineNo]:
+    """Compute the multiline map from a stream of tokens.
+
+    The result maps line numbers in multi-line statements to the first line
+    number of their statement.  This is the only place the map is computed:
+    `PythonParser._raw_parse` uses it for parsing and reporting, and the
+    sys.monitoring core uses `multiline_map_from_text` to get the map without
+    paying for a full parse during measurement.
+
+    """
+    multiline_map: dict[TLineNo, TLineNo] = {}
+    # The line number of the first line in a multi-line statement.
+    first_line = 0
+    for toktype, ttext, (slineno, _), (elineno, _), _ in tokens:
+        if toktype == token.NEWLINE:
+            if first_line and elineno != first_line:
+                # We're at the end of a line, and we've ended on a
+                # different line than the first line of the statement,
+                # so record a multi-line range.
+                for l in range(first_line, elineno + 1):
+                    multiline_map[l] = first_line
+            first_line = 0
+        if ttext.strip() and toktype != tokenize.COMMENT:
+            # A non-white-space token, the first in a statement.
+            if not first_line:
+                first_line = slineno
+    return multiline_map
+
+
+def multiline_map_from_text(text: str) -> dict[TLineNo, TLineNo]:
+    """Compute just the multiline map for `text`, without a full parse.
+
+    Can raise tokenize.TokenError, IndentationError, or SyntaxError if the
+    text isn't parsable as Python.
+
+    """
+    return multiline_map_from_tokens(generate_tokens(text))
 
 
 class PythonParser:
@@ -98,15 +136,18 @@ class PythonParser:
         self._missing_arc_fragments: TArcFragments | None = None
         self._with_jump_fixers: dict[TArc, tuple[TArc, TArc]] = {}
 
+        self._first_line_cache: dict[TLineNo, TLineNo] = {}
+        self._exit_counts: dict[TLineNo, int] | None = None
+
         self._raw_funcdefs: set[tuple[TLineNo, TLineNo, str]] | None = None
-    
+
     @property
     def raw_funcdefs(self) -> set[tuple[TLineNo, TLineNo, str]]:
         if self._raw_funcdefs is None:
             self._analyze_ast()
         assert self._raw_funcdefs is not None
         return self._raw_funcdefs
-        
+
 
     def lines_matching(self, regex: str) -> set[TLineNo]:
         """Find the lines matching a regex.
@@ -156,8 +197,9 @@ class PythonParser:
         nesting: int = 0
 
         assert self.text is not None
-        tokgen = generate_tokens(self.text)
-        for toktype, ttext, (slineno, _), (elineno, _), ltext in tokgen:
+        tokens = list(generate_tokens(self.text))
+        self.multiline_map = multiline_map_from_tokens(tokens)
+        for toktype, ttext, (slineno, _), (elineno, _), ltext in tokens:
             if self.show_tokens:  # pragma: debugging
                 print(
                     "%10s %5s %-20r %r"
@@ -187,12 +229,9 @@ class PythonParser:
                 elif ttext in ")]}":
                     nesting -= 1
             elif toktype == token.NEWLINE:
-                if first_line and elineno != first_line:
-                    # We're at the end of a line, and we've ended on a
-                    # different line than the first line of the statement,
-                    # so record a multi-line range.
-                    for l in range(first_line, elineno + 1):
-                        self.multiline_map[l] = first_line
+                # multiline_map_from_tokens() has already recorded this
+                # statement's lines; we only track first_line here for the
+                # exclusion logic.
                 first_line = 0
 
             if ttext.strip() and toktype != tokenize.COMMENT:
@@ -217,7 +256,7 @@ class PythonParser:
         # AST lets us find classes, docstrings, and decorator-affected
         # functions and classes.
         assert self._ast_root is not None
-        for node in ast.walk(self._ast_root):
+        for node in walk_statement_nodes(self._ast_root):
             # Find docstrings.
             if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
                 if node.body:
@@ -237,14 +276,16 @@ class PythonParser:
                 if self.excluded.intersection(range(first_line, node.lineno + 1)):
                     self.excluded.update(range(first_line, cast(int, node.end_lineno) + 1))
 
-    @functools.lru_cache(maxsize=1000)
     def first_line(self, lineno: TLineNo) -> TLineNo:
         """Return the first line number of the statement including `lineno`."""
-        if lineno < 0:
-            lineno = -self.multiline_map.get(-lineno, -lineno)
-        else:
-            lineno = self.multiline_map.get(lineno, lineno)
-        return lineno
+        first = self._first_line_cache.get(lineno)
+        if first is None:
+            if lineno < 0:
+                first = -self.multiline_map.get(-lineno, -lineno)
+            else:
+                first = self.multiline_map.get(lineno, lineno)
+            self._first_line_cache[lineno] = first
+        return first
 
     def first_lines(self, linenos: Iterable[TLineNo]) -> set[TLineNo]:
         """Map the line numbers in `linenos` to the correct first line of the
@@ -363,25 +404,26 @@ class PythonParser:
         arcs = (set(arcs) | to_add) - to_remove
         return arcs
 
-    @functools.lru_cache
     def exit_counts(self) -> dict[TLineNo, int]:
         """Get a count of exits from that each line.
 
         Excluded lines are excluded.
 
         """
-        exit_counts: dict[TLineNo, int] = collections.defaultdict(int)
-        for l1, l2 in self.arcs():
-            assert l1 > 0, f"{l1=} should be greater than zero in {self.filename}"
-            if l1 in self.excluded:
-                # Don't report excluded lines as line numbers.
-                continue
-            if l2 in self.excluded:
-                # Arcs to excluded lines shouldn't count.
-                continue
-            exit_counts[l1] += 1
+        if self._exit_counts is None:
+            exit_counts: dict[TLineNo, int] = collections.defaultdict(int)
+            for l1, l2 in self.arcs():
+                assert l1 > 0, f"{l1=} should be greater than zero in {self.filename}"
+                if l1 in self.excluded:
+                    # Don't report excluded lines as line numbers.
+                    continue
+                if l2 in self.excluded:
+                    # Arcs to excluded lines shouldn't count.
+                    continue
+                exit_counts[l1] += 1
+            self._exit_counts = exit_counts
 
-        return exit_counts
+        return self._exit_counts
 
     def _finish_action_msg(self, action_msg: str | None, end: TLineNo) -> str:
         """Apply some defaulting and formatting to an arc's description."""
@@ -585,6 +627,33 @@ class TryBlock(Block):
 # TODO: Shouldn't the cause messages join with "and" instead of "or"?
 
 
+# Node types that are statements, or that wrap suites of statements
+# (`except` clauses and `case` clauses).  Only these can lead to more
+# statements, so `walk_statement_nodes` only descends into them.
+_STMT_CONTAINERS = (ast.stmt, ast.excepthandler, ast.match_case)
+
+
+def walk_statement_nodes(root: ast.AST) -> Iterable[ast.AST]:
+    """Yield `root` and its descendant statement-level nodes.
+
+    Like ast.walk, but skips expression subtrees entirely, since statements
+    (including def and class) can never appear inside them.  This visits a
+    small fraction of the nodes ast.walk does, which matters when scanning
+    many files during reporting.
+
+    ExceptHandler and match_case nodes are also yielded; callers only
+    interested in particular node types must check for them.
+
+    """
+    todo = [root]
+    while todo:
+        node = todo.pop()
+        yield node
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, _STMT_CONTAINERS):
+                todo.append(child)
+
+
 def is_constant_test_expr(node: ast.AST) -> tuple[bool, bool]:
     """Is this a compile-time constant test expression?
 
@@ -674,11 +743,13 @@ class AstArcAnalyzer:
 
     def analyze(self) -> None:
         """Examine the AST tree from `self.root_node` to determine possible arcs."""
-        for node in ast.walk(self.root_node):
-            node_name = node.__class__.__name__
-            code_object_handler = getattr(self, f"_code_object__{node_name}", None)
-            if code_object_handler is not None:
-                code_object_handler(node)
+        for node in walk_statement_nodes(self.root_node):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self._code_object__FunctionDef(node)
+            elif isinstance(node, ast.ClassDef):
+                self._code_object__ClassDef(node)
+            elif isinstance(node, ast.Module):
+                self._code_object__Module(node)
 
     def with_jump_fixers(self) -> dict[TArc, tuple[TArc, TArc]]:
         """Get a dict with data for fixing jumps out of with statements.
@@ -724,15 +795,13 @@ class AstArcAnalyzer:
     def _process_function_def(self, start, node):
         self.funcdefs.add((start, node.body[-1].lineno, node.name))
 
-    def _code_object__FunctionDef(self, node: ast.FunctionDef) -> None:
+    def _code_object__FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
         start = self.line_for_node(node)
         self.block_stack.append(FunctionBlock(start=start, name=node.name))
         exits = self.process_body(node.body)
         self.process_return_exits(exits)
         self._process_function_def(start, node)
         self.block_stack.pop()
-
-    _code_object__AsyncFunctionDef = _code_object__FunctionDef
 
     def _code_object__ClassDef(self, node: ast.ClassDef) -> None:
         start = self.line_for_node(node)
@@ -769,9 +838,10 @@ class AstArcAnalyzer:
 
         """
         node_name = node.__class__.__name__
-        handler = cast(
-            Optional[Callable[[ast.AST], TLineNo]],
-            getattr(self, f"_line__{node_name}", None),
+        handler: Callable[[ast.AST], TLineNo] | None = getattr(
+            self,
+            f"_line__{node_name}",
+            None,
         )
         if handler is not None:
             line = handler(node)
@@ -853,9 +923,10 @@ class AstArcAnalyzer:
 
         """
         node_name = node.__class__.__name__
-        handler = cast(
-            Optional[Callable[[ast.AST], set[ArcStart]]],
-            getattr(self, f"_handle__{node_name}", None),
+        handler: Callable[[ast.AST], set[ArcStart]] | None = getattr(
+            self,
+            f"_handle__{node_name}",
+            None,
         )
         if handler is not None:
             arc_starts = handler(node)
