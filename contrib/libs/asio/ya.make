@@ -2,9 +2,9 @@
 
 LIBRARY()
 
-VERSION(1.38.0)
+VERSION(1.38.2)
 
-ORIGINAL_SOURCE(https://github.com/chriskohlhoff/asio/archive/asio-1-38-0.tar.gz)
+ORIGINAL_SOURCE(https://github.com/chriskohlhoff/asio/archive/asio-1-38-2.tar.gz)
 
 LICENSE(
     BSL-1.0 AND

@@ -2,7 +2,7 @@
 // detail/work_dispatcher.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2025 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2026 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -30,6 +30,7 @@
 #include "asio/detail/push_options.hpp"
 
 namespace asio {
+ASIO_INLINE_NAMESPACE_BEGIN
 namespace detail {
 
 struct empty_work_function
@@ -39,8 +40,13 @@ struct empty_work_function
   }
 };
 
-template <typename Function>
+template <typename Function, typename = void>
 struct work_result
+{
+};
+
+template <typename Function>
+struct work_result<Function, void_t<result_of_t<decay_t<Function>()>>>
 {
   typedef decay_t<result_of_t<decay_t<Function>()>> type;
 };
@@ -296,6 +302,7 @@ private:
 #endif // !defined(ASIO_NO_TS_EXECUTORS)
 
 } // namespace detail
+ASIO_INLINE_NAMESPACE_END
 } // namespace asio
 
 #include "asio/detail/pop_options.hpp"

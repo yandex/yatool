@@ -2,7 +2,7 @@
 // detail/atomic_count.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2025 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2026 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -21,9 +21,13 @@
 // Nothing to include.
 #else // !defined(ASIO_HAS_THREADS)
 # include <atomic>
+# if defined(ASIO_HAS_THREAD_SANITIZER)
+#  include <sanitizer/tsan_interface.h>
+# endif // defined(ASIO_HAS_THREAD_SANITIZER)
 #endif // !defined(ASIO_HAS_THREADS)
 
 namespace asio {
+ASIO_INLINE_NAMESPACE_BEGIN
 namespace detail {
 
 #if !defined(ASIO_HAS_THREADS)
@@ -48,7 +52,11 @@ inline bool ref_count_down(atomic_count& a)
 {
   if (a.fetch_sub(1, std::memory_order_release) == 1)
   {
+#if defined(ASIO_HAS_THREAD_SANITIZER)
+    __tsan_acquire(&a);
+#else // defined(ASIO_HAS_THREAD_SANITIZER)
     std::atomic_thread_fence(std::memory_order_acquire);
+#endif // defined(ASIO_HAS_THREAD_SANITIZER)
     return true;
   }
   return false;
@@ -67,6 +75,7 @@ inline long ref_count_read_acquire(atomic_count& a)
 #endif // !defined(ASIO_HAS_THREADS)
 
 } // namespace detail
+ASIO_INLINE_NAMESPACE_END
 } // namespace asio
 
 #endif // ASIO_DETAIL_ATOMIC_COUNT_HPP
