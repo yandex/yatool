@@ -352,7 +352,11 @@ class FilteringOptions(devtools.ya.core.yarg.Options):
             devtools.ya.core.yarg.ConfigConsumer('test_whitelist_path'),
             TestArgConsumer(
                 ['-F', '--test-filter'],
-                help="Run only test that matches <tests-filter>. Asterics '*' can be used in filter to match test subsets. Chunks can be filtered as well using pattern that matches '[*] chunk'",
+                help=(
+                    "Run tests matching <tests-filter>. A filter may match multiple tests. "
+                    "Asterisks '*' can be used to match test subsets. Chunks can also be filtered using a pattern "
+                    "matching '[*] chunk'."
+                ),
                 hook=devtools.ya.core.yarg.SetAppendHook('tests_filters'),
                 subgroup=FILTERING_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,

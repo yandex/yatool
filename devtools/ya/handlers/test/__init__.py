@@ -39,7 +39,7 @@ class YaTestYaHandler(devtools.ya.core.yarg.OptsHandler):
                 ),
                 devtools.ya.core.yarg.UsageExample(
                     '{prefix} -F "*subname*"',
-                    'Build and run test which name contains "subname"',
+                    'Build and run all tests matched by the filter',
                 ),
             ],
             description=self.description,
