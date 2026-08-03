@@ -198,14 +198,6 @@ def gen_host_tc(c_compiler=None, cxx_compiler=None):
     return gen_tc(host_platform_name(), c_compiler, cxx_compiler)
 
 
-def gen_specific_tc(tc_key):
-    return tools.get_tool('c++', tc_key)
-
-
-def gen_specific_tc_for_ide(ide):
-    return tools.get_tool_for_ide('c++', ide)
-
-
 def parse_local_ymake(path):
     local_ymake_content = exts.fs.read_text(path)
 

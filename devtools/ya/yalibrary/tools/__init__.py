@@ -360,20 +360,6 @@ def iter_tools(name, tn_filter=None):
                 yield res
 
 
-def get_tool(name, toolchain_key):
-    for tool in iter_tools(name, lambda key, descr: key == toolchain_key):
-        return tool
-
-    raise UnsupportedToolchain('No toolchain found: %s' % toolchain_key)
-
-
-def get_tool_for_ide(name, ide):
-    for tool in iter_tools(name, lambda key, descr: descr.get('params', {}).get('for_ide') == ide):
-        return tool
-
-    raise UnsupportedToolchain('No toolchain found for ide: %s' % ide)
-
-
 def _platform_os_arch(plat):
     os_ = plat.get('os')
     arch = plat.get('arch')
