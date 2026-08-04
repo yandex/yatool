@@ -1647,7 +1647,6 @@ class YaMake:
             self.distbuild_graph,
             self.targets,
             tests,
-            self.get_owners(),
             self.get_make_files(),
             results_dir,
             self._output_root,

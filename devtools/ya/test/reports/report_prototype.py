@@ -59,7 +59,6 @@ def get_blank_record():
         "status": TestStatus.Good,
         "rich-snippet": "",
         "uid": "",
-        "owners": {},
         "links": {},
         "metrics": {},
     }

@@ -16,7 +16,6 @@ import yalibrary.term.console as term_console
 from devtools.ya.build.reports import configure_error as ce
 from exts.fs import create_dirs, ensure_removed
 from exts.hashing import md5_value
-import devtools.ya.build.owners as ow
 from devtools.ya.test import const as constants
 from devtools.ya.test.const import Status, TestSize
 import devtools.ya.test.reports.report_prototype as rp
@@ -251,7 +250,6 @@ def make_target_entry(
     target_hid,
     uid,
     status,
-    owners,
     results_dir,
     messages_dir,
     errors,
@@ -291,7 +289,6 @@ def make_target_entry(
             "type": message_type,
             "status": status,
             "uid": uid,
-            "owners": owners,
         }
     )
     if error_type:
@@ -407,14 +404,11 @@ class YaMakeProgress:
 class ReportGenerator:
     _logger = logging.getLogger('ReportGenerator')
 
-    def __init__(
-        self, opts, distbuild_graph, targets, tests, owners_list, make_files, results_dir, build_root, reports
-    ):
+    def __init__(self, opts, distbuild_graph, targets, tests, make_files, results_dir, build_root, reports):
         self._opts = opts
         self._distbuild_graph = distbuild_graph
         self._report_config = results_report.safe_read_report_config(self._opts.report_config_path)
         self._targets = targets
-        self._owners_list = owners_list
         self._make_files = make_files
         self._results_dir = results_dir
         self._build_root = build_root
@@ -530,7 +524,6 @@ class ReportGenerator:
                 ]
                 target_id = rp.get_id(target_name, 'configure-step')
                 target_hid = rp.get_hash_id(target_name, 'configure-step')
-                owners = ow.find_path_owners(self._owners_list, target_name)
                 status = rp.TestStatus.Fail if errors else rp.TestStatus.Good
                 configure_uid = rp.get_id(target_name, "configure" + str(errors))
                 entries.append(
@@ -540,7 +533,6 @@ class ReportGenerator:
                         target_hid,
                         configure_uid,
                         status,
-                        owners,
                         self._results_dir,
                         self._messages_dir,
                         errors,
@@ -570,7 +562,6 @@ class ReportGenerator:
                 errors = configure_errors.get(target_name, [])
                 target_id = rp.get_id(target_name, 'configure-step')
                 target_hid = rp.get_hash_id(target_name, 'configure-step')
-                owners = ow.find_path_owners(self._owners_list, target_name)
                 status = rp.TestStatus.Fail if errors else rp.TestStatus.Good
                 configure_uid = rp.get_id(target_name, "configure" + str(errors))
                 entries.append(
@@ -580,7 +571,6 @@ class ReportGenerator:
                         target_hid,
                         configure_uid,
                         status,
-                        owners,
                         self._results_dir,
                         self._messages_dir,
                         errors,
@@ -620,7 +610,6 @@ class ReportGenerator:
             status = rp.TestStatus.Good
             error_type = None
 
-        owners = ow.find_path_owners(self._owners_list, target_name)
         target_id = rp.get_id(target_name, subtest=(module_tag or ''))
         target_hid = rp.get_hash_id(target_name, subtest=(module_tag or ''))
         return make_target_entry(
@@ -629,7 +618,6 @@ class ReportGenerator:
             target_hid,
             uid,
             status,
-            owners,
             self._results_dir,
             self._messages_dir,
             errors,
@@ -755,7 +743,6 @@ class ReportGenerator:
 
             entry.update(
                 {
-                    "owners": ow.find_path_owners(self._owners_list, entry["path"]),
                     "toolchain": results_report.transform_toolchain(
                         self._report_config,
                         entry_prototype["target_platform_descriptor"] or platform_matcher.my_platform(),
@@ -847,14 +834,13 @@ class ReportGenerator:
             report.trace_stage(build_stage)
 
 
-def prepare_results(test_results, report_prototype, builder, owners_list, configure_errors, results_dir, build_root):
+def prepare_results(test_results, report_prototype, builder, configure_errors, results_dir, build_root):
     report = results_report.StoredReport()
     generator = ReportGenerator(
         builder.opts,
         builder.distbuild_graph,
         builder.targets,
         builder.ctx.tests,
-        owners_list,
         builder.get_make_files(),
         results_dir,
         build_root,

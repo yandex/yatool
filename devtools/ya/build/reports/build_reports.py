@@ -77,7 +77,6 @@ def generate_results_report(builder):
                 suites,
                 report_prototype,
                 builder,
-                builder.get_owners(),
                 builder.ctx.configure_errors,
                 output_dir,
                 output_dir,
