@@ -764,7 +764,7 @@ asio::awaitable<void> ReportConfigureErrors(THolder<TYMake>& yMake) {
     co_return;
 }
 
-asio::awaitable<void> SaveCaches(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
+asio::awaitable<void> SaveCoreCaches(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     if (conf.WriteFsCache || conf.WriteDepsCache) {
         yMake->UpdateUnreachableExternalFileChanges();
         yMake->Save(conf.YmakeCache, true);
@@ -861,6 +861,11 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
     }
 
     bool hasBadLoops = PostConfigureStage(conf, yMake);
+    if (conf.WriteFsCache || conf.WriteDepsCache) {
+        // The DM, internal, and UID caches must use one generation fingerprint. Prepare it before
+        // DM is saved and before internal-cache saving and rendering start concurrently.
+        yMake->PrepareCacheSave();
+    }
 
     auto mainFlow = asio::co_spawn(exec, [exec, &conf, &yMake, hasBadLoops]() -> asio::awaitable<TMaybe<EBuildResult>> {
         auto result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
@@ -879,7 +884,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
             co_return BR_CONFIGURE_FAILED;
         }
 
-        co_await (asio::co_spawn(exec, SaveCaches(conf, yMake), asio::use_awaitable)
+        co_await (asio::co_spawn(exec, SaveCoreCaches(conf, yMake), asio::use_awaitable)
             && asio::co_spawn(exec, [&result, &conf, &yMake, &exec]() -> asio::awaitable<void> {
                 result = co_await RenderGraph(conf, yMake, exec);
                 co_return;

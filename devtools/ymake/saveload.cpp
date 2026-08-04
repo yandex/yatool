@@ -1007,11 +1007,17 @@ void TYMake::SaveStartTargets(TCacheFileWriter& writer) {
     writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(buffer)));
 }
 
+void TYMake::PrepareCacheSave() {
+    if (CurrDepsFingerprint.empty()) {
+        CurrDepsFingerprint = TGUID::Create().AsGuidString();
+    }
+}
+
 void TYMake::Save(const TFsPath& file, bool delayed) {
     // Graph.Save() requires no references into graph
     TCacheFileWriter cacheWriter(Conf, file);
 
-    CurrDepsFingerprint = TGUID::Create().AsGuidString();
+    PrepareCacheSave();
     cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(CurrDepsFingerprint)));
 
     TInternalCacheSaver saver(*this, cacheWriter);
@@ -1055,6 +1061,7 @@ bool TYMake::SaveDependencyManagementCache(const TFsPath& cacheFile, TFsPath* te
     try {
         NYMake::TTraceStageWithTimer stage("Save Dependency management cache", MON_NAME(EYmakeStats::DMCacheSaveTime));
 
+        PrepareCacheSave();
         TCacheFileWriter cacheWriter(Conf, cacheFile);
         cacheWriter.AddBlob(new TBlobSaverMemory(&DMCacheVersion, sizeof(ui64)));
         cacheWriter.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(CurrDepsFingerprint)));
@@ -1148,6 +1155,7 @@ void TYMake::CommitCaches() {
         }
     }
     UidsCacheTempFile = {};
+    CurrDepsFingerprint.clear();
 }
 
 void TYMake::JSONCacheLoaded(bool jsonCacheLoaded) {
