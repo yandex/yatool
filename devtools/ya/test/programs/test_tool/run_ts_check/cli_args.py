@@ -10,6 +10,7 @@ class CliArgs:
     target_path: str
     nodejs: str
     script_name: str
+    command: str | None
     test_type: str
     files: list[str]
 
@@ -24,6 +25,11 @@ def parse_args(args=None) -> CliArgs:
     parser.add_argument("--target_path", dest="target_path", help="Path to the test for", required=True)
     parser.add_argument("--nodejs", dest="nodejs", help="Path to the Node.JS resource dir", required=True)
     parser.add_argument("--script-name", dest="script_name", help="Name of the script to run", required=True)
+    parser.add_argument(
+        "--command",
+        dest="command",
+        help="Inline command to execute as --script-name without changing the source package.json",
+    )
     parser.add_argument("--test-type", dest="test_type", help="Type of the test for report", required=True)
     parser.add_argument("files", nargs='*')
     return parser.parse_args(args)

@@ -112,6 +112,7 @@ class TsCheckSuite(BaseFrontendSuite):
         self._files = sorted(self.meta.test_files)
         self._check_type = self.meta.ts_check_type
         self._script_name = self.meta.test_name  # we use TEST_NAME to pass script name to runner
+        self._command = self.meta.ts_check_command
         self._supports_coverage = self.meta.ts_check_has_coverage == "yes"
         # replace all none letters and none digits to '_'
         self._script_name_norm = re.sub(r"[\W_]+", "_", self._script_name)
@@ -241,9 +242,10 @@ class TsCheckSuite(BaseFrontendSuite):
             get_nodejs_res(self.meta),
             "--script-name",
             self._script_name,
-            "--test-type",
-            self.get_type(),
         ]
+        if self._command:
+            cmd += ["--command", self._command]
+        cmd += ["--test-type", self.get_type()]
 
         return cmd + self._files
 
