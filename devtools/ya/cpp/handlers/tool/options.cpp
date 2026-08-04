@@ -24,7 +24,6 @@ namespace NYa::NTool {
         "--use-universal-fetcher-everywhere",
         "--force-refetch",
         "--force-update",
-        "--get-param",
         "--get-resource-id",
         "--hide-arm64-host-warning",
         "--key",

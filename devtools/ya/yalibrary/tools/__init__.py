@@ -187,10 +187,6 @@ class _ToolChain(object):
         tc, toolchain, location = self.__find_toolchain(tool_name)
         return str(_bottle(tc, location['bottle'], for_platform).get_resource_id_from_cache())
 
-    def param(self, tool_name, param):
-        params = self.__find_toolchain(tool_name)[1].get('params', {})
-        return params.get(param)
-
     def environ(self, tool_name):
         tc, toolchain, location = self.__find_toolchain(tool_name)
         params = toolchain.get('params', {})
@@ -227,10 +223,6 @@ def tool(
         toolchain_extra = resolve_tool_by_host_os(name, pm.current_os(), target_platform)['name']
     toolchain = _ToolChain(toolchain_extra)
     return toolchain.find(name, with_params, for_platform, cache=cache, force_refetch=force_refetch)
-
-
-def param(name, toolchain_extra, param):
-    return _ToolChain(toolchain_extra).param(name, param)
 
 
 def environ(name, toolchain_extra=None):

@@ -27,7 +27,7 @@ import devtools.ya.app
 from devtools.ya.build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, UniversalFetcherOptions
 from devtools.ya.core.yarg.groups import PRINT_CONTROL_GROUP
 from devtools.ya.core.yarg.help_level import HelpLevel
-from yalibrary.tools import environ, param, resource_id, tool, tools, toolchain_root
+from yalibrary.tools import environ, resource_id, tool, tools, toolchain_root
 from yalibrary.toolscache import lock_resource
 from yalibrary.platform_matcher import is_darwin_rosetta
 import devtools.ya.core.config
@@ -97,7 +97,6 @@ class ToolOptions(Options):
         self.print_path = None
         self.print_toolchain_path = None
         self.toolchain = None
-        self.param = None
         self.platform = None
         self.target_platforms = []
         self.need_resource_id = None
@@ -125,7 +124,6 @@ class ToolOptions(Options):
             ArgConsumer(['--host-platform'], help="Set host platform", hook=SetValueHook('host_platform')),
             EnvConsumer('YA_TOOL_HOST_PLATFORM', hook=SetValueHook('host_platform')),
             ArgConsumer(['--toolchain'], help="Specify toolchain", hook=SetValueHook('toolchain')),
-            ArgConsumer(['--get-param'], help="Get specified param", hook=SetValueHook('param')),
             ArgConsumer(
                 ['--get-resource-id'],
                 help="Get resource id for specific platform (the platform should be specified)",
@@ -218,9 +216,7 @@ def do_tool(params):
 
     lock_result = False
 
-    if params.param:
-        print(param(tool_name, params.toolchain, params.param))
-    elif params.print_toolchain_path:
+    if params.print_toolchain_path:
         print(toolchain_root(tool_name, params.toolchain, for_platform))
         lock_result = True
     elif params.print_path:
