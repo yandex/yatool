@@ -16,6 +16,7 @@ struct TCommandLineOptions {
     TFsPath CachePath;
     TString PatchPath;
 
+    bool ManagedDepTreeJson = false;
     bool Test = false;
     bool KeepGoing = false;
     bool VerboseMake = false;

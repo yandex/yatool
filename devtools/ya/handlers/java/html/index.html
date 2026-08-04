@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title><!--TITLE--></title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1a1c1f; --muted: #6b7280; --line: #e5e7eb; --panel: #f7f8fa;
+  --accent: #2563eb; --warn: #b45309; --bad: #b91c1c; --ok: #047857; --hit: #fde68a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171a; --fg: #e6e8ea; --muted: #9aa1ab; --line: #2b2f36; --panel: #1c1f24;
+    --accent: #7aa2f7; --warn: #e0a458; --bad: #f07178; --ok: #6ecf9a; --hit: #5c4a12;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+header {
+  position: sticky; top: 0; z-index: 5; padding: 10px 14px; background: var(--panel);
+  border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+}
+h1 { font-size: 13px; font-weight: 600; margin: 0 12px 0 0; }
+input[type=search] {
+  flex: 1; min-width: 220px; padding: 6px 9px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit;
+}
+button {
+  padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); font: inherit; cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+label { color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+.stats { width: 100%; color: var(--muted); font-size: 12px; }
+main { display: flex; align-items: flex-start; }
+#tree { flex: 1; padding: 10px 14px 60vh; }
+#side {
+  width: min(38vw, 520px); padding: 10px 14px; border-left: 1px solid var(--line);
+  position: sticky; top: 56px; max-height: calc(100vh - 56px); overflow: auto; display: none;
+}
+#side.on { display: block; }
+.row { display: flex; align-items: baseline; gap: 6px; padding: 1px 2px; border-radius: 4px; white-space: nowrap; }
+.row:hover { background: var(--panel); }
+.tw { width: 14px; flex: none; text-align: center; color: var(--muted); cursor: pointer; }
+.tw.leaf { cursor: default; opacity: .35; }
+.kids { margin-left: 14px; padding-left: 6px; border-left: 1px dotted var(--line); }
+.collapsed > .kids { display: none; }
+.hidden { display: none; }
+.name { cursor: pointer; }
+.name:hover { text-decoration: underline; text-decoration-style: dotted; }
+.dir { color: var(--muted); }
+.ver { color: var(--ok); }
+.art { font-weight: 600; }
+.tag { font-size: 10.5px; padding: 0 5px; border-radius: 9px; border: 1px solid var(--line); color: var(--muted); }
+.s-conflict .ver, .s-conflict .art { color: var(--bad); }
+.s-excluded { opacity: .55; }
+.s-duplicate { opacity: .7; }
+.s-managed .ver, .s-direct_managed .ver, .s-direct_default .ver { color: var(--warn); }
+.root > .row { font-weight: 700; padding-top: 8px; }
+mark { background: var(--hit); color: inherit; border-radius: 2px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+td, th { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 4px 0 8px; }
+.pathlist li { margin-bottom: 6px; word-break: break-all; }
+.chain { color: var(--muted); font-size: 11.5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><!--TITLE--></h1>
+  <input type="search" id="q" placeholder="filter: substring or /regexp/ (press /)" autocomplete="off">
+  <button id="expand">expand all</button>
+  <button id="collapse">collapse</button>
+  <button id="depth3">depth 3</button>
+  <button id="conflicts">conflicts</button>
+  <label><input type="checkbox" id="hideOmitted"> hide omitted</label>
+  <label><input type="checkbox" id="hideDuplicates"> hide (*)</label>
+  <div class="stats" id="stats"></div>
+</header>
+<main>
+  <div id="tree"></div>
+  <aside id="side"></aside>
+</main>
+<script>
+const DATA = <!--JSON-->;
+const ROOTS = DATA.roots;
+const STATS = DATA.stats;
+
+const tree = document.getElementById('tree');
+const side = document.getElementById('side');
+const stats = document.getElementById('stats');
+const q = document.getElementById('q');
+const esc = s => s.replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]));
+const summary = () => `${STATS.total} nodes · ${STATS.unique} unique dependencies · `
+  + `${Object.keys(STATS.conflicts).length} dependencies with more than one version`;
+
+// ---------- tree ----------
+// ymake reports the version separately, so the rest of the path is the dependency itself.
+const keyOf = node => node.version ? node.path.slice(0, -(node.version.length + 1)) : node.path;
+const nameOf = node => keyOf(node).split('/').pop();
+
+function nodeHTML(node, depth) {
+  const kids = node.children || [];
+  const key = keyOf(node);
+  const name = nameOf(node);
+  const dir = key.slice(0, key.length - name.length);
+  const cls = ['node', 's-' + node.status, depth === 0 ? 'root' : '',
+               depth >= 2 && kids.length ? 'collapsed' : ''].join(' ');
+
+  let tags = '';
+  if (node.status === 'conflict') tags += `<span class="tag">conflict → ${esc(node.conflict_with || '')}</span>`;
+  if (node.status === 'excluded') tags += `<span class="tag">EXCLUDE</span>`;
+  if (node.status === 'duplicate') tags += `<span class="tag">(*)</span>`;
+  if (node.status === 'managed' || node.status === 'direct_managed') {
+    tags += `<span class="tag">replaced from ${esc(node.replaced_from || '')}</span>`;
+  }
+  if (node.status === 'direct_default') tags += `<span class="tag">unversioned → default</span>`;
+  if (node.module_type) tags += `<span class="tag">${esc(node.module_type)}</span>`;
+  if (STATS.conflicts[key] && node.status !== 'conflict') {
+    tags += `<span class="tag" title="several versions in the tree">`
+      + `${Object.keys(STATS.conflicts[key]).length} versions</span>`;
+  }
+
+  return `<div class="${cls}" data-key="${esc(key)}">`
+    + `<div class="row"><span class="tw ${kids.length ? '' : 'leaf'}">${kids.length ? '▸' : '·'}</span>`
+    + `<span class="name"><span class="dir">${esc(dir)}</span><span class="art">${esc(name)}</span>`
+    + (node.version ? `<span class="ver">:${esc(node.version)}</span>` : '')
+    + `</span>${tags}</div>`
+    + (kids.length ? `<div class="kids">${kids.map(kid => nodeHTML(kid, depth + 1)).join('')}</div>` : '')
+    + `</div>`;
+}
+
+tree.innerHTML = ROOTS.map(root => nodeHTML(root, 0)).join('');
+stats.textContent = summary();
+
+function setCollapsed(node, collapsed) {
+  if (!node.querySelector(':scope > .kids')) return;
+  node.classList.toggle('collapsed', collapsed);
+  node.querySelector(':scope > .row > .tw').textContent = collapsed ? '▸' : '▾';
+}
+
+tree.addEventListener('click', event => {
+  const twisty = event.target.closest('.tw');
+  if (twisty && !twisty.classList.contains('leaf')) {
+    const node = twisty.closest('.node');
+    setCollapsed(node, !node.classList.contains('collapsed'));
+    return;
+  }
+  const name = event.target.closest('.name');
+  if (name) showPaths(name.closest('.node').dataset.key);
+});
+
+const setAll = collapsed => tree.querySelectorAll('.node').forEach(node => setCollapsed(node, collapsed));
+document.getElementById('expand').onclick = () => setAll(false);
+document.getElementById('collapse').onclick = () => setAll(true);
+document.getElementById('depth3').onclick = () => {
+  setAll(true);
+  const open = (node, depth) => {
+    setCollapsed(node, false);
+    if (depth >= 3) return;
+    node.querySelectorAll(':scope > .kids > .node').forEach(kid => open(kid, depth + 1));
+  };
+  tree.querySelectorAll(':scope > .node').forEach(root => open(root, 1));
+};
+
+// ---------- filters ----------
+function applyFilters() {
+  const hideOmitted = document.getElementById('hideOmitted').checked;
+  const hideDuplicates = document.getElementById('hideDuplicates').checked;
+  tree.querySelectorAll('.node').forEach(node => {
+    const omitted = node.classList.contains('s-excluded') || node.classList.contains('s-conflict');
+    const duplicate = node.classList.contains('s-duplicate');
+    node.classList.toggle('filtered', (hideOmitted && omitted) || (hideDuplicates && duplicate));
+  });
+  search(q.value);
+}
+document.getElementById('hideOmitted').onchange = applyFilters;
+document.getElementById('hideDuplicates').onchange = applyFilters;
+
+// ---------- search ----------
+let marked = [];
+
+function matcher(text) {
+  if (!text.trim()) return null;
+  const asRegexp = text.match(/^\/(.*)\/([a-z]*)$/);
+  if (asRegexp) {
+    try {
+      return new RegExp(asRegexp[1], asRegexp[2] || 'i');
+    } catch (e) {
+      return null;
+    }
+  }
+  const lower = text.toLowerCase();
+  return {test: value => value.toLowerCase().includes(lower)};
+}
+
+function highlight(holder, re, text) {
+  const global = re instanceof RegExp
+    ? new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g')
+    : new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  marked.push([holder, holder.innerHTML]);
+  // Each part is highlighted separately to keep the directory/name/version colouring.
+  holder.querySelectorAll('span').forEach(part => {
+    part.innerHTML = esc(part.textContent).replace(global, hit => `<mark>${esc(hit)}</mark>`);
+  });
+}
+
+function search(text) {
+  marked.forEach(([holder, original]) => { holder.innerHTML = original; });
+  marked = [];
+
+  const re = matcher(text);
+  let hits = 0;
+
+  const visit = node => {
+    const holder = node.querySelector(':scope > .row > .name');
+    const filtered = node.classList.contains('filtered');
+    const matches = (re ? re.test(holder.textContent) : true) && !filtered;
+    let visible = matches;
+
+    node.querySelectorAll(':scope > .kids > .node').forEach(kid => {
+      if (visit(kid)) visible = true;
+    });
+    node.classList.toggle('hidden', !visible || filtered);
+
+    if (re && matches) {
+      hits++;
+      highlight(holder, re, text);
+      for (let parent = node.parentElement; parent && parent !== tree; parent = parent.parentElement) {
+        if (parent.classList.contains('node')) setCollapsed(parent, false);
+      }
+    }
+    return visible && !filtered;
+  };
+
+  tree.querySelectorAll(':scope > .node').forEach(visit);
+  stats.textContent = re ? `${hits} matches` : summary();
+}
+
+let searchTimer;
+q.oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => search(q.value), 140);
+};
+document.addEventListener('keydown', event => {
+  if (event.key === '/' && document.activeElement !== q) {
+    event.preventDefault();
+    q.focus();
+    q.select();
+  }
+  if (event.key === 'Escape') {
+    side.classList.remove('on');
+    if (document.activeElement === q) {
+      q.value = '';
+      search('');
+    }
+  }
+});
+
+// ---------- side panel ----------
+function chainsTo(key) {
+  const chains = [];
+  const walk = (node, stack) => {
+    const here = stack.concat([node]);
+    if (keyOf(node) === key) {
+      chains.push(here.map(item => nameOf(item) + (item.version ? ':' + item.version : '')
+        + (item.status === 'normal' ? '' : ' (' + item.status + ')')));
+    }
+    (node.children || []).forEach(kid => walk(kid, here));
+  };
+  ROOTS.forEach(root => walk(root, []));
+  return chains;
+}
+
+function showPaths(key) {
+  const chains = chainsTo(key);
+  const versions = STATS.versions[key] || {};
+  const shown = chains.slice(0, 300);
+  side.classList.add('on');
+  side.innerHTML = `<h2>${esc(key)}</h2>`
+    + `<div>versions: `
+    + (Object.entries(versions).map(([version, count]) => `<span class="tag">${esc(version)} ×${count}</span>`).join(' ') || '—')
+    + `</div><h2>${chains.length} path(s) from root</h2><ol class="pathlist">`
+    + shown.map(chain => `<li>` + chain.map((item, index) => index === chain.length - 1
+        ? `<b>${esc(item)}</b>`
+        : `<span class="chain">${esc(item)}</span>`).join(' <span class="chain">›</span>') + `</li>`).join('')
+    + `</ol>`
+    + (chains.length > shown.length ? `<p class="chain">…${chains.length - shown.length} more not shown</p>` : '');
+  side.scrollTop = 0;
+}
+
+document.getElementById('conflicts').onclick = () => {
+  const rows = Object.entries(STATS.conflicts)
+    .sort((a, b) => Object.keys(b[1]).length - Object.keys(a[1]).length);
+  side.classList.add('on');
+  side.innerHTML = `<h2>${rows.length} dependencies with more than one version</h2>`
+    + `<table><tr><th>dependency</th><th>versions (occurrences)</th></tr>`
+    + rows.map(([key, versions]) => `<tr><td><a href="#" data-key="${esc(key)}">${esc(key)}</a></td><td>`
+        + Object.entries(versions).sort().map(([version, count]) => `${esc(version)}&nbsp;×${count}`).join('<br>')
+        + `</td></tr>`).join('')
+    + `</table>`;
+  side.querySelectorAll('a[data-key]').forEach(link => {
+    link.onclick = event => {
+      event.preventDefault();
+      showPaths(link.dataset.key);
+    };
+  });
+};
+
+document.getElementById('depth3').click();
+</script>
+</body>
+</html>

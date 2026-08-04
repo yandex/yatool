@@ -18,7 +18,10 @@ struct TDependencyManagementModuleInfo {
     TVector<TNodeId> AppliedExcludes;
 };
 
-void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots);
+// Prints the dependency tree to Cout, either as text or as json, so that consumers get
+// structured data rather than the printed text. Other messages of the run go to Cmsg, which
+// should be sent to stderr (--xE) when json is asked for.
+void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, bool asJson = false);
 void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EManagedPeersDepth depth = EManagedPeersDepth::Transitive);
 void DumpFDM(const TVars& globalVars, bool asJson);
 

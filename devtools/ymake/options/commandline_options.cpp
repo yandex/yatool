@@ -5,6 +5,7 @@ void TCommandLineOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption('X', "find-path-from", "find (any) path from this target").EmplaceTo(&FindPathFrom);
     opts.AddLongOption('Z', "find-path-to", "find (any) path to this target").EmplaceTo(&FindPathTo);
     opts.AddLongOption("managed-dep-tree", "print dependency tree with DEPENDENCY_MANAGEMENT explanation").EmplaceTo(&ManagedDepTreeRoots);
+    opts.AddLongOption("managed-dep-tree-json", "print dependency tree from --managed-dep-tree as json (use with --xE to keep other messages off stdout)").SetFlag(&ManagedDepTreeJson).NoArgument();
     opts.AddLongOption("managed-deps", "print managed dependencies for the given target").EmplaceTo(&DumpDMRoots);
     opts.AddLongOption('m', "write-meta-data", "metadata export file").StoreResult(&WriteMetaData);
     opts.AddLongOption('z', "cache-path", "load cache from path and do not update graph").StoreResult(&CachePath);

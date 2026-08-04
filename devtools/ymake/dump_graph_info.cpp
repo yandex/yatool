@@ -83,7 +83,7 @@ void PerformDumps(const TBuildConfiguration& conf, TYMake& yMake) {
     if (!conf.ManagedDepTreeRoots.empty()) {
         THashSet<TNodeId> roots;
         yMake.ResolveRelationTargets(conf.ManagedDepTreeRoots, roots);
-        ExplainDM(yMake.GetRestoreContext(), roots);
+        ExplainDM(yMake.GetRestoreContext(), roots, conf.ManagedDepTreeJson);
     }
 
     if (!conf.DumpDMRoots.empty()) {

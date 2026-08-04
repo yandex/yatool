@@ -1,4 +1,5 @@
 from . import helpers
+from . import opts as java_opts
 
 import devtools.ya.app
 import devtools.ya.core.yarg
@@ -27,7 +28,7 @@ class JavaYaHandler(devtools.ya.core.yarg.CompositeHandler):
         self['dependency-tree'] = devtools.ya.core.yarg.OptsHandler(
             action=devtools.ya.app.execute(action=helpers.print_ymake_dep_tree),
             description='Print dependency tree',
-            opts=default_options() + [build_opts.BuildTypeOptions('release')],
+            opts=default_options() + [build_opts.BuildTypeOptions('release'), java_opts.DependencyTreeOutputOptions()],
             visible=True,
         )
         self['classpath'] = devtools.ya.core.yarg.OptsHandler(

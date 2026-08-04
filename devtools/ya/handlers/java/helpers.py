@@ -11,6 +11,8 @@ import yalibrary.formatter as yaformatter
 
 import yalibrary.graph.const as consts
 
+from . import dep_tree
+
 
 def _get_subscribers(opts, app_ctx):
     return [ya_make.DisplayMessageSubscriber(opts, app_ctx.display)]
@@ -59,6 +61,8 @@ class WrongInputException(Exception):
 
 
 def print_ymake_dep_tree(opts):
+    as_text = opts.dep_tree_format == dep_tree.FORMAT_TEXT
+
     with temp_dir() as tmp:
         res, evlog = gen_managed_dep_tree(
             build_root=tmp,
@@ -67,6 +71,7 @@ def print_ymake_dep_tree(opts):
             debug_options=opts.debug_options,
             flags=opts.flags,
             ymake_bin=opts.ymake_bin,
+            as_json=not as_text,
         )
 
     import app_ctx
@@ -75,9 +80,25 @@ def print_ymake_dep_tree(opts):
         for ev in evlog:
             event_queue(ev)
 
-    formatter = yaformatter.new_formatter(is_tty=sys.stdout.isatty())
-    print(formatter.format_message(res.stdout))
-    return any('Type' in ev and ev['Type'] == 'Error' for ev in evlog)
+    failed = any('Type' in ev and ev['Type'] == 'Error' for ev in evlog)
+
+    if as_text:
+        formatter = yaformatter.new_formatter(is_tty=sys.stdout.isatty())
+        print(formatter.format_message(res.stdout))
+    elif not res.stdout.strip():
+        app_ctx.display.emit_message('[[bad]]ymake has not generated the dependency tree')
+        return True
+    else:
+        path = dep_tree.dump(
+            dep_tree.loads(res.stdout),
+            opts.dep_tree_format,
+            opts.rel_targets,
+            output=opts.dep_tree_output,
+            open_in_browser=opts.dep_tree_open,
+        )
+        app_ctx.display.emit_message('[[imp]]Dependency tree is written to {}'.format(path))
+
+    return failed
 
 
 def print_classpath(opts):

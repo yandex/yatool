@@ -152,6 +152,7 @@ def _gen_graph_params():
             yarg.Param('find_path_from', default_value=None),
             yarg.Param('find_path_to', default_value=None),
             yarg.Param('managed_dep_tree', default_value=None),
+            yarg.Param('managed_dep_tree_json', default_value=False),
             yarg.Param('classpaths', default_value=None),
             yarg.Param('enabled_events', default_value=consts.YmakeEvents.ALL.value),
             yarg.Param('yndex_file', default_value=None),
@@ -418,6 +419,9 @@ def _cons_ymake_args(**kwargs):
     if managed_dep_tree:
         for target in managed_dep_tree:
             ret += ['--managed-dep-tree', target]
+
+    if kwargs.pop('managed_dep_tree_json', False):
+        ret += ['--managed-dep-tree-json']
 
     classpaths = kwargs.pop('classpaths', None)
     if classpaths:

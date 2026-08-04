@@ -11,6 +11,7 @@
 #include <devtools/ymake/diag/trace.h>
 #include <library/cpp/json/fast_sax/parser.h>
 #include <library/cpp/json/writer/json.h>
+#include <util/generic/ptr.h>
 #include <util/string/split.h>
 #include <fmt/format.h>
 
@@ -1373,6 +1374,10 @@ namespace {
             return StartModule;
         }
 
+        bool IsVersionedContrib(const TModule& module) const {
+            return DMConf.IsContribWithVer(module);
+        }
+
     private:
         TConstDepNodeRef GetReplacement(const TConstDepNodeRef& peerNode, bool directPeer) {
             if (StartModuleManagedDeps.has(peerNode.Id())) {
@@ -1445,12 +1450,175 @@ namespace {
         THashMap<TFileElemId, THashMap<TFileView, TNodeId>> ModuleLibVersionsCache;
     };
 
+    enum class EDepTreeNodeKind {
+        Normal,
+        Submodule,
+        Duplicate,
+        Conflict,
+        Excluded,
+        Managed,
+        DirectManaged,
+        DirectDefault,
+    };
+
+    TStringBuf DepTreeNodeKindName(EDepTreeNodeKind kind) {
+        switch (kind) {
+            case EDepTreeNodeKind::Normal: return "normal";
+            case EDepTreeNodeKind::Submodule: return "submodule";
+            case EDepTreeNodeKind::Duplicate: return "duplicate";
+            case EDepTreeNodeKind::Conflict: return "conflict";
+            case EDepTreeNodeKind::Excluded: return "excluded";
+            case EDepTreeNodeKind::Managed: return "managed";
+            case EDepTreeNodeKind::DirectManaged: return "direct_managed";
+            case EDepTreeNodeKind::DirectDefault: return "direct_default";
+        }
+        Y_ABORT("Unknown dependency tree node kind");
+    }
+
+    // One node of the dependency tree as it is reported by the traversal. All the string views
+    // are owned by the graph and are only valid during the reporting call.
+    struct TDepTreeNode {
+        size_t Depth = 0;
+        EDepTreeNodeKind Kind = EDepTreeNodeKind::Normal;
+        TStringBuf Path;
+        TStringBuf Version;      // basename of a versioned contrib directory, empty for other modules
+        TStringBuf ModuleType;   // submodule type of a multimodule
+        TStringBuf ReplacedFrom; // version replaced by DEPENDENCY_MANAGEMENT
+        TStringBuf ConflictWith; // version which has won the conflict
+    };
+
+    class IDepTreePrinter {
+    public:
+        virtual ~IDepTreePrinter() = default;
+
+        virtual void OnNode(const TDepTreeNode& node) = 0;
+        virtual void Finish() {}
+    };
+
+    class TDepTreeTextPrinter: public IDepTreePrinter {
+    public:
+        void OnNode(const TDepTreeNode& node) override {
+            if (auto depth = node.Depth; depth > 0) {
+                Cout << "[[unimp]]";
+                while (depth-- > 1) {
+                    Cout << "|   ";
+                }
+                Cout << "|-->[[rst]]";
+            }
+
+            fmt::memory_buffer buf;
+            auto out = std::back_inserter(buf);
+            switch (node.Kind) {
+                case EDepTreeNodeKind::Normal:
+                    fmt::format_to(out, fmt::runtime(NORMAL), "path"_a = node.Path);
+                    break;
+                case EDepTreeNodeKind::Submodule:
+                    fmt::format_to(out, fmt::runtime(SUBMODULE), "path"_a = node.Path, "type"_a = node.ModuleType);
+                    break;
+                case EDepTreeNodeKind::Duplicate:
+                    fmt::format_to(out, fmt::runtime(DUPLICATE), "path"_a = node.Path);
+                    break;
+                case EDepTreeNodeKind::Conflict:
+                    fmt::format_to(out, fmt::runtime(CONFLICT), "path"_a = node.Path, "conflict_resolution"_a = node.ConflictWith);
+                    break;
+                case EDepTreeNodeKind::Excluded:
+                    fmt::format_to(out, fmt::runtime(EXCLUDED), "path"_a = node.Path);
+                    break;
+                case EDepTreeNodeKind::Managed:
+                    fmt::format_to(out, fmt::runtime(MANAGED), "path"_a = node.Path, "orig"_a = node.ReplacedFrom);
+                    break;
+                case EDepTreeNodeKind::DirectManaged:
+                    fmt::format_to(out, fmt::runtime(DIRECT_MANAGED), "path"_a = node.Path);
+                    break;
+                case EDepTreeNodeKind::DirectDefault:
+                    fmt::format_to(out, fmt::runtime(DIRECT_DEFAULT), "path"_a = node.Path);
+                    break;
+            }
+            Cout.Write(buf.data(), buf.size());
+            Cout << Endl;
+        }
+
+    private:
+        static constexpr const char* NORMAL = "[[imp]]{path}[[rst]]";
+        static constexpr const char* SUBMODULE = "[[imp]]{path}@{type}[[rst]]";
+        static constexpr const char* CONFLICT = "[[unimp]]{path} (omitted because of [[c:yellow]]confict with {conflict_resolution}[[unimp]])[[rst]]";
+        static constexpr const char* MANAGED = "[[imp]]{path}[[unimp]] (replaced from [[c:blue]]{orig}[[unimp]] because of [[c:blue]]DEPENDENCY_MANAGEMENT[[unimp]])[[rst]]";
+        static constexpr const char* DUPLICATE = "[[unimp]]{path} (*)[[rst]]";
+        static constexpr const char* EXCLUDED = "[[unimp]]{path} (omitted because of [[c:red]]EXCLUDE[[unimp]])[[rst]]";
+        static constexpr const char* DIRECT_MANAGED = "[[imp]]{path}[[unimp]] (replaced from [[c:blue]]unversioned[[unimp]] because of [[c:blue]]DEPENDENCY_MANAGEMENT[[unimp]])[[rst]]";
+        static constexpr const char* DIRECT_DEFAULT = "[[imp]]{path}[[unimp]] (replaced from [[c:magenta]]unversioned[[unimp]] to [[c:magenta]]default[[unimp]])[[rst]]";
+    };
+
+    // Nodes come in DFS pre-order, so the depth of a node is enough to know where it belongs:
+    // everything deeper than the new node is closed, and the node itself is appended to the
+    // children of the node right above it.
+    class TDepTreeJsonPrinter: public IDepTreePrinter {
+    public:
+        explicit TDepTreeJsonPrinter(IOutputStream& out): Buf{NJsonWriter::HEM_DONT_ESCAPE_HTML, &out} {
+            Buf.BeginObject();
+            Buf.WriteKey("roots");
+            Buf.BeginList();
+        }
+
+        void OnNode(const TDepTreeNode& node) override {
+            CloseDeeperThan(node.Depth);
+            Y_ASSERT(OpenNodes.size() == node.Depth);
+
+            if (node.Depth > 0 && !OpenNodes.back()) {
+                Buf.WriteKey("children");
+                Buf.BeginList();
+                OpenNodes.back() = true;
+            }
+
+            Buf.BeginObject();
+            Buf.WriteKey("path");
+            Buf.WriteString(node.Path);
+            Buf.WriteKey("status");
+            Buf.WriteString(DepTreeNodeKindName(node.Kind));
+            WriteIfSet("version", node.Version);
+            WriteIfSet("module_type", node.ModuleType);
+            WriteIfSet("replaced_from", node.ReplacedFrom);
+            WriteIfSet("conflict_with", node.ConflictWith);
+            OpenNodes.push_back(false);
+        }
+
+        void Finish() override {
+            CloseDeeperThan(0);
+            Buf.EndList();
+            Buf.EndObject();
+        }
+
+    private:
+        void WriteIfSet(TStringBuf key, TStringBuf value) {
+            if (!value.empty()) {
+                Buf.WriteKey(key);
+                Buf.WriteString(value);
+            }
+        }
+
+        void CloseDeeperThan(size_t depth) {
+            while (OpenNodes.size() > depth) {
+                if (OpenNodes.back()) {
+                    Buf.EndList();
+                }
+                Buf.EndObject();
+                OpenNodes.pop_back();
+            }
+        }
+
+    private:
+        NJsonWriter::TBuf Buf;
+        TVector<bool> OpenNodes; // for every open node: whether its children list is open
+    };
+
     class TDepTreeVisitor: public TNoReentryVisitorBase<TVisitorStateItemBase, TGraphIteratorStateItemBase<true>> {
     public:
         using TBase = TNoReentryVisitorBase<TVisitorStateItemBase, TGraphIteratorStateItemBase<true>>;
         using TState = TBase::TState;
 
-        TDepTreeVisitor(TRestoreContext restoreContext, const TModule& startModule): Explainer{restoreContext, startModule} {}
+        TDepTreeVisitor(TRestoreContext restoreContext, const TModule& startModule, IDepTreePrinter& printer)
+            : Explainer{restoreContext, startModule}
+            , Printer{printer} {}
 
         bool Enter(TState& state) {
             const bool fresh = TBase::Enter(state);
@@ -1461,9 +1629,9 @@ namespace {
             if (state.Size() == 1) {
                 const auto& mod = Explainer.GetStartModule();
                 if (mod.IsFromMultimodule())
-                    DMExlain(state, SUBMODULE, "path"_a = mod.GetDir().CutAllTypes(), "type"_a = mod.GetUserType());
+                    Report(state, EDepTreeNodeKind::Submodule, mod, mod.GetUserType());
                 else {
-                    DMExlain(state, NORMAL, "path"_a = mod.GetDir().CutAllTypes());
+                    Report(state, EDepTreeNodeKind::Normal, mod);
                 }
                 return fresh;
             }
@@ -1483,28 +1651,28 @@ namespace {
 
             const bool isReplacement = info.Resolution != TDependencyManagementExplainer::Conflict && info.Resolution != TDependencyManagementExplainer::Excluded;
             if (isReplacement && !Reported.emplace(info.Orig->GetId(), info.Peer->GetId()).second) {
-                DMExlain(state, DUPLICATE, "path"_a = info.Peer->GetDir().CutAllTypes());
+                Report(state, EDepTreeNodeKind::Duplicate, *info.Peer);
                 return false;
             }
 
             switch(info.Resolution) {
                 case TDependencyManagementExplainer::RegularDep:
-                    DMExlain(state, NORMAL, "path"_a = info.Peer->GetDir().CutAllTypes());
+                    Report(state, EDepTreeNodeKind::Normal, *info.Peer);
                     break;
                 case TDependencyManagementExplainer::Default:
-                    DMExlain(state, DIRECT_DEFAULT, "path"_a = info.Peer->GetDir().CutAllTypes());
+                    Report(state, EDepTreeNodeKind::DirectDefault, *info.Peer);
                     return !TraverseReplacement(state, info.PeerId) && fresh;
                 case TDependencyManagementExplainer::DirectManaged:
-                    DMExlain(state, DIRECT_MANAGED, "path"_a = info.Peer->GetDir().CutAllTypes());
+                    Report(state, EDepTreeNodeKind::DirectManaged, *info.Peer);
                     return !TraverseReplacement(state, info.PeerId) && fresh;
                 case TDependencyManagementExplainer::Managed:
-                    DMExlain(state, MANAGED, "path"_a = info.Peer->GetDir().CutAllTypes(), "orig"_a = info.Orig->GetDir().Basename());
+                    Report(state, EDepTreeNodeKind::Managed, *info.Peer, info.Orig->GetDir().Basename());
                     return !TraverseReplacement(state, info.PeerId) && fresh;
                 case TDependencyManagementExplainer::Conflict:
-                    DMExlain(state, CONFLICT, "path"_a = info.Orig->GetDir().CutAllTypes(), "conflict_resolution"_a = info.Peer->GetDir().Basename());
+                    Report(state, EDepTreeNodeKind::Conflict, *info.Orig, info.Peer->GetDir().Basename());
                     return false;
                 case TDependencyManagementExplainer::Excluded:
-                    DMExlain(state, EXCLUDED, "path"_a = info.Orig->GetDir().CutAllTypes());
+                    Report(state, EDepTreeNodeKind::Excluded, *info.Orig);
                     return false;
             }
 
@@ -1524,19 +1692,36 @@ namespace {
         }
 
     private:
-        template<typename... T>
-        void DMExlain(TState& state, const char* fmtStr, T&&... args) {
-            if (auto depth = state.Size() - ReplacementsInStack - 1; depth > 0) {
-                Cout << "[[unimp]]";
-                while (depth-- > 1) {
-                    Cout << "|   ";
-                }
-                Cout << "|-->[[rst]]";
+        // `extra` is the submodule type for Submodule, the replaced version for Managed and the
+        // winning version for Conflict; the other kinds do not use it.
+        void Report(TState& state, EDepTreeNodeKind kind, const TModule& module, TStringBuf extra = {}) {
+            TDepTreeNode node;
+            node.Depth = state.Size() - ReplacementsInStack - 1;
+            node.Kind = kind;
+            node.Path = module.GetDir().CutAllTypes();
+            if (Explainer.IsVersionedContrib(module)) {
+                node.Version = module.GetDir().Basename();
             }
-            fmt::memory_buffer buf;
-            fmt::format_to(std::back_inserter(buf), fmt::runtime(fmtStr), std::forward<T>(args)...);
-            Cout.Write(buf.data(), buf.size());
-            Cout << Endl;
+
+            switch (kind) {
+                case EDepTreeNodeKind::Submodule:
+                    node.ModuleType = extra;
+                    break;
+                case EDepTreeNodeKind::Managed:
+                    node.ReplacedFrom = extra;
+                    break;
+                case EDepTreeNodeKind::Conflict:
+                    node.ConflictWith = extra;
+                    break;
+                case EDepTreeNodeKind::DirectManaged:
+                case EDepTreeNodeKind::DirectDefault:
+                    node.ReplacedFrom = UNVERSIONED;
+                    break;
+                default:
+                    break;
+            }
+
+            Printer.OnNode(node);
         }
 
         bool TraverseReplacement(TState& state, TNodeId replacement) {
@@ -1550,17 +1735,11 @@ namespace {
         }
 
     private:
-        static constexpr const char* NORMAL = "[[imp]]{path}[[rst]]";
-        static constexpr const char* SUBMODULE = "[[imp]]{path}@{type}[[rst]]";
-        static constexpr const char* CONFLICT = "[[unimp]]{path} (omitted because of [[c:yellow]]confict with {conflict_resolution}[[unimp]])[[rst]]";
-        static constexpr const char* MANAGED = "[[imp]]{path}[[unimp]] (replaced from [[c:blue]]{orig}[[unimp]] because of [[c:blue]]DEPENDENCY_MANAGEMENT[[unimp]])[[rst]]";
-        static constexpr const char* DUPLICATE = "[[unimp]]{path} (*)[[rst]]";
-        static constexpr const char* EXCLUDED = "[[unimp]]{path} (omitted because of [[c:red]]EXCLUDE[[unimp]])[[rst]]";
-        static constexpr const char* DIRECT_MANAGED = "[[imp]]{path}[[unimp]] (replaced from [[c:blue]]unversioned[[unimp]] because of [[c:blue]]DEPENDENCY_MANAGEMENT[[unimp]])[[rst]]";
-        static constexpr const char* DIRECT_DEFAULT = "[[imp]]{path}[[unimp]] (replaced from [[c:magenta]]unversioned[[unimp]] to [[c:magenta]]default[[unimp]])[[rst]]";
+        static constexpr TStringBuf UNVERSIONED = "unversioned";
 
     private:
         TDependencyManagementExplainer Explainer;
+        IDepTreePrinter& Printer;
         THashSet<std::pair<TFileElemId, TFileElemId>> Reported; // from module id, to module id
         size_t ReplacementsInStack = 0;
     };
@@ -1740,7 +1919,14 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
     return TMaybe<EBuildResult>();
 }
 
-void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots) {
+void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, bool asJson) {
+    THolder<IDepTreePrinter> printer;
+    if (asJson) {
+        printer = MakeHolder<TDepTreeJsonPrinter>(Cout);
+    } else {
+        printer = MakeHolder<TDepTreeTextPrinter>();
+    }
+
     for (TConstDepNodeRef node : GetStartModules(restoreContext.Graph, roots)) {
         const TModule* module = restoreContext.Modules.Get(AssumeFile(node->ElemId));
         Y_ASSERT(module);
@@ -1750,9 +1936,11 @@ void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots) {
             continue;
         }
 
-        TDepTreeVisitor visitor{restoreContext, *module};
+        TDepTreeVisitor visitor{restoreContext, *module, *printer};
         IterateAll(node, visitor);
     }
+
+    printer->Finish();
 }
 
 void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EManagedPeersDepth depth) {
