@@ -595,6 +595,10 @@ def _run_ymake(**kwargs):
         except ValueError:
             logger.warning(line)
             return
+        if isinstance(j, str):
+            # XXX: yjson parses string as a valid json
+            logger.warning(line)
+            return
 
         j['ymake_run_uid'] = _ymake_unique_run_id
         events.append(j)
