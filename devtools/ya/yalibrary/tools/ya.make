@@ -21,3 +21,7 @@ IF (PYTHON2)
 ENDIF()
 
 END()
+
+RECURSE_FOR_TESTS(
+    tests
+)

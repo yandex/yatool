@@ -9,7 +9,6 @@ import devtools.ya.core.config
 import yalibrary.fetcher.tool_chain_fetcher
 import yalibrary.platform_matcher as pm
 from yalibrary.toolscache import toolscache_version
-from library.python import func
 import exts.path2
 import devtools.libs.yaplatform.python.platform_map as platform_map
 
@@ -84,30 +83,9 @@ class _Bottle(object):
             return exts.path2.normpath(os.path.join(path, self.__executable))
 
 
-class _Bottler(object):
-    def get(self, toolchain_name, bottle_name, for_platform, force_refetch):
-        visited = set()
-        bottles = devtools.ya.core.config.config()['bottles']
-        while True:
-            if bottle_name in visited:
-                raise Exception('loop detected')
-            visited.add(bottle_name)
-            value = bottles[bottle_name]
-            if isinstance(value, dict):
-                return _Bottle(
-                    toolchain_name, bottle_name, value['formula'], value.get('executable'), for_platform, force_refetch
-                )
-            else:
-                bottle_name = value
-
-
-@func.lazy
-def _bottler():
-    return _Bottler()
-
-
 def _bottle(toolchain_name, bottle_name, for_platform=None, force_refetch=False):
-    return _bottler().get(toolchain_name, bottle_name, for_platform, force_refetch=force_refetch)
+    value = devtools.ya.core.config.config()['bottles'][bottle_name]
+    return _Bottle(toolchain_name, bottle_name, value['formula'], value.get('executable'), for_platform, force_refetch)
 
 
 class _ToolInfo(object):
@@ -220,7 +198,7 @@ def tool(
     if target_platform:
         if toolchain_extra:
             raise ToolResolveException("toolchain and target platform should not be specified together")
-        toolchain_extra = resolve_tool_by_host_os(name, pm.current_os(), target_platform)['name']
+        toolchain_extra = _resolve_tool_by_host_os(name, pm.current_os(), target_platform)['name']
     toolchain = _ToolChain(toolchain_extra)
     return toolchain.find(name, with_params, for_platform, cache=cache, force_refetch=force_refetch)
 
@@ -253,103 +231,101 @@ ToolInfo = tp.TypedDict(
 )
 
 
+def _load_toolchain(toolchain_name, platforms, platf_type, default_value=None):
+    platform = platforms.get(platf_type, None)
+    if not platform:
+        if default_value:
+            return copy.deepcopy(default_value)
+        else:
+            raise UnsupportedToolchain('%s platform should be always specified. %s', platf_type, platforms)
+    else:
+        res_os = platform.get('os', None)
+        if not res_os:
+            raise UnsupportedToolchain('OS should be defined. %s', platform)
+        return {
+            'os': res_os,
+            'arch': platform.get('arch', 'x86_64'),
+            'toolchain': toolchain_name,
+            'visible_name': toolchain_name,
+        }
+
+
+def _iter_platforms(descr, toolchain_name):
+    for platforms in descr.get('platforms', []):
+        host = _load_toolchain(toolchain_name, platforms, 'host')
+        target = _load_toolchain(toolchain_name, platforms, 'target', host)
+
+        yield {'host': host, 'target': target}
+
+        if platforms.get('default', False):
+            tc_def = {'toolchain': 'default'}
+            h_copy = copy.deepcopy(host) | tc_def
+            t_copy = copy.deepcopy(target) | tc_def
+            yield {'host': h_copy, 'target': t_copy}
+
+
+def _subst(x, root, tool_var):
+    if isinstance(x, dict):
+        return dict((_subst(k, root, tool_var), _subst(v, root, tool_var)) for k, v in x.items())
+
+    if isinstance(x, list):
+        return [_subst(v, root, tool_var) for v in x]
+    if isinstance(x, six.string_types):
+        if x == root:
+            return tool_var
+
+        return x.replace('$(' + root + ')', '$(' + tool_var + ')')
+
+    return x
+
+
 def iter_tools(name, tn_filter=None):
     # type: (str, tp.Callable | None) -> tp.Iterator[ToolInfo]
-    tc = devtools.ya.core.config.config()['toolchain']  # type: dict[str, dict]
-    bt = devtools.ya.core.config.config()['bottles']
+    toolchains = devtools.ya.core.config.config()['toolchain']  # type: dict[str, dict]
+    bottles = devtools.ya.core.config.config()['bottles']
 
-    for tn, descr in tc.items():
-        if tn_filter is not None and not tn_filter(tn, descr):
+    for toolchain_key, descr in toolchains.items():
+        if tn_filter is not None and not tn_filter(toolchain_key, descr):
             continue
 
-        trn = tn
-        tn = descr.get('name', tn)
         tools = descr.get('tools', {})
+        if name not in tools:
+            continue
 
-        if name in tools:
-            tool = tools[name]
-            bottle_name = tool.get('bottle', None)
-            executable_path = tool.get('executable', None)
+        toolchain_name = descr.get('name', toolchain_key)
+        tool = tools[name]
+        bottle_name = tool.get('bottle', None)
+        executable_path = tool.get('executable', None)
 
-            formula = bt[bottle_name]['formula'] if bottle_name else None
+        formula = bottles[bottle_name]['formula'] if bottle_name else None
 
-            def iter_platforms():
-                for pl in descr.get('platforms', []):
+        for p in _iter_platforms(descr, toolchain_name):
+            pp = descr.get('params', {})
 
-                    def load_toolchain(platf_type, default_value=None):
-                        platform = pl.get(platf_type, None)
-                        if not platform:
-                            if default_value:
-                                return copy.deepcopy(default_value)
-                            else:
-                                raise UnsupportedToolchain('%s platform should be always specified. %s', platf_type, pl)
-                        else:
-                            res_os = platform.get('os', None)
-                            if not res_os:
-                                raise UnsupportedToolchain('OS should be defined. %s', platform)
-                            return {
-                                'os': res_os,
-                                'arch': platform.get('arch', 'x86_64'),
-                                'toolchain': tn,
-                                'visible_name': tn,
-                            }
+            res = {
+                'platform': p,
+                'env': descr.get('env', {}),
+                'params': pp,
+                'formula': formula,
+                'name': toolchain_key,
+                'bottle_name': bottle_name,
+                'executable_path': executable_path,
+            }  # type: ToolInfo
+            root = res.get('params', {}).get('match_root', None)
 
-                    host = load_toolchain('host')
-                    target = load_toolchain('target', host)
+            if root:
+                if formula and res.get('params', {}).get('use_bundle', False):
+                    formula = yalibrary.fetcher.tool_chain_fetcher.get_formula_value(formula)
+                    tool_var = six.ensure_str(platform_map.mapping_var_name_from_json(root, json.dumps(formula)))
+                else:
+                    tool_var = pm.stringize_platform(p['target'], sep='_')
 
-                    yield {'host': host, 'target': target}
+                res['tool_var'] = tool_var
 
-                    is_default = pl.get('default', False)
+                for key in ('env', 'params'):
+                    res[key] = _subst(res[key], root, tool_var)
 
-                    if is_default:
-                        h_copy = copy.deepcopy(host)
-                        t_copy = copy.deepcopy(target)
-
-                        h_copy['toolchain'] = 'default'
-                        t_copy['toolchain'] = 'default'
-                        yield {'host': h_copy, 'target': t_copy}
-
-            for p in iter_platforms():
-                pp = descr.get('params', {})
-
-                res = {
-                    'platform': p,
-                    'env': descr.get('env', {}),
-                    'params': pp,
-                    'formula': formula,
-                    'name': trn,
-                    'bottle_name': bottle_name,
-                    'executable_path': executable_path,
-                }  # type: ToolInfo
-                root = res.get('params', {}).get('match_root', None)
-
-                if root:
-                    if formula and res.get('params', {}).get('use_bundle', False):
-                        formula = yalibrary.fetcher.tool_chain_fetcher.get_formula_value(formula)
-                        tool_var = six.ensure_str(platform_map.mapping_var_name_from_json(root, json.dumps(formula)))
-                    else:
-                        tool_var = pm.stringize_platform(p['target'], sep='_')
-
-                    res['tool_var'] = tool_var
-
-                    def subst(x):
-                        if isinstance(x, dict):
-                            return dict((subst(k), subst(v)) for k, v in x.items())
-
-                        if isinstance(x, list):
-                            return [subst(v) for v in x]
-                        if isinstance(x, six.string_types):
-                            if x == root:
-                                return tool_var
-
-                            return x.replace('$(' + root + ')', '$(' + tool_var + ')')
-
-                        return x
-
-                    for key in ('env', 'params'):
-                        res[key] = subst(res[key])
-
-                yield res
+            yield res
 
 
 def _platform_os_arch(plat):
@@ -366,78 +342,66 @@ def resolve_tool(name, host, target, toolchain_key=None):
     parsed_host = _platform_os_arch(pm.parse_platform(host)) if match_os_arch_only else None
     parsed_target = _platform_os_arch(pm.parse_platform(target)) if match_os_arch_only else None
 
-    def filter_host(tool_name, tool_host):
+    def filter_host():
         avail = set()
         ok = False
         tn_filter = (lambda key, descr: key == toolchain_key) if toolchain_key else None
 
-        for tool in iter_tools(tool_name, tn_filter):
+        for tool in iter_tools(name, tn_filter):
             host_str = pm.stringize_platform(tool['platform']['host'])
             avail.add(host_str)
             if match_os_arch_only:
                 matched = _platform_os_arch(tool['platform']['host']) == parsed_host
             else:
-                matched = host_str == tool_host
+                matched = host_str == host
             if matched:
                 ok = True
                 yield tool
 
         if not ok:
             raise UnsupportedPlatform(
-                'Unsupported host platforms %s for tool %s, use one of %s'
-                % (tool_host, tool_name, ', '.join(sorted(avail)))
+                'Unsupported host platforms %s for tool %s, use one of %s' % (host, name, ', '.join(sorted(avail)))
             )
 
     target_match = (lambda plat: _platform_os_arch(plat) == parsed_target) if match_os_arch_only else None
 
-    return _resolve_tool(name, host, target, filter_host, target_match=target_match)
+    return _resolve_tool(name, target, filter_host(), target_match=target_match)
 
 
-def resolve_tool_by_host_os(name, host_os, target):
-    def filter_host(tool_name, tool_host_os):
+def _resolve_tool_by_host_os(name, host_os, target):
+    def filter_host():
         avail = set()
         ok = False
 
-        for tool in iter_tools(tool_name):
-            # print tool['platform']['target']
+        for tool in iter_tools(name):
             host_os_str = tool['platform']['host']['os']
             avail.add(host_os_str)
-            if host_os_str == tool_host_os:
+            if host_os_str == host_os:
                 ok = True
                 yield tool
 
         if not ok:
             raise UnsupportedPlatform(
-                'Unsupported host os %s for tool %s, use one of %s'
-                % (tool_host_os, tool_name, ', '.join(sorted(avail)))
+                'Unsupported host os %s for tool %s, use one of %s' % (host_os, name, ', '.join(sorted(avail)))
             )
 
-    return _resolve_tool(name, host_os, target, filter_host)
+    return _resolve_tool(name, target, filter_host())
 
 
-def _resolve_tool(name, host, target, filter_host, target_match=None):
-    def filter_target():
-        avail = set()
-        ok = False
+def _resolve_tool(name, target, tools, target_match=None):
+    avail = set()
+    for tool in tools:
+        target_str = pm.stringize_platform(tool['platform']['target'])
+        avail.add(target_str)
 
-        for tool in filter_host(name, host):
-            target_str = pm.stringize_platform(tool['platform']['target'])
-            avail.add(target_str)
+        if target_match is not None:
+            matched = target_match(tool['platform']['target'])
+        else:
+            matched = target_str == target
 
-            if target_match is not None:
-                matched = target_match(tool['platform']['target'])
-            else:
-                matched = target_str == target
+        if matched:
+            return tool
 
-            if matched:
-                ok = True
-
-                yield tool
-
-        if not ok:
-            raise UnsupportedPlatform(
-                'Unsupported target platform %s for tool %s, use one of %s' % (target, name, ', '.join(sorted(avail)))
-            )
-
-    for t in filter_target():
-        return t
+    raise UnsupportedPlatform(
+        'Unsupported target platform %s for tool %s, use one of %s' % (target, name, ', '.join(sorted(avail)))
+    )
