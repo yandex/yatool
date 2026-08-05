@@ -114,6 +114,73 @@ class PrepareAllNodesTask(UniqueTask):
 
         return new_nodes
 
+    def _compute_bottom_levels(self, tp):
+        """Compute bottom_level for each node: weighted distance to graph sinks (result nodes).
+
+        bl[v] = w(v) + max(bl[u] for u in dependants(v))
+
+        where dependants are nodes that have v as a dependency (reverse edges).
+        Uses node type as weight: LD=5 (linker is on critical path), AR=2, CC/default=1.
+        Must be called after the full graph walk so tp._deps is complete.
+        """
+        # Type-based weights when build_time_cache is unavailable.
+        # LD (linker) is the dominant critical-path node; AR (archiver) next.
+        _TYPE_WEIGHT = {'LD': 5, 'AR': 2}
+
+        all_nodes = tp._dsu.keys()
+
+        # Build reverse map: node -> list of nodes that depend on it
+        dependants = {n: [] for n in all_nodes}
+        for from_node, deps in tp._deps.items():
+            for dep in deps:
+                dependants[dep].append(from_node)
+
+        # Node weight: prefer build_time_cache if available, else type-based estimate
+        build_time_cache = getattr(self._ctx, 'build_time_cache', None)
+
+        def _weight(node):
+            if build_time_cache is not None and hasattr(node, 'static_uid') and node.static_uid is not None:
+                _, t = build_time_cache.last_usage(node.static_uid)
+                if t:
+                    return float(t)
+            return float(_TYPE_WEIGHT.get(getattr(node, 'kv', {}).get('p', ''), 1))
+
+        # Compute bottom_level in reverse topological order (leaves first).
+        # A leaf has no dependants; result nodes are at the top.
+        # Iterating tp._activation_order gives nodes in completion order (leaves first
+        # since they complete before result nodes), but _activation_order is only
+        # populated during the run phase. Instead, perform a simple iterative
+        # relaxation from nodes with no dependants (true leaves) upward.
+        #
+        # Since the graph is a DAG, one BFS pass from sinks (result nodes) in reverse
+        # dependency direction suffices. We walk from leaves (no dependants) upward.
+
+        import collections as _collections
+
+        # Count how many dependants each node has that have not yet been processed
+        remaining = {n: len(dependants[n]) for n in all_nodes}
+        queue = _collections.deque(n for n in all_nodes if remaining[n] == 0)
+        bottom_level = {}
+        for n in queue:
+            bottom_level[n] = _weight(n)
+
+        while queue:
+            node = queue.popleft()
+            bl_node = bottom_level[node]
+            for dep in tp._deps.get(node, []):
+                candidate = _weight(dep) + bl_node
+                if candidate > bottom_level.get(dep, 0.0):
+                    bottom_level[dep] = candidate
+                remaining[dep] -= 1
+                if remaining[dep] == 0:
+                    if dep not in bottom_level:
+                        bottom_level[dep] = _weight(dep)
+                    queue.append(dep)
+
+        # Store result on each node object for RunNodeTask.bottom_level property
+        for node in all_nodes:
+            node.bottom_level = bottom_level.get(node, 0.0)
+
     def __call__(self, *args, **kwargs):
         import concurrent.futures as cf
 
@@ -157,6 +224,8 @@ class PrepareAllNodesTask(UniqueTask):
                             nodes_to_process |= new_nodes
                     except PrepareAllNodesTask._ResolveError:
                         return
+
+        self._compute_bottom_levels(tp)
 
         # Sanity check
         unscheduled = tp.get_unscheduled()
