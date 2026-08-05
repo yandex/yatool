@@ -1776,7 +1776,7 @@ def do_dump_input(params, arcadia_root, output):
                     arcadia_section.add(safe_format(path, formatters))
             if data.get("source", {}).get("type") == 'SANDBOX_RESOURCE':
                 sandbox_id = data["source"].get("id")
-                if id:
+                if sandbox_id:
                     sandbox_section.add(sandbox_id)
 
         include_section = package_context.tree_info.get_recursive_includes(arcadia_root)
