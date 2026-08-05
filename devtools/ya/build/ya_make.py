@@ -1896,6 +1896,10 @@ class YaMake:
         with stager.scope('dispatch_build'):
             if self.opts.use_distbuild:
                 return self._build_distbs(callback)
+            if self.opts.larry_addr is not None:
+                from devtools.ya.build.larry_client import LarryClient
+
+                return LarryClient(callback).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
 

@@ -30,6 +30,7 @@ PEERDIR(
     devtools/ya/build/gen_plan
     devtools/ya/build/genconf
     devtools/ya/build/graph_description
+    devtools/ya/build/larry_client
     devtools/ya/build/makelist
     devtools/ya/build/node_checks
     devtools/ya/build/owners
@@ -105,6 +106,7 @@ RECURSE(
     evlog
     gen_plan
     genconf
+    larry_client
     makelist
     owners
     prefetch

@@ -3467,6 +3467,7 @@ def ya_make_options(  # compat
             CompressYmakeOutputOptions(),
         ]
         + distbs_options(use_distbuild=use_distbuild)
+        + larry_options()
         + checkout_options()
         + svn_checkout_options()
         + build_graph_cache_config_opts()
@@ -3521,6 +3522,12 @@ def distbs_options(use_distbuild=False):
             distbs.RemoteGenGraphOptions(),
             distbs.DistbsOptions(),
         ]
+
+
+def larry_options():
+    from devtools.ya.build.build_opts import larry
+
+    return [larry.LarryOptions()]
 
 
 def build_graph_cache_config_opts():
