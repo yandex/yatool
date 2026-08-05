@@ -191,6 +191,9 @@ public:
 
     NPolexpr::EVarId InsertVar(std::string_view name) { return static_cast<NPolexpr::EVarId>(Vars.Add(name)); }
     std::string_view GetVarName(NPolexpr::EVarId id) const;
+    // Non-mutating lookup of an already-registered variable id. Returns EVarId{} (the reserved
+    // sentinel, never a real variable) when the name was never inserted.
+    NPolexpr::EVarId GetVarIdNx(std::string_view name) const { return static_cast<NPolexpr::EVarId>(Vars.GetIdNx(name)); }
 
     NPolexpr::TConstId InsertValue(const TValue& value);
     TValue GetValue(NPolexpr::TConstId id) const;

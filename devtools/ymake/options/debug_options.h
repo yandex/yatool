@@ -126,6 +126,7 @@ struct TDebugOptions {
     std::optional<EShowExpressionErrors> ExpressionErrorDetails;
     bool ValidateCmdNodes = false;
     bool DeprecateNonStructCmdNodes = false;
+    bool DenyRecursiveVars = false;
 
     // The Uids cache can be controlled by the Deps cache settings,
     // but this still could be overridden by --xCC=u and --xRC=u.

@@ -18,6 +18,11 @@ TStringBuf GetCmdName(const TStringBuf& cmd);
 TStringBuf CheckAndGetCmdName(TStringBuf cmd);
 TStringBuf GetCmdValue(const TStringBuf& cmd);
 
+// Detects the legacy SET_APPEND "recursion" convention, where a variable's value
+// begins with a reference to the variable itself, e.g. "123:MYVAR=$MYVAR any other values"
+// (see TVars::ResetAppend). Expects a prefixed "id:NAME=value" command string.
+bool IsSelfReferentialCmd(const TStringBuf& cmd);
+
 // + intent self-documentation wrappers
 inline void ParseLegacyCommandOrSubst(const TStringBuf& source, ui64& id, TStringBuf& cmdName, TStringBuf& cmdValue) {
     // EDT_BuildCommand -> EMNT_BuildCommand

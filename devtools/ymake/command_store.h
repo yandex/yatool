@@ -178,6 +178,9 @@ public:
 
     // TODO collect vars and tools while compiling
     TVector<TStringBuf> GetCommandVars(TCmdElemId elemId) const;
+    // Whether the compiled expression references a variable named `name`
+    // (used to detect self-referential variable bindings; early-exits on first match).
+    bool CommandReferencesVar(TCmdElemId elemId, TStringBuf name) const;
     TToolsAndResults GetCommandToolsEtc(TCmdElemId elemId) const;
 
     void Save(TMultiBlobBuilder& builder) const;

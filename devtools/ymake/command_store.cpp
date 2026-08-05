@@ -1098,6 +1098,22 @@ TVector<TStringBuf> TCommands::GetCommandVars(TCmdElemId elemId) const {
     return result.Take();
 }
 
+bool TCommands::CommandReferencesVar(TCmdElemId elemId, TStringBuf name) const {
+    const auto* expr = GetByElemId(elemId);
+    if (Y_UNLIKELY(expr == nullptr)) {
+        return false;
+    }
+    const auto targetId = Values.GetVarIdNx(name);
+    if (targetId == NPolexpr::EVarId{}) // never registered as a variable, so it cannot be referenced
+        return false;
+    for (const auto& node : expr->GetNodes()) {
+        if (node.GetType() == NPolexpr::TExpression::TNode::EType::Variable &&
+            static_cast<NPolexpr::EVarId>(node.GetIdx()) == targetId)
+            return true;
+    }
+    return false;
+}
+
 TToolsAndResults TCommands::GetCommandToolsEtc(TCmdElemId elemId) const {
     const auto* expr = GetByElemId(elemId);
     if (Y_UNLIKELY(expr == nullptr)) {

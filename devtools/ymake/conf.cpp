@@ -507,6 +507,7 @@ void TBuildConfiguration::FillMiscValues() {
     }
     ValidateCmdNodes = NYMake::IsTrue(CommandConf.EvalValue("_DBG_VALIDATE_CMD_NODES"));
     DeprecateNonStructCmdNodes = NYMake::IsTrue(CommandConf.EvalValue("_DBG_DEPRECATE_NON_STRUCT_CMD_NODES"));
+    DenyRecursiveVars = NYMake::IsTrue(CommandConf.EvalValue("_DBG_DENY_RECURSIVE_VARS"));
 }
 
 void TBuildConfiguration::InitExcludedPeerdirs() {

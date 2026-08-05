@@ -19,6 +19,7 @@
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/stream/output.h>
+#include <util/string/ascii.h>
 #include <util/string/cast.h>
 #include <util/string/split.h>
 #include <util/string/subst.h>
@@ -87,6 +88,26 @@ TStringBuf GetCmdValue(const TStringBuf& cmd) {
     if (pat.at(0) == ' ') // just for aestetics?
         pat.Skip(1);
     return pat;
+}
+
+bool IsSelfReferentialCmd(const TStringBuf& cmd) {
+    const TStringBuf name = GetCmdName(cmd);
+    const TStringBuf value = GetCmdValue(cmd);
+    if (name.empty() || value.empty() || value[0] != '$')
+        return false;
+    TStringBuf rest = value.SubStr(1); // skip '$'
+    if (rest.StartsWith('{')) { // ${NAME} form
+        rest.Skip(1);
+        return rest.StartsWith(name) && rest.SubStr(name.size()).StartsWith('}');
+    }
+    // bare $NAME form: the name must not be a prefix of a longer identifier
+    if (!rest.StartsWith(name))
+        return false;
+    const TStringBuf after = rest.SubStr(name.size());
+    if (after.empty())
+        return true;
+    const char c = after[0];
+    return !(IsAsciiAlnum(c) || c == '_');
 }
 
 TString FormatProperty(const TStringBuf& propName, const TStringBuf& value) {

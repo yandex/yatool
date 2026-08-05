@@ -413,6 +413,28 @@ TCmdElemId TCommandInfo::InitCmdNode(const TYVar& var, EStructCmd structCmd, EEx
 void TCommandInfo::AddCmdNode(const TYVar& var, TCmdElemId elemId, EStructCmd structCmd, EExprRole role) {
     Y_ENSURE(UpdIter != nullptr);
 
+    // The dependency graph must not store the legacy SET_APPEND "recursion" convention,
+    // where a variable's value is a continuation of itself. Such self-referential data is an
+    // internal continuation mechanism only and must be resolved before it reaches the graph;
+    // block it (under _DBG_DENY_RECURSIVE_VARS) so that any remaining producers surface.
+    if (Conf->DenyRecursiveVars && role == EExprRole::Var && var.size() == 1 && var[0].HasPrefix) {
+        const TStringBuf cmdName = var[0].Name;
+        // (a) old-school form: the value literally begins with "$NAME ..." (e.g. "0:MYVAR=$MYVAR ...")
+        if (IsSelfReferentialCmd(cmdName)) {
+            ythrow TError() << "refusing to store self-referential variable into the dependency graph: " << cmdName;
+        }
+        // (b) struct-cmd form: the value refers to a compiled expression which, when the variable
+        //     is not inlined (NoInline/NO_EXPAND/reserved), may itself reference NAME as a term.
+        if (structCmd == EStructCmd::Yes) {
+            const TStringBuf name = GetCmdName(cmdName);
+            const TCmdElemId exprId = Graph->Names().CommandConf.GetIdNx(GetCmdValue(cmdName));
+            if (exprId && UpdIter->YMake.Commands.CommandReferencesVar(exprId, name)) {
+                ythrow TError() << "refusing to store self-referential variable into the dependency graph: "
+                                << cmdName << " (compiled expression references " << name << ")";
+            }
+        }
+    }
+
     if (Conf->ValidateCmdNodes) {
         Y_ENSURE(var.size() == 1);
         bool varHasPrefix = var[0].HasPrefix;
