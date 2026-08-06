@@ -155,10 +155,10 @@ def populate_contrib_unified(
                 license_macro.add_value(lic)
 
         # REPOSITORY
-        if p.get('repository'):
+        if p.get('original_source'):
             repository_macro = utils.find_or_create(project, 'ORIGINAL_SOURCE')
             repository_macro.children = []
-            repository_macro.add_value(p.get('repository'))
+            repository_macro.add_value(p.get('original_source'))
 
         # if p['generate_ya_dependency_management_inc']:
         #     macro = md.StringMacro('INCLUDE')
@@ -461,6 +461,7 @@ def import_unified(
                 'dm': extract_artefacts(data.get('managed_dependencies', []), replace_version),
                 'licenses': my_licenses,
                 'repository': data.get('repository'),
+                'original_source': data.get('original_source'),
             }
             empty_ya_make, empty_inc = is_empty_project(nodes[str(key)])
             if empty_ya_make:
