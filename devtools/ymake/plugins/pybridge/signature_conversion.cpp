@@ -128,9 +128,6 @@ std::expected<TSignature, ESignatureDeductionError> DeduceConfSignature(
             } else {
                 positionals.push_back(TString{argName});
             }
-        } else if (IsArrayArgTypeAnnotation(*val) && isVararg) {
-            // TODO(YMAKE-2151): remove support of `tuple[str, ...]` on `*args`
-            positionals.push_back(TString{argName} + NStaticConf::ARRAY_SUFFIX);
         } else
             return std::unexpected(ESignatureDeductionError::WrongArgType);
     }

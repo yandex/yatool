@@ -559,9 +559,6 @@ namespace {
                     case WrongFlagDefault:
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only False is allowed as default value of a flag (bool) KW argument.");
                         break;
-                    case PositionalAfterVararg:
-                        PyErr_SetString(PyExc_RuntimeError, "ymake.macro: only last (vararg) positional argument can be a tuple.");
-                        break;
                     case KwArgWithoutDefaults:
                         PyErr_SetString(PyExc_RuntimeError, "ymake.macro: all kw-only arguments must have default values.");
                         break;

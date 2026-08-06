@@ -18,7 +18,6 @@ enum class ESignatureDeductionError {
     WrongArgType,
     WrongReturnType,
     WrongFlagDefault,
-    PositionalAfterVararg,
     KwArgWithoutDefaults,
     IndistinguishableKwArg,
 };
