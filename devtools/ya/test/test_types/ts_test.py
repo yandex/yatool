@@ -173,12 +173,12 @@ class TsCheckSuite(BaseFrontendSuite):
 
     def get_test_dependencies(self):
         # this list is used to build correct `deps` in test node
-        # add pre.pnpm-lock.yaml to dependencies so test node will be connected to PREPARE_DEPS
+        # add package.json to dependencies so test node will be connected to PREPARE_DEPS
         # self.meta.custom_dependencies are from DEPENDS macro
         return sorted(
             set(
                 [x for x in self.meta.custom_dependencies.split(" ") if x and not x == "$TEST_DEPENDS_VALUE"]
-                + [self._abs_build_path("pre.pnpm-lock.yaml")]
+                + [self._abs_build_path("package.json")]
             )
         )
 
@@ -189,8 +189,6 @@ class TsCheckSuite(BaseFrontendSuite):
         extra_source_files = [
             # we need it to copy to BINDIR
             "package.json",
-            # we don't use it for `pnpm install`, but we read it in _restore_original_lockfile
-            "pnpm-lock.yaml",
         ]
         all_files = extra_source_files + self._files
         return sorted(set([self._abs_source_path(f, arc_root) for f in all_files]))
@@ -306,11 +304,11 @@ class BaseFrontendRegularSuite(BaseFrontendSuite):
 
     def get_test_dependencies(self):
         base_deps = super().get_test_dependencies()
-        return sorted(set([os.path.join(self.target_path, "pre.pnpm-lock.yaml")] + base_deps))
+        return sorted(set([os.path.join(self.target_path, "package.json")] + base_deps))
 
     def get_run_cmd_inputs(self, opts):
         base_deps = super().get_run_cmd_inputs(opts)
-        return sorted(set([os.path.join(self.target_path, "pre.pnpm-lock.yaml")] + base_deps))
+        return sorted(set([os.path.join(self.target_path, "package.json")] + base_deps))
 
 
 class JestTestSuite(BaseFrontendRegularSuite):
@@ -590,18 +588,14 @@ class AbstractFrontendStyleSuite(BaseFrontendSuite):
 
     def get_test_dependencies(self):
         return sorted(
-            set(
-                [x for x in self.meta.custom_dependencies.split(" ") if x]
-                + [self._abs_build_path("pre.pnpm-lock.yaml")]
-            )
+            set([x for x in self.meta.custom_dependencies.split(" ") if x] + [self._abs_build_path("package.json")])
         )
 
     def get_run_cmd_inputs(self, opts):
-        source_inputs = self._get_config_files() + ["package.json", "pnpm-lock.yaml"]
+        source_inputs = self._get_config_files() + ["package.json"]
         return sorted(
             set(
-                [self._abs_source_path(f) for f in source_inputs + self._files]
-                + [self._abs_build_path("pre.pnpm-lock.yaml")]
+                [self._abs_source_path(f) for f in source_inputs + self._files] + [self._abs_build_path("package.json")]
             )
         )
 
