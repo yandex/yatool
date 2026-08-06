@@ -1378,6 +1378,42 @@ namespace {
             return DMConf.IsContribWithVer(module);
         }
 
+        TNodeId GetTransparentImplementationPeer(const TModule& module) const {
+            if (!module.GetAttrs().DepManagementTransparent) {
+                return TNodeId::Invalid;
+            }
+
+            TNodeId implementationPeer = TNodeId::Invalid;
+            for (TNodeId peerId: RestoreContext.Modules.GetModuleNodeLists(module.GetId()).ManagedDirectPeers()) {
+                const auto* peer = RestoreContext.Modules.Get(AssumeFile(RestoreContext.Graph[peerId]->ElemId));
+                Y_ASSERT(peer);
+                if (peer->GetDir() != module.GetDir()) {
+                    continue;
+                }
+                if (implementationPeer != TNodeId::Invalid) {
+                    return TNodeId::Invalid;
+                }
+                implementationPeer = peerId;
+            }
+            return implementationPeer;
+        }
+
+        bool IsTransparentImplementationBridge(const TConstDepRef& dep) const {
+            const auto* parent = RestoreContext.Modules.Get(AssumeFile(dep.From()->ElemId));
+            Y_ASSERT(parent);
+            return GetTransparentImplementationPeer(*parent) == dep.To().Id();
+        }
+
+        TFileElemId GetLogicalModuleId(const TModule& module) const {
+            const auto implementationPeer = GetReachableTransparentImplementationPeer(StartModule.GetId(), module);
+            if (implementationPeer == TNodeId::Invalid) {
+                return module.GetId();
+            }
+            const auto* implementation = RestoreContext.Modules.Get(AssumeFile(RestoreContext.Graph[implementationPeer]->ElemId));
+            Y_ASSERT(implementation);
+            return implementation->GetId();
+        }
+
     private:
         TConstDepNodeRef GetReplacement(const TConstDepNodeRef& peerNode, bool directPeer) {
             if (StartModuleManagedDeps.has(peerNode.Id())) {
@@ -1385,6 +1421,9 @@ namespace {
             }
             const auto* peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
             Y_ASSERT(peer);
+            if (GetReachableTransparentImplementationPeer(StartModule.GetId(), *peer) != TNodeId::Invalid) {
+                return peerNode;
+            }
             if (!DMConf.IsContribWithVer(*peer)) {
                 return RestoreContext.Graph.GetInvalidNode();
             }
@@ -1430,6 +1469,17 @@ namespace {
             return it->second;
         }
 
+        TNodeId GetReachableTransparentImplementationPeer(TFileElemId moduleId, const TModule& peer) const {
+            const auto implementationPeer = GetTransparentImplementationPeer(peer);
+            if (
+                implementationPeer != TNodeId::Invalid &&
+                RestoreContext.Modules.GetModuleNodeLists(moduleId).UniqPeers().has(implementationPeer)
+            ) {
+                return implementationPeer;
+            }
+            return TNodeId::Invalid;
+        }
+
         bool CanFollow(const TModule& parent, const TConstDepNodeRef& peerNode) {
             if (RestoreContext.Modules.GetModuleNodeLists(parent.GetId()).UniqPeers().has(peerNode.Id())) {
                 return true;
@@ -1437,6 +1487,9 @@ namespace {
 
             const auto *peer = RestoreContext.Modules.Get(AssumeFile(peerNode->ElemId));
             Y_ASSERT(peer);
+            if (GetReachableTransparentImplementationPeer(parent.GetId(), *peer) != TNodeId::Invalid) {
+                return true;
+            }
             auto& fileConf = RestoreContext.Graph.Names().FileConf;
             return GetLibResolutions(parent.GetId()).contains(fileConf.Parent(peer->GetDir()));
         }
@@ -1497,13 +1550,17 @@ namespace {
 
     class TDepTreeTextPrinter: public IDepTreePrinter {
     public:
+        explicit TDepTreeTextPrinter(IOutputStream& out)
+            : Out{out}
+        {}
+
         void OnNode(const TDepTreeNode& node) override {
             if (auto depth = node.Depth; depth > 0) {
-                Cout << "[[unimp]]";
+                Out << "[[unimp]]";
                 while (depth-- > 1) {
-                    Cout << "|   ";
+                    Out << "|   ";
                 }
-                Cout << "|-->[[rst]]";
+                Out << "|-->[[rst]]";
             }
 
             fmt::memory_buffer buf;
@@ -1534,11 +1591,13 @@ namespace {
                     fmt::format_to(out, fmt::runtime(DIRECT_DEFAULT), "path"_a = node.Path);
                     break;
             }
-            Cout.Write(buf.data(), buf.size());
-            Cout << Endl;
+            Out.Write(buf.data(), buf.size());
+            Out << Endl;
         }
 
     private:
+        IOutputStream& Out;
+
         static constexpr const char* NORMAL = "[[imp]]{path}[[rst]]";
         static constexpr const char* SUBMODULE = "[[imp]]{path}@{type}[[rst]]";
         static constexpr const char* CONFLICT = "[[unimp]]{path} (omitted because of [[c:yellow]]confict with {conflict_resolution}[[unimp]])[[rst]]";
@@ -1640,6 +1699,11 @@ namespace {
                 return fresh;
             }
 
+            if (Explainer.IsTransparentImplementationBridge(state.IncomingDep())) {
+                ++ReplacementsInStack;
+                return fresh;
+            }
+
             const auto* module = Explainer.GetRestoreContext().Modules.Get(AssumeFile(state.TopNode()->ElemId));
             Y_ASSERT(module);
             if (!module->GetAttrs().RequireDepManagement) {
@@ -1650,7 +1714,13 @@ namespace {
             Y_ASSERT(info.Peer || info.Resolution == TDependencyManagementExplainer::Excluded);
 
             const bool isReplacement = info.Resolution != TDependencyManagementExplainer::Conflict && info.Resolution != TDependencyManagementExplainer::Excluded;
-            if (isReplacement && !Reported.emplace(info.Orig->GetId(), info.Peer->GetId()).second) {
+            if (
+                isReplacement &&
+                !Reported.emplace(
+                    Explainer.GetLogicalModuleId(*info.Orig),
+                    Explainer.GetLogicalModuleId(*info.Peer)
+                ).second
+            ) {
                 Report(state, EDepTreeNodeKind::Duplicate, *info.Peer);
                 return false;
             }
@@ -1677,6 +1747,14 @@ namespace {
             }
 
             return fresh;
+        }
+
+        void Leave(TState& state) {
+            if (state.HasIncomingDep() && Explainer.IsTransparentImplementationBridge(state.IncomingDep())) {
+                Y_ASSERT(ReplacementsInStack > 0);
+                --ReplacementsInStack;
+            }
+            TBase::Leave(state);
         }
 
         bool AcceptDep(TState& state) {
@@ -1920,11 +1998,15 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
 }
 
 void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, bool asJson) {
+    ExplainDM(restoreContext, roots, asJson, Cout);
+}
+
+void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, bool asJson, IOutputStream& out) {
     THolder<IDepTreePrinter> printer;
     if (asJson) {
-        printer = MakeHolder<TDepTreeJsonPrinter>(Cout);
+        printer = MakeHolder<TDepTreeJsonPrinter>(out);
     } else {
-        printer = MakeHolder<TDepTreeTextPrinter>();
+        printer = MakeHolder<TDepTreeTextPrinter>(out);
     }
 
     for (TConstDepNodeRef node : GetStartModules(restoreContext.Graph, roots)) {

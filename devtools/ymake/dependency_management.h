@@ -2,6 +2,7 @@
 
 #include <util/generic/vector.h>
 #include <util/generic/hash.h>
+#include <util/stream/output.h>
 
 #include <devtools/ymake/compact_graph/graph.h>
 #include <devtools/ymake/vars.h>
@@ -22,6 +23,7 @@ struct TDependencyManagementModuleInfo {
 // structured data rather than the printed text. Other messages of the run go to Cmsg, which
 // should be sent to stderr (--xE) when json is asked for.
 void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, bool asJson = false);
+void ExplainDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, bool asJson, IOutputStream& out);
 void DumpDM(TRestoreContext restoreContext, const THashSet<TNodeId>& roots, EManagedPeersDepth depth = EManagedPeersDepth::Transitive);
 void DumpFDM(const TVars& globalVars, bool asJson);
 
