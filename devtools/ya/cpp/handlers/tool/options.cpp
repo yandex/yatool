@@ -103,20 +103,14 @@ namespace NYa::NTool {
         optionDefs.emplace_back("--host-platform", &options.HostPlatform);
 
         options.ProgramName = args[0];
-        TString unsupportedOption{};
         for (size_t i = toolHandlerIndex + 1; i < args.size(); ++i) {
             const TStringBuf arg = args[i];
             if (arg.StartsWith("-")) {
-                if (arg == "--") {
-                    options.ToolOptions.insert(options.ToolOptions.end(), args.begin() + i + 1, args.end());
-                    break;
-                }
                 TStringBuf value = arg;
                 const TStringBuf optionName = value.NextTok('=');
-                if (Find(UNSUPPORTED_OPTIONS, optionName) != end(UNSUPPORTED_OPTIONS) && unsupportedOption.empty()) {
+                if (Find(UNSUPPORTED_OPTIONS, optionName) != end(UNSUPPORTED_OPTIONS)) {
                     // We don't care unsupported option may have a value and its value falls into the options.ToolOptions
-                    // Don't break here because we have to check args for the `--no-fallback-to-python` and `--print-toolchain-path` options
-                    unsupportedOption = optionName;
+                    options.UnsupportedOption = optionName;
                 } else {
                     TOptionDef* optionDef = FindIfPtr(optionDefs, [optionName](const TOptionDef& def) {return def.OptionName == optionName;});
                     if (optionDef) {
@@ -152,7 +146,7 @@ namespace NYa::NTool {
                 options.HostPlatform = HostPlatform;
             }
         }
-        Y_ENSURE(!unsupportedOption, TString("Unsupported option is found: '") + unsupportedOption + "'");
+        Y_ENSURE(!options.UnsupportedOption, TString("Unsupported option is found: '") + options.UnsupportedOption + "'");
         Y_ENSURE(options.ToolName, "Tool name is missing");
    }
 
