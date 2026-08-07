@@ -3,7 +3,6 @@ import logging
 import os
 import shutil
 import stat
-import tempfile
 import time
 
 import build.plugins.lib.nots.package_manager.constants as pm_const
@@ -111,26 +110,8 @@ def set_inline_script(build_dir: str, script_name: str, command: str):
     with open(package_json_path, "rb") as package_json_file:
         package_json = json.load(package_json_file)
     package_json.setdefault("scripts", {})[script_name] = command
-    inline_package_json = json.dumps(package_json).encode("utf-8")
-    backup_fd, package_json_backup_path = tempfile.mkstemp(prefix="package-json-", suffix=".backup")
-    os.close(backup_fd)
-    try:
-        shutil.copyfile(package_json_path, package_json_backup_path)
-    except Exception:
-        os.unlink(package_json_backup_path)
-        raise
-    try:
-        with open(package_json_path, "wb") as package_json_file:
-            package_json_file.write(inline_package_json)
-    except Exception:
-        restore_package_json(package_json_path, package_json_backup_path)
-        raise
-    return package_json_path, package_json_backup_path
-
-
-def restore_package_json(package_json_path: str, package_json_backup_path: str):
-    shutil.copyfile(package_json_backup_path, package_json_path)
-    os.unlink(package_json_backup_path)
+    with open(package_json_path, "wb") as package_json_file:
+        package_json_file.write(json.dumps(package_json).encode("utf-8"))
 
 
 def create_suite(cwd: str, log_path: str) -> PerformedTestSuite:
@@ -245,29 +226,25 @@ def run(args: CliArgs):
     cwd = build_dir
 
     copy_files(src_dir, build_dir, args.files)
-    inline_script_state = None
-    try:
-        inline_script_state = set_inline_script(build_dir, args.script_name, args.command) if args.command else None
-        cmd = get_cmd(args)
-        suite = create_suite(cwd, args.log_path)
+    if args.command:
+        set_inline_script(build_dir, args.script_name, args.command)
+    cmd = get_cmd(args)
+    suite = create_suite(cwd, args.log_path)
 
-        # Create progress listener that will watch the report file
-        watcher = ReportFileWatcher(report_path, suite, args.script_name, args.tracefile)
+    # Create progress listener that will watch the report file
+    watcher = ReportFileWatcher(report_path, suite, args.script_name, args.tracefile)
 
-        start_time = time.monotonic()
-        res = execute(
-            cmd,
-            cwd=cwd,
-            env=get_env(args, report_path),
-            check_exit_code=False,
-            stderr=node_run_log,
-            stdout_to_stderr=True,
-            timeout=10000000,  # without timeout process_progress_listener is not called periodically
-            process_progress_listener=watcher,
-        )
-    finally:
-        if inline_script_state:
-            restore_package_json(*inline_script_state)
+    start_time = time.monotonic()
+    res = execute(
+        cmd,
+        cwd=cwd,
+        env=get_env(args, report_path),
+        check_exit_code=False,
+        stderr=node_run_log,
+        stdout_to_stderr=True,
+        timeout=10000000,  # without timeout process_progress_listener is not called periodically
+        process_progress_listener=watcher,
+    )
     messages = []
     if res.exit_code != 0:
         messages = [
