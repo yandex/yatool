@@ -17,6 +17,21 @@ class TimeoutExpired(Exception):
 
 logger = logging.getLogger(__name__)
 
+_pre_execve_hooks = []  # type: list
+
+
+def register_pre_execve_hook(hook):
+    # type: (callable) -> None
+    _pre_execve_hooks.append(hook)
+
+
+def _run_pre_execve_hooks():
+    for hook in _pre_execve_hooks:
+        try:
+            hook()
+        except Exception:
+            logger.debug('Pre-execve hook failed', exc_info=True)
+
 
 # Wrapper for Popen with some fixes and improvements
 @windows.errorfix
@@ -33,6 +48,8 @@ def execve(exec_path, args=[], env=None, cwd=None):
     from library.python import tmp
 
     tmp.remove_tmp_dirs(env)
+
+    _run_pre_execve_hooks()
 
     logging.shutdown()
 

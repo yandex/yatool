@@ -25,5 +25,6 @@ RECURSE_FOR_TESTS(
 
 RECURSE(
     edl
+    snowden
     start_stager
 )

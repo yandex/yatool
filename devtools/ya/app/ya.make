@@ -53,6 +53,7 @@ IF (NOT YA_OPENSOURCE)
         devtools/ya/yalibrary/oauth
         devtools/ya/yalibrary/yandex/sandbox
         devtools/ya/yalibrary/diagnostics
+        devtools/ya/yalibrary/snowden
     )
 ENDIF()
 

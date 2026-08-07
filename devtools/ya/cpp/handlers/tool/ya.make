@@ -15,6 +15,7 @@ PEERDIR(
     devtools/local_cache/toolscache/dbbe
     devtools/local_cache/toolscache/proto
     devtools/ya/cpp/lib
+    devtools/ya/cpp/lib/snowden
 )
 
 END()

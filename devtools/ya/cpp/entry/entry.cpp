@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <devtools/ya/cpp/lib/class_registry.h>
 #include <devtools/ya/cpp/lib/config.h>
+#include <devtools/ya/cpp/lib/snowden/snowden.h>
 #include <devtools/ya/cpp/lib/ya_handler.h>
 #include <devtools/ya/cpp/lib/logger.h>
 #include <devtools/ya/cpp/lib/pgroup.h>
@@ -206,6 +207,8 @@ namespace NYa {
                 DEBUG_LOG << "Ya changed its pgid: " << newPgid << "\n";
             }
             DEBUG_LOG << "Start handler " << handlerName << "\n";
+            NSnowden::EnsureDaemon(config);
+            NSnowden::ReportCppHandlerEvent(handlerName);
             // If handler has no fall back to python it just does exit() and doesn't return here.
             handlerPtr->Run(args);
             DEBUG_LOG << "Fallback to python\n";
