@@ -667,6 +667,7 @@ class YamlFmt:
                 styler_opts.config_loaders
                 if styler_opts.config_loaders
                 else (
+                    cfg.AutoincludeConfig.make(const.CustomExplicitLinterName.Yamlfmt),
                     cfg.DefaultConfig(
                         linter_name=const.CustomExplicitLinterName.Yamlfmt,
                         defaults_file=const.DefaultLinterConfig.Yaml,
