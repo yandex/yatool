@@ -325,14 +325,17 @@ class PrintStatisticsOptions(Options):
         return [
             ArgConsumer(
                 ['--stat'],
-                help=('Show the critical path and wall time by execution stage, ' 'including aggregate test task time'),
+                help='Show the critical path and wall time by execution stage, including aggregate test task time',
                 hook=SetConstValueHook('print_statistics', True),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
             ),
             ArgConsumer(
                 ['--stat-dir'],
-                help='Additional statistics output dir',
+                help=(
+                    'Target platform name or toolchain alias, such as default-darwin-arm64, '
+                    'default-linux-x86_64, or default-win-x86_64'
+                ),
                 hook=SetValueHook('statistics_out_dir'),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
@@ -817,10 +820,7 @@ class CrossCompilationOptions(Options):
             ),
             ArgConsumer(
                 ['--target-platform'],
-                help=(
-                    'Target platform name or toolchain alias, such as default-darwin-arm64, '
-                    'default-linux-x86_64, or default-win-x86_64'
-                ),
+                help='Target platform',
                 hook=CrossCompilationOptions.PlatformSetAppendHook(
                     'target_platforms',
                     values=CrossCompilationOptions.generate_target_platforms_cxx,
@@ -1360,3 +1360,29 @@ class ToolsOptions(Options):
         # Enable ya-tc in ya-bin executed indirectly, for example, through test_tool.
         if params.tools_cache:
             os.environ['YA_TC'] = '1'
+
+
+class SnowdenOpts(Options):
+    def __init__(self):
+        self.wait_snowden_send_sec = None  # None means auto-detect by UserClass
+
+    @staticmethod
+    def consumer():
+        hook = SetValueHook('wait_snowden_send_sec', transform=int)
+        return [
+            ArgConsumer(
+                ['--wait-snowden-send-sec'],
+                help=(
+                    'Wait up to N seconds for Snowden events delivery before ya exits. '
+                    'Default: 30 on Sandbox, 0 locally. 0 disables self-drain.'
+                ),
+                hook=hook,
+                group=ADVANCED_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            EnvConsumer(
+                'YA_SNOWDEN_WAIT_SEC',
+                help='Same as --wait-snowden-send-sec',
+                hook=hook,
+            ),
+        ]

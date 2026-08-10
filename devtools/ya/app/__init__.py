@@ -781,6 +781,23 @@ def _resources_report():
     return stat
 
 
+def _get_snowden_wait_sec(ctx, user_class):
+    # type: (object, object) -> int
+    explicit = getattr(getattr(ctx, 'params', None), 'wait_snowden_send_sec', None)
+    if explicit is not None:
+        return max(0, int(explicit))
+    # Fall back to env var in case SnowdenOpts was not included in the handler's params.
+    env_val = os.environ.get('YA_SNOWDEN_WAIT_SEC')
+    if env_val is not None:
+        try:
+            return max(0, int(env_val))
+        except (ValueError, TypeError):
+            pass
+    if user_class == user.UserClass.SANDBOX:
+        return 30
+    return 0
+
+
 def configure_report_interceptor(ctx, report_events, intent=None):
     # we can only do that after respawn with valid python
     from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args, parse_events_filter
@@ -789,17 +806,21 @@ def configure_report_interceptor(ctx, report_events, intent=None):
     parsed_report_events = parse_events_filter.parse_events_filter(report_events)
 
     snowden_mode = None
+    _ya_pid_path = None
+    _snowden_store_dir = None
+    _snowden_user_class = None
     if app_config.in_house:
         from yalibrary import snowden
         from yalibrary.snowden import SnowdenMode
 
-        user_class = user.classify_user(ctx.username)
-        snowden_mode = snowden.resolve_snowden_mode(user_class)
+        _snowden_user_class = user.classify_user(ctx.username)
+        snowden_mode = snowden.resolve_snowden_mode(_snowden_user_class)
 
         if snowden_mode == SnowdenMode.STANDALONE:
-            store_dir = snowden.snowden_dir()
-            snowden.touch_version_dir(store_dir)
-            snowden.ensure_daemon(store_dir, shard='report')
+            _snowden_store_dir = snowden.snowden_dir()
+            snowden.touch_version_dir(_snowden_store_dir)
+            snowden.ensure_daemon(_snowden_store_dir, shard='report')
+            _ya_pid_path = snowden.register_ya_pid(_snowden_store_dir)
             try:
                 snowden.cleanup_old_versions()
             except Exception:
@@ -934,6 +955,20 @@ def configure_report_interceptor(ctx, report_events, intent=None):
             urgent=True,
         )
         telemetry.stop_reporter()  # flush urgent reports
+
+        if app_config.in_house and snowden_mode == SnowdenMode.STANDALONE:
+            from yalibrary import snowden
+
+            try:
+                snowden.unregister_ya_pid(_ya_pid_path)
+            except Exception:
+                logger.debug('Snowden unregister_ya_pid failed', exc_info=True)
+            try:
+                _wait_sec = _get_snowden_wait_sec(ctx, _snowden_user_class)
+                if _wait_sec > 0 and _snowden_store_dir is not None:
+                    snowden.self_drain(_snowden_store_dir, shard='report', timeout_sec=_wait_sec)
+            except Exception:
+                logger.debug('Snowden self-drain failed', exc_info=True)
 
 
 def configure_caller_info(ctx):

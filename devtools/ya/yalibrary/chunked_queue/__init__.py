@@ -411,6 +411,10 @@ class ChunkedQueue(BaseQueue):
         finally:
             self._release_chunk()
 
+    def flush_active_chunk(self):
+        # type: () -> None
+        self._release_chunk()
+
     def _release_chunk(self):
         with self._active_chunk_value_lock:
             if self._active_chunk:
