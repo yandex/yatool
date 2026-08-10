@@ -420,6 +420,31 @@ TMd5Sig ExtraConfHash(const TBuildConfiguration& conf) {
     return conf.YmakeExtraConfMD5;
 }
 
+EConfigureCacheUnavailableReason ConfigureCacheUnavailableReason(TCacheFileReader::EReadResult result) noexcept {
+    switch (result) {
+        case TCacheFileReader::IncompatibleFormat:
+            return EConfigureCacheUnavailableReason::IncompatibleFormat;
+        case TCacheFileReader::ChangedConfig:
+        case TCacheFileReader::ChangedExtraConfig:
+            return EConfigureCacheUnavailableReason::ChangedConfig;
+        case TCacheFileReader::UpdatedBinary:
+            return EConfigureCacheUnavailableReason::UpdatedBinary;
+        case TCacheFileReader::Exception:
+            return EConfigureCacheUnavailableReason::ReadError;
+        case TCacheFileReader::Success:
+            return EConfigureCacheUnavailableReason::Unknown;
+    }
+    Y_UNREACHABLE();
+}
+
+bool IsStrictConfigureCacheHit(TCacheFileReader::EReadResult result) noexcept {
+    return result == TCacheFileReader::Success;
+}
+
+static bool AreInternalConfigureCachesRequired(const TBuildConfiguration& conf) noexcept {
+    return conf.IsConfigureCacheRequired() && conf.WriteYdx.empty();
+}
+
 TCacheFileReader::TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, bool useExtraConf, TConfHash confHash, TConfHash extraConfHash)
     : Conf(conf)
     , ForceLoad(forceLoad)
@@ -600,7 +625,15 @@ namespace {
 bool TYMake::Load(const TFsPath& file) {
     try {
         return LoadImpl(file);
+    } catch (const TConfigureCacheViolation&) {
+        throw;
     } catch (...) {
+        if (AreInternalConfigureCachesRequired(Conf)) {
+            Conf.ConfigureCachePolicy.FailRejected(
+                FSCacheLoaded_ ? EConfigureCacheKind::Deps : EConfigureCacheKind::FS,
+                EConfigureCacheUnavailableReason::ReadError
+            );
+        }
         YErr() << "can not load cache: " << CurrentExceptionMessage() << Endl;
     }
 
@@ -699,10 +732,16 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     bool loadFsCache = Conf.ReadFsCache;
     if (!loadFsCache) {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedFSCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
+        if (AreInternalConfigureCachesRequired(Conf)) {
+            Conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::FS);
+        }
     }
     bool loadDepsCache = Conf.ReadDepsCache;
     if (!loadDepsCache) {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
+        if (AreInternalConfigureCachesRequired(Conf)) {
+            Conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Deps);
+        }
     }
     const char* info = nullptr;
     switch (readResult) {
@@ -750,12 +789,33 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         default:
             if (loadFsCache) {
                 loadFsCache = false;
-                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_Unknown);
+                TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedFSCache, TCacheFileReader::ERejectCacheReason::ERCR_Unknown);
             }
             if (loadDepsCache) {
                 loadDepsCache = false;
                 TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_Unknown);
             }
+    }
+
+    // A non-successful container read may still be useful for legacy
+    // incremental recovery (notably ChangedExtraConfig and forceLoad), but it
+    // is never a strict FS/dependency-cache hit.
+    if (AreInternalConfigureCachesRequired(Conf) && !IsStrictConfigureCacheHit(readResult)) {
+        if (loadFsCache) {
+            loadFsCache = false;
+            TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedFSCache, readResult);
+        }
+        if (loadDepsCache) {
+            loadDepsCache = false;
+            TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, readResult);
+        }
+    }
+
+    if (!loadFsCache && AreInternalConfigureCachesRequired(Conf)) {
+        Conf.ConfigureCachePolicy.FailRejected(EConfigureCacheKind::FS, ConfigureCacheUnavailableReason(readResult));
+    }
+    if (!loadDepsCache && AreInternalConfigureCachesRequired(Conf)) {
+        Conf.ConfigureCachePolicy.FailRejected(EConfigureCacheKind::Deps, ConfigureCacheUnavailableReason(readResult));
     }
 
     if (info != nullptr) {
@@ -774,7 +834,14 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             YDebug() << "FS cache has been loaded..." << Endl;
             FSCacheLoaded_ = true;
             NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheLoadTime), TimeSince(fsCacheLoadCheckpoint));
+            Conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::Loaded(EConfigureCacheKind::FS));
         } else {
+            if (AreInternalConfigureCachesRequired(Conf)) {
+                Conf.ConfigureCachePolicy.FailRejected(
+                    EConfigureCacheKind::FS,
+                    EConfigureCacheUnavailableReason::IncompatibleFormat
+                );
+            }
             return false;
         }
     } else {
@@ -788,10 +855,23 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             PrevDepsFingerprint = prevDepsFingerprint;
             DepsCacheLoaded_ = true;
             NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheLoadTime), TimeSince(depsCacheLoadCheckpoint));
+            Conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::Loaded(EConfigureCacheKind::Deps));
         } else {
+            if (AreInternalConfigureCachesRequired(Conf)) {
+                Conf.ConfigureCachePolicy.FailRejected(
+                    EConfigureCacheKind::Deps,
+                    EConfigureCacheUnavailableReason::IncompatibleFormat
+                );
+            }
             return false;
         }
     } else {
+        if (AreInternalConfigureCachesRequired(Conf)) {
+            Conf.ConfigureCachePolicy.FailRejected(
+                EConfigureCacheKind::Deps,
+                EConfigureCacheUnavailableReason::IncompatibleFormat
+            );
+        }
         // related: TInternalCacheSaver::CompactSymbols games
         Names.CommandConf.Clear();
     }
@@ -865,8 +945,9 @@ TCacheFileReader::EReadResult TYMake::LoadDependencyManagementCache(const TFsPat
 
     try {
         TCacheFileReader cacheReader(Conf, false, false);
-        if (cacheReader.Read(cacheFile) != TCacheFileReader::EReadResult::Success) {
-            return TCacheFileReader::EReadResult::IncompatibleFormat;
+        const auto readResult = cacheReader.Read(cacheFile);
+        if (readResult != TCacheFileReader::EReadResult::Success) {
+            return readResult;
         }
 
         if (cacheReader.HasNextBlob()) {

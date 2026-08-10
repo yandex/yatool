@@ -1970,13 +1970,49 @@ namespace NDetail {
 }
 
 TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
+    if (!CanBypassConfigure()) {
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, false);
+        Conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::DM));
+    } else if (!Conf.ReadDepManagementCache) {
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, false);
+        TCacheFileReader::RejectedMonEvent(
+            NStats::MonName_RejectedDMCache,
+            TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled
+        );
+        if (Conf.IsConfigureCacheRequired()) {
+            Conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::DM);
+        }
+    } else if (!Conf.YmakeDMCache.Exists()) {
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, false);
+        if (Conf.IsConfigureCacheRequired()) {
+            Conf.ConfigureCachePolicy.FailMissing(EConfigureCacheKind::DM);
+        }
+    }
+
     if (CanBypassConfigure() && Conf.ReadDepManagementCache && Conf.YmakeDMCache.Exists()) {
         auto status = LoadDependencyManagementCache(Conf.YmakeDMCache);
         if (status == TCacheFileReader::EReadResult::Success) {
+            NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, true);
             YDebug() << "Use Dependency management cache" << Endl;
+            Conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::Loaded(EConfigureCacheKind::DM));
             return TMaybe<EBuildResult>();
-        } else if (status == TCacheFileReader::EReadResult::Exception) {
+        }
+
+        NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, false);
+        TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDMCache, status);
+        if (status == TCacheFileReader::EReadResult::Exception) {
+            if (Conf.IsConfigureCacheRequired()) {
+                Conf.ConfigureCachePolicy.FailRejected(
+                    EConfigureCacheKind::DM,
+                    EConfigureCacheUnavailableReason::ReadError
+                );
+            }
             return TMaybe<EBuildResult>(BR_RETRYABLE_ERROR);
+        } else if (Conf.IsConfigureCacheRequired()) {
+            Conf.ConfigureCachePolicy.FailRejected(
+                EConfigureCacheKind::DM,
+                ConfigureCacheUnavailableReason(status)
+            );
         }
     }
 

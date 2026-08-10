@@ -345,3 +345,11 @@ message TModStageStats {
     required TModStageExtremum Min = 4;
     required TModStageExtremum Max = 5;
 }
+
+message TConfigureCacheFailure {
+    option (message_id) = 54;
+    required string Cache = 1;
+    required string Outcome = 2;
+    optional string Reason = 3;
+    optional string DisabledBy = 4;
+}

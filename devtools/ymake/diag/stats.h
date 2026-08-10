@@ -18,12 +18,14 @@ namespace NStats {
     static const TString MonName_UsedConfCache = MON_NAME(EYmakeStats::UsedConfCache);
     static const TString MonName_UsedFSCache = MON_NAME(EYmakeStats::UsedFSCache);
     static const TString MonName_UsedDepsCache = MON_NAME(EYmakeStats::UsedDepsCache);
+    static const TString MonName_UsedDMCache = MON_NAME(EYmakeStats::UsedDMCache);
     static const TString MonName_UsedJSONCache = MON_NAME(EYmakeStats::UsedJSONCache);
     static const TString MonName_UsedUidsCache = MON_NAME(EYmakeStats::UsedUidsCache);
 
     static const TString MonName_RejectedConfCache = MON_NAME(EYmakeStats::RejectedConfCache);
     static const TString MonName_RejectedFSCache = MON_NAME(EYmakeStats::RejectedFSCache);
     static const TString MonName_RejectedDepsCache = MON_NAME(EYmakeStats::RejectedDepsCache);
+    static const TString MonName_RejectedDMCache = MON_NAME(EYmakeStats::RejectedDMCache);
     static const TString MonName_RejectedJSONCache = MON_NAME(EYmakeStats::RejectedJSONCache);
     static const TString MonName_RejectedUidsCache = MON_NAME(EYmakeStats::RejectedUidsCache);
 

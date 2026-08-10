@@ -263,6 +263,8 @@ asio::awaitable<THolder<TMakePlanCache>> TYMake::LoadJsonCacheAsync(asio::any_io
             auto JSONCache = MakeHolder<TMakePlanCache>(Conf);
             JSONCacheLoaded(JSONCache->LoadFromFile());
             co_return JSONCache;
+        } catch (const TConfigureCacheViolation&) {
+            throw;
         } catch (const std::exception& e) {
             YDebug() << "JSON cache failed to be loaded: " << e.what() << Endl;
             co_return nullptr;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <devtools/ymake/common/md5sig.h>
+#include <devtools/ymake/options/configure_cache_policy.h>
 
 #include <library/cpp/on_disk/multi_blob/multiblob_builder.h>
 
@@ -61,6 +62,9 @@ public:
 private:
     EReadResult CheckVersionInfo();
 };
+
+EConfigureCacheUnavailableReason ConfigureCacheUnavailableReason(TCacheFileReader::EReadResult result) noexcept;
+bool IsStrictConfigureCacheHit(TCacheFileReader::EReadResult result) noexcept;
 
 class TCacheFileWriter {
 private:

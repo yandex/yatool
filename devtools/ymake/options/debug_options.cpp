@@ -19,9 +19,17 @@ namespace {
         Y_ASSERT(opts != nullptr);
 
         if (opts->RebuildGraph) {
-            opts->ReadFsCache = false;
+            opts->SetCacheReadFlag(
+                EConfigureCacheKind::FS,
+                false,
+                EConfigureCacheDisableSource::CliRebuildGraph
+            );
             opts->WriteFsCache = true;
-            opts->ReadDepsCache = false;
+            opts->SetCacheReadFlag(
+                EConfigureCacheKind::Deps,
+                false,
+                EConfigureCacheDisableSource::CliRebuildGraph
+            );
             opts->WriteDepsCache = true;
             opts->ReadJsonCache = false;
             // Current strange behavior which should be fixed later
@@ -29,9 +37,17 @@ namespace {
         }
         if (opts->UseFSCacheOnly) {
             opts->WriteFsCache = true;
-            opts->ReadFsCache = true;
+            opts->SetCacheReadFlag(
+                EConfigureCacheKind::FS,
+                true,
+                EConfigureCacheDisableSource::CliFsCacheOnly
+            );
             opts->WriteDepsCache = false;
-            opts->ReadDepsCache = false;
+            opts->SetCacheReadFlag(
+                EConfigureCacheKind::Deps,
+                false,
+                EConfigureCacheDisableSource::CliFsCacheOnly
+            );
         }
         if (opts->DontWriteInternalCache) {
             opts->WriteFsCache = false;
@@ -42,63 +58,61 @@ namespace {
     }
 
     struct TCacheFlags {
-        bool ReadConfCache = true;
-        bool WriteConfCache = true;
-        bool ReadDepsCache = true;
-        bool WriteDepsCache = true;
-        bool ReadFsCache = true;
-        bool WriteFsCache = true;
-        bool ReadJsonCache = true;
-        bool WriteJsonCache = true;
-        bool ReadUidsCache = true;
-        bool WriteUidsCache = true;
+#define YMAKE_CACHE_FLAG_FIELD(Name, Letter, ReadDefault, WriteDefault, Kind) \
+        bool Read##Name##Cache = true; \
+        bool Write##Name##Cache = true;
+#include "cache_flag_fields.inc"
+#undef YMAKE_CACHE_FLAG_FIELD
 
         bool ConfCacheWasSetExplicitly = false;
         bool UidsCacheWasSetExplicitly = false;
     };
 
+    struct TParsedCacheFlagDescriptor {
+        char Letter;
+        bool TCacheFlags::* ReadFlag;
+        bool TCacheFlags::* WriteFlag;
+    };
+
+#define YMAKE_CACHE_FLAG_FIELD(Name, Letter, ReadDefault, WriteDefault, Kind) \
+    {Letter, &TCacheFlags::Read##Name##Cache, &TCacheFlags::Write##Name##Cache},
+    constexpr std::array<TParsedCacheFlagDescriptor, CacheFlagDescriptors.size()> ParsedCacheFlagDescriptors = {{
+#include "cache_flag_fields.inc"
+    }};
+#undef YMAKE_CACHE_FLAG_FIELD
+
+    void SetCacheReadFlag(
+        TDebugOptions* opts,
+        const TCacheFlagDescriptor& descriptor,
+        bool value,
+        EConfigureCacheDisableSource source
+    ) {
+        if (descriptor.ConfigureKind == EConfigureCacheKind::Count) {
+            opts->*descriptor.ReadFlag = value;
+        } else {
+            opts->SetCacheReadFlag(descriptor.ConfigureKind, value, source);
+        }
+    }
+
     void ParseCacheConfig(const TVector<TString>& config, TCacheFlags* cacheFlags) {
         auto&& parser = [cacheFlags](TStringBuf item) {
-            if (item.size() != 3
-                || !EqualToOneOf(item[0], 'c', 'd', 'f', 'j', 'u')
-                || item[1] != ':'
-                || !EqualToOneOf(item[2], 'a', 'n', 'r', 'w'))
-            {
+            const auto descriptor = FindIf(ParsedCacheFlagDescriptors, [item](const auto& candidate) {
+                return !item.empty() && candidate.Letter == item[0];
+            });
+            if (item.size() != 3 || descriptor == ParsedCacheFlagDescriptors.end()
+                || item[1] != ':' || !EqualToOneOf(item[2], 'a', 'n', 'r', 'w')) {
                 TStringStream message;
-                message << "Invalid value format: [(c|d|f|j|u):(a|n|r|w)]: [" << item << "]";
+                message << "Invalid value format: [(c|d|f|j|m|u):(a|n|r|w)]: [" << item << "]";
                 throw TCacheConfigParserError(message.Str());
             }
 
-            bool *readFlag = nullptr;
-            bool *writeFlag = nullptr;
-            switch (item[0]) {
-                case 'c':
-                    readFlag = &cacheFlags->ReadConfCache;
-                    writeFlag = &cacheFlags->WriteConfCache;
-                    cacheFlags->ConfCacheWasSetExplicitly = true;
-                    break;
-                case 'd':
-                    readFlag = &cacheFlags->ReadDepsCache;
-                    writeFlag = &cacheFlags->WriteDepsCache;
-                    break;
-                case 'f':
-                    readFlag = &cacheFlags->ReadFsCache;
-                    writeFlag = &cacheFlags->WriteFsCache;
-                    break;
-                case 'j':
-                    readFlag = &cacheFlags->ReadJsonCache;
-                    writeFlag = &cacheFlags->WriteJsonCache;
-                    break;
-                case 'u':
-                    readFlag = &cacheFlags->ReadUidsCache;
-                    writeFlag = &cacheFlags->WriteUidsCache;
-                    cacheFlags->UidsCacheWasSetExplicitly = true;
-                default:
-                    // Unreachable code
-                    Y_ASSERT(true);
+            if (item[0] == 'c') {
+                cacheFlags->ConfCacheWasSetExplicitly = true;
+            } else if (item[0] == 'u') {
+                cacheFlags->UidsCacheWasSetExplicitly = true;
             }
-            *readFlag = EqualToOneOf(item[2], 'a', 'r');
-            *writeFlag = EqualToOneOf(item[2], 'a', 'w');
+            cacheFlags->*descriptor->ReadFlag = EqualToOneOf(item[2], 'a', 'r');
+            cacheFlags->*descriptor->WriteFlag = EqualToOneOf(item[2], 'a', 'w');
         };
 
         for (const auto& item : config) {
@@ -109,18 +123,13 @@ namespace {
     void SetupCacheConfig(TDebugOptions* opts) {
         Y_ASSERT(opts != nullptr);
 
-        TCacheFlags flags{
-            .ReadConfCache = opts->ReadConfCache,
-            .WriteConfCache = opts->WriteConfCache,
-            .ReadDepsCache = opts->ReadDepsCache,
-            .WriteDepsCache = opts->WriteDepsCache,
-            .ReadFsCache = opts->ReadFsCache,
-            .WriteFsCache = opts->WriteFsCache,
-            .ReadJsonCache = opts->ReadJsonCache,
-            .WriteJsonCache = opts->WriteJsonCache,
-            .ReadUidsCache = opts->ReadUidsCache,
-            .WriteUidsCache = opts->WriteUidsCache,
-        };
+        TCacheFlags flags;
+        for (size_t index = 0; index < CacheFlagDescriptors.size(); ++index) {
+            const auto& descriptor = CacheFlagDescriptors[index];
+            const auto& parsedDescriptor = ParsedCacheFlagDescriptors[index];
+            flags.*parsedDescriptor.ReadFlag = opts->*descriptor.ReadFlag;
+            flags.*parsedDescriptor.WriteFlag = opts->*descriptor.WriteFlag;
+        }
 
         try {
             ParseCacheConfig(opts->CacheConfig, &flags);
@@ -128,18 +137,17 @@ namespace {
             ythrow yexception() << "Invalid value for --xCC flag: " << e.what();
         }
 
-#define SET_OPT_FLAG(FlagName) { opts->FlagName = flags.FlagName; }
-        SET_OPT_FLAG(ReadConfCache);
-        SET_OPT_FLAG(WriteConfCache);
-        SET_OPT_FLAG(ReadDepsCache);
-        SET_OPT_FLAG(WriteDepsCache);
-        SET_OPT_FLAG(ReadFsCache);
-        SET_OPT_FLAG(WriteFsCache);
-        SET_OPT_FLAG(ReadJsonCache);
-        SET_OPT_FLAG(WriteJsonCache);
-        SET_OPT_FLAG(ReadUidsCache);
-        SET_OPT_FLAG(WriteUidsCache);
-#undef SET_OPT_FLAG
+        for (size_t index = 0; index < CacheFlagDescriptors.size(); ++index) {
+            const auto& descriptor = CacheFlagDescriptors[index];
+            const auto& parsedDescriptor = ParsedCacheFlagDescriptors[index];
+            SetCacheReadFlag(
+                opts,
+                descriptor,
+                flags.*parsedDescriptor.ReadFlag,
+                EConfigureCacheDisableSource::CliCacheConfig
+            );
+            opts->*descriptor.WriteFlag = flags.*parsedDescriptor.WriteFlag;
+        }
 
         opts->ConfCacheWasSetExplicitly = opts->ConfCacheWasSetExplicitly || flags.ConfCacheWasSetExplicitly;
         opts->UidsCacheWasSetExplicitly = opts->UidsCacheWasSetExplicitly || flags.UidsCacheWasSetExplicitly;
@@ -155,18 +163,17 @@ namespace {
             ythrow yexception() << "Invalid value for --xRC flag: " << e.what();
         }
 
-#define RESTRICT_OPT_FLAG(FlagName) { opts->FlagName = opts->ReadDepsCache && flags.ReadDepsCache; }
-        RESTRICT_OPT_FLAG(ReadConfCache);
-        RESTRICT_OPT_FLAG(WriteConfCache);
-        RESTRICT_OPT_FLAG(ReadDepsCache);
-        RESTRICT_OPT_FLAG(WriteDepsCache);
-        RESTRICT_OPT_FLAG(ReadFsCache);
-        RESTRICT_OPT_FLAG(WriteFsCache);
-        RESTRICT_OPT_FLAG(ReadJsonCache);
-        RESTRICT_OPT_FLAG(WriteJsonCache);
-        RESTRICT_OPT_FLAG(ReadUidsCache);
-        RESTRICT_OPT_FLAG(WriteUidsCache);
-#undef RESTRICT_OPT_FLAG
+        for (size_t index = 0; index < CacheFlagDescriptors.size(); ++index) {
+            const auto& descriptor = CacheFlagDescriptors[index];
+            const auto& parsedDescriptor = ParsedCacheFlagDescriptors[index];
+            SetCacheReadFlag(
+                opts,
+                descriptor,
+                opts->*descriptor.ReadFlag && flags.*parsedDescriptor.ReadFlag,
+                EConfigureCacheDisableSource::RetryCacheConfig
+            );
+            opts->*descriptor.WriteFlag = opts->*descriptor.WriteFlag && flags.*parsedDescriptor.WriteFlag;
+        }
 
         opts->ConfCacheWasSetExplicitly = opts->ConfCacheWasSetExplicitly || flags.ConfCacheWasSetExplicitly;
         opts->UidsCacheWasSetExplicitly = opts->UidsCacheWasSetExplicitly || flags.UidsCacheWasSetExplicitly;
@@ -303,16 +310,21 @@ void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
         .StoreResult(&BinaryLogFileName);
     opts.AddLongOption("disable-text-log", "Disable text debug logging to stderr").SetFlag(&DisableTextLog).NoArgument();
     opts.AddLongOption("xCC", "Cache configuration")
-        .RequiredArgument("(c|f|d|j|u):(a|r|w|n)[,(c|f|d|j|u):(a|r|w|n)]*")
+        .RequiredArgument("(c|f|d|j|m|u):(a|r|w|n)[,(c|f|d|j|m|u):(a|r|w|n)]*")
         .SplitHandler(&CacheConfig, ',');
     opts.AddLongOption("xRC", "Retry ymake with given cache configuration restrictions")
-        .RequiredArgument("(c|f|d|j|u):(a|r|w|n)[,(c|f|d|j|u):(a|r|w|n)]*")
+        .RequiredArgument("(c|f|d|j|m|u):(a|r|w|n)[,(c|f|d|j|m|u):(a|r|w|n)]*")
         .SplitHandler(&RetryConfig, ',');
+    opts.AddLongOption(
+        "fail-on-no-configure-cache",
+        "Fail before uncached configure when an applicable FS, Conf, Deps, or DM cache is unavailable"
+    ).SetFlag(&FailOnNoConfigureCache).NoArgument();
 }
 
 void TDebugOptions::PostProcess(const TVector<TString>& /* freeArgs */) {
     DumpGraphStuff = DumpGraph | DumpRenderedCmds | DumpBuildables | DumpNames;
 
+    ConfigureCachePolicy.SetEnabled(FailOnNoConfigureCache);
     SetupCaches(this);
 
     for (char c : DumpGraphStructuredFlags) {
@@ -330,4 +342,23 @@ void TDebugOptions::PostProcess(const TVector<TString>& /* freeArgs */) {
                 ythrow yexception() << "Unknown structured graph dump flag '" << c << "'";
         }
     }
+}
+
+void TDebugOptions::SetCacheReadFlag(
+    EConfigureCacheKind kind,
+    bool value,
+    EConfigureCacheDisableSource source
+) {
+    bool* flag = nullptr;
+    for (const auto& descriptor : CacheFlagDescriptors) {
+        if (descriptor.ConfigureKind == kind) {
+            flag = &(this->*descriptor.ReadFlag);
+            break;
+        }
+    }
+    Y_ASSERT(flag != nullptr);
+
+    const bool oldValue = *flag;
+    *flag = value;
+    ConfigureCachePolicy.OnReadFlagMutation(kind, oldValue, value, source);
 }

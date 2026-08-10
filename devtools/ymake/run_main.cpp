@@ -155,6 +155,9 @@ TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfigura
 
         // Readers may require input stream to be set.
         conf.ForeignTargetReader = pipeline.CreateReader(conf);
+    } catch (const TConfigureCacheViolation& error) {
+        ReportConfigureCacheViolation(conf.ConfigureCachePolicy, error);
+        return BR_FATAL_ERROR;
     } catch (const yexception& error) {
         YErr() << "Conf initialization failed with error: " << error.what() << Endl;
         return BR_FATAL_ERROR;
@@ -192,6 +195,9 @@ asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyIn
     try {
         NYMake::TTraceStage stage("ymake main");
         ret_code = co_await main_real(conf, exec);
+    } catch (const TConfigureCacheViolation& error) {
+        ReportConfigureCacheViolation(conf.ConfigureCachePolicy, error);
+        ret_code = BR_FATAL_ERROR;
     } catch (const yexception& error) {
         YErr() << "Configure stage failed with error: " << error.what() << Endl;
         ret_code = BR_FATAL_ERROR;

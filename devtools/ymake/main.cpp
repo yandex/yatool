@@ -644,6 +644,7 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
     }
 
     if (!conf.WriteYdx.empty()) {
+        conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::DM));
         THolder<IOutputStream> ydxOut(new TFileOutput(conf.WriteYdx));
         yMake->Yndex.WriteJSON(*ydxOut);
         ydxOut->Finish();
@@ -683,6 +684,22 @@ TMaybe<EBuildResult> EarlyDumpStage(TBuildConfiguration& conf) {
 }
 
 TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& conf) {
+    const bool configureCachesApplicable = conf.WriteYdx.empty();
+    if (conf.IsConfigureCacheRequired() && configureCachesApplicable) {
+        if (!conf.ReadFsCache) {
+            conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::FS);
+        }
+        if (!conf.ReadDepsCache) {
+            conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Deps);
+        }
+        if (!conf.CachePath.Exists()) {
+            conf.ConfigureCachePolicy.FailMissing(EConfigureCacheKind::FS);
+        }
+    } else if (!configureCachesApplicable) {
+        conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::FS));
+        conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::Deps));
+    }
+
     if (!conf.CachePath.Exists() && conf.ShouldUseOnlyYmakeCache()) {
         YErr() << "Can not load ymake.cache. File does not exist: " << conf.YmakeCache << Endl;
         return BR_FATAL_ERROR;

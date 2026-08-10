@@ -1,0 +1,6 @@
+YMAKE_CACHE_FLAG_FIELD(Conf, 'c', true, true, EConfigureCacheKind::Conf)
+YMAKE_CACHE_FLAG_FIELD(Deps, 'd', true, true, EConfigureCacheKind::Deps)
+YMAKE_CACHE_FLAG_FIELD(Fs, 'f', true, true, EConfigureCacheKind::FS)
+YMAKE_CACHE_FLAG_FIELD(Json, 'j', true, true, EConfigureCacheKind::Count)
+YMAKE_CACHE_FLAG_FIELD(DepManagement, 'm', true, true, EConfigureCacheKind::DM)
+YMAKE_CACHE_FLAG_FIELD(Uids, 'u', false, false, EConfigureCacheKind::Count)

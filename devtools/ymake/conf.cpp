@@ -1,5 +1,6 @@
 #include "conf.h"
 
+#include "configure_cache_status.h"
 #include "sysincl_conf.h"
 #include "licenses_conf.h"
 #include "autoincludes_conf.h"
@@ -28,6 +29,23 @@
 #include <util/string/split.h>
 
 using namespace NYMake;
+
+EConfigureCacheUnavailableReason ConfigureCacheUnavailableReason(NConfReader::ELoadStatus status) noexcept {
+    switch (status) {
+        case NConfReader::ELoadStatus::DoesNotExist:
+            return EConfigureCacheUnavailableReason::Missing;
+        case NConfReader::ELoadStatus::UnknownFormat:
+        case NConfReader::ELoadStatus::VersionMismatch:
+            return EConfigureCacheUnavailableReason::IncompatibleFormat;
+        case NConfReader::ELoadStatus::ConfigurationChanged:
+            return EConfigureCacheUnavailableReason::ChangedConfig;
+        case NConfReader::ELoadStatus::UnhandledException:
+            return EConfigureCacheUnavailableReason::ReadError;
+        case NConfReader::ELoadStatus::Success:
+            return EConfigureCacheUnavailableReason::Unknown;
+    }
+    Y_UNREACHABLE();
+}
 
 namespace {
     constexpr TStringBuf VAR_PEERDIRS_RULES_PATH = "PEERDIRS_RULES_PATH"sv;
@@ -158,17 +176,34 @@ void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
     bool fromCache = false;
     if (!ReadConfCache) {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedConfCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
+        if (IsConfigureCacheRequired()) {
+            ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Conf);
+        }
     }
-    if (ReadConfCache && LoadCache(*this, confMd5) == ELoadStatus::Success) {
+    const auto loadStatus = ReadConfCache ? LoadCache(*this, confMd5) : ELoadStatus::DoesNotExist;
+    if (ReadConfCache && loadStatus == ELoadStatus::Success) {
         updateConfCacheFlags();
         // call to updateConfCacheFlag() may change the value of ReadConfCache
         if (ReadConfCache) {
             fromCache = true;
+            ConfigureCachePolicy.Record(TConfigureCacheLoadResult::Loaded(EConfigureCacheKind::Conf));
         } else {
             // Conf cache manual disabled by conf var
             TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedConfCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
+            if (IsConfigureCacheRequired()) {
+                ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Conf);
+            }
             ClearYmakeConfig();
         }
+    } else if (ReadConfCache && IsConfigureCacheRequired()) {
+        if (loadStatus == ELoadStatus::DoesNotExist) {
+            ConfigureCachePolicy.FailMissing(EConfigureCacheKind::Conf);
+        }
+        Y_ASSERT(loadStatus != ELoadStatus::Success);
+        ConfigureCachePolicy.FailRejected(
+            EConfigureCacheKind::Conf,
+            ConfigureCacheUnavailableReason(loadStatus)
+        );
     }
     Y_ASSERT(GetFromCache() == fromCache);
 
@@ -181,6 +216,9 @@ void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
         LoadConfig(YmakeConf.GetPath(), SourceRoot.GetPath(), BuildRoot.GetPath(), tempConfData);
         tempConfData.Final(confMd5.RawData);
         updateConfCacheFlags();
+        if (!ReadConfCache && IsConfigureCacheRequired()) {
+            ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Conf);
+        }
     }
 
     if (WriteConfCache && !fromCache) {

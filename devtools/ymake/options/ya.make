@@ -2,6 +2,7 @@ LIBRARY()
 
 SRCS(
     commandline_options.cpp
+    configure_cache_policy.cpp
     debug_options.cpp
     roots_options.cpp
     startup_options.cpp

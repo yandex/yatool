@@ -1,5 +1,6 @@
 #pragma once
 
+#include "configure_cache_policy.h"
 #include "static_options.h"
 
 #include <library/cpp/getopt/small/last_getopt.h>
@@ -11,6 +12,8 @@
 #include <util/stream/file.h>
 #include <util/stream/output.h>
 #include <util/system/types.h>
+
+#include <array>
 
 struct TDebugOptions {
     bool RebuildGraph = false;
@@ -99,21 +102,16 @@ struct TDebugOptions {
 
     TVector<TString> CacheConfig;
     TVector<TString> RetryConfig;
-    bool ReadFsCache = true;
-    bool WriteFsCache = true;
-    bool ReadDepsCache = true;
-    bool WriteDepsCache = true;
-    bool ReadJsonCache = true;
-    bool WriteJsonCache = true;
-    bool ReadDepManagementCache = true;
-    bool WriteDepManagementCache = true;
-    bool ReadUidsCache = false;
-    bool WriteUidsCache = false;
+    bool FailOnNoConfigureCache = false;
+    TConfigureCachePolicy ConfigureCachePolicy;
+#define YMAKE_CACHE_FLAG_FIELD(Name, Letter, ReadDefault, WriteDefault, Kind) \
+    bool Read##Name##Cache = ReadDefault; \
+    bool Write##Name##Cache = WriteDefault;
+#include "cache_flag_fields.inc"
+#undef YMAKE_CACHE_FLAG_FIELD
 
     bool UidsCacheWasSetExplicitly = false;
 
-    bool ReadConfCache = true;
-    bool WriteConfCache = true;
     bool ConfCacheWasSetExplicitly = false;
 
     TString PatchPath2;
@@ -138,7 +136,11 @@ struct TDebugOptions {
     }
 
     void DisableConfCache() {
-        ReadConfCache = false;
+        SetCacheReadFlag(
+            EConfigureCacheKind::Conf,
+            false,
+            EConfigureCacheDisableSource::ConfCacheEnabled
+        );
         WriteConfCache = false;
     }
 
@@ -154,9 +156,22 @@ struct TDebugOptions {
     // but this still could be overridden by --xCC=c and --xCR=c.
     void MakeDepsCacheControlConfCache() {
         if (!ConfCacheWasSetExplicitly) {
-            ReadConfCache = ReadDepsCache;
+            SetCacheReadFlag(
+                EConfigureCacheKind::Conf,
+                ReadDepsCache,
+                EConfigureCacheDisableSource::DepsControlConf
+            );
             WriteConfCache = WriteDepsCache;
         }
+    }
+
+    void SetCacheReadFlag(
+        EConfigureCacheKind kind,
+        bool value,
+        EConfigureCacheDisableSource source
+    );
+    bool IsConfigureCacheRequired() const noexcept {
+        return ConfigureCachePolicy.IsEnabled();
     }
 
     IOutputStream& Cmsg() const {
@@ -176,3 +191,17 @@ struct TDebugOptions {
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
 };
+
+struct TCacheFlagDescriptor {
+    char Letter;
+    EConfigureCacheKind ConfigureKind;
+    bool TDebugOptions::* ReadFlag;
+    bool TDebugOptions::* WriteFlag;
+};
+
+#define YMAKE_CACHE_FLAG_FIELD(Name, Letter, ReadDefault, WriteDefault, Kind) \
+    {Letter, Kind, &TDebugOptions::Read##Name##Cache, &TDebugOptions::Write##Name##Cache},
+inline constexpr std::array<TCacheFlagDescriptor, 6> CacheFlagDescriptors = {{
+#include "cache_flag_fields.inc"
+}};
+#undef YMAKE_CACHE_FLAG_FIELD
