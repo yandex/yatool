@@ -14,11 +14,20 @@ def get_skip_reason(path, data, skip_links=True):
     return _path_skip_reason(path, skip_links) or _content_skip_reason(path, data)
 
 
+_non_contrib_path_prefixes = [
+    "devtools/contrib/"
+]
+
+
 def _path_skip_reason(path, skip_links=True):
     if '/generated/' in path:
         return "path '{}' contains '/generated/'".format(path)
 
-    if path and '/contrib/' in path and '/.yandex_meta/' not in path:
+    path_without_prefix = path
+    for prefix in _non_contrib_path_prefixes:
+        if prefix in path_without_prefix:
+            path_without_prefix = path_without_prefix[path_without_prefix.index(prefix)+len(prefix):]
+    if path and '/contrib/' in path_without_prefix and '/.yandex_meta/' not in path:
         return "path '{}' contains '/contrib/'".format(path)
 
     if path and '/vendor/' in path:
