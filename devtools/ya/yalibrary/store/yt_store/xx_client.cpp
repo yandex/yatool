@@ -663,17 +663,26 @@ namespace NYa {
             }
 
             auto promise = InitializeControl_.Init(initTimeout);
-            ThreadPool_.SafeAddFunc([this, promise=std::move(promise), proxy, dataDir]() mutable {
-                TThread::SetCurrentThreadName("YtStore::Initialize");
-                Initialize(std::move(promise), proxy, dataDir);
-            });
-            if (CritLevel_ != ECritLevel::NONE) {
-                // Wait for the initialization to complete
-                InitializeControl_.GetValue();
+            try {
+                ThreadPool_.SafeAddFunc([this, promise=std::move(promise), proxy, dataDir]() mutable {
+                    TThread::SetCurrentThreadName("YtStore::Initialize");
+                    Initialize(std::move(promise), proxy, dataDir);
+                });
+                if (CritLevel_ != ECritLevel::NONE) {
+                    // Wait for the initialization to complete
+                    InitializeControl_.GetValue();
+                }
+            } catch (...) {
+                // In case of exception in the previous statements, ~TImpl would not be called,
+                // because the construction is not finished. Perform TearDown() and rethrow.
+                TearDown();
+                throw;
             }
         }
 
-        ~TImpl() = default;
+        ~TImpl() {
+            TearDown();
+        }
 
         bool Disabled() const noexcept {
             return Disabled_.load(std::memory_order::relaxed);
@@ -1918,6 +1927,12 @@ namespace NYa {
         };
 
     private:
+        // Cancels ongoing work and joins the pool threads.
+        void TearDown() noexcept {
+            CancellationSource_.Cancel();
+            ThreadPool_.Stop();
+        }
+
         template <class TFunc, class T = std::invoke_result<TFunc()>>
         T CheckDisabledAndDisableOnError(T defaultValue, TFunc&& func) {
             if (!Disabled()) {
