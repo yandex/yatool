@@ -38,176 +38,177 @@
 #include <asio/co_spawn.hpp>
 
 #if defined(__linux__)
-#include <sys/mman.h>
+    #include <sys/mman.h>
 #endif
 
 namespace {
 
-void SigInt(int) {
-    _Exit(BR_INTERRUPTED);
-}
+    void SigInt(int) {
+        _Exit(BR_INTERRUPTED);
+    }
 
 #if !defined(_win_)
-void PrintBackTraceOnSignal(int signum, siginfo_t*, void*) {
-    Cerr << "Signal " << signum << ", backtrace is:" << Endl;
-    PrintBackTrace();
-    raise(signum);
-}
+    void PrintBackTraceOnSignal(int signum, siginfo_t*, void*) {
+        Cerr << "Signal " << signum << ", backtrace is:" << Endl;
+        PrintBackTrace();
+        raise(signum);
+    }
 
-using THandler = void (*)(int, siginfo_t*, void*);
-void SetupSignalHandler(int signum, THandler handler) {
-    struct sigaction sa = {};
-    sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESETHAND,
-    sa.sa_sigaction = handler;
-    Y_ENSURE(sigaction(signum, &sa, nullptr) == 0, strerror(errno));
-}
+    using THandler = void (*)(int, siginfo_t*, void*);
+    void SetupSignalHandler(int signum, THandler handler) {
+        struct sigaction sa = {};
+        sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_RESETHAND,
+        sa.sa_sigaction = handler;
+        Y_ENSURE(sigaction(signum, &sa, nullptr) == 0, strerror(errno));
+    }
 #endif // !_win_
 
-struct TConfigDesc {
-    size_t Id;
-    TVector<const char*> CmdLine;
-};
-
-TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** argv) {
-    TVector<TVector<const char*>> configs;
-
-    using namespace std::views;
-
-    // split by --conf-id then drop the very first part: it is the program name or the whole command line
-    for (const auto v : split(TVector<const char*>{argv, argv + argc}, TVector<TStringBuf>{"--conf-id"sv}) | drop(1)) {
-        TVector<const char*> config{argv[0]};
-        // (+ 1) means we omit conf-id value since we don't need it for now
-        config.insert(config.end(), v.begin() + 1, v.end());
-        configs.push_back(std::move(config));
-    }
-
-    if (configs.empty()) {
-        configs.push_back(TVector<const char*>(argv, argv + argc));
-    }
-
-    return configs;
-}
-
-using namespace NLastGetopt;
-
-const char* GetOption(int& argc, char** argv, std::string_view option) noexcept {
-    const char* result = nullptr;
-    int out = 1;
-
-    for (int in = 1; in < argc; ) {
-        if (!result && argv[in] == option && in + 1 < argc && argv[in + 1][0] != '-') {
-            result = argv[in + 1];
-            in += 2;
-        } else {
-            argv[out++] = argv[in++];
-        }
-    }
-
-    argc = out;
-    return result;
-}
-
-void InitGlobalOpts(int& argc, char** argv, int& threads) {
-    try {
-        TVector<TString> events;
-        for (const auto& name : { "--events", "-E" }) {
-            while (true) {
-                const char* value = GetOption(argc, argv, name);
-                if (value == nullptr)
-                    break;
-                events.push_back(std::move(value));
-            }
-        }
-
-        for (const auto& name : { "--threads", "-t" }) {
-            const char* threadsStr = GetOption(argc, argv, name);
-            if (threadsStr != nullptr) {
-                threads = std::stoul(threadsStr);
-            }
-        }
-
-        if (!events.empty()) {
-            if (!std::all_of(events.begin(), events.end(), [&events](const TString& event) {return event == events.front();})) {
-                YWarn() << "All trace events must be the same" << Endl;
-            }
-            NYMake::InitTraceSubsystem(events.front());
-        }
-    } catch (const yexception& error) {
-        YErr() << "Global opts initialization failed with error: " << error.what() << Endl;
-    }
-}
-
-TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
-    try {
-        TOpts opts;
-        opts.ArgPermutation_ = REQUIRE_ORDER;
-        opts.AddHelpOption('?');
-
-        conf.AddOptions(opts);
-
-        const TOptsParseResult res(&opts, value.size(), const_cast<const char**>(value.data()));
-
-        // Create writer as early as possible to notify readers on FinalizeConfig.
-        conf.ForeignTargetWriter = pipeline.CreateWriter(conf);
-
-        // This calls FORCE_TRACE(U, NEvent::TStageStated("ymake run")); after tracing initialization
-        conf.PostProcess(res.GetFreeArgs());
-
-        // Readers may require input stream to be set.
-        conf.ForeignTargetReader = pipeline.CreateReader(conf);
-    } catch (const TConfigureCacheViolation& error) {
-        ReportConfigureCacheViolation(conf.ConfigureCachePolicy, error);
-        return BR_FATAL_ERROR;
-    } catch (const yexception& error) {
-        YErr() << "Conf initialization failed with error: " << error.what() << Endl;
-        return BR_FATAL_ERROR;
-    }
-    return TMaybe<EBuildResult>();
-}
-
-// Attempt to call MLock after logger is ready leads to mlock failure thus it's called before
-// logger initialization and it's failure is reported later. This var keeps mlock call result.
-bool MLOCK_FAILED = false;
-
-asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyInterpreterState*()> subinterpreterStateGetter, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
-    TBuildConfiguration conf;
-    conf.SubinterpreterStateGetter = subinterpreterStateGetter;
-    TMaybe<EBuildResult> result{};
-    {
-        NYMake::TPythonThreadStateScope initState{nullptr};
-        result = InitConf(value, conf, pipeline);
-    }
-
-    Y_DEFER {
-        pipeline.FinalizeConfig(conf);
-        conf.ClearPlugins();
+    struct TConfigDesc {
+        size_t Id;
+        TVector<const char*> CmdLine;
     };
 
-    if (result.Defined()) {
-        co_return result.GetRef();
+    TVector<TVector<const char*>> SplitMulticonfigCmdline(int argc, char** argv) {
+        TVector<TVector<const char*>> configs;
+
+        using namespace std::views;
+
+        // split by --conf-id then drop the very first part: it is the program name or the whole command line
+        for (const auto v : split(TVector<const char*>{argv, argv + argc}, TVector<TStringBuf>{"--conf-id"sv}) | drop(1)) {
+            TVector<const char*> config{argv[0]};
+            // (+ 1) means we omit conf-id value since we don't need it for now
+            config.insert(config.end(), v.begin() + 1, v.end());
+            configs.push_back(std::move(config));
+        }
+
+        if (configs.empty()) {
+            configs.push_back(TVector<const char*>(argv, argv + argc));
+        }
+
+        return configs;
     }
 
-    if (MLOCK_FAILED) {
-        YDebug() << "mlockall failed" << Endl;
+    using namespace NLastGetopt;
+
+    const char* GetOption(int& argc, char** argv, std::string_view option) noexcept {
+        const char* result = nullptr;
+        int out = 1;
+
+        for (int in = 1; in < argc;) {
+            if (!result && argv[in] == option && in + 1 < argc && argv[in + 1][0] != '-') {
+                result = argv[in + 1];
+                in += 2;
+            } else {
+                argv[out++] = argv[in++];
+            }
+        }
+
+        argc = out;
+        return result;
     }
 
-    int ret_code = BR_OK;
-    try {
-        NYMake::TTraceStage stage("ymake main");
-        ret_code = co_await main_real(conf, exec);
-    } catch (const TConfigureCacheViolation& error) {
-        ReportConfigureCacheViolation(conf.ConfigureCachePolicy, error);
-        ret_code = BR_FATAL_ERROR;
-    } catch (const yexception& error) {
-        YErr() << "Configure stage failed with error: " << error.what() << Endl;
-        ret_code = BR_FATAL_ERROR;
+    void InitGlobalOpts(int& argc, char** argv, int& threads) {
+        try {
+            TVector<TString> events;
+            for (const auto& name : {"--events", "-E"}) {
+                while (true) {
+                    const char* value = GetOption(argc, argv, name);
+                    if (value == nullptr) {
+                        break;
+                    }
+                    events.push_back(std::move(value));
+                }
+            }
+
+            for (const auto& name : {"--threads", "-t"}) {
+                const char* threadsStr = GetOption(argc, argv, name);
+                if (threadsStr != nullptr) {
+                    threads = std::stoul(threadsStr);
+                }
+            }
+
+            if (!events.empty()) {
+                if (!std::all_of(events.begin(), events.end(), [&events](const TString& event) { return event == events.front(); })) {
+                    YWarn() << "All trace events must be the same" << Endl;
+                }
+                NYMake::InitTraceSubsystem(events.front());
+            }
+        } catch (const yexception& error) {
+            YErr() << "Global opts initialization failed with error: " << error.what() << Endl;
+        }
     }
-    co_return ret_code;
-}
 
-}
+    TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
+        try {
+            TOpts opts;
+            opts.ArgPermutation_ = REQUIRE_ORDER;
+            opts.AddHelpOption('?');
 
-auto CreatePipeline(const TVector<TVector<const char*>>& configs , asio::any_io_executor exec) {
+            conf.AddOptions(opts);
+
+            const TOptsParseResult res(&opts, value.size(), const_cast<const char**>(value.data()));
+
+            // Create writer as early as possible to notify readers on FinalizeConfig.
+            conf.ForeignTargetWriter = pipeline.CreateWriter(conf);
+
+            // This calls FORCE_TRACE(U, NEvent::TStageStated("ymake run")); after tracing initialization
+            conf.PostProcess(res.GetFreeArgs());
+
+            // Readers may require input stream to be set.
+            conf.ForeignTargetReader = pipeline.CreateReader(conf);
+        } catch (const TConfigureCacheViolation& error) {
+            ReportConfigureCacheViolation(conf.ConfigureCachePolicy, error);
+            return BR_FATAL_ERROR;
+        } catch (const yexception& error) {
+            YErr() << "Conf initialization failed with error: " << error.what() << Endl;
+            return BR_FATAL_ERROR;
+        }
+        return TMaybe<EBuildResult>();
+    }
+
+    // Attempt to call MLock after logger is ready leads to mlock failure thus it's called before
+    // logger initialization and it's failure is reported later. This var keeps mlock call result.
+    bool MLOCK_FAILED = false;
+
+    asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyInterpreterState*()> subinterpreterStateGetter, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
+        TBuildConfiguration conf;
+        conf.SubinterpreterStateGetter = subinterpreterStateGetter;
+        TMaybe<EBuildResult> result{};
+        {
+            NYMake::TPythonThreadStateScope initState{nullptr};
+            result = InitConf(value, conf, pipeline);
+        }
+
+        Y_DEFER {
+            pipeline.FinalizeConfig(conf);
+            conf.ClearPlugins();
+        };
+
+        if (result.Defined()) {
+            co_return result.GetRef();
+        }
+
+        if (MLOCK_FAILED) {
+            YDebug() << "mlockall failed" << Endl;
+        }
+
+        int ret_code = BR_OK;
+        try {
+            NYMake::TTraceStage stage("ymake main");
+            ret_code = co_await main_real(conf, exec);
+        } catch (const TConfigureCacheViolation& error) {
+            ReportConfigureCacheViolation(conf.ConfigureCachePolicy, error);
+            ret_code = BR_FATAL_ERROR;
+        } catch (const yexception& error) {
+            YErr() << "Configure stage failed with error: " << error.what() << Endl;
+            ret_code = BR_FATAL_ERROR;
+        }
+        co_return ret_code;
+    }
+
+} // namespace
+
+auto CreatePipeline(const TVector<TVector<const char*>>& configs, asio::any_io_executor exec) {
     THolder<NForeignTargetPipeline::TForeignTargetPipeline> pipeline;
     const bool hasMulticonfig = configs.size() > 1;
     size_t marked = 0;
@@ -229,7 +230,7 @@ using TChannel = asio::experimental::concurrent_channel<void(asio::error_code, i
 
 void SubmitNextConfigIfAny(NYMake::TPythonRuntimeScope& pythonRuntime, TAdaptiveLock& confQueueLock, TQueue<TConfigDesc>& confQueue, asio::thread_pool::executor_type exec, THolder<NForeignTargetPipeline::TForeignTargetPipeline>& pipeline, TDeque<TAtomicSharedPtr<TChannel>>& channels) {
     TConfigDesc config;
-    with_lock(confQueueLock) {
+    with_lock (confQueueLock) {
         if (confQueue.empty()) {
             return;
         }
@@ -241,14 +242,12 @@ void SubmitNextConfigIfAny(NYMake::TPythonRuntimeScope& pythonRuntime, TAdaptive
         std::make_shared<TConfMsgManager>(),
         std::make_shared<TProgressManager>(),
         std::make_shared<TModuleStagesStatsManager>(),
-        std::make_shared<TDiagCtrl>()
-    );
+        std::make_shared<TDiagCtrl>());
     auto proxy = TExecutorWithContext<TExecContext>(
         asio::require(exec, asio::execution::blocking.never),
-        ctx
-    );
+        ctx);
     auto p = MakeAtomicShared<TChannel>(exec, 1u);
-    with_lock(confQueueLock) {
+    with_lock (confQueueLock) {
         channels.push_back(p); // TODO: mb other lock
     }
     asio::co_spawn(proxy, RunConfigure(config.CmdLine, pythonRuntime.GetSubinterpreterStateGetter(config.Id), proxy, *pipeline), [p, &pythonRuntime, &confQueueLock, &confQueue, exec, &pipeline, &channels](std::exception_ptr ptr, int rc) {

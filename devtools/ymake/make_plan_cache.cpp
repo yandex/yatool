@@ -33,172 +33,169 @@ namespace {
     const TStringBuf JOINED_PART_START("\"");
     const TStringBuf JOINED_PART_END("\"");
     const TStringBuf JOINED_PART_SEPARATOR("\", \"");
-}
+} // namespace
 
 namespace NCache {
-        template <typename TStrType>
-        void TConversionContext::Convert(const TCached& src, TStrType& dst) const {
-            TStringBuf buffer = Names_.GetName<TCmdView>(src).GetStr();
+    template <typename TStrType>
+    void TConversionContext::Convert(const TCached& src, TStrType& dst) const {
+        TStringBuf buffer = Names_.GetName<TCmdView>(src).GetStr();
+        dst = buffer;
+    }
+
+    TStringBuf TConversionContext::GetBuf(const TCached& src) const {
+        return Names_.GetName<TCmdView>(src).GetStr();
+    }
+
+    template <typename TStrType>
+    void TConversionContext::Convert(TStrType&& src, TCached& dst) {
+        dst = IdGetter_(std::forward<TStrType>(src), Names_);
+    }
+
+    void TConversionContext::Convert(const TOriginal& src, TJoinedCached& dst) {
+        TStringBuf srcFixed(src);
+        srcFixed.SkipPrefix(JOINED_START);
+        srcFixed.ChopSuffix(JOINED_END);
+        srcFixed.SkipPrefix(JOINED_PART_START);
+        srcFixed.ChopSuffix(JOINED_PART_END);
+
+        if (srcFixed.empty()) {
+            return;
+        }
+
+        TVector<TStringBuf> parts;
+        StringSplitter(srcFixed).SplitByString(JOINED_PART_SEPARATOR).Collect(&parts);
+
+        dst.resize(parts.size());
+        for (size_t i = 0; i < parts.size(); i++) {
+            Convert(parts[i], dst[i]);
+        }
+    }
+
+    void TConversionContext::Convert(const TVector<TOriginal>& src, TJoinedCached& dst) {
+        dst.resize(src.size());
+        for (size_t i = 0; i < src.size(); i++) {
+            Convert(src[i], dst[i]);
+        }
+    }
+
+    void TConversionContext::Convert(const TJoinedCommand& src, TJoinedCachedCommand& dst) {
+        std::visit(TOverloaded{
+                       [&](const TOriginal& src) { dst.Tag = 0; Convert(src, dst.Data); },
+                       [&](const TVector<TOriginal>& src) { dst.Tag = 1; Convert(src, dst.Data); }}, src);
+    }
+
+    void TConversionContext::Convert(const TJoinedCached& src, TOriginal& dst) {
+        TVector<TStringBuf> parts;
+        parts.reserve(src.size());
+        for (const auto& srcElem : src) {
+            parts.emplace_back();
+            Convert(srcElem, parts.back());
+        }
+
+        TStringBuilder builder;
+        builder << JOINED_START;
+        if (!parts.empty()) {
+            builder << JOINED_PART_START;
+        }
+        builder << MakeRangeJoiner(JOINED_PART_SEPARATOR, parts);
+        if (!parts.empty()) {
+            builder << JOINED_PART_END;
+        }
+        builder << JOINED_END;
+        dst = builder;
+    }
+
+    void TConversionContext::Convert(const TJoinedCached& src, TVector<TOriginal>& dst) {
+        dst.reserve(src.size());
+        for (const auto& srcElem : src) {
+            dst.emplace_back();
+            Convert(srcElem, dst.back());
+        }
+    }
+
+    void TConversionContext::Convert(const TJoinedCachedCommand& src, TJoinedCommand& dst) {
+        switch (src.Tag) {
+            case 0: {
+                dst = TOriginal();
+                Convert(src.Data, std::get<TOriginal>(dst));
+                break;
+            }
+            case 1: {
+                dst = TVector<TOriginal>();
+                Convert(src.Data, std::get<TVector<TOriginal>>(dst));
+                break;
+            }
+            default:
+                throw yexception();
+        }
+    }
+
+    template <typename TSrc, typename TDst>
+    void TConversionContext::Convert(const TVector<TSrc>& src, TVector<TDst>& dst) {
+        dst.clear();
+        dst.reserve(src.size());
+
+        for (const auto& srcElem : src) {
+            TDst buffer;
+            Convert(srcElem, buffer);
+            dst.push_back(std::move(buffer));
+        }
+    }
+
+    template <typename TSrc, typename TDst>
+    void TConversionContext::Convert(const TMaybe<TSrc>& src, TMaybe<TDst>& dst) {
+        if (src.Empty()) {
+            dst = {};
+        } else {
+            TDst buffer;
+            Convert(src.GetRef(), buffer);
             dst = buffer;
         }
+    }
 
-        TStringBuf TConversionContext::GetBuf(const TCached& src) const {
-            return Names_.GetName<TCmdView>(src).GetStr();
+    template <typename TSrc, typename TDst>
+    void TConversionContext::Convert(const TKeyValueMap<TSrc>& src, TKeyValueMap<TDst>& dst) {
+        dst.clear();
+        dst.reserve(src.size());
+        for (const auto& [key, value] : src) {
+            TDst keyOriginal, valueOriginal;
+            Convert(key, keyOriginal);
+            Convert(value, valueOriginal);
+            dst.emplace(std::move(keyOriginal), std::move(valueOriginal));
         }
+    }
 
-        template <typename TStrType>
-        void TConversionContext::Convert(TStrType&& src, TCached& dst) {
-            dst = IdGetter_(std::forward<TStrType>(src), Names_);
+    template <typename TSrc, typename TJoinedSrc, typename TDst, typename TJoinedDst>
+    void TConversionContext::Convert(const TMakeCmdDescription<TSrc, TJoinedSrc>& src, TMakeCmdDescription<TDst, TJoinedDst>& dst) {
+        Convert(src.CmdArgs, dst.CmdArgs);
+        Convert(src.Env, dst.Env);
+        Convert(src.Cwd, dst.Cwd);
+        Convert(src.StdOut, dst.StdOut);
+    }
+
+    template <
+        typename TSrc, typename TJoinedSrc, typename TJoinedCmdSrc,
+        typename TDst, typename TJoinedDst, typename TJoinedCmdDst>
+    void TConversionContext::Convert(
+        const TMakeNodeDescription<TSrc, TJoinedSrc, TJoinedCmdSrc>& src,
+        TMakeNodeDescription<TDst, TJoinedDst, TJoinedCmdDst>& dst) {
+        Convert(src.SelfUid, dst.SelfUid);
+        Convert(src.Cmds, dst.Cmds);
+        Convert(src.Deps, dst.Deps);
+        Convert(src.ToolDeps, dst.ToolDeps);
+        Convert(src.KV, dst.KV);
+        Convert(src.Requirements, dst.Requirements);
+        Convert(src.TaredOuts, dst.TaredOuts);
+        Convert(src.TargetProps, dst.TargetProps);
+        Convert(src.OldEnv, dst.OldEnv);
+        if (StoreInputs_) {
+            Convert(src.Inputs, dst.Inputs);
         }
-
-        void TConversionContext::Convert(const TOriginal& src, TJoinedCached& dst) {
-            TStringBuf srcFixed(src);
-            srcFixed.SkipPrefix(JOINED_START);
-            srcFixed.ChopSuffix(JOINED_END);
-            srcFixed.SkipPrefix(JOINED_PART_START);
-            srcFixed.ChopSuffix(JOINED_PART_END);
-
-            if (srcFixed.empty()) {
-                return;
-            }
-
-            TVector<TStringBuf> parts;
-            StringSplitter(srcFixed).SplitByString(JOINED_PART_SEPARATOR).Collect(&parts);
-
-            dst.resize(parts.size());
-            for (size_t i = 0; i < parts.size(); i++) {
-                Convert(parts[i], dst[i]);
-            }
-        }
-
-        void TConversionContext::Convert(const TVector<TOriginal>& src, TJoinedCached& dst) {
-            dst.resize(src.size());
-            for (size_t i = 0; i < src.size(); i++) {
-                Convert(src[i], dst[i]);
-            }
-        }
-
-        void TConversionContext::Convert(const TJoinedCommand& src, TJoinedCachedCommand& dst) {
-            std::visit(TOverloaded{
-                [&](const TOriginal& src)          { dst.Tag = 0; Convert(src, dst.Data); },
-                [&](const TVector<TOriginal>& src) { dst.Tag = 1; Convert(src, dst.Data); }
-            }, src);
-        }
-
-        void TConversionContext::Convert(const TJoinedCached& src, TOriginal& dst) {
-            TVector<TStringBuf> parts;
-            parts.reserve(src.size());
-            for (const auto& srcElem : src) {
-                parts.emplace_back();
-                Convert(srcElem, parts.back());
-            }
-
-            TStringBuilder builder;
-            builder << JOINED_START;
-            if (!parts.empty()) {
-                builder << JOINED_PART_START;
-            }
-            builder << MakeRangeJoiner(JOINED_PART_SEPARATOR, parts);
-             if (!parts.empty()) {
-                 builder << JOINED_PART_END;
-             }
-            builder << JOINED_END;
-            dst = builder;
-        }
-
-        void TConversionContext::Convert(const TJoinedCached& src, TVector<TOriginal>& dst) {
-            dst.reserve(src.size());
-            for (const auto& srcElem : src) {
-                dst.emplace_back();
-                Convert(srcElem, dst.back());
-            }
-        }
-
-        void TConversionContext::Convert(const TJoinedCachedCommand& src, TJoinedCommand& dst) {
-            switch(src.Tag) {
-                case 0: {
-                    dst = TOriginal();
-                    Convert(src.Data, std::get<TOriginal>(dst));
-                    break;
-                }
-                case 1: {
-                    dst = TVector<TOriginal>();
-                    Convert(src.Data, std::get<TVector<TOriginal>>(dst));
-                    break;
-                }
-                default:
-                    throw yexception();
-            }
-        }
-
-        template <typename TSrc, typename TDst>
-        void TConversionContext::Convert(const TVector<TSrc>& src, TVector<TDst>& dst) {
-            dst.clear();
-            dst.reserve(src.size());
-
-            for (const auto& srcElem : src) {
-                TDst buffer;
-                Convert(srcElem, buffer);
-                dst.push_back(std::move(buffer));
-            }
-        }
-
-        template <typename TSrc, typename TDst>
-        void TConversionContext::Convert(const TMaybe<TSrc>& src, TMaybe<TDst>& dst) {
-            if (src.Empty()) {
-                dst = {};
-            } else {
-                TDst buffer;
-                Convert(src.GetRef(), buffer);
-                dst = buffer;
-            }
-        }
-
-        template <typename TSrc, typename TDst>
-        void TConversionContext::Convert(const TKeyValueMap<TSrc>& src, TKeyValueMap<TDst>& dst) {
-            dst.clear();
-            dst.reserve(src.size());
-            for (const auto& [key, value] : src) {
-                TDst keyOriginal, valueOriginal;
-                Convert(key, keyOriginal);
-                Convert(value, valueOriginal);
-                dst.emplace(std::move(keyOriginal), std::move(valueOriginal));
-            }
-        }
-
-        template <typename TSrc, typename TJoinedSrc, typename TDst, typename TJoinedDst>
-        void TConversionContext::Convert(const TMakeCmdDescription<TSrc, TJoinedSrc>& src, TMakeCmdDescription<TDst, TJoinedDst>& dst) {
-            Convert(src.CmdArgs, dst.CmdArgs);
-            Convert(src.Env, dst.Env);
-            Convert(src.Cwd, dst.Cwd);
-            Convert(src.StdOut, dst.StdOut);
-        }
-
-        template <
-            typename TSrc, typename TJoinedSrc, typename TJoinedCmdSrc,
-            typename TDst, typename TJoinedDst, typename TJoinedCmdDst
-        >
-        void TConversionContext::Convert(
-            const TMakeNodeDescription<TSrc, TJoinedSrc, TJoinedCmdSrc>& src,
-            TMakeNodeDescription<TDst, TJoinedDst, TJoinedCmdDst>& dst
-        ) {
-            Convert(src.SelfUid, dst.SelfUid);
-            Convert(src.Cmds, dst.Cmds);
-            Convert(src.Deps, dst.Deps);
-            Convert(src.ToolDeps, dst.ToolDeps);
-            Convert(src.KV, dst.KV);
-            Convert(src.Requirements, dst.Requirements);
-            Convert(src.TaredOuts, dst.TaredOuts);
-            Convert(src.TargetProps, dst.TargetProps);
-            Convert(src.OldEnv, dst.OldEnv);
-            if (StoreInputs_) {
-                Convert(src.Inputs, dst.Inputs);
-            }
-            Convert(src.Outputs, dst.Outputs);
-            Convert(src.LateOuts, dst.LateOuts);
-            Convert(src.ResourceUris, dst.ResourceUris);
-        }
-}
+        Convert(src.Outputs, dst.Outputs);
+        Convert(src.LateOuts, dst.LateOuts);
+        Convert(src.ResourceUris, dst.ResourceUris);
+    }
+} // namespace NCache
 
 namespace {
     inline void WriteCachedJoinedArrToMap(TJsonWriterFuncArgs&& funcArgs, const NCache::TJoinedCached& cachedArr) {
@@ -240,7 +237,7 @@ namespace {
         }
         writer.CloseMap(subMap);
     }
-}
+} // namespace
 
 TMd5Sig JsonConfHash(const TBuildConfiguration& conf) {
     auto fakeIdValue = conf.CommandConf.Get1("JSON_CACHE_FAKE_ID");
@@ -317,7 +314,7 @@ void TMakeCmdCached::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     const auto* context = funcArgs.Context;
     if (const auto* refreshedMakeNode = context->GetRefreshedMakeNode(); refreshedMakeNode) {
@@ -327,7 +324,7 @@ void TMakeNodeCached::WriteUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteSelfUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     const auto* context = funcArgs.Context;
     if (const auto* refreshedMakeNode = context->GetRefreshedMakeNode(); refreshedMakeNode) {
@@ -337,13 +334,13 @@ void TMakeNodeCached::WriteSelfUidStr(TJsonWriterFuncArgs&& funcArgs) const {
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteCmdsArr(TJsonWriterFuncArgs&& funcArgs) const {
     auto& writer = funcArgs.Writer;
     const auto* context = funcArgs.Context;
     writer.WriteMapKey(funcArgs.Map, funcArgs.Key);
     auto cmdArr = writer.OpenArray();
-    for (const auto& cmd: Cmds) {
+    for (const auto& cmd : Cmds) {
         if (cmd.Empty()) {
             continue;
         }
@@ -352,7 +349,7 @@ void TMakeNodeCached::WriteCmdsArr(TJsonWriterFuncArgs&& funcArgs) const {
     writer.CloseArray(cmdArr);
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteInputsArr(TJsonWriterFuncArgs&& funcArgs) const {
     const auto* context = funcArgs.Context;
     if (const auto* refreshedMakeNode = context->GetRefreshedMakeNode(); refreshedMakeNode && !context->GetStoreInputs()) {
@@ -362,12 +359,12 @@ void TMakeNodeCached::WriteInputsArr(TJsonWriterFuncArgs&& funcArgs) const {
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
     WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), Outputs);
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
     if (const auto* refreshedMakeNode = funcArgs.Context->GetRefreshedMakeNode(); refreshedMakeNode) {
         funcArgs.Writer.WriteMapKeyValue(funcArgs.Map, funcArgs.Key, refreshedMakeNode->Deps);
@@ -376,7 +373,7 @@ void TMakeNodeCached::WriteDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteForeignDepsArr(TJsonWriterFuncArgs&& funcArgs) const {
     if (!ToolDeps.empty()) {
         auto& writer = funcArgs.Writer;
@@ -392,12 +389,12 @@ void TMakeNodeCached::WriteForeignDepsArr(TJsonWriterFuncArgs&& funcArgs) const 
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteKVMap(TJsonWriterFuncArgs&& funcArgs) const {
     WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), KV);
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const {
     auto& writer = funcArgs.Writer;
     const auto* context = funcArgs.Context;
@@ -416,19 +413,19 @@ void TMakeNodeCached::WriteRequirementsMap(TJsonWriterFuncArgs&& funcArgs) const
     writer.CloseMap(reqMap);
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteEnvMap(TJsonWriterFuncArgs&& funcArgs) const {
     if (!OldEnv.empty()) {
         WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), OldEnv);
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteTargetPropertiesMap(TJsonWriterFuncArgs&& funcArgs) const {
     WriteCachedMapToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), TargetProps);
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteResourcesMap(TJsonWriterFuncArgs&& funcArgs) const {
     if (!ResourceUris.empty()) {
         auto& writer = funcArgs.Writer;
@@ -444,7 +441,7 @@ void TMakeNodeCached::WriteResourcesMap(TJsonWriterFuncArgs&& funcArgs) const {
     }
 }
 
-template<>
+template <>
 void TMakeNodeCached::WriteTaredOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
     if (!TaredOuts.empty()) {
         WriteCachedArrToMap(std::forward<TJsonWriterFuncArgs>(funcArgs), TaredOuts);
@@ -456,16 +453,18 @@ bool TMakeNodeSavedState::TCacheId::operator==(const TMakeNodeSavedState::TCache
 }
 
 TMakePlanCache::TMakePlanCache(const TBuildConfiguration& conf)
-        : Conf(conf)
-        , LoadFromCache(Conf.ReadJsonCache)
-        , SaveToCache(Conf.WriteJsonCache)
-        , LockCache(Conf.ParallelRendering)
-        , CachePath(Conf.YmakeJsonCache)
-        , ConversionContext_(MakeHolder<NCache::TConversionContext>(Names, Conf.StoreInputsInJsonCache))
-{}
+    : Conf(conf)
+    , LoadFromCache(Conf.ReadJsonCache)
+    , SaveToCache(Conf.WriteJsonCache)
+    , LockCache(Conf.ParallelRendering)
+    , CachePath(Conf.YmakeJsonCache)
+    , ConversionContext_(MakeHolder<NCache::TConversionContext>(Names, Conf.StoreInputsInJsonCache))
+{
+}
 
 TMakePlanCache::~TMakePlanCache()
-{}
+{
+}
 
 bool TMakePlanCache::LoadFromFile() {
     if (!LoadFromCache) {

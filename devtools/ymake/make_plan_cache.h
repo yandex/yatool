@@ -35,14 +35,14 @@ namespace NCache {
     private:
         TNameStore& Names_;
         bool StoreInputs_;
-        const TMakeNode* RefreshedMakeNode_;///< MakeNode with refreshed UIDs
+        const TMakeNode* RefreshedMakeNode_; ///< MakeNode with refreshed UIDs
         std::function<ui32(const TStringBuf&, TNameStore&)> IdGetter_;
 
     public:
         explicit TConversionContext(TNameStore& names, bool storeInputs, std::function<ui32(const TStringBuf&, TNameStore&)> idGetter = [](const TStringBuf& name, TNameStore& names) -> ui32 { return names.Add(name); })
-                : Names_(names)
-                , StoreInputs_(storeInputs)
-                , IdGetter_(idGetter)
+            : Names_(names)
+            , StoreInputs_(storeInputs)
+            , IdGetter_(idGetter)
         {
         }
 
@@ -80,12 +80,10 @@ namespace NCache {
 
         template <
             typename TSrc, typename TJoinedSrc, typename TJoinedCmdSrc,
-            typename TDst, typename TJoinedDst, typename TJoinedCmdDst
-        >
+            typename TDst, typename TJoinedDst, typename TJoinedCmdDst>
         void Convert(
             const TMakeNodeDescription<TSrc, TJoinedSrc, TJoinedCmdSrc>& src,
-            TMakeNodeDescription<TDst, TJoinedDst, TJoinedCmdDst>& dst
-        );
+            TMakeNodeDescription<TDst, TJoinedDst, TJoinedCmdDst>& dst);
 
         const TMakeNode* GetRefreshedMakeNode() const {
             return RefreshedMakeNode_;
@@ -107,7 +105,7 @@ namespace NCache {
             return Names_;
         }
     };
-}
+} // namespace NCache
 
 using TMakeCmdCached = TMakeCmdDescription<NCache::TCached, NCache::TJoinedCachedCommand>;
 using TMakeNodeCached = TMakeNodeDescription<NCache::TCached, NCache::TJoinedCached, NCache::TJoinedCachedCommand>;
