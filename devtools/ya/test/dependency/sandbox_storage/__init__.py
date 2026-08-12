@@ -255,7 +255,7 @@ class SandboxStorage(object):
             import yalibrary.fetcher.ufetcher as ufetcher
 
             downloader = ufetcher.UFetcherDownloader(
-                ufetcher=ufetcher.get_ufetcher(should_tar_output=False),
+                ufetcher=ufetcher.get_ufetcher(should_tar_output=False, oauth_token=self._oauth_token),
                 parsed_uri=f"sbr:{resource_id}",
                 progress_callback=None,
                 keep_directory_packed=False,

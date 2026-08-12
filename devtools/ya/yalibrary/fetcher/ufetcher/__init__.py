@@ -42,9 +42,12 @@ def _get_sandbox_token() -> str:
         import app_ctx
 
         _, _, sandbox_token = app_ctx.fetcher_params
-        return sandbox_token or ""
+        if sandbox_token:
+            return sandbox_token
     except (ImportError, AttributeError):
-        return ""
+        pass
+
+    return os.environ.get("SANDBOX_SESSION_TOKEN", "")
 
 
 def _get_docker_config() -> str:
@@ -103,7 +106,10 @@ def _get_transports_order() -> list[universal_fetcher.SandboxTransportType]:
 
 @functools.cache
 def get_ufetcher(
-    should_tar_output: bool = True, docker_config_path: str | None = None, skopeo_binary: str | None = None
+    should_tar_output: bool = True,
+    docker_config_path: str | None = None,
+    skopeo_binary: str | None = None,
+    oauth_token: str | None = None,
 ) -> universal_fetcher.UniversalFetcher:
     # 2.3 + 5 + 12 + 27 + 64 + 148 + 340 + 360
     default_retry_policy = universal_fetcher.RetryPolicy(
@@ -137,7 +143,7 @@ def get_ufetcher(
     if app_config.in_house:
         transports_order = _get_transports_order()
         sandbox_params = universal_fetcher.SandboxParams(
-            oauth_token=_get_sandbox_token(),
+            oauth_token=_get_sandbox_token() or oauth_token or "",
             transports_order=transports_order,
             allow_no_auth=True,
             should_tar_output=should_tar_output,
@@ -189,7 +195,7 @@ class UFetcherDownloader:
         progress_callback: tp.Callable[[int, int], None] | None,
         keep_directory_packed: bool,
         resource_info: dict | None,
-        resource_type: tp.Literal['sbr', 'http', 'https', 'docker'],
+        resource_type: tp.Literal["sbr", "http", "https", "docker"],
     ):
         self._ufetcher = ufetcher
         self._parsed_uri = parsed_uri
@@ -212,26 +218,26 @@ class UFetcherDownloader:
         try:
             return self._ufetcher.download(self._parsed_uri, dst_path, filename, self._progress_callback, 200)
         finally:
-            if hasattr(self._progress_callback, 'finalize'):
+            if hasattr(self._progress_callback, "finalize"):
                 self._progress_callback.finalize()
 
     def _post_process(self, res_info: dict, download_to: str) -> None:
         res_info_attrs = deepget.deepget(res_info, ("last_attempt", "result", "resource_info", "attrs"))
 
-        orig_fname = res_info_attrs.get('original_filename', None)
-        res_info['filename'] = res_info['file_name'] = orig_fname
+        orig_fname = res_info_attrs.get("original_filename", None)
+        res_info["filename"] = res_info["file_name"] = orig_fname
 
-        is_multifile = res_info_attrs.get('multifile', False)
-        res_info['multifile'] = is_multifile
+        is_multifile = res_info_attrs.get("multifile", False)
+        res_info["multifile"] = is_multifile
 
-        resource_id = res_info_attrs.get('id', None)
-        res_info['id'] = resource_id
+        resource_id = res_info_attrs.get("id", None)
+        res_info["id"] = resource_id
 
-        is_executable = deepget.deepget(res_info, ("last_attempt", "result", "resource_info")).get('executable', False)
+        is_executable = deepget.deepget(res_info, ("last_attempt", "result", "resource_info")).get("executable", False)
 
         if self._default_resource_info:
-            res_info['filename'] = res_info['file_name'] = self._default_resource_info.get('file_name', orig_fname)
-            res_info['id'] = self._default_resource_info.get('id', resource_id)
+            res_info["filename"] = res_info["file_name"] = self._default_resource_info.get("file_name", orig_fname)
+            res_info["id"] = self._default_resource_info.get("id", resource_id)
 
         should_unpack = is_multifile and not self._keep_dir_packed
         if should_unpack:
@@ -245,14 +251,14 @@ class UFetcherDownloader:
     @staticmethod
     def handle_error(res_info: dict) -> None:
         try:
-            status = res_info['last_attempt']['result']['status']
+            status = res_info["last_attempt"]["result"]["status"]
             if status != universal_fetcher.OK:
-                error = res_info['last_attempt']['result']['error']
+                error = res_info["last_attempt"]["result"]["error"]
                 logger.debug("universal fetcher returned the following result: %s", res_info)
                 raise UnableToFetchError(f"universal fetcher got error: {error}")
 
         except KeyError as err:
-            raise UnableToFetchError(f'No attempt was made: {err}')
+            raise UnableToFetchError(f"No attempt was made: {err}")
 
     @classmethod
     def update_permissions(cls, dst: str, executable: bool, resource_type: str) -> None:
@@ -310,5 +316,6 @@ class UFetcherDownloader:
         more_then_one_attempt_was_made = history_len > 0 or transport_history_len > 1
         if more_then_one_attempt_was_made:
             devtools.ya.core.report.telemetry.report(
-                devtools.ya.core.report.ReportTypes.UNIVERSAL_FETCHER, {"universal_fetcher_result": res_info}
+                devtools.ya.core.report.ReportTypes.UNIVERSAL_FETCHER,
+                {"universal_fetcher_result": res_info},
             )
