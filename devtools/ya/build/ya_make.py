@@ -1899,7 +1899,7 @@ class YaMake:
             if self.opts.larry_addr is not None:
                 from devtools.ya.build.larry_client import LarryClient
 
-                return LarryClient(callback, self.ctx.graph).build(self.opts.larry_addr)
+                return LarryClient(callback, self.ctx.graph, self.ctx.src_dir).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
 
