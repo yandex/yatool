@@ -8,4 +8,6 @@ JAR_RESOURCE(6072602872)
 
 SRC_RESOURCE(6072603197)
 
+ORIGINAL_SOURCE(https://github.com/google/flatbuffers)
+
 END()
