@@ -1897,7 +1897,10 @@ class YaMake:
             if self.opts.use_distbuild:
                 return self._build_distbs(callback)
             if self.opts.larry_addr is not None:
-                from devtools.ya.build.larry_client import LarryClient
+                try:
+                    from devtools.ya.build.larry_client import LarryClient
+                except ImportError:
+                    raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
 
                 return LarryClient(callback, self.ctx.graph, self.ctx.src_dir).build(self.opts.larry_addr)
             else:

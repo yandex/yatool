@@ -30,7 +30,6 @@ PEERDIR(
     devtools/ya/build/gen_plan
     devtools/ya/build/genconf
     devtools/ya/build/graph_description
-    devtools/ya/build/larry_client
     devtools/ya/build/makelist
     devtools/ya/build/node_checks
     devtools/ya/build/owners
@@ -82,6 +81,7 @@ PEERDIR(
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
         devtools/ya/build/distbuild_mock
+        devtools/ya/build/larry_client
         devtools/ya/build/remote
         devtools/ya/build/source_package
         devtools/ya/yalibrary/build_graph_cache
