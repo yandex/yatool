@@ -4,7 +4,7 @@ VERSION(2.3.10)
 
 LICENSE(Apache-2.0)
 
-ORIGINAL_SOURCE(https://repo1.maven.org/maven2)
+ORIGINAL_SOURCE(https://github.com/JetBrains/kotlin)
 
 PEERDIR(
     contrib/java/org/jetbrains/kotlin/kotlin-stdlib/2.3.10
