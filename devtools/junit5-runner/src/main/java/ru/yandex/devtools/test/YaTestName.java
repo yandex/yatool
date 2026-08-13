@@ -23,6 +23,7 @@ public class YaTestName extends CachedTestNames<String, TestIdentifier> {
 
     public YaTestName(YaTestNameBase baseName, TestPlan plan) {
         super(baseName);
+        baseName.getMethodNames().forEach((key, value) -> putMethodName(key.toString(), value));
         this.baseName = Objects.requireNonNull(baseName);
         this.plan = Objects.requireNonNull(plan);
     }
