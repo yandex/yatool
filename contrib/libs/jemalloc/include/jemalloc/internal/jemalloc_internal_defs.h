@@ -8,6 +8,8 @@
 #   include "jemalloc_internal_defs-win.h"
 #elif defined(__linux__) && defined(__arm__)
 #   include "jemalloc_internal_defs-linux-arm.h"
+#elif defined(__linux__) && defined(__aarch64__)
+#   include "jemalloc_internal_defs-linux-aarch64.h"
 #else
 #   include "jemalloc_internal_defs-linux.h"
 #endif
