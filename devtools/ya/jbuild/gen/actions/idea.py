@@ -878,6 +878,19 @@ def collect_common_jvm_args(by_path):
     return {i.replace('$(BUILD_ROOT)', '$PROJECT_DIR$') for i in (jvm_args or set())}
 
 
+KOTLIN_JVM_ABI_PLUGIN_OPTION_PREFIX = 'plugin:org.jetbrains.kotlin.jvm.abi:'
+KOTLIN_JVM_ABI_PLUGIN_JAR = 'kotlin-jvm-abi-gen-plugin.jar'
+
+
+def is_kotlin_jvm_abi_plugin(plugin_bin):
+    plugin_bin = plugin_bin.replace('\\', '/')
+    return os.path.basename(plugin_bin) == KOTLIN_JVM_ABI_PLUGIN_JAR or '/jvm-abi-gen/' in plugin_bin
+
+
+def is_kotlin_jvm_abi_plugin_option(opt):
+    return opt.replace('\\:', ':').startswith(KOTLIN_JVM_ABI_PLUGIN_OPTION_PREFIX)
+
+
 def collect_kotlic_args(by_path, resource_id, plugin_root):
     plugins, kotlinc_args = set(), set()
     opts = set()
@@ -889,6 +902,11 @@ def collect_kotlic_args(by_path, resource_id, plugin_root):
                 i += 1
                 if opt.startswith('-Xplugin='):
                     plugin_bin = opt[len('-Xplugin=') :]
+                    # jvm-abi-gen is needed only by ya make to produce per-module ABI jars.
+                    # IDEA stores compiler arguments globally, so exporting per-module
+                    # outputDir options makes kotlinc fail with "Multiple values are not allowed".
+                    if is_kotlin_jvm_abi_plugin(plugin_bin):
+                        continue
                     plugins.add(plugin_bin)
                     if resource_id:
                         kotlinc_args.add(
@@ -897,10 +915,14 @@ def collect_kotlic_args(by_path, resource_id, plugin_root):
                             )
                         )
                     continue
+                if opt.startswith('-P') and is_kotlin_jvm_abi_plugin_option(opt[len('-P') :].lstrip()):
+                    continue
                 if opt.startswith('-') and i < len(m.kotlinc_args or []):
                     next_opt = m.kotlinc_args[i]
                     if not next_opt.startswith('-'):
                         i += 1
+                        if opt == '-P' and is_kotlin_jvm_abi_plugin_option(next_opt):
+                            continue
                         if next_opt not in opts:
                             opts.add(next_opt)
                         kotlinc_args.add((opt, next_opt))
