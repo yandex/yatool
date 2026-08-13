@@ -18,11 +18,9 @@ enum class EConfigureCacheKind : ui8 {
 };
 
 enum class EConfigureCacheLoadOutcome : ui8 {
-    Loaded,
     Missing,
     Rejected,
     Disabled,
-    NotApplicable,
 };
 
 enum class EConfigureCacheUnavailableReason : ui8 {
@@ -40,7 +38,7 @@ enum class EConfigureCacheDisableSource : ui8 {
     CliFsCacheOnly,
     CliCacheConfig,
     RetryCacheConfig,
-    ConfCacheEnabled,
+    ConfCacheDisabled,
     DepsControlConf,
 };
 
@@ -50,7 +48,6 @@ struct TConfigureCacheLoadResult {
     std::optional<EConfigureCacheUnavailableReason> Reason;
     std::optional<EConfigureCacheDisableSource> DisabledBy;
 
-    static TConfigureCacheLoadResult Loaded(EConfigureCacheKind kind);
     static TConfigureCacheLoadResult Missing(EConfigureCacheKind kind);
     static TConfigureCacheLoadResult Rejected(
         EConfigureCacheKind kind,
@@ -60,7 +57,6 @@ struct TConfigureCacheLoadResult {
         EConfigureCacheKind kind,
         EConfigureCacheDisableSource disabledBy
     );
-    static TConfigureCacheLoadResult NotApplicable(EConfigureCacheKind kind);
 };
 
 class TConfigureCacheViolation final : public yexception {
@@ -91,9 +87,6 @@ public:
 
     bool IsEnabled() const noexcept;
 
-    void Record(TConfigureCacheLoadResult result);
-    std::optional<TConfigureCacheLoadResult> Result(EConfigureCacheKind kind) const;
-
     void OnReadFlagMutation(
         EConfigureCacheKind kind,
         bool oldValue,
@@ -102,9 +95,7 @@ public:
     );
     EConfigureCacheDisableSource DisableSource(EConfigureCacheKind kind) const noexcept;
 
-    [[noreturn]] void FailMissing(EConfigureCacheKind kind);
-    [[noreturn]] void FailRejected(EConfigureCacheKind kind, EConfigureCacheUnavailableReason reason);
-    [[noreturn]] void FailDisabled(EConfigureCacheKind kind);
+    [[noreturn]] void Fail(TConfigureCacheLoadResult result);
 
     bool MarkDiagnosticEmitted() noexcept;
 
@@ -131,8 +122,6 @@ public:
 
 private:
     static size_t Index(EConfigureCacheKind kind) noexcept;
-    [[noreturn]] void Fail(TConfigureCacheLoadResult result);
-
 #ifndef NDEBUG
     [[nodiscard]] TDebugAccessGuard GuardAccess() const noexcept;
 #endif
@@ -142,7 +131,6 @@ private:
 
     bool Enabled_ = false;
     bool DiagnosticEmitted_ = false;
-    std::array<std::optional<TConfigureCacheLoadResult>, CacheCount> Results_;
     std::array<std::optional<EConfigureCacheDisableSource>, CacheCount> DisableSources_;
 #ifndef NDEBUG
     mutable std::atomic_flag AccessInProgress_ = ATOMIC_FLAG_INIT;

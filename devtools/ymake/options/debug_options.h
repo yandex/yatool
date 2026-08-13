@@ -14,6 +14,7 @@
 #include <util/system/types.h>
 
 #include <array>
+#include <optional>
 
 struct TDebugOptions {
     bool RebuildGraph = false;
@@ -139,7 +140,7 @@ struct TDebugOptions {
         SetCacheReadFlag(
             EConfigureCacheKind::Conf,
             false,
-            EConfigureCacheDisableSource::ConfCacheEnabled
+            EConfigureCacheDisableSource::ConfCacheDisabled
         );
         WriteConfCache = false;
     }
@@ -194,7 +195,7 @@ struct TDebugOptions {
 
 struct TCacheFlagDescriptor {
     char Letter;
-    EConfigureCacheKind ConfigureKind;
+    std::optional<EConfigureCacheKind> ConfigureKind;
     bool TDebugOptions::* ReadFlag;
     bool TDebugOptions::* WriteFlag;
 };

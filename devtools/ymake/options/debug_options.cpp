@@ -87,10 +87,10 @@ namespace {
         bool value,
         EConfigureCacheDisableSource source
     ) {
-        if (descriptor.ConfigureKind == EConfigureCacheKind::Count) {
+        if (!descriptor.ConfigureKind) {
             opts->*descriptor.ReadFlag = value;
         } else {
-            opts->SetCacheReadFlag(descriptor.ConfigureKind, value, source);
+            opts->SetCacheReadFlag(*descriptor.ConfigureKind, value, source);
         }
     }
 

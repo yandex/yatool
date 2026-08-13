@@ -11,10 +11,6 @@
 namespace {
     void Validate(const TConfigureCacheLoadResult& result) {
         switch (result.Outcome) {
-            case EConfigureCacheLoadOutcome::Loaded:
-            case EConfigureCacheLoadOutcome::NotApplicable:
-                Y_ASSERT(!result.Reason && !result.DisabledBy);
-                return;
             case EConfigureCacheLoadOutcome::Missing:
                 Y_ASSERT(result.Reason == EConfigureCacheUnavailableReason::Missing && !result.DisabledBy);
                 return;
@@ -58,10 +54,6 @@ TConfigureCachePolicy::TDebugAccessGuard TConfigureCachePolicy::DebugAcquireAcce
 }
 #endif
 
-TConfigureCacheLoadResult TConfigureCacheLoadResult::Loaded(EConfigureCacheKind kind) {
-    return {kind, EConfigureCacheLoadOutcome::Loaded, std::nullopt, std::nullopt};
-}
-
 TConfigureCacheLoadResult TConfigureCacheLoadResult::Missing(EConfigureCacheKind kind) {
     return {
         kind,
@@ -84,10 +76,6 @@ TConfigureCacheLoadResult TConfigureCacheLoadResult::Disabled(
     EConfigureCacheDisableSource disabledBy
 ) {
     return {kind, EConfigureCacheLoadOutcome::Disabled, std::nullopt, disabledBy};
-}
-
-TConfigureCacheLoadResult TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind kind) {
-    return {kind, EConfigureCacheLoadOutcome::NotApplicable, std::nullopt, std::nullopt};
 }
 
 TConfigureCacheViolation::TConfigureCacheViolation(TConfigureCacheLoadResult result)
@@ -118,21 +106,6 @@ bool TConfigureCachePolicy::IsEnabled() const noexcept {
     return Enabled_;
 }
 
-void TConfigureCachePolicy::Record(TConfigureCacheLoadResult result) {
-#ifndef NDEBUG
-    const auto access = GuardAccess();
-#endif
-    Validate(result);
-    Results_[Index(result.Kind)] = std::move(result);
-}
-
-std::optional<TConfigureCacheLoadResult> TConfigureCachePolicy::Result(EConfigureCacheKind kind) const {
-#ifndef NDEBUG
-    const auto access = GuardAccess();
-#endif
-    return Results_[Index(kind)];
-}
-
 void TConfigureCachePolicy::OnReadFlagMutation(
     EConfigureCacheKind kind,
     bool oldValue,
@@ -157,21 +130,6 @@ EConfigureCacheDisableSource TConfigureCachePolicy::DisableSource(EConfigureCach
     return DisableSources_[Index(kind)].value_or(EConfigureCacheDisableSource::Default);
 }
 
-[[noreturn]] void TConfigureCachePolicy::FailMissing(EConfigureCacheKind kind) {
-    Fail(TConfigureCacheLoadResult::Missing(kind));
-}
-
-[[noreturn]] void TConfigureCachePolicy::FailRejected(
-    EConfigureCacheKind kind,
-    EConfigureCacheUnavailableReason reason
-) {
-    Fail(TConfigureCacheLoadResult::Rejected(kind, reason));
-}
-
-[[noreturn]] void TConfigureCachePolicy::FailDisabled(EConfigureCacheKind kind) {
-    Fail(TConfigureCacheLoadResult::Disabled(kind, DisableSource(kind)));
-}
-
 bool TConfigureCachePolicy::MarkDiagnosticEmitted() noexcept {
 #ifndef NDEBUG
     const auto access = GuardAccess();
@@ -184,7 +142,6 @@ bool TConfigureCachePolicy::MarkDiagnosticEmitted() noexcept {
 }
 
 [[noreturn]] void TConfigureCachePolicy::Fail(TConfigureCacheLoadResult result) {
-    Record(result);
     throw TConfigureCacheViolation(std::move(result));
 }
 
@@ -206,16 +163,12 @@ TStringBuf ConfigureCacheKindName(EConfigureCacheKind kind) noexcept {
 
 TStringBuf ConfigureCacheOutcomeName(EConfigureCacheLoadOutcome outcome) noexcept {
     switch (outcome) {
-        case EConfigureCacheLoadOutcome::Loaded:
-            return "loaded"sv;
         case EConfigureCacheLoadOutcome::Missing:
             return "missing"sv;
         case EConfigureCacheLoadOutcome::Rejected:
             return "rejected"sv;
         case EConfigureCacheLoadOutcome::Disabled:
             return "disabled"sv;
-        case EConfigureCacheLoadOutcome::NotApplicable:
-            return "not-applicable"sv;
     }
     Y_UNREACHABLE();
 }
@@ -250,8 +203,8 @@ TStringBuf ConfigureCacheDisableSourceName(EConfigureCacheDisableSource source) 
             return "cli-cache-config"sv;
         case EConfigureCacheDisableSource::RetryCacheConfig:
             return "retry-cache-config"sv;
-        case EConfigureCacheDisableSource::ConfCacheEnabled:
-            return "conf-cache-enabled"sv;
+        case EConfigureCacheDisableSource::ConfCacheDisabled:
+            return "conf-cache-disabled"sv;
         case EConfigureCacheDisableSource::DepsControlConf:
             return "deps-control-conf"sv;
     }

@@ -177,7 +177,10 @@ void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
     if (!ReadConfCache) {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedConfCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
         if (IsConfigureCacheRequired()) {
-            ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Conf);
+            ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+                EConfigureCacheKind::Conf,
+                ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Conf)
+            ));
         }
     }
     const auto loadStatus = ReadConfCache ? LoadCache(*this, confMd5) : ELoadStatus::DoesNotExist;
@@ -186,24 +189,26 @@ void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
         // call to updateConfCacheFlag() may change the value of ReadConfCache
         if (ReadConfCache) {
             fromCache = true;
-            ConfigureCachePolicy.Record(TConfigureCacheLoadResult::Loaded(EConfigureCacheKind::Conf));
         } else {
             // Conf cache manual disabled by conf var
             TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedConfCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
             if (IsConfigureCacheRequired()) {
-                ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Conf);
+                ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+                    EConfigureCacheKind::Conf,
+                    ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Conf)
+                ));
             }
             ClearYmakeConfig();
         }
     } else if (ReadConfCache && IsConfigureCacheRequired()) {
         if (loadStatus == ELoadStatus::DoesNotExist) {
-            ConfigureCachePolicy.FailMissing(EConfigureCacheKind::Conf);
+            ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Missing(EConfigureCacheKind::Conf));
         }
         Y_ASSERT(loadStatus != ELoadStatus::Success);
-        ConfigureCachePolicy.FailRejected(
+        ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
             EConfigureCacheKind::Conf,
             ConfigureCacheUnavailableReason(loadStatus)
-        );
+        ));
     }
     Y_ASSERT(GetFromCache() == fromCache);
 
@@ -217,7 +222,10 @@ void TBuildConfiguration::PrepareConfiguration(TMd5Sig& confMd5) {
         tempConfData.Final(confMd5.RawData);
         updateConfCacheFlags();
         if (!ReadConfCache && IsConfigureCacheRequired()) {
-            ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Conf);
+            ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+                EConfigureCacheKind::Conf,
+                ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Conf)
+            ));
         }
     }
 

@@ -644,7 +644,6 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
     }
 
     if (!conf.WriteYdx.empty()) {
-        conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::DM));
         THolder<IOutputStream> ydxOut(new TFileOutput(conf.WriteYdx));
         yMake->Yndex.WriteJSON(*ydxOut);
         ydxOut->Finish();
@@ -687,17 +686,20 @@ TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& c
     const bool configureCachesApplicable = conf.WriteYdx.empty();
     if (conf.IsConfigureCacheRequired() && configureCachesApplicable) {
         if (!conf.ReadFsCache) {
-            conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::FS);
+            conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+                EConfigureCacheKind::FS,
+                conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::FS)
+            ));
         }
         if (!conf.ReadDepsCache) {
-            conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::Deps);
+            conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+                EConfigureCacheKind::Deps,
+                conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Deps)
+            ));
         }
         if (!conf.CachePath.Exists()) {
-            conf.ConfigureCachePolicy.FailMissing(EConfigureCacheKind::FS);
+            conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Missing(EConfigureCacheKind::FS));
         }
-    } else if (!configureCachesApplicable) {
-        conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::FS));
-        conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::Deps));
     }
 
     if (!conf.CachePath.Exists() && conf.ShouldUseOnlyYmakeCache()) {

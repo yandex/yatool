@@ -1972,7 +1972,6 @@ namespace NDetail {
 TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
     if (!CanBypassConfigure()) {
         NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, false);
-        Conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::NotApplicable(EConfigureCacheKind::DM));
     } else if (!Conf.ReadDepManagementCache) {
         NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, false);
         TCacheFileReader::RejectedMonEvent(
@@ -1980,12 +1979,15 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
             TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled
         );
         if (Conf.IsConfigureCacheRequired()) {
-            Conf.ConfigureCachePolicy.FailDisabled(EConfigureCacheKind::DM);
+            Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+                EConfigureCacheKind::DM,
+                Conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::DM)
+            ));
         }
     } else if (!Conf.YmakeDMCache.Exists()) {
         NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, false);
         if (Conf.IsConfigureCacheRequired()) {
-            Conf.ConfigureCachePolicy.FailMissing(EConfigureCacheKind::DM);
+            Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Missing(EConfigureCacheKind::DM));
         }
     }
 
@@ -1994,7 +1996,6 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
         if (status == TCacheFileReader::EReadResult::Success) {
             NStats::TStatsBase::MonEvent(NStats::MonName_UsedDMCache, true);
             YDebug() << "Use Dependency management cache" << Endl;
-            Conf.ConfigureCachePolicy.Record(TConfigureCacheLoadResult::Loaded(EConfigureCacheKind::DM));
             return TMaybe<EBuildResult>();
         }
 
@@ -2002,17 +2003,17 @@ TMaybe<EBuildResult> TYMake::ApplyDependencyManagement() {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDMCache, status);
         if (status == TCacheFileReader::EReadResult::Exception) {
             if (Conf.IsConfigureCacheRequired()) {
-                Conf.ConfigureCachePolicy.FailRejected(
+                Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
                     EConfigureCacheKind::DM,
                     EConfigureCacheUnavailableReason::ReadError
-                );
+                ));
             }
             return TMaybe<EBuildResult>(BR_RETRYABLE_ERROR);
         } else if (Conf.IsConfigureCacheRequired()) {
-            Conf.ConfigureCachePolicy.FailRejected(
+            Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
                 EConfigureCacheKind::DM,
                 ConfigureCacheUnavailableReason(status)
-            );
+            ));
         }
     }
 
