@@ -25,6 +25,7 @@ import devtools.ya.core.yarg as yarg
 import devtools.ya.core.config
 import devtools.ya.core.report
 import devtools.ya.core.event_handling
+import devtools.libs.python.build_error_parser.configure_cache as configure_cache
 
 import devtools.ya.build.genconf as genconf
 import devtools.ya.build.prefetch as prefetch
@@ -35,6 +36,8 @@ from devtools.ya.build.ccgraph.cpp_string_wrapper import CppStringWrapper
 from devtools.ya.build.evlog.progress import PrintProgressSubscriber
 
 logger = logging.getLogger(__name__)
+
+STRICT_CONFIGURE_CACHE_KINDS = frozenset(('fs', 'conf', 'deps', 'dm'))
 
 
 class YMakeError(Exception):
@@ -51,8 +54,16 @@ class YMakeConfigureError(YMakeError):
 
 class YMakeNeedRetryError(YMakeError):
     def __init__(self, err, dirty_dirs):
-        super(YMakeError, self).__init__(err)
+        super().__init__(err)
         self.dirty_dirs = dirty_dirs
+
+
+class YMakeConfigureCacheUnavailableError(YMakeError):
+    mute = True
+
+    def __init__(self, failure):
+        super().__init__(failure.marker, exit_code=core_error.ExitCodes.INFRASTRUCTURE_ERROR)
+        self.failure = failure
 
 
 class YMakeResult:
@@ -132,6 +143,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('dont_check_transitive_requirements', default_value=None),
         yarg.Param('parallel_rendering', default_value=False),
         yarg.Param('use_subinterpreters', default_value=False),
+        yarg.Param('fail_on_no_configure_cache', default_value=False),
     ]
 
 
@@ -262,6 +274,9 @@ def _cons_ymake_args(**kwargs):
     debug_options = kwargs.pop('debug_options', [])
     if debug_options:
         ret += ['--x' + f for f in debug_options]
+
+    if kwargs.pop('fail_on_no_configure_cache', False):
+        ret.append('--fail-on-no-configure-cache')
 
     dump_file = kwargs.pop('dump_file', None)
     if dump_file:
@@ -477,6 +492,7 @@ def _prepare_and_run_ymake(**kwargs):
 
     no_caches_on_retry = kwargs.pop('no_caches_on_retry')
     no_ymake_retry = kwargs.pop('no_ymake_retry', False)
+    no_ymake_retry |= kwargs.get('fail_on_no_configure_cache', False)
 
     try:
         return _run_ymake(**kwargs)
@@ -500,6 +516,45 @@ def _prepare_and_run_ymake(**kwargs):
 
 
 _gen_ymake_uid = functools.partial(next, itertools.count())
+
+
+def _configure_cache_failure_from_event(event):
+    if event.get('_typename') != 'NEvent.TConfigureCacheFailure':
+        return None
+    if event.get('Outcome') not in ('missing', 'rejected'):
+        return None
+    cache = event.get('Cache')
+    reason = event.get('Reason')
+    if cache not in STRICT_CONFIGURE_CACHE_KINDS or not reason:
+        return None
+    marker = f'Error: YMAKE_CONFIGURE_CACHE_UNAVAILABLE cache={cache} reason={reason}'
+    return configure_cache.parse_ymake_configure_cache_unavailable(marker)
+
+
+def configure_cache_unavailable_failure(exit_code, stderr, event=None):
+    if exit_code != 1:
+        return None
+    if event is not None:
+        failure = _configure_cache_failure_from_event(event)
+        if failure is not None:
+            return failure
+    failure = configure_cache.parse_ymake_configure_cache_unavailable(stderr)
+    if failure is None or failure.cache not in STRICT_CONFIGURE_CACHE_KINDS:
+        return None
+    return failure
+
+
+def configure_cache_unavailable_marker(exit_code, stderr):
+    failure = configure_cache_unavailable_failure(exit_code, stderr)
+    return failure.marker if failure is not None else None
+
+
+def _configure_cache_failure_telemetry(failure):
+    return {
+        'cache': failure.cache,
+        'reason': failure.reason,
+        'marker': failure.marker,
+    }
 
 
 def _run_ymake(**kwargs):
@@ -587,9 +642,11 @@ def _run_ymake(**kwargs):
     enabled_events = kwargs.pop('enabled_events') if 'enabled_events' in kwargs else consts.YmakeEvents.DEFAULT.value
 
     events = []
+    configure_cache_failure_event = None
     app_ctx = sys.modules.get("app_ctx")
 
     def stderr_listener(line):
+        nonlocal configure_cache_failure_event
         try:
             j = json.loads(line)
         except ValueError:
@@ -602,6 +659,8 @@ def _run_ymake(**kwargs):
 
         j['ymake_run_uid'] = _ymake_unique_run_id
         events.append(j)
+        if j.get('_typename') == 'NEvent.TConfigureCacheFailure':
+            configure_cache_failure_event = j
         ev_listener(j)
         stages_listener(j)
         if app_ctx:
@@ -722,6 +781,10 @@ def _run_ymake(**kwargs):
                 logger.debug("ymake stderr: \n%s", stderr)
                 _debug_info['stdout'] = stdout
                 _debug_info['stderr'] = stderr
+                failure = configure_cache_unavailable_failure(exit_code, stderr, configure_cache_failure_event)
+                if failure is not None:
+                    _run_info['configure_cache_failure'] = _configure_cache_failure_telemetry(failure)
+                    raise YMakeConfigureCacheUnavailableError(failure)
                 if exit_code == 2:
                     # XXX YA-1456
                     if getattr(app_ctx.params, 'ignore_configure_errors', True):
@@ -742,7 +805,7 @@ def _run_ymake(**kwargs):
         _run_info['exception'] = {
             'type': type(e).__name__,
             'msg': str(e),
-            'args': list(map(strings.to_str, e.args)),
+            'args': list(map(strings.to_unicode, e.args)),
         }
         raise
     finally:

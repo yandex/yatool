@@ -2024,6 +2024,7 @@ class _GraphMaker:
             enabled_events=enabled_events,
             no_caches_on_retry=no_caches_on_retry,
             no_ymake_retry=no_ymake_retry or self._opts.ymake_multiconfig,
+            fail_on_no_configure_cache=self._opts.fail_on_no_configure_cache,
             disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
             parallel_rendering=self._opts.ymake_parallel_rendering,
             use_subinterpreters=self._opts.ymake_use_subinterpreters,

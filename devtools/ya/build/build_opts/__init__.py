@@ -3336,6 +3336,27 @@ class YMakeRetryOptions(Options):
         ]
 
 
+class YMakeFailOnNoConfigureCacheOptions(Options):
+    def __init__(self):
+        self.fail_on_no_configure_cache = False
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--fail-on-no-configure-cache'],
+                help=(
+                    'Require every applicable FS, Conf, Deps, and DM configure cache. A cold start, rejected '
+                    'cache, or read error stops before uncached configure and returns an infrastructure error; '
+                    'a disabled applicable cache is a configuration conflict'
+                ),
+                hook=SetConstValueHook('fail_on_no_configure_cache', True),
+                group=GRAPH_GENERATION_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+        ]
+
+
 class CompressYmakeOutputOptions(Options):
     def __init__(self):
         self.compress_ymake_output = False
@@ -3414,6 +3435,7 @@ def ya_make_options(  # compat
             ConfigureDebugOptions(),
             YMakeBinOptions(),
             YMakeRetryOptions(),
+            YMakeFailOnNoConfigureCacheOptions(),
             YMakeModeOptions(),
             LocalConfOptions(),
             BuildRootOptions(random_build_root),

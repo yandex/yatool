@@ -259,12 +259,12 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
         Cerr << Endl << errStream.Str() << Endl;
     }
 
-    for (const auto& [i, param]: Enumerate(params)) {
-        results[i] = MakeAtomicShared<TRunYMakeResult>(exitCode, std::move(outStreams[i].Str()), std::move(errStreams[i].Str()));
-    }
-
     for (auto& thread: pollThreads) {
         thread.Join();
+    }
+
+    for (const auto& [i, param]: Enumerate(params)) {
+        results[i] = MakeAtomicShared<TRunYMakeResult>(exitCode, std::move(outStreams[i].Str()), std::move(errStreams[i].Str()));
     }
 
     return MakeAtomicShared<THashMap<int, TRunYMakeResultPtr>>(results);

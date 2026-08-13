@@ -16,6 +16,7 @@ PEERDIR(
     devtools/ya/core/event_handling
     devtools/ya/core/report
     devtools/ya/core/yarg
+    devtools/libs/python/build_error_parser
     devtools/ya/exts
     devtools/ya/yalibrary/guards
     devtools/ya/yalibrary/tools

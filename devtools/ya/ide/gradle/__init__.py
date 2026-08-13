@@ -5,6 +5,7 @@ import yalibrary.tools as tools
 
 import exts.asyncthread as core_async
 from devtools.ya.build.sem_graph import SemException
+import devtools.ya.core.yarg as yarg
 
 from devtools.ya.ide.gradle.build import _Builder
 from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException
@@ -111,6 +112,9 @@ def _async_build(config: _JavaSemConfig, sem_graph: _JavaSemGraph):
 
 def do_gradle(params) -> int:
     """Real handler of `ya ide gradle`"""
+    if params.fail_on_no_configure_cache:
+        raise yarg.ArgsValidatingException('--fail-on-no-configure-cache is not supported by ya ide gradle')
+
     success = True
     with tracer.scope('summary'):
         try:
