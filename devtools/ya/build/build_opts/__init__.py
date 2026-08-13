@@ -866,6 +866,8 @@ class SandboxAuthOptions(AuthOptions):
 
 
 class SandboxUploadOptions(SandboxAuthOptions):
+    sandbox_owner_help = 'User name to own data saved to sandbox. Required in case of inf ttl of resources in mds.'
+
     def __init__(
         self,
         ssh_key_option_name="--key",
@@ -884,7 +886,7 @@ class SandboxUploadOptions(SandboxAuthOptions):
         return super().consumer() + [
             ArgConsumer(
                 [self.sandbox_owner_option_name],
-                help='User name to own data saved to sandbox. Required in case of inf ttl of resources in mds.',
+                help=self.sandbox_owner_help,
                 hook=SetValueHook('resource_owner'),
                 group=SANDBOX_UPLOAD_OPT_GROUP,
             ),
@@ -919,9 +921,14 @@ class SandboxUploadOptions(SandboxAuthOptions):
 
 class MavenImportOptions(SandboxUploadOptions):
     visible = HelpLevel.NONE
+    sandbox_owner_help = (
+        'Sandbox group to own uploaded Maven artifacts. Default: JAVA_CONTRIB. '
+        'Request access: https://idm.yandex-team.ru/request?roles=sandbox%2FJAVA_CONTRIB%7C%7C'
+    )
 
     def __init__(self, visible=None):
         super().__init__(sandbox_owner_option_name='--sandbox-owner', visible=visible)
+        self.resource_owner = 'JAVA_CONTRIB'
         self.libs = []
         self.remote_repos = []
         self.contrib_owner = None
@@ -950,7 +957,7 @@ class MavenImportOptions(SandboxUploadOptions):
             ),
             ArgConsumer(
                 ['-s'],
-                help='User name to own data saved to sandbox',
+                help=self.sandbox_owner_help,
                 hook=SetValueHook('resource_owner'),
                 group=SANDBOX_UPLOAD_OPT_GROUP,
             ),
