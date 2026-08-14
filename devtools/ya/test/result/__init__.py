@@ -373,12 +373,25 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
                 key = (suite.project_path, target_platform, suite.uid)
                 node_errors = builder.build_result.build_errors.get(key)
 
-                deps_mgs = ', '.join('[{} {}]'.format(u, d) for u, d in suite.get_build_deps())
-                msg = "Infrastructure error - contact devtools@ for details. Suite build deps: {}".format(deps_mgs)
-                if node_errors:
-                    msg += "\n{}".format("\n".join(node_errors))
-                logger.warning("%s (uid=%s): %s", suite, suite.uid, msg)
-                suite.add_suite_error(msg, devtools.ya.test.const.Status.INTERNAL)
+                if builder.build_result.build_errors and not node_errors:
+                    # The build failed and the suite dependencies were cancelled
+                    # by the early stopping: the suite was skipped as a
+                    # consequence of the build failure. INTERNAL is reserved for
+                    # autocheck's own faults (see the CI statuses contract), so
+                    # keep the suite skipped, in line with
+                    # set_skipped_status_for_broken_suites in build/ya_make.py.
+                    if not suite._errors:
+                        suite.add_suite_error(
+                            "[[bad]]skipped due to a failed build[[warn]]", devtools.ya.test.const.Status.MISSING
+                        )
+                    logger.debug("%s (uid=%s): skipped due to a failed build", suite, suite.uid)
+                else:
+                    deps_mgs = ', '.join('[{} {}]'.format(u, d) for u, d in suite.get_build_deps())
+                    msg = "Infrastructure error - contact devtools@ for details. Suite build deps: {}".format(deps_mgs)
+                    if node_errors:
+                        msg += "\n{}".format("\n".join(node_errors))
+                    logger.warning("%s (uid=%s): %s", suite, suite.uid, msg)
+                    suite.add_suite_error(msg, devtools.ya.test.const.Status.INTERNAL)
 
             if resolver:
                 suite.fix_roots(resolver)
