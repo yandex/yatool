@@ -5,6 +5,9 @@ VERSION(1.27)
 LICENSE(Apache-2.0)
 
 JAR_RESOURCE(1841245849)
+
 SRC_RESOURCE(1841245955)
+
+ORIGINAL_SOURCE(https://bitbucket.org/asomov/snakeyaml/src)
 
 END()
