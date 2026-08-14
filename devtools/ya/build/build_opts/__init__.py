@@ -3354,6 +3354,15 @@ class YMakeFailOnNoConfigureCacheOptions(Options):
                 group=GRAPH_GENERATION_GROUP,
                 visible=HelpLevel.ADVANCED,
             ),
+            EnvConsumer(
+                'YMAKE_FAIL_ON_NO_CONFIGURE_CACHE',
+                help=(
+                    'Require every applicable FS, Conf, Deps, and DM configure cache. A cold start, rejected '
+                    'cache, or read error stops before uncached configure and returns an infrastructure error; '
+                    'a disabled applicable cache is a configuration conflict'
+                ),
+                hook=SetValueHook('fail_on_no_configure_cache', return_true_if_enabled),
+            ),
         ]
 
 

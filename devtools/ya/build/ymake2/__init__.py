@@ -8,6 +8,7 @@ import exts.yjson as json
 import logging
 import os
 import re
+import six
 import sys
 import time
 import tempfile
@@ -36,8 +37,6 @@ from devtools.ya.build.ccgraph.cpp_string_wrapper import CppStringWrapper
 from devtools.ya.build.evlog.progress import PrintProgressSubscriber
 
 logger = logging.getLogger(__name__)
-
-STRICT_CONFIGURE_CACHE_KINDS = frozenset(('fs', 'conf', 'deps', 'dm'))
 
 
 class YMakeError(Exception):
@@ -518,41 +517,57 @@ def _prepare_and_run_ymake(**kwargs):
 _gen_ymake_uid = functools.partial(next, itertools.count())
 
 
-def _configure_cache_failure_from_event(event):
-    if event.get('_typename') != 'NEvent.TConfigureCacheFailure':
-        return None
-    if event.get('Outcome') not in ('missing', 'rejected'):
-        return None
-    cache = event.get('Cache')
-    reason = event.get('Reason')
-    if cache not in STRICT_CONFIGURE_CACHE_KINDS or not reason:
-        return None
-    marker = f'Error: YMAKE_CONFIGURE_CACHE_UNAVAILABLE cache={cache} reason={reason}'
-    return configure_cache.parse_ymake_configure_cache_unavailable(marker)
+class _ConfigureCacheFailureDetector:
+    def __init__(self):
+        self._event_failure = None
+        self._stderr_failure = None
+        self._unparsed_stderr_failure = None
+
+    def consume_event(self, event):
+        if self._event_failure is not None:
+            return
+        if event.get('_typename') != 'NEvent.TConfigureCacheFailure':
+            return
+        self._event_failure = configure_cache.make_required_cache_failure_from_event(
+            event.get('Cache'),
+            event.get('Outcome'),
+            event.get('Reason'),
+        )
+
+    def consume_stderr_line(self, line):
+        if (
+            self._event_failure is not None
+            or self._stderr_failure is not None
+            or configure_cache.CONFIGURE_CACHE_UNAVAILABLE_MARKER not in line
+        ):
+            return
+        failure = configure_cache.parse_ymake_configure_cache_unavailable_line(line)
+        if failure is not None:
+            self._stderr_failure = failure
+        elif self._unparsed_stderr_failure is None:
+            self._unparsed_stderr_failure = configure_cache.UnparsedRequiredCacheFailure()
+
+    def failure(self, exit_code):
+        if not 0 < exit_code <= 3:
+            return None
+        return self._event_failure or self._stderr_failure or self._unparsed_stderr_failure
 
 
 def configure_cache_unavailable_failure(exit_code, stderr, event=None):
-    if exit_code != 1:
-        return None
+    """Compatibility API; the streaming runner uses _ConfigureCacheFailureDetector directly."""
+    detector = _ConfigureCacheFailureDetector()
     if event is not None:
-        failure = _configure_cache_failure_from_event(event)
-        if failure is not None:
-            return failure
-    failure = configure_cache.parse_ymake_configure_cache_unavailable(stderr)
-    if failure is None or failure.cache not in STRICT_CONFIGURE_CACHE_KINDS:
-        return None
-    return failure
-
-
-def configure_cache_unavailable_marker(exit_code, stderr):
-    failure = configure_cache_unavailable_failure(exit_code, stderr)
-    return failure.marker if failure is not None else None
+        detector.consume_event(event)
+    if detector.failure(exit_code) is None:
+        for line in six.ensure_str(stderr).splitlines(keepends=True):
+            detector.consume_stderr_line(line)
+    return detector.failure(exit_code)
 
 
 def _configure_cache_failure_telemetry(failure):
     return {
-        'cache': failure.cache,
-        'reason': failure.reason,
+        'cache': failure.cache or 'unknown',
+        'reason': failure.reason or 'unknown',
         'marker': failure.marker,
     }
 
@@ -642,29 +657,40 @@ def _run_ymake(**kwargs):
     enabled_events = kwargs.pop('enabled_events') if 'enabled_events' in kwargs else consts.YmakeEvents.DEFAULT.value
 
     events = []
-    configure_cache_failure_event = None
+    configure_cache_failure_detector = _ConfigureCacheFailureDetector()
     app_ctx = sys.modules.get("app_ctx")
 
     def stderr_listener(line):
-        nonlocal configure_cache_failure_event
+        configure_cache_failure_detector.consume_stderr_line(line)
+        if not line.startswith('{'):
+            logger.warning(line)
+            return
         try:
             j = json.loads(line)
         except ValueError:
             logger.warning(line)
             return
-        if isinstance(j, str):
-            # XXX: yjson parses string as a valid json
+        if not isinstance(j, dict):
+            # XXX: yjson parses any JSON value as valid JSON, while ymake events are objects.
             logger.warning(line)
             return
 
         j['ymake_run_uid'] = _ymake_unique_run_id
         events.append(j)
-        if j.get('_typename') == 'NEvent.TConfigureCacheFailure':
-            configure_cache_failure_event = j
+        configure_cache_failure_detector.consume_event(j)
         ev_listener(j)
         stages_listener(j)
         if app_ctx:
             app_ctx.state.check_cancel_state()
+
+    def raise_configure_cache_failure(failure):
+        if isinstance(failure, configure_cache.UnparsedRequiredCacheFailure):
+            logger.error(
+                "Cannot parse cache kind and failure reason from %s marker",
+                configure_cache.CONFIGURE_CACHE_UNAVAILABLE_MARKER,
+            )
+        _run_info['configure_cache_failure'] = _configure_cache_failure_telemetry(failure)
+        raise YMakeConfigureCacheUnavailableError(failure) from None
 
     meta_data = {}
 
@@ -777,14 +803,13 @@ def _run_ymake(**kwargs):
                         )
                         diag.save('ymake-cache', ymake_cache_arch=exts.fs.read_file(tar_gz_file))
 
-            if exit_code != 0 and check:
+            configure_cache_failure = configure_cache_failure_detector.failure(exit_code) if check else None
+            if check and (exit_code != 0 or configure_cache_failure is not None):
                 logger.debug("ymake stderr: \n%s", stderr)
                 _debug_info['stdout'] = stdout
                 _debug_info['stderr'] = stderr
-                failure = configure_cache_unavailable_failure(exit_code, stderr, configure_cache_failure_event)
-                if failure is not None:
-                    _run_info['configure_cache_failure'] = _configure_cache_failure_telemetry(failure)
-                    raise YMakeConfigureCacheUnavailableError(failure)
+                if configure_cache_failure is not None:
+                    raise_configure_cache_failure(configure_cache_failure)
                 if exit_code == 2:
                     # XXX YA-1456
                     if getattr(app_ctx.params, 'ignore_configure_errors', True):
