@@ -5876,13 +5876,13 @@ Module name is used as a package name by default. This can be overriden by SDC_P
 
     SDC_INSTALL(
         COMMON_BIN
-            TARGET sdg/sdc/ros/node_starter/yamakes/cgroup_dumper
-            TARGET sdg/sdc/ros/node_starter/yamakes/setup_machine
+            TARGET sdg/sdc/bros/node_starter/yamakes/cgroup_dumper
+            TARGET sdg/sdc/bros/node_starter/yamakes/setup_machine
         LAUNCH
             package.xml
             tests/launch/test.launch
         LIB
-            NODE xml_diagnostics_republisher sdg/sdc/ros/node_starter/yamakes/xml_diagnostics_republisher_bin
+            NODE xml_diagnostics_republisher sdg/sdc/bros/node_starter/yamakes/xml_diagnostics_republisher_bin
     )
 
 About NODE rule: Only one thing is deployed: either node binary, either supernode link. This is defined by
