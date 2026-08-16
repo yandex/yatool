@@ -1,89 +1,83 @@
 Metadata-Version: 2.4
 Name: portalocker
-Version: 3.2.0
-Summary: Wraps the portalocker recipe for easy usage
+Version: 4.0.0
+Summary: Cross-platform file locking, with Redis, PID-file and bounded-semaphore locks
+Keywords: locking,locks,with,statement,windows,linux,unix
+Author: Rick van Hattem
 Author-email: Rick van Hattem <wolph@wol.ph>
 License-Expression: BSD-3-Clause
-Project-URL: bugs, https://github.com/wolph/portalocker/issues
-Project-URL: documentation, https://portalocker.readthedocs.io/en/latest/
-Project-URL: repository, https://github.com/wolph/portalocker/
-Keywords: locking,locks,with,statement,windows,linux,unix
-Platform: any
-Classifier: Development Status :: 5 - Production/Stable
+License-File: LICENSE
 Classifier: Development Status :: 6 - Mature
 Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: System Administrators
 Classifier: Natural Language :: English
-Classifier: Operating System :: MacOS :: MacOS X
 Classifier: Operating System :: MacOS
-Classifier: Operating System :: Microsoft :: MS-DOS
-Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: MacOS :: MacOS X
 Classifier: Operating System :: Microsoft
-Classifier: Operating System :: POSIX :: BSD :: FreeBSD
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: POSIX
 Classifier: Operating System :: POSIX :: BSD
+Classifier: Operating System :: POSIX :: BSD :: FreeBSD
+Classifier: Operating System :: POSIX :: BSD :: NetBSD
+Classifier: Operating System :: POSIX :: BSD :: OpenBSD
 Classifier: Operating System :: POSIX :: Linux
 Classifier: Operating System :: POSIX :: SunOS/Solaris
-Classifier: Operating System :: POSIX
 Classifier: Operating System :: Unix
-Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3 :: Only
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
 Classifier: Programming Language :: Python :: 3.13
-Classifier: Programming Language :: Python :: Implementation :: CPython
-Classifier: Programming Language :: Python :: Implementation :: IronPython
-Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Programming Language :: Python :: 3.14
 Classifier: Programming Language :: Python :: Implementation
-Classifier: Programming Language :: Python
-Classifier: Topic :: Education :: Testing
-Classifier: Topic :: Office/Business
-Classifier: Topic :: Other/Nonlisted Topic
-Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
 Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: System
+Classifier: Topic :: System :: Distributed Computing
+Classifier: Topic :: System :: Filesystems
 Classifier: Topic :: System :: Monitoring
 Classifier: Typing :: Typed
-Requires-Python: >=3.9
-Description-Content-Type: text/x-rst
-License-File: LICENSE
-Requires-Dist: pywin32>=226; platform_system == "Windows"
+Requires-Dist: sphinx>=7 ; extra == 'docs'
+Requires-Dist: furo ; extra == 'docs'
+Requires-Dist: redis>=5.0 ; extra == 'redis'
+Requires-Dist: portalocker[redis] ; extra == 'tests'
+Requires-Dist: fakeredis>=2.31.0 ; extra == 'tests'
+Requires-Dist: pytest>=5.4.1 ; extra == 'tests'
+Requires-Dist: pytest-cov>=2.8.1 ; extra == 'tests'
+Requires-Dist: pytest-timeout>=2.1.0 ; extra == 'tests'
+Requires-Dist: pytest-rerunfailures>=15.1 ; extra == 'tests'
+Requires-Dist: coverage-conditional-plugin>=0.9 ; extra == 'tests'
+Requires-Dist: types-pywin32>=310.0.0.20250429 ; extra == 'tests'
+Requires-Dist: pywin32>=226 ; sys_platform == 'win32' and extra == 'win32'
+Requires-Python: >=3.10
+Project-URL: homepage, https://github.com/wolph/portalocker/
+Project-URL: documentation, https://portalocker.readthedocs.io/en/latest/
+Project-URL: repository, https://github.com/wolph/portalocker/
 Provides-Extra: docs
-Requires-Dist: portalocker[tests]; extra == "docs"
-Provides-Extra: tests
-Requires-Dist: coverage-conditional-plugin>=0.9.0; extra == "tests"
-Requires-Dist: portalocker[redis]; extra == "tests"
-Requires-Dist: pytest-cov>=2.8.1; extra == "tests"
-Requires-Dist: pytest-mypy>=0.8.0; extra == "tests"
-Requires-Dist: pytest-rerunfailures>=15.0; extra == "tests"
-Requires-Dist: pytest-timeout>=2.1.0; extra == "tests"
-Requires-Dist: pytest>=5.4.1; extra == "tests"
-Requires-Dist: sphinx>=6.0.0; extra == "tests"
-Requires-Dist: types-pywin32>=310.0.0.20250429; extra == "tests"
-Requires-Dist: types-redis; extra == "tests"
 Provides-Extra: redis
-Requires-Dist: redis; extra == "redis"
-Dynamic: license-file
+Provides-Extra: tests
+Provides-Extra: win32
+Description-Content-Type: text/x-rst
 
 ############################################
 portalocker - Cross-platform locking library
 ############################################
 
-.. image:: https://github.com/WoLpH/portalocker/actions/workflows/python-package.yml/badge.svg?branch=master
-    :alt: Linux Test Status
-    :target: https://github.com/WoLpH/portalocker/actions/
-
-.. image:: https://ci.appveyor.com/api/projects/status/mgqry98hgpy4prhh?svg=true
-    :alt: Windows Tests Status
-    :target: https://ci.appveyor.com/project/WoLpH/portalocker
-
-.. image:: https://coveralls.io/repos/WoLpH/portalocker/badge.svg?branch=master
-    :alt: Coverage Status
-    :target: https://coveralls.io/r/WoLpH/portalocker?branch=master
+.. image:: https://github.com/wolph/portalocker/actions/workflows/ci.yml/badge.svg?branch=develop
+    :alt: CI Test Status
+    :target: https://github.com/wolph/portalocker/actions/workflows/ci.yml
 
 Overview
 --------
 
 Portalocker is a library to provide an easy API to file locking.
+
+Portalocker requires Python 3.10 or later.
 
 An important detail to note is that on Linux and Unix systems the locks are
 advisory by default. By specifying the `-o mand` option to the mount command it
@@ -93,6 +87,22 @@ recommended however. For more information about the subject:
  - https://en.wikipedia.org/wiki/File_locking
  - http://stackoverflow.com/questions/39292051/portalocker-does-not-seem-to-lock
  - https://stackoverflow.com/questions/12062466/mandatory-file-lock-on-linux
+
+Windows and the ``pywin32`` dependency
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Since version 4.0.0, ``pywin32`` is no longer installed automatically on
+Windows. Exclusive locks work out of the box without any extra
+dependencies using the built-in `msvcrt` module. Shared locks
+(``LockFlags.SHARED``) on Windows require the optional `pywin32`
+dependency, which can be installed through the ``win32`` extra:
+
+::
+
+    pip install "portalocker[win32]"
+
+Attempting to acquire a shared lock on Windows without `pywin32` raises an
+``ImportError`` explaining this requirement.
 
 The module is currently maintained by Rick van Hattem <Wolph@wol.ph>.
 The project resides at https://github.com/WoLpH/portalocker . Bugs and feature
@@ -104,6 +114,35 @@ Security contact information
 To report a security vulnerability, please use the
 `Tidelift security contact <https://tidelift.com/security>`_.
 Tidelift will coordinate the fix and disclosure.
+
+PidFileLock contexts
+--------------------
+
+The default context is inspection-oriented: it enters even when another
+process owns the lock and returns that process's PID. A ``None`` value means
+this process acquired the lock:
+
+.. code-block:: python
+
+    import portalocker
+
+    with portalocker.PidFileLock('worker.pid') as holder_pid:
+        if holder_pid is None:
+            run_singleton_worker()
+        else:
+            print(f'worker already running as PID {holder_pid}')
+
+Use ``fail_closed()`` when the protected body must only run after acquisition:
+
+.. code-block:: python
+
+    import portalocker
+
+    try:
+        with portalocker.PidFileLock('worker.pid').fail_closed():
+            run_singleton_worker()
+    except portalocker.AlreadyLocked as exc:
+        print(f'worker already running as PID {exc.holder_pid}')
 
 Redis Locks
 -----------
@@ -137,8 +176,37 @@ Usage is really easy:
     with lock:
         print('do something here')
 
+Shared locks allow multiple readers while remaining mutually exclusive with
+writers:
+
+::
+
+    read_lock = portalocker.RedisLock(
+        'some_lock_channel_name',
+        flags=portalocker.LockFlags.SHARED,
+    )
+
+    with read_lock:
+        print('read shared state')
+
+Waiting writers prevent new readers from entering, so a continuous stream of
+readers cannot starve an exclusive lock. New shared locks also interoperate with
+older portalocker clients: legacy Redis locks are treated as exclusive.
+
 The API is essentially identical to the other ``Lock`` classes so in addition
 to the ``with`` statement you can also use ``lock.acquire(...)``.
+
+The normal test suite uses ``fakeredis``. To optionally repeat the Redis tests
+against a locally running server:
+
+::
+
+    redis-server
+    tox -e redis-live
+
+Set ``REDIS_HOST`` or ``REDIS_PORT`` when the server does not use
+``localhost:6379``. The ``redis-live`` environment fails instead of skipping
+when it cannot connect.
 
 Python 2
 --------
@@ -256,4 +324,3 @@ License
 -------
 
 See the `LICENSE <https://github.com/WoLpH/portalocker/blob/develop/LICENSE>`_ file.
-
