@@ -2371,6 +2371,12 @@ def _build_graph_and_tests(
         return graph_maker.cmdline_generation_error
 
     ymake_opts = {'multiconfig': opts.ymake_multiconfig, 'check_error_fn': cmdline_generation_error_fn}
+    configure_cache_failure_detector = ymake2._make_multiconfig_configure_cache_failure_detector(
+        opts.ymake_multiconfig,
+        opts.fail_on_no_configure_cache,
+    )
+    if configure_cache_failure_detector is not None:
+        ymake_opts['configure_cache_failure_detector'] = configure_cache_failure_detector
     for i, tc in enumerate(target_tcs, start=1):
         targets = []
         for target in tc.get('targets', []):

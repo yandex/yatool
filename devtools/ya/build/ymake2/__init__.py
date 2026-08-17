@@ -143,6 +143,7 @@ def _configure_params(buildable, build_type=None, continue_on_fail=False, check=
         yarg.Param('parallel_rendering', default_value=False),
         yarg.Param('use_subinterpreters', default_value=False),
         yarg.Param('fail_on_no_configure_cache', default_value=False),
+        yarg.Param('configure_cache_failure_detector', default_value=None),
     ]
 
 
@@ -519,38 +520,46 @@ _gen_ymake_uid = functools.partial(next, itertools.count())
 
 class _ConfigureCacheFailureDetector:
     def __init__(self):
+        self._lock = threading.Lock()
         self._event_failure = None
         self._stderr_failure = None
         self._unparsed_stderr_failure = None
 
     def consume_event(self, event):
-        if self._event_failure is not None:
-            return
         if event.get('_typename') != 'NEvent.TConfigureCacheFailure':
             return
-        self._event_failure = configure_cache.make_required_cache_failure_from_event(
+        failure = configure_cache.make_required_cache_failure_from_event(
             event.get('Cache'),
             event.get('Outcome'),
             event.get('Reason'),
         )
+        with self._lock:
+            if self._event_failure is None:
+                self._event_failure = failure
 
     def consume_stderr_line(self, line):
-        if (
-            self._event_failure is not None
-            or self._stderr_failure is not None
-            or configure_cache.CONFIGURE_CACHE_UNAVAILABLE_MARKER not in line
-        ):
+        if configure_cache.CONFIGURE_CACHE_UNAVAILABLE_MARKER not in line:
             return
         failure = configure_cache.parse_ymake_configure_cache_unavailable_line(line)
-        if failure is not None:
-            self._stderr_failure = failure
-        elif self._unparsed_stderr_failure is None:
-            self._unparsed_stderr_failure = configure_cache.UnparsedRequiredCacheFailure()
+        with self._lock:
+            if self._event_failure is not None or self._stderr_failure is not None:
+                return
+            if failure is not None:
+                self._stderr_failure = failure
+            elif self._unparsed_stderr_failure is None:
+                self._unparsed_stderr_failure = configure_cache.UnparsedRequiredCacheFailure()
 
     def failure(self, exit_code):
         if not 0 < exit_code <= 3:
             return None
-        return self._event_failure or self._stderr_failure or self._unparsed_stderr_failure
+        with self._lock:
+            return self._event_failure or self._stderr_failure or self._unparsed_stderr_failure
+
+
+def _make_multiconfig_configure_cache_failure_detector(multiconfig, fail_on_no_configure_cache):
+    if multiconfig and fail_on_no_configure_cache:
+        return _ConfigureCacheFailureDetector()
+    return None
 
 
 def configure_cache_unavailable_failure(exit_code, stderr, event=None):
@@ -577,6 +586,9 @@ def _run_ymake(**kwargs):
     # - Divide ymake runs in `ya dump debug`
     # - Show correct configure progress
     _ymake_unique_run_id = _gen_ymake_uid()
+    configure_cache_failure_detector = kwargs.pop('configure_cache_failure_detector', None)
+    if configure_cache_failure_detector is None:
+        configure_cache_failure_detector = _ConfigureCacheFailureDetector()
 
     _stat_info = {}
     _stat_info_preparing = _stat_info['preparing'] = {'start': time.time()}
@@ -657,7 +669,6 @@ def _run_ymake(**kwargs):
     enabled_events = kwargs.pop('enabled_events') if 'enabled_events' in kwargs else consts.YmakeEvents.DEFAULT.value
 
     events = []
-    configure_cache_failure_detector = _ConfigureCacheFailureDetector()
     app_ctx = sys.modules.get("app_ctx")
 
     def stderr_listener(line):
