@@ -620,6 +620,9 @@ TFileConf::EMarkAsChangedResult TFileConf::MarkFileAsChanged(const TString& file
     auto fileExisted = HasName(filename);
     auto id = Add(filename);
     if (auto [_, inserted] = ExternalChanges.insert(id); !inserted) {
+        // ExternalChanges accumulates across sessions, so a repeated change must
+        // invalidate the filesystem status even when the element is already present.
+        GetFileDataById(id).LastCheckedStamp = TTimeStamps::Never;
         return EMarkAsChangedResult::DONE;
     }
 
