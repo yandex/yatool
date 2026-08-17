@@ -145,6 +145,56 @@ bool TConfigureCachePolicy::MarkDiagnosticEmitted() noexcept {
     throw TConfigureCacheViolation(std::move(result));
 }
 
+void TConfigureCachePolicy::BeginInternalCacheApplicabilityProbe() {
+#ifndef NDEBUG
+    const auto access = GuardAccess();
+#endif
+    Y_ASSERT(!InternalCacheApplicabilityProbeActive_);
+    Y_ASSERT(!DeferredInternalCacheFailure_);
+    InternalCacheApplicabilityProbeActive_ = true;
+}
+
+void TConfigureCachePolicy::OnInternalCacheFailure(TConfigureCacheLoadResult result) {
+    Validate(result);
+    Y_ASSERT(result.Kind == EConfigureCacheKind::FS || result.Kind == EConfigureCacheKind::Deps);
+#ifndef NDEBUG
+    const auto access = GuardAccess();
+#endif
+    if (InternalCacheApplicabilityProbeActive_) {
+        if (!DeferredInternalCacheFailure_) {
+            DeferredInternalCacheFailure_ = std::move(result);
+        }
+        return;
+    }
+    Fail(std::move(result));
+}
+
+void TConfigureCachePolicy::ConfirmInternalCachesApplicable() {
+    std::optional<TConfigureCacheLoadResult> failure;
+    {
+#ifndef NDEBUG
+        const auto access = GuardAccess();
+#endif
+        if (!InternalCacheApplicabilityProbeActive_) {
+            return;
+        }
+        InternalCacheApplicabilityProbeActive_ = false;
+        failure = std::move(DeferredInternalCacheFailure_);
+        DeferredInternalCacheFailure_.reset();
+    }
+    if (failure) {
+        Fail(std::move(*failure));
+    }
+}
+
+void TConfigureCachePolicy::ConfirmInternalCachesNotApplicable() noexcept {
+#ifndef NDEBUG
+    const auto access = GuardAccess();
+#endif
+    InternalCacheApplicabilityProbeActive_ = false;
+    DeferredInternalCacheFailure_.reset();
+}
+
 TStringBuf ConfigureCacheKindName(EConfigureCacheKind kind) noexcept {
     switch (kind) {
         case EConfigureCacheKind::FS:

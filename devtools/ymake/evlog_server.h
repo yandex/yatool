@@ -7,6 +7,9 @@
 
 #include <asio/thread_pool.hpp>
 
+#include <functional>
+#include <utility>
+
 namespace NEvlogServer {
     struct TTarget {
         TString Dir;
@@ -37,7 +40,19 @@ namespace NEvlogServer {
 
     class TServer {
     public:
-        TServer(TConfigurationExecutor exec, ITargetConfigurator& Configurator, TBuildConfiguration& Conf) : Configurator_(Configurator), Conf_(Conf), Exec_{exec} {
+        using TBeforeFirstTargetCallback = std::function<void()>;
+
+        TServer(
+            TConfigurationExecutor exec,
+            ITargetConfigurator& Configurator,
+            TBuildConfiguration& Conf,
+            TBeforeFirstTargetCallback beforeFirstTarget = {}
+        )
+            : Configurator_(Configurator)
+            , Conf_(Conf)
+            , BeforeFirstTarget_(std::move(beforeFirstTarget))
+            , Exec_{exec}
+        {
             for (auto& dir : Conf.StartDirs) {
                 ReachableTargets_.insert({dir, "", true});
             }
@@ -54,6 +69,7 @@ namespace NEvlogServer {
         TMaybe<EMode> Mode_;
         THashSet<TTarget> ReachableTargets_;
         THashSet<TString> PossibleTargets_;
+        TBeforeFirstTargetCallback BeforeFirstTarget_;
         TConfigurationExecutor Exec_;
     };
 } // namespace NEvlogServer

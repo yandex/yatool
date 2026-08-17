@@ -615,6 +615,7 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
         co_await ProcessEvlogAsync(yMake, conf, *conf.ForeignTargetReader, exec);
 
         if (conf.StartDirs.empty()) {
+            conf.ConfigureCachePolicy.ConfirmInternalCachesNotApplicable();
             conf.ForeignTargetWriter->WriteLine(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
             FORCE_TRACE(U,  NEvent::TCacheIsExpectedToBeEmpty{conf.YmakeCache.GetPath()});
             co_return BR_OK;
@@ -685,20 +686,23 @@ TMaybe<EBuildResult> EarlyDumpStage(TBuildConfiguration& conf) {
 TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& conf) {
     const bool configureCachesApplicable = conf.WriteYdx.empty();
     if (conf.IsConfigureCacheRequired() && configureCachesApplicable) {
+        if (conf.ReadStartTargetsFromEvlog && conf.StartDirs.empty()) {
+            conf.ConfigureCachePolicy.BeginInternalCacheApplicabilityProbe();
+        }
         if (!conf.ReadFsCache) {
-            conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+            conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Disabled(
                 EConfigureCacheKind::FS,
                 conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::FS)
             ));
         }
         if (!conf.ReadDepsCache) {
-            conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+            conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Disabled(
                 EConfigureCacheKind::Deps,
                 conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Deps)
             ));
         }
         if (!conf.CachePath.Exists()) {
-            conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Missing(EConfigureCacheKind::FS));
+            conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Missing(EConfigureCacheKind::FS));
         }
     }
 

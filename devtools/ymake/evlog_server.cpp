@@ -29,6 +29,11 @@ namespace NEvlogServer {
             co_return;
         }
 
+        if (BeforeFirstTarget_) {
+            auto beforeFirstTarget = std::exchange(BeforeFirstTarget_, {});
+            beforeFirstTarget();
+        }
+
         if (targetEvent->GetReachable()) {
             YDebug() << "EvlogServer: Reachable target found " << targetEvent->GetDir() << ", platform " << TForeignPlatformTarget_EPlatform_Name(targetEvent->GetPlatform()) << Endl;
             Conf_.AddTarget(targetEvent->GetDir());

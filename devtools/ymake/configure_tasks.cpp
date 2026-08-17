@@ -116,7 +116,9 @@ asio::awaitable<TMaybe<EBuildResult>> RunConfigureAsync(THolder<TYMake>& yMake, 
 asio::awaitable<void> ProcessEvlogAsync(THolder<TYMake>& yMake, TBuildConfiguration& conf, NForeignTargetPipeline::TLineReader& input, TConfigurationExecutor exec) {
     YDebug() << "Pseudo parallel server mode START" << Endl;
     yMake->TimeStamps.InitSession(yMake->Graph.GetFileNodeData());
-    NEvlogServer::TServer evlogServer{exec, *yMake, conf};
+    NEvlogServer::TServer evlogServer{exec, *yMake, conf, [&conf] {
+        conf.ConfigureCachePolicy.ConfirmInternalCachesApplicable();
+    }};
     // For now it's a synchronous reader w/o any buffering.
     // The client must ensure they use non-blocking writes on their side,
     // like it's done for tool evlog in devtools/ya/build/graph.py:_ToolTargetsQueue

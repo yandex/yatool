@@ -629,7 +629,7 @@ bool TYMake::Load(const TFsPath& file) {
         throw;
     } catch (...) {
         if (AreInternalConfigureCachesRequired(Conf)) {
-            Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
+            Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Rejected(
                 FSCacheLoaded_ ? EConfigureCacheKind::Deps : EConfigureCacheKind::FS,
                 EConfigureCacheUnavailableReason::ReadError
             ));
@@ -733,7 +733,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     if (!loadFsCache) {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedFSCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
         if (AreInternalConfigureCachesRequired(Conf)) {
-            Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+            Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Disabled(
                 EConfigureCacheKind::FS,
                 Conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::FS)
             ));
@@ -743,7 +743,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     if (!loadDepsCache) {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_ManualDisabled);
         if (AreInternalConfigureCachesRequired(Conf)) {
-            Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Disabled(
+            Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Disabled(
                 EConfigureCacheKind::Deps,
                 Conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Deps)
             ));
@@ -818,16 +818,23 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     }
 
     if (!loadFsCache && AreInternalConfigureCachesRequired(Conf)) {
-        Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
+        Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Rejected(
             EConfigureCacheKind::FS,
             ConfigureCacheUnavailableReason(readResult)
         ));
     }
     if (!loadDepsCache && AreInternalConfigureCachesRequired(Conf)) {
-        Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
+        Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Rejected(
             EConfigureCacheKind::Deps,
             ConfigureCacheUnavailableReason(readResult)
         ));
+    }
+
+    // In deferred strict mode an FS-cache rejection no longer throws here,
+    // but the reader has no usable blob sequence to inspect. Keep the legacy
+    // non-strict recovery path unchanged.
+    if (!loadFsCache && AreInternalConfigureCachesRequired(Conf)) {
+        return false;
     }
 
     if (info != nullptr) {
@@ -848,7 +855,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::FSCacheLoadTime), TimeSince(fsCacheLoadCheckpoint));
         } else {
             if (AreInternalConfigureCachesRequired(Conf)) {
-                Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
+                Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Rejected(
                     EConfigureCacheKind::FS,
                     EConfigureCacheUnavailableReason::IncompatibleFormat
                 ));
@@ -868,7 +875,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheLoadTime), TimeSince(depsCacheLoadCheckpoint));
         } else {
             if (AreInternalConfigureCachesRequired(Conf)) {
-                Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
+                Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Rejected(
                     EConfigureCacheKind::Deps,
                     EConfigureCacheUnavailableReason::IncompatibleFormat
                 ));
@@ -877,7 +884,7 @@ bool TYMake::LoadImpl(const TFsPath& file) {
         }
     } else {
         if (AreInternalConfigureCachesRequired(Conf)) {
-            Conf.ConfigureCachePolicy.Fail(TConfigureCacheLoadResult::Rejected(
+            Conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Rejected(
                 EConfigureCacheKind::Deps,
                 EConfigureCacheUnavailableReason::IncompatibleFormat
             ));

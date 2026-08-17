@@ -97,6 +97,14 @@ public:
 
     [[noreturn]] void Fail(TConfigureCacheLoadResult result);
 
+    // Internal FS/dependency caches are not applicable to a targetless evlog
+    // configuration. Their load failures are therefore kept until the stream
+    // either supplies its first target or is confirmed to be targetless.
+    void BeginInternalCacheApplicabilityProbe();
+    void OnInternalCacheFailure(TConfigureCacheLoadResult result);
+    void ConfirmInternalCachesApplicable();
+    void ConfirmInternalCachesNotApplicable() noexcept;
+
     bool MarkDiagnosticEmitted() noexcept;
 
 #ifndef NDEBUG
@@ -132,6 +140,8 @@ private:
     bool Enabled_ = false;
     bool DiagnosticEmitted_ = false;
     std::array<std::optional<EConfigureCacheDisableSource>, CacheCount> DisableSources_;
+    bool InternalCacheApplicabilityProbeActive_ = false;
+    std::optional<TConfigureCacheLoadResult> DeferredInternalCacheFailure_;
 #ifndef NDEBUG
     mutable std::atomic_flag AccessInProgress_ = ATOMIC_FLAG_INIT;
 #endif
