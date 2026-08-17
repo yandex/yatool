@@ -67,6 +67,7 @@ RECURSE(
     buf
     cache
     clang_tidy
+    code
     completion
     curl
     dctl
