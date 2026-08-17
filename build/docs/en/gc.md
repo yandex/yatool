@@ -108,6 +108,19 @@ If a filter is not set, then the cleanup will proceed in line with the `cache_si
 ```
 - --gc-symlinks: Clears outdated build symlinks in the repository.
 ```
+
+### Cleaning Snowden telemetry cache
+
+> **Warning:** This option permanently deletes unsent telemetry events. Use with caution.
+
+By default, `ya gc cache` does **not** remove the Snowden telemetry cache (`~/.ya/snowden/`). In standalone Snowden mode, this directory contains chunk-files with events that the Snowden daemon has not yet sent to the backend. Removing this directory will cause permanent loss of those unsent events.
+
+To explicitly clean the Snowden cache, pass the `--clear-snowden` flag:
+```
+ya gc cache --clear-snowden
+```
+Only use this flag when you are certain that losing unsent telemetry is acceptable (for example, when freeing up disk space on a machine that will be decommissioned).
+
 ### Practical application examples
 Deleting large cache objects
 ```

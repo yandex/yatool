@@ -52,6 +52,7 @@ class CollectCacheOptions(LocalCacheOptions):
         self.object_size_limit = None
         self.age_limit = None
         self.symlinks_ttl = 0
+        self.clear_snowden = False
 
     def consumer(self):
         return super().consumer(strip_controls_visibility=False) + [
@@ -76,6 +77,12 @@ class CollectCacheOptions(LocalCacheOptions):
                 ['--age-limit'],
                 help='Strip build cache from old objects (in hours if not set explicitly)',
                 hook=devtools.ya.core.yarg.SetValueHook('age_limit', transform=_to_timespan_in_hours),
+                group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ['--clear-snowden'],
+                help='Also remove Snowden telemetry cache (unsent events will be lost)',
+                hook=devtools.ya.core.yarg.SetConstValueHook('clear_snowden', True),
                 group=devtools.ya.core.yarg.BULLET_PROOF_OPT_GROUP,
             ),
         ]
@@ -248,7 +255,8 @@ def do_cache(opts):
 def _do_collect_cache(cache, build_root, opts):
     _rm_tree('Cleaning tmp root', cc.tmp_path())
     _rm_tree('Cleaning pycache root', cc.pycache_path())
-    _rm_tree('Cleaning snowden root', os.path.join(cc.misc_root(), 'snowden'))
+    if getattr(opts, 'clear_snowden', False):
+        _rm_tree('Cleaning snowden root', os.path.join(cc.misc_root(), 'snowden'))
     _rm_tree('Cleaning build root', os.path.join(build_root, 'build_root'))
     _rm_tree('Cleaning conf root', os.path.join(build_root, 'conf'))
     _rm_tree('Cleaning misc conf root', os.path.join(cc.misc_root(), 'conf'))

@@ -36,7 +36,7 @@ namespace NYa::NSnowden {
                 return;
             }
             SpawnPythonEntryPoint(
-                "devtools.ya.yalibrary.snowden:ensure_daemon_main",
+                "yalibrary.snowden:ensure_daemon_main",
                 {}
             );
             DEBUG_LOG << "[snowden] EnsureDaemon initiated\n";
@@ -48,7 +48,7 @@ namespace NYa::NSnowden {
     void ReportCppHandlerEvent(const TString& handlerName) {
         try {
             SpawnPythonEntryPoint(
-                "devtools.ya.yalibrary.snowden:push_event_main",
+                "yalibrary.snowden:push_event_main",
                 {
                     "--key",   "cpp_handler",
                     "--field", TString("handler_name=") + handlerName,
@@ -67,7 +67,7 @@ namespace NYa::NSnowden {
     ) {
         try {
             SpawnPythonEntryPoint(
-                "devtools.ya.yalibrary.snowden:push_event_main",
+                "yalibrary.snowden:push_event_main",
                 {
                     "--key",   "tool_execution",
                     "--field", "tool_launch_method=cpp_fast_path",
