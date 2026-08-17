@@ -1,3 +1,4 @@
+import codecs
 import json
 import logging
 import os
@@ -154,6 +155,7 @@ class ReportFileWatcher:
         self.last_check_time = 0
         self.check_interval = 0.2  # Check every 200ms
         self._line_buffer = ""
+        self._decoder = codecs.getincrementaldecoder("utf-8")()
 
     def open(self, command, process, out_file, err_file):
         """Called when process starts."""
@@ -173,11 +175,12 @@ class ReportFileWatcher:
         """Read new content from report file and process it."""
         if os.path.exists(self.report_path):
             try:
-                with open(self.report_path, 'r') as f:
+                with open(self.report_path, 'rb') as f:
                     f.seek(self.last_position)
-                    new_content = f.read()
-                    if new_content:
+                    new_bytes = f.read()
+                    if new_bytes:
                         self.last_position = f.tell()
+                        new_content = self._decoder.decode(new_bytes)
                         self._process_new_content(new_content)
             except (IOError, OSError) as e:
                 logger.debug(f"Error reading report file: {e}")
@@ -209,6 +212,7 @@ class ReportFileWatcher:
     def close(self):
         """Called when process finishes - do final check."""
         self._check_report_file()
+        self._process_new_content(self._decoder.decode(b"", final=True))
         if self._line_buffer:
             self._process_event_lines([self._line_buffer])
             self._line_buffer = ""
