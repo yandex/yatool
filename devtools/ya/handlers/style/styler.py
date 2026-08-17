@@ -46,6 +46,7 @@ class StylerKind(StrEnum):
     GO = auto()
     YQL = auto()
     LUA = auto()
+    TF = auto()
     JSON = auto()
     YAML = auto()
     EOL = auto()
@@ -620,6 +621,43 @@ class StyLua:
 
         if err:
             raise StylingError('error while running stylua on file "{}": {}'.format(path, err.strip()))
+
+        return out
+
+    def format(self, path: PurePath, content: str, stdin: bool) -> StylerOutput:
+        return StylerOutput(self._run_format(path, content))
+
+
+@_register
+class OpenTofu:
+    kind: tp.ClassVar = StylerKind.TF
+    name: tp.ClassVar = 'opentofu'
+    match_suffixes: tp.ClassVar[tuple[tp.LiteralString, ...]] = (".tf", ".hcl")
+    match_names: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+    ignore: tp.ClassVar[tuple[tp.LiteralString, ...]] = ()
+
+    def __init__(self, styler_opts: StylerOptions) -> None:
+        self._tool: str = yalibrary.tools.tool("tofu")  # type: ignore
+
+    def _run_format(self, path: PurePath, content: str) -> str:
+        args = [self._tool, 'fmt', '-']
+
+        p = subprocess.Popen(
+            args,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=False,
+            text=True,
+        )
+        out, err = p.communicate(input=content)
+
+        # Abort styling on signal
+        if p.returncode < 0:
+            state_helper.stop()
+
+        if err:
+            raise StylingError('error while running opentofu on file "{}": {}'.format(path, err.strip()))
 
         return out
 
