@@ -918,6 +918,7 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
 
         def iter_filter_nodes(filters, host=False):
             nonlocal python_binary_path
+            promoted_renamed = set()
             for flt in filters:
                 for node, full_match in filter_nodes_by_output(
                     graph, flt, warn=False, host=host, any_match=opts.all_outputs_to_result
@@ -935,6 +936,23 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
                             else:
                                 python_binary_path = resolved_py3
                         yield _gen_filter_node(node, flt, python_binary_path), True
+                        # A renamed-output wrapper has no self_uid and cannot be uploaded.
+                        # Promote the underlying node only for a real output-name mapping;
+                        # a non-full suffix match alone is insufficient.
+                        uid = node.get('uid')
+                        if (
+                            not host
+                            and opts.promote_renamed_result_deps
+                            and node.get('self_uid')
+                            and uid not in promoted_renamed
+                        ):
+                            out_names_map = _get_node_out_names_map(node)
+                            for out in node.get('outputs') or ():
+                                renamed_out, renamed = _apply_out_names_map(out_names_map, out)
+                                if renamed and renamed_out.endswith(flt):
+                                    promoted_renamed.add(uid)
+                                    yield node, False
+                                    break
 
         if opts.replace_result:
             graph['result'] = []

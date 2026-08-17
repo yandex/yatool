@@ -1299,6 +1299,7 @@ class GraphFilterOutputResultOptions(Options):
         self.replace_result = False
         self.all_outputs_to_result = False
         self.add_binaries_to_results = False
+        self.promote_renamed_result_deps = False
 
     @staticmethod
     def consumer():
@@ -1341,10 +1342,20 @@ class GraphFilterOutputResultOptions(Options):
                 group=OUTPUT_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
+            ArgConsumer(
+                ['--promote-renamed-result-deps'],
+                help='For renamed --add-result matches, also add the underlying content-addressable node '
+                'to results so it is dist-cacheable. Results use internal output names; intended for '
+                '--no-src-links cache-heating runs',
+                hook=SetConstValueHook('promote_renamed_result_deps', True),
+                group=OUTPUT_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
             ConfigConsumer('add_result'),
             ConfigConsumer('add_result_extend', hook=ExtendHook('add_result')),
             ConfigConsumer('add_host_result'),
             ConfigConsumer('all_outputs_to_result'),
+            ConfigConsumer('promote_renamed_result_deps'),
             ArgConsumer(
                 ['--replace-result'],
                 help='Build only --add-result targets',
