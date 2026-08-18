@@ -20,6 +20,7 @@ import exts.timer
 from library.python import windows
 import devtools.ya.test.const
 import devtools.ya.yalibrary.runner.schedule_strategy as schedule_strategy
+import yalibrary.term.console as term_console
 
 from devtools.ya.build.graph_description import GraphNode, GraphNodeUid, SelfUid, StaticUid
 from yalibrary import status_view
@@ -110,6 +111,23 @@ class CapCalculator:
         return self._max_cap
 
 
+def _called_by_agent(app_ctx) -> bool:
+    """Tell whether ya was launched by a coding agent.
+
+    Reads the caller_info app module duck-typed (yalibrary must not import
+    app.modules): the provider detects the caller in a background thread,
+    so an unfinished detection reads as "not an agent".
+    """
+    provider = getattr(app_ctx, 'caller_info', None)
+    if provider is None:
+        return False
+    data = provider.get_nowait() if hasattr(provider, 'get_nowait') else provider
+    try:
+        return bool(data and data.get('agent'))
+    except Exception:
+        return False
+
+
 class TaskContext(object):
     def __init__(
         self,
@@ -143,6 +161,7 @@ class TaskContext(object):
             self._invocation_id = None
             self._build_id = None
         self.state = app_ctx.state.sub(__name__)
+        self.called_by_agent = _called_by_agent(app_ctx)
         self.resources: dict[str, dict] = {}
         self.legacy_sandbox_fetcher = app_ctx.legacy_sandbox_fetcher
         self.content_uids: bool = self.opts.content_uids
@@ -438,12 +457,15 @@ class TaskContext(object):
                 except AttributeError:
                     continue
                 stderr = getattr(task_info.task, "raw_stderr", None)
+                log_stderr = stderr
+                if stderr and _called_by_agent(self._app_ctx):
+                    log_stderr = term_console.strip_ansi_codes(stderr)
                 if rc:
                     logger.debug(
                         "Task %s failed with %s exit code: %s",
                         task_info.task,
                         rc,
-                        '\n' + stderr if stderr else 'no strderr was provided',
+                        '\n' + log_stderr if log_stderr else 'no strderr was provided',
                     )
                     task_uid = getattr(task_info.task, 'uid', getattr(task_info.task, 'short_name', 'UnknownTask'))
                     exit_code_map[task_uid] = rc
@@ -464,10 +486,12 @@ class TaskContext(object):
                     total_errors += 1
 
                 elif stderr:
-                    if len(stderr) <= TRUNCATE_STDERR * 2:
-                        truncated_stderr = stderr
+                    if len(log_stderr) <= TRUNCATE_STDERR * 2:
+                        truncated_stderr = log_stderr
                     else:
-                        truncated_stderr = "\n".join((stderr[:TRUNCATE_STDERR], "...", stderr[-TRUNCATE_STDERR:]))
+                        truncated_stderr = "\n".join(
+                            (log_stderr[:TRUNCATE_STDERR], "...", log_stderr[-TRUNCATE_STDERR:])
+                        )
                     logger.debug("Task %s has stderr:\n%s", task_info.task, truncated_stderr)
 
         devtools.ya.core.report.telemetry.report(
@@ -668,6 +692,14 @@ class TaskContext(object):
         self._ticker = status_view.TickThrottle(term_view.tick, 0.1)
         self._exit_stack.callback(lambda: self._ticker.tick(force=True))
         self._exit_stack.callback(term_view.tick)
+
+        # Duck-typed on purpose: yalibrary must not import app.modules
+        # (see AgentConsole in devtools/ya/yalibrary/agent_ui). The console
+        # projects this snapshot into the ``running`` heartbeat field.
+        agent_console = getattr(self._app_ctx, 'agent_ui', None)
+        if agent_console is not None:
+            agent_console.set_activity(queue_status.active)
+            self._exit_stack.callback(agent_console.set_activity, None)
 
         self.runq = runqueue.RunQueue(self._workers.add, queue_status.listener())
         self.task_cache = task_cache.TaskCache(self.runq)

@@ -488,7 +488,10 @@ class RunNodeTask(object):
                 if tmp_dir and (not self._ctx.opts.keep_temps and exit_code == 0):
                     self._remove_dir(tmp_dir)
 
-            if exit_code:
+            if exit_code and not self._ctx.called_by_agent:
+                # An agent needs the diagnosis, not the full command line: the
+                # command only burns its context. It is still reported when
+                # there is no stderr to show, so the failure never goes silent.
                 c = ' '.join(map(six.ensure_str, args))
                 errs.append(
                     'command (pid: {}) {} failed with exit code [[imp]]{}[[rst]] in {}'.format(pid, c, exit_code, cwd)

@@ -31,6 +31,7 @@ import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
 
+from .modules import agent_ui
 from .modules import evlog
 from .modules import params
 from .modules import token_suppressions
@@ -154,6 +155,9 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('params', params.configure(parameters, with_respawn)),
             ('hide_token', token_suppressions.configure(ctx)),
             ('state', configure_active_state(ctx)),
+            # Must be configured before 'display': configure_display consults
+            # app_ctx.agent_ui to replace human rendering in agent mode.
+            ('agent_ui', agent_ui.configure(ctx)),
             ('display', configure_display(ctx)),
             ('custom_file_log', configure_custom_file_log(ctx)),
             ('display_log', configure_display_log(ctx)),
@@ -503,6 +507,13 @@ def configure_display_log(app_ctx):
     from yalibrary.loggers import display_log
     from devtools.ya.core import logger  # XXX
 
+    agent_console = getattr(app_ctx, 'agent_ui', None)
+    if agent_console is not None:
+        from yalibrary.agent_ui import log_handler
+
+        # Must go first: with_display_log replays and closes the early
+        # warning buffer, and the display is DevNull in agent mode.
+        log_handler.with_agent_log(app_ctx, agent_console)
     display_log.with_display_log(app_ctx, logger.level(), app_ctx.hide_token)
     yield
 
@@ -601,6 +612,13 @@ def configure_legacy_sandbox_fetcher(app_ctx):
 def configure_display(app_ctx):
     import yalibrary.display as yadisplay
     from yalibrary import formatter
+
+    # Consult the already-made decision (app_ctx.agent_ui), not params: in
+    # agent mode the event stream is the output; human rendering only costs
+    # tokens and interleaves streams.
+    if getattr(app_ctx, 'agent_ui', None) is not None:
+        yield yadisplay.DevNullDisplay()
+        return
 
     fmt = formatter.new_formatter(
         exts.os2.is_tty(),

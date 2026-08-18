@@ -34,6 +34,7 @@ PEERDIR(
     devtools/ya/yalibrary/status_view
     devtools/ya/yalibrary/status_view
     devtools/ya/yalibrary/store
+    devtools/ya/yalibrary/term
     devtools/ya/yalibrary/worker_threads
     library/python/reservoir_sampling
 )

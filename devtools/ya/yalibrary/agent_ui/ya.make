@@ -1,0 +1,23 @@
+PY3_LIBRARY()
+
+PY_SRCS(
+    NAMESPACE yalibrary.agent_ui
+    __init__.py
+    log_handler.py
+    projection.py
+    subscriber.py
+)
+
+PEERDIR(
+    devtools/ya/core/error
+    devtools/ya/core/event_handling
+    devtools/ya/yalibrary/formatter
+    devtools/ya/yalibrary/loggers/file_log
+    library/python/strings
+)
+
+END()
+
+RECURSE_FOR_TESTS(
+    tests
+)
