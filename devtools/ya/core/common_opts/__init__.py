@@ -332,10 +332,7 @@ class PrintStatisticsOptions(Options):
             ),
             ArgConsumer(
                 ['--stat-dir'],
-                help=(
-                    'Target platform name or toolchain alias, such as default-darwin-arm64, '
-                    'default-linux-x86_64, or default-win-x86_64'
-                ),
+                help='Directory to write statistics to',
                 hook=SetValueHook('statistics_out_dir'),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
@@ -846,7 +843,10 @@ class CrossCompilationOptions(Options):
             ),
             ArgConsumer(
                 ['--target-platform'],
-                help='Target platform',
+                help=(
+                    'Target platform name or toolchain alias, such as default-darwin-arm64, '
+                    'default-linux-x86_64, or default-win-x86_64'
+                ),
                 hook=CrossCompilationOptions.PlatformSetAppendHook(
                     'target_platforms',
                     values=CrossCompilationOptions.generate_target_platforms_cxx,
