@@ -92,14 +92,6 @@ namespace {
             YDebug() << "No incorrect loops found" << Endl;
         }
     }
-
-    inline bool NeedToPassInputs(const TConstDepRef& dep) {
-        if (dep.To()->NodeType == EMNT_Program || dep.To()->NodeType == EMNT_Library) {
-            return false;
-        }
-
-        return true;
-    }
 }
 
 TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarget> startDirs)
@@ -112,6 +104,11 @@ TUidsData::TUidsData(const TRestoreContext& restoreContext, const TVector<TTarge
 
 
 void TUidsData::SaveCache(IOutputStream* output, const TDepGraph& graph) {
+    if (!RestoreContext.Conf.StoreInputsInJsonCache) {
+        // FIXME: Don't bother saving: without inputs the uids cache is unusable
+        return;
+    }
+
     TVector<ui8> rawBuffer;
     rawBuffer.reserve(64 * 1024);
 
@@ -152,6 +149,11 @@ void TUidsData::SaveCache(IOutputStream* output, const TDepGraph& graph) {
 }
 
 void TUidsData::LoadCache(IInputStream* input, const TDepGraph& graph) {
+    if (!RestoreContext.Conf.StoreInputsInJsonCache) {
+        // FIXME: Shall compute NodeInputs from scratch: avoid uids cache cut-off
+        return;
+    }
+
     TVector<ui8> rawBuffer;
     rawBuffer.reserve(64 * 1024);
     ui32 nodesSkipped = 0;
@@ -466,11 +468,10 @@ bool TJSONVisitor::Enter(TState& state) {
         if (IsModule(*CurrState)) {
             CurrData->IsGlobalVarsCollectorStarted = GlobalVarsCollector.Start(*CurrState);
         }
-    }
 
-    // TODO: Этот код выполняется при каждом Enter, а возможно нужно только при первом.
-    if (RestoreContext.Conf.DumpInputsInJSON && CurrType == EMNT_File) {
-        AddTo(CurrNode.Id(), GetNodeInputs(CurrNode.Id()));
+        if (RestoreContext.Conf.DumpInputsInJSON && CurrType == EMNT_File) {
+            AddTo(CurrNode.Id(), GetNodeIncludedInputs(CurrNode.Id()));
+        }
     }
 
     CurrData->WasFresh = fresh;
@@ -579,6 +580,14 @@ TSimpleSharedPtr<TUniqVector<TNodeId>>& TJSONVisitor::GetNodeInputs(TNodeId node
     }
 }
 
+TSimpleSharedPtr<TUniqVector<TNodeId>>& TJSONVisitor::GetNodeIncludedInputs(TNodeId node) {
+    if (const auto* loop = Loops.FindLoopForNode(node)) {
+        return LoopsIncludedInputs[*loop];
+    } else {
+        return NodesIncludedInputs[node];
+    }
+}
+
 const TVector<TString>& TJSONVisitor::GetHostResources() const {
     return HostResources;
 }
@@ -683,8 +692,25 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
                 } else {
                     prntDestSet.Add(CurrData->IncludedDeps);
                 }
+
+                if (RestoreContext.Conf.DumpInputsInJSON) {
+                    if (IsIncludeFileDep(incDep)) {
+                        AddTo(GetNodeIncludedInputs(CurrNode.Id()), GetNodeIncludedInputs(prntNode.Id()));
+                    } else if (*incDep == EDT_BuildFrom && IsFileType(CurrNode->NodeType)) {
+                        AddTo(GetNodeIncludedInputs(CurrNode.Id()), GetNodeInputs(prntNode.Id()));
+                    }
+                }
+
                 if (IsDirectPeerdirDep(incDep) && PrntState->Module->PassPeers()) {
                     PrntData->IncludedDeps.Add(CurrData->IncludedDeps);
+                } else if (isParentBuildEntry && CurrData->IsFile && Graph.ToTargetStringBuf(CurrNode).EndsWith(".in")) {
+                    // FIXME(YMAKE-2169): includes parsed from xxx.cpp.in are attached to it while shall be includes of xxx.cpp
+                    // ideally this shall be handled elsewhere: either directly adding include to proper node or through induced deps
+                    // also propagation is done without filetring, so xxx.cpp.in leaks into xxx.cpp compilation
+                    PrntData->IncludedDeps.Add(CurrData->IncludedDeps);
+                    if (RestoreContext.Conf.DumpInputsInJSON) {
+                        AddTo(GetNodeIncludedInputs(CurrNode.Id()), GetNodeIncludedInputs(prntNode.Id()));
+                    }
                 }
             }
         }
@@ -785,9 +811,6 @@ void TJSONVisitor::PrepareLeaving(TState& state) {
             }
         }
 
-        if (tool == TNodeId::Invalid && RestoreContext.Conf.DumpInputsInJSON && NeedToPassInputs(incDep)) {
-            AddTo(GetNodeInputs(CurrNode.Id()), GetNodeInputs(prntNode.Id()));
-        }
     }
 
     if (state.HasIncomingDep() && (
@@ -1361,7 +1384,7 @@ void TJSONVisitor::AddGlobalSrcs() {
                 TConstDepNodeRef srcNode = Graph[globalSrcNodeId];
                 Y_ASSERT(srcNode->NodeType == EMNT_File);
                 if (srcNode->NodeType == EMNT_File) {
-                    AddTo(globalSrcNodeId, GetNodeInputs(CurrNode.Id()));
+                    AddTo(GetNodeIncludedInputs(globalSrcNodeId), GetNodeInputs(CurrNode.Id()));
                 }
             }
         }
