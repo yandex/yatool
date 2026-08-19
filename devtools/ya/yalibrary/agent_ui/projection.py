@@ -121,7 +121,10 @@ def project_result(entry: dict) -> dict | None:
     return event
 
 
-def project_progress(value: dict[str, list[dict]] | None) -> dict | None:
+def project_progress(value: dict[str, list[dict]] | None, in_flight: int = 0) -> dict | None:
+    """Aggregate per-toolchain counters; ``in_flight`` is the count of tasks
+    the runner is executing right now, present on every event so agents
+    never handle its absence."""
     if not value:
         return None
 
@@ -146,7 +149,7 @@ def project_progress(value: dict[str, list[dict]] | None) -> dict | None:
     if not by_kind:
         return None
 
-    return {'type': 'progress', 'done': done_sum, 'total': total_sum, 'by_kind': by_kind}
+    return {'type': 'progress', 'done': done_sum, 'total': total_sum, 'in_flight': in_flight, 'by_kind': by_kind}
 
 
 def project_running(active: list) -> dict | None:

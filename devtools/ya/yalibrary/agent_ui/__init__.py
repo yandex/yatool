@@ -142,7 +142,7 @@ class AgentConsole:
         from the heartbeat and only when something has changed.
         """
         try:
-            event = projection.project_progress(functor())
+            event = projection.project_progress(functor(), self._in_flight())
         except Exception:
             logger.exception("Failed to compute the initial progress for the agent console")
             event = None
@@ -160,9 +160,20 @@ class AgentConsole:
         running_delay of complete stream silence the writer thread projects
         it into a standalone ``running`` event, so the agent sees both that
         ya is alive and what it is busy with. Progress events stay
-        counters-only.
+        counters-only; the same source feeds their in_flight counter.
         """
         self._activity = functor
+
+    def _in_flight(self) -> int:
+        """Count the tasks the runner is executing right now, 0 without a source."""
+        activity = self._activity
+        if activity is None:
+            return 0
+        try:
+            return len(activity())
+        except Exception:
+            logger.exception("Failed to count in-flight tasks for the agent console")
+            return 0
 
     def _running_snapshot(self) -> dict | None:
         activity = self._activity
@@ -187,7 +198,7 @@ class AgentConsole:
         if progress is None:
             return
         try:
-            event = projection.project_progress(progress())
+            event = projection.project_progress(progress(), self._in_flight())
         except Exception:
             logger.exception("Failed to compute the final progress for the agent console")
             return
@@ -217,11 +228,13 @@ class AgentConsole:
         if progress is None:
             return None
         try:
-            event = projection.project_progress(progress())
+            event = projection.project_progress(progress(), self._in_flight())
         except Exception:
             logger.exception("Failed to compute progress heartbeat for the agent console")
             return None
-        # Only the writer thread reads and writes _last_progress.
+        # Only the writer thread reads and writes _last_progress; in_flight
+        # is part of the comparison — a change in the task count alone is
+        # worth a snapshot.
         if event == self._last_progress:
             return None
         self._last_progress = event
@@ -257,7 +270,10 @@ class AgentConsole:
                 try:
                     # Agents read raw JSONL: keep "type" the first key of
                     # every line regardless of how the event was built.
-                    event = {'type': event['type'], **event}
+                    # The wall-clock stamp is added here, past every dedup
+                    # comparison: events are deduped by content, and a stamp
+                    # applied earlier would make identical events unequal.
+                    event = {'type': event['type'], 'ts': round(time.time(), 3), **event}
                     self._stream.write(json.dumps(event) + '\n')
                     self._stream.flush()
                 except Exception:
