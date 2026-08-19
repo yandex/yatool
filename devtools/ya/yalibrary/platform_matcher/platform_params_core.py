@@ -121,11 +121,12 @@ def transform_toolchain(alias, target_platforms, toolchain_transforms):
                         if "-" in param and param != platform_name:
                             params_to_replace[param.replace("-", "_")] = param
 
+                    resolved_toolchain = toolchain
                     for replace_param, orig_param in params_to_replace.items():
-                        toolchain = toolchain.replace(orig_param, replace_param)
+                        resolved_toolchain = resolved_toolchain.replace(orig_param, replace_param)
 
                     replaced_toolchain_params = make_platform_params(
-                        platform_name + toolchain.replace(platform_name, "", 1).replace("-", ",")
+                        platform_name + resolved_toolchain.replace(platform_name, "", 1).replace("-", ",")
                     )
 
                     toolchain_params = []
