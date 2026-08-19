@@ -99,8 +99,11 @@ class DevNullDisplay(object):
         pass
 
 
+_plain_formatter = yalibrary.formatter.Formatter(yalibrary.formatter.PlainSupport())
+
+
 def strip_markup(txt):
-    return yalibrary.formatter.Formatter(yalibrary.formatter.PlainSupport()).format_message(txt)
+    return _plain_formatter.format_message(txt)
 
 
 def build_term_display(stream, tty):

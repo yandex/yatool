@@ -1791,11 +1791,12 @@ class YaMake:
         if self.build_result is None:
             return []
         test_uids = self._test_module_uids()
+        targets = self.targets  # a property resolving the graph; hoist out of the loop
         artifacts = []
         for uid, results in self.build_result.ok_nodes.items():
             if uid in test_uids:
                 continue
-            target = self.targets.get(uid)
+            target = targets.get(uid)
             if not target:
                 continue
             target_name, target_platform = target[0], target[1]
@@ -1818,6 +1819,7 @@ class YaMake:
         artifacts of the requested targets.
         """
         uids = set()
+        targets = self.targets  # a property resolving the graph; hoist out of the loop
         for node in self.ctx.graph['graph']:
             if node.get('node-type') != devtools.ya.test.const.NodeType.TEST:
                 continue
@@ -1825,7 +1827,7 @@ class YaMake:
             if not test_dir:
                 continue
             for dep in node.get('deps') or ():
-                target = self.targets.get(dep)
+                target = targets.get(dep)
                 if target and target[0] == test_dir:
                     uids.add(dep)
         return uids

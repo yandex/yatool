@@ -10,18 +10,17 @@ def configure(app_ctx):
         yield None
         return
 
-    opened_file = None
     if value == common_opts.AgentOutputOptions.STDERR:
         # stdout is reserved for the handlers' payload (ya dump etc.);
         # the event stream is meta output, like the human display.
         stream = sys.stderr
     else:
-        stream = opened_file = open(value, 'w')
+        stream = open(value, 'w')
     console = agent_ui.AgentConsole(stream)
     console.start()
     try:
         yield console
     finally:
         console.stop()
-        if opened_file is not None:
-            opened_file.close()
+        if stream is not sys.stderr:
+            stream.close()

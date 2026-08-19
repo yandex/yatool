@@ -77,7 +77,11 @@ class AgentConsole:
 
         Called by ConfigureSubscriber from event-queue threads; the buffer
         is emitted only when the configuration fails hard (see stop()).
+        Once a build frame has opened the buffer can never be read again,
+        so it stops accepting entries instead of hoarding dead dicts.
         """
+        if self._builds:
+            return
         self._configure_errors.append(event)
 
     def _emit_configure_errors(self) -> None:
@@ -103,6 +107,9 @@ class AgentConsole:
         """Frame a single build: emit build_started/artifact/build_finished events around it."""
         index = self._builds
         self._builds += 1
+        # Configure errors reach the stream through the report pipeline now
+        # (see buffer_configure_error); drop the buffer.
+        self._configure_errors = []
         sink = _BuildSink(self, split_toolchains=len(platforms or []) > 1)
         self.emit(
             {
@@ -141,15 +148,8 @@ class AgentConsole:
         The first snapshot announces the work totals; later snapshots come
         from the heartbeat and only when something has changed.
         """
-        try:
-            event = projection.project_progress(functor(), self._in_flight())
-        except Exception:
-            logger.exception("Failed to compute the initial progress for the agent console")
-            event = None
-        if event:
-            # The heartbeat cannot run concurrently: _progress is still None.
-            self._last_progress = event
-            self.emit(event)
+        # The heartbeat cannot run concurrently: _progress is still None.
+        self._emit_progress_if_changed(functor, 'initial')
         self._progress = functor
 
     def set_activity(self, functor: Callable[[], list] | None) -> None:
@@ -185,6 +185,24 @@ class AgentConsole:
             logger.exception("Failed to snapshot running tasks for the agent console")
             return None
 
+    def _emit_progress_if_changed(self, source: Callable[[], dict | None], what: str) -> None:
+        """Project the progress source and emit the snapshot unless it repeats the last one.
+
+        in_flight is part of the comparison — a change in the task count
+        alone is worth a snapshot. The wall-clock stamp is added later, in
+        the writer loop, so it never defeats the dedup. Callers alternate
+        between the build thread (initial/final, when the heartbeat source
+        is detached) and the writer thread (heartbeat), never concurrently.
+        """
+        try:
+            event = projection.project_progress(source(), self._in_flight())
+        except Exception:
+            logger.exception("Failed to compute the %s progress for the agent console", what)
+            return
+        if event and event != self._last_progress:
+            self._last_progress = event
+            self.emit(event)
+
     def _emit_final_progress(self) -> None:
         """Flush the definitive progress ignoring the heartbeat timing.
 
@@ -195,16 +213,8 @@ class AgentConsole:
         # Detach the source first to stop the heartbeat; a heartbeat already
         # in flight may at worst emit the same final snapshot twice.
         self._progress = None
-        if progress is None:
-            return
-        try:
-            event = projection.project_progress(progress(), self._in_flight())
-        except Exception:
-            logger.exception("Failed to compute the final progress for the agent console")
-            return
-        if event and event != self._last_progress:
-            self._last_progress = event
-            self.emit(event)
+        if progress is not None:
+            self._emit_progress_if_changed(progress, 'final')
 
     def _summary_exit_code(self) -> int | None:
         for exit_code in self._exit_codes:
@@ -212,33 +222,14 @@ class AgentConsole:
                 return exit_code
         return self._exit_codes[-1] if self._exit_codes else None
 
-    def _heartbeat(self) -> list[dict]:
+    def _heartbeat(self) -> None:
         """Quiet-window pulse: a changed progress snapshot and/or a running hint."""
-        events = []
-        progress_event = self._progress_heartbeat()
-        if progress_event:
-            events.append(progress_event)
+        progress = self._progress
+        if progress is not None:
+            self._emit_progress_if_changed(progress, 'heartbeat')
         running_event = self._running_heartbeat()
         if running_event:
-            events.append(running_event)
-        return events
-
-    def _progress_heartbeat(self) -> dict | None:
-        progress = self._progress
-        if progress is None:
-            return None
-        try:
-            event = projection.project_progress(progress(), self._in_flight())
-        except Exception:
-            logger.exception("Failed to compute progress heartbeat for the agent console")
-            return None
-        # Only the writer thread reads and writes _last_progress; in_flight
-        # is part of the comparison — a change in the task count alone is
-        # worth a snapshot.
-        if event == self._last_progress:
-            return None
-        self._last_progress = event
-        return event
+            self.emit(running_event)
 
     def _running_heartbeat(self) -> dict | None:
         """The keepalive during a long test suite or link.
@@ -260,25 +251,25 @@ class AgentConsole:
     def _loop(self) -> None:
         while True:
             try:
-                events = [self._queue.get(timeout=self._progress_delay)]
+                event = self._queue.get(timeout=self._progress_delay)
             except queue.Empty:
-                events = self._heartbeat()
-            for event in events:
-                if event is _STOP:
-                    return
-                self._last_event_time = time.monotonic()
-                try:
-                    # Agents read raw JSONL: keep "type" the first key of
-                    # every line regardless of how the event was built.
-                    # The wall-clock stamp is added here, past every dedup
-                    # comparison: events are deduped by content, and a stamp
-                    # applied earlier would make identical events unequal.
-                    event = {'type': event['type'], 'ts': round(time.time(), 3), **event}
-                    self._stream.write(json.dumps(event) + '\n')
-                    self._stream.flush()
-                except Exception:
-                    # A write failure must never propagate into the build.
-                    logger.exception("Failed to write an agent console event")
+                self._heartbeat()
+                continue
+            if event is _STOP:
+                return
+            self._last_event_time = time.monotonic()
+            try:
+                # Agents read raw JSONL: keep "type" the first key of
+                # every line regardless of how the event was built.
+                # The wall-clock stamp is added here, past every dedup
+                # comparison: events are deduped by content, and a stamp
+                # applied earlier would make identical events unequal.
+                event = {'type': event['type'], 'ts': round(time.time(), 3), **event}
+                self._stream.write(json.dumps(event) + '\n')
+                self._stream.flush()
+            except Exception:
+                # A write failure must never propagate into the build.
+                logger.exception("Failed to write an agent console event")
 
 
 class _BuildSink:
@@ -304,10 +295,11 @@ class _BuildSink:
         # Called from listener/worker threads by ReportGenerator._add_entries —
         # must be cheap and never raise.
         try:
-            statuses = [status for status in map(projection.test_case_status, entries) if status]
-            if statuses:
-                self._console.count_tests(statuses)
+            statuses = []
             for entry in entries:
+                status = projection.test_case_status(entry)
+                if status:
+                    statuses.append(status)
                 event = projection.project_result(entry)
                 if event:
                     if not self._split_toolchains:
@@ -318,6 +310,8 @@ class _BuildSink:
                     # No per-event build index: results are framed by the
                     # build_started/build_finished events, which carry it.
                     self._console.emit(event)
+            if statuses:
+                self._console.count_tests(statuses)
         except Exception:
             # Exception wall: a bug here must never fail the build.
             logger.exception("Failed to project report entries for the agent console")

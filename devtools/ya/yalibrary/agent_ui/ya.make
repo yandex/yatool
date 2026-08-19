@@ -10,7 +10,7 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/core/error
     devtools/ya/core/event_handling
-    devtools/ya/yalibrary/formatter
+    devtools/ya/yalibrary/display
     devtools/ya/yalibrary/loggers/file_log
     library/python/strings
 )

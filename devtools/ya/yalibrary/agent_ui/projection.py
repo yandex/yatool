@@ -8,7 +8,7 @@ JsonLineReport wraps as ``{"time", "type": "result", "data": entry}``.
 import os
 
 from library.python import strings
-from yalibrary import formatter
+from yalibrary.display import strip_markup
 
 # Wire statuses that carry no failure information
 # (see TestStatus in devtools/ya/test/reports/report_prototype.py).
@@ -27,8 +27,6 @@ _FIELD_MAPPING = (
 )
 
 _TEXT_LIMIT = 1000
-
-_plain_formatter = formatter.Formatter(formatter.PlainSupport(), show_status=False)
 
 
 def _entry_level(entry: dict) -> str | None:
@@ -56,7 +54,7 @@ def _entry_text(entry: dict) -> str | None:
     if not snippet:
         return None
 
-    text = _plain_formatter.format_message(snippet).strip()
+    text = strip_markup(snippet).strip()
     if not text:
         return None
     # Keep the tail: build errors are prefixed with the whole compiler
@@ -121,7 +119,7 @@ def project_result(entry: dict) -> dict | None:
     return event
 
 
-def project_progress(value: dict[str, list[dict]] | None, in_flight: int = 0) -> dict | None:
+def project_progress(value: dict[str, list[dict]] | None, in_flight: int) -> dict | None:
     """Aggregate per-toolchain counters; ``in_flight`` is the count of tasks
     the runner is executing right now, present on every event so agents
     never handle its absence."""
@@ -173,7 +171,7 @@ def project_running(active: list) -> dict | None:
             status = next(iter(status), None)
         if not status:
             continue
-        text = _plain_formatter.format_message(status).strip()
+        text = strip_markup(status).strip()
         if not text:
             continue
         entries.append({'text': strings.truncate(text, _TEXT_LIMIT), 'elapsed': int(elapsed)})
@@ -188,7 +186,7 @@ def plain_message_text(text: str) -> str | None:
     The tail carries the diagnosis both in build errors (prefixed with the
     compiler command line) and in logged tracebacks.
     """
-    text = _plain_formatter.format_message(text).strip()
+    text = strip_markup(text).strip()
     if not text:
         return None
     return strings.truncate(text, _TEXT_LIMIT, whence=strings.Whence.Start)
