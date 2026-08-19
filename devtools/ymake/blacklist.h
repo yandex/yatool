@@ -12,6 +12,7 @@ public:
     using EParserErrorKind = NBlacklist::EParserErrorKind;
 
     const TString* IsValidPath(TStringBuf path) const;
+    void OnParserDiagnostic(const NBlacklist::TBlacklistDiagnostic& diagnostic) override;
     void OnParserError(EParserErrorKind kind, TStringBuf path, TStringBuf file) override;
     void Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confHash);
 };
