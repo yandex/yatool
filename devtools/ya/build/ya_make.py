@@ -55,7 +55,7 @@ import library.python.func as func
 from exts.decompress import udopen
 from exts.compress import zcopen
 from yalibrary import tools
-from yalibrary.agent_ui import subscriber as agent_ui_subscriber
+from devtools.ya.yalibrary.agent_ui import subscriber as agent_ui_subscriber
 from yalibrary.last_failed import last_failed
 from yalibrary.runner import patterns as ptrn
 from yalibrary.runner import result_store
@@ -299,8 +299,8 @@ def _build_graph_and_tests(opts, app_ctx, ymake_stats):
         errors_collector,
     ]
 
-    # Duck-typed on purpose: yalibrary must not import app.modules
-    # (see AgentConsole in devtools/ya/yalibrary/agent_ui).
+    # AgentConsole (devtools/ya/yalibrary/agent_ui) is taken from app_ctx;
+    # it is absent or None when the agent output is disabled.
     agent_console = getattr(app_ctx, 'agent_ui', None)
     if agent_console is not None:
         configure_time_subscribers.append(agent_ui_subscriber.ConfigureSubscriber(agent_console))

@@ -114,9 +114,9 @@ class CapCalculator:
 def _called_by_agent(app_ctx) -> bool:
     """Tell whether ya was launched by a coding agent.
 
-    Reads the caller_info app module duck-typed (yalibrary must not import
-    app.modules): the provider detects the caller in a background thread,
-    so an unfinished detection reads as "not an agent".
+    Reads the caller_info app module through getattr (yalibrary must not
+    import app.modules): the provider detects the caller in a background
+    thread, so an unfinished detection reads as "not an agent".
     """
     provider = getattr(app_ctx, 'caller_info', None)
     if provider is None:
@@ -693,8 +693,8 @@ class TaskContext(object):
         self._exit_stack.callback(lambda: self._ticker.tick(force=True))
         self._exit_stack.callback(term_view.tick)
 
-        # Duck-typed on purpose: yalibrary must not import app.modules
-        # (see AgentConsole in devtools/ya/yalibrary/agent_ui). The console
+        # AgentConsole (devtools/ya/yalibrary/agent_ui) comes through
+        # app_ctx: yalibrary must not import app.modules. The console
         # projects this snapshot into the ``running`` heartbeat field.
         agent_console = getattr(self._app_ctx, 'agent_ui', None)
         if agent_console is not None:

@@ -17,7 +17,7 @@ from typing import IO
 
 import devtools.ya.core.error as core_error
 
-from yalibrary.agent_ui import projection
+from devtools.ya.yalibrary.agent_ui import projection
 
 logger = logging.getLogger(__name__)
 

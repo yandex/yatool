@@ -509,7 +509,7 @@ def configure_display_log(app_ctx):
 
     agent_console = getattr(app_ctx, 'agent_ui', None)
     if agent_console is not None:
-        from yalibrary.agent_ui import log_handler
+        from devtools.ya.yalibrary.agent_ui import log_handler
 
         # Must go first: with_display_log replays and closes the early
         # warning buffer, and the display is DevNull in agent mode.

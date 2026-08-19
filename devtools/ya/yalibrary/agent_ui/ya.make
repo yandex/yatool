@@ -1,7 +1,6 @@
 PY3_LIBRARY()
 
 PY_SRCS(
-    NAMESPACE yalibrary.agent_ui
     __init__.py
     log_handler.py
     projection.py

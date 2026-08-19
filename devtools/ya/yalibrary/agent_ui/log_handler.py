@@ -7,7 +7,7 @@ into a structured message event instead of a markup string for a display.
 
 import logging
 
-from yalibrary.agent_ui import projection
+from devtools.ya.yalibrary.agent_ui import projection
 from yalibrary.loggers.file_log import TokenFilterFormatter
 
 
@@ -29,7 +29,7 @@ class AgentLogHandler(logging.Handler):
             return False
         # Reentrancy guard: the console logs its own write failures, so
         # forwarding its records would loop the failure back into itself.
-        if record.name.startswith('yalibrary.agent_ui'):
+        if record.name.startswith(__package__):
             return False
         return super().filter(record)
 

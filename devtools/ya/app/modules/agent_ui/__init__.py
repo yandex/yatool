@@ -1,7 +1,7 @@
 import sys
 
 import devtools.ya.core.common_opts as common_opts
-from yalibrary import agent_ui
+from devtools.ya.yalibrary import agent_ui
 
 
 def configure(app_ctx):
