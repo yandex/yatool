@@ -59,6 +59,10 @@ ENDIF()
 
 SRCS(
     action.cpp
+    model/action_graph.cpp
+    model_producer/action_binding_builder.cpp
+    model_producer/action_glob_evaluator.cpp
+    model_producer/action_path_resolver.cpp
     add_dep_adaptor.cpp
     add_iter_debug.cpp
     add_iter.cpp

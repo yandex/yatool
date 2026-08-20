@@ -1,5 +1,9 @@
 #include "module_builder.h"
 
+#include "model/action_graph.h"
+#include "model_producer/action_binding_builder.h"
+#include "model_producer/action_glob_evaluator.h"
+#include "model_producer/action_path_resolver.h"
 #include "args_converter.h"
 #include "builtin_macro_consts.h"
 #include "glob_helper.h"
@@ -79,6 +83,10 @@ void TModuleBuilder::AddDart(TStringBuf dartName, TStringBuf dartValue, const TV
 
 void TModuleBuilder::RecursiveAddInputs() {
     const auto stageScope = TModuleStagesStatsManager::Current().Measure();
+    TActionGraphEncoder actionGraph(Conf, Graph, UpdIter, &Module);
+    TActionInputResolver inputResolver;
+    TActionOutputResolver outputResolver;
+    TActionGlobEvaluator globEvaluator(actionGraph.MakeGlobEvaluationContext());
     bool lastTryMode = false;
     const TCommandInfo* firstFail = nullptr;
     while (!CmdAddQueue.empty()) {
@@ -92,8 +100,9 @@ void TModuleBuilder::RecursiveAddInputs() {
             lastTryMode = true;
         }
 
-        TCommandInfo::ECmdInfoState state = cmdInfo->CheckInputs(*this, Node, lastTryMode);
-        if (state == TCommandInfo::SKIPPED) {
+        auto submission = actionGraph.PrepareActionSubmission(Node);
+        EActionInputResolution state = inputResolver.Resolve(*cmdInfo, *this, submission, lastTryMode);
+        if (state == EActionInputResolution::Skipped) {
             TStringBuf cmd, cmdName;
             auto tryParse = [&](const TYVar& var, TStringBuf& cmdName, TStringBuf* cmdArgs) {
                 if (var.size() != 1 || var[0].StructCmdForVars)
@@ -111,7 +120,7 @@ void TModuleBuilder::RecursiveAddInputs() {
             YConfErr(BadInput) << Module.GetDir() << ": skip processing macro " << cmdName << cmd << " due to unallowed input." << Endl;
             continue;
         }
-        if (state == TCommandInfo::FAILED) {
+        if (state == EActionInputResolution::Pending) {
             if (!firstFail) {
                 firstFail = cmdInfo.Get();
             }
@@ -121,14 +130,16 @@ void TModuleBuilder::RecursiveAddInputs() {
             continue;
         }
         firstFail = nullptr;
-        if (!cmdInfo->Process(*this, Node, false)) {
+        if (!outputResolver.Resolve(*cmdInfo, *this)) {
             continue;
         }
-        TCommandInfo& info = *cmdInfo;
-        if (const auto* mainOut = cmdInfo->GetMainOutput()) {
-            AddOutput(AssumeFile(mainOut->ElemId), EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
+        const auto encoding = actionGraph.EncodeActionSubmission(cmdInfo, *this, submission, globEvaluator, false);
+        if (encoding == TActionGraphEncoder::EActionEncodingResult::Failed) {
+            continue;
         }
-        QueueCommandOutputs(info);
+        if (encoding == TActionGraphEncoder::EActionEncodingResult::NeedsCompletion) {
+            actionGraph.CompleteActionSubmission(cmdInfo, *this, submission, false);
+        }
     }
 
     if (Module.IsInputsComplete()) {
@@ -184,41 +195,6 @@ void TModuleBuilder::RecursiveAddInputs() {
     Module.SetInputsComplete();
     Module.SetDirsComplete();
     return;
-}
-
-void TModuleBuilder::SaveInputResolution(const TVarStrEx& input, TStringBuf origInput, TFileView curDir) {
-    if (origInput == input.Name) {
-        return;
-    }
-    if (NPath::IsTypedPathEx(origInput)) {
-        switch (NPath::GetType(origInput))
-        {
-        case NPath::Link:
-            if (!NPath::IsType(NPath::GetTargetFromLink(origInput), NPath::Unset)) {
-                return;
-            }
-            [[fallthrough]];
-        case NPath::Unset:
-            break;
-        case NPath::Source:
-        case NPath::Build:
-            return;
-        }
-    } else {
-        TString dummyRes;
-        if (Resolver().ResolveAsKnownWithoutCheck(origInput, curDir, dummyRes)) {
-            return;
-        }
-    }
-
-    Module.ResolveResults.insert({
-        AssumeFile(Graph.Names().AddName(
-            EMNT_MissingFile,
-            NPath::IsTypedPathEx(origInput) ? origInput : NPath::ConstructPath(origInput,  NPath::Unset)
-        )),
-        curDir.IsValid() ? curDir.GetElemId() : TResolveResult::EmptyPath,
-        AssumeFile(input.ElemId)
-    });
 }
 
 bool TModuleBuilder::AddByExt(const TStringBuf& sectionName, TVarStrEx& src, const TVector<TStringBuf>* args) {
@@ -347,57 +323,6 @@ void TModuleBuilder::AddInputVarDep(TVarStrEx& input, TAddDepAdaptor& inputNode)
     inputNode.AddDepIface(EDT_BuildFrom, nType, input.ElemId);
 }
 
-void TModuleBuilder::AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node) {
-    // enforce the existence of an elemId for a USED_RESERVED_VAR prop node
-    // to be used by the cache, see TSaveBuffer::FindUsedReservedVar
-    Graph.Names().AddName(EMNT_BuildCommand, TString::Join(NProps::USED_RESERVED_VAR, "=", varName));
-
-    auto var = Vars.Lookup(varName);
-    if (!var)
-        return;
-
-    auto varText = Get1(var);
-    if (varText.size() && GetCmdValue(varText).size()) {
-        auto res = [&]() {
-            ui64 id;
-            TStringBuf cmdName;
-            TStringBuf cmdValue;
-            ParseCommandLikeVariable(varText, id, cmdName, cmdValue);
-
-            auto compiled = Commands.Compile(cmdValue, Conf, Vars, false, {});
-            // TODO: there's no point in allocating cmdElemId for expressions
-            // that do _not_ have directly corresponding nodes
-            // (and are linked as "0:VARNAME=S:123" instead)
-            auto cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
-            auto value = Graph.Names().CmdNameById(cmdElemId).GetStr();
-            auto compiledVarText = FormatCmd(TCmdElemId(id), cmdName, value);
-            auto compiledVarElemId = AssumeCmd(Graph.Names().AddName(EMNT_BuildCommand, compiledVarText));
-
-            TCommandInfo cmdInfo(Conf, &Graph, &UpdIter, &Module);
-            cmdInfo.GetCommandInfoFromStructVar(compiledVarElemId, cmdElemId, Commands, Conf.CommandConf);
-
-            return compiledVarElemId;
-        }();
-
-        if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
-            // duplication comes from adding locally referenced vars
-            // via TCommandInfo::GlobalVars, then the whole list through here
-            node.AddUniqueDep(EDT_Include, EMNT_BuildCommand, res);
-        } else {
-            node.AddDepIface(EDT_Include, EMNT_BuildCommand, res);
-        }
-    }
-}
-
-void TModuleBuilder::AddGlobalVarDeps(TAddDepAdaptor& node) {
-    for (const auto& var : GetModuleConf().Globals) {
-        const TString depName = TString::Join(var, "_GLOBAL");
-        AddGlobalVarDep(depName, node);
-    }
-    for (const auto& resource : Module.ExternalResources) {
-        AddGlobalVarDep(resource, node);
-    }
-}
 
 void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind) {
     YDIAG(Dev) << "Add LinkDep for: " << name << node.NodeType << Endl;
@@ -414,17 +339,38 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
         }
         return Commands.Compile("$FAIL_MODULE_CMD", Conf, Vars, true, {.MainOutput = mainOutputName});
     }();
-    const TCmdElemId cmdElemId = Commands.Add(Graph, std::move(compiled.Expression));
+    TActionGraphEncoder actionGraph(Conf, Graph, UpdIter, &Module);
+    const TCmdElemId cmdElemId = actionGraph
+        .ImportCommandExpression(std::move(compiled.Expression))
+        .Id;
 
     TAutoPtr<TCommandInfo> cmdInfo = new TCommandInfo(Conf, &Graph, &UpdIter, &Module);
     cmdInfo->InitFromModule(Module);
 
     cmdInfo->GetCommandInfoFromStructCmd(Commands, cmdElemId, compiled, true, Vars);
 
-    if (cmdInfo->CheckInputs(*this, node, /* lastTry */ true) == TCommandInfo::OK && cmdInfo->Process(*this, node, true)) {
-        AddGlobalVarDeps(node);
-        node.AddOutput(AssumeFile(node.ElemId), EMNT_NonParsedFile, false).GetAction().GetModuleData().CmdInfo = cmdInfo;
-    } else {
+    TActionInputResolver inputResolver;
+    TActionOutputResolver outputResolver;
+    TActionGlobEvaluator globEvaluator(actionGraph.MakeGlobEvaluationContext());
+    auto submission = actionGraph.PrepareActionSubmission(node);
+    bool actionAdded = false;
+    if (inputResolver.Resolve(*cmdInfo, *this, submission, /* lastTry */ true) == EActionInputResolution::Ready &&
+        outputResolver.Resolve(*cmdInfo, *this)) {
+        const auto encoding = actionGraph.EncodeActionSubmission(cmdInfo, *this, submission, globEvaluator, true);
+        if (encoding == TActionGraphEncoder::EActionEncodingResult::Complete) {
+            actionAdded = true;
+        } else if (encoding == TActionGraphEncoder::EActionEncodingResult::NeedsCompletion) {
+            for (const auto& variableName : CollectGlobalBindingNames(*this)) {
+                actionGraph.RecordGlobalBindingUse(variableName);
+                if (auto binding = CompileGlobalBinding(*this, variableName)) {
+                    actionGraph.AttachGlobalBinding(std::move(*binding), submission);
+                }
+            }
+            actionGraph.CompleteActionSubmission(cmdInfo, *this, submission, true);
+            actionAdded = true;
+        }
+    }
+    if (!actionAdded) {
         YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
         if (cmdKind != EModuleCmdKind::Fail) {
             YDIAG(Dev) << "... will try to add FAIL_MODULE_CMD" << Endl;
@@ -457,14 +403,13 @@ void TModuleBuilder::AddGlobalDep() {
 
 void TModuleBuilder::AddFileGroupVars() {
     for (auto& [varId, cmdInfo] : FileGroupCmds) {
-        Node.AddUniqueDep(EDT_Property, EMNT_BuildCommand, varId);
-        auto& [id, entryStats] = *UpdIter.Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, varId), &UpdIter.YMake, &Module);
-        entryStats.SetOnceEntered(false);
-        entryStats.SetReassemble(true);
-        auto& cmdNode = entryStats.GetAddCtx(&Module, UpdIter.YMake);
-
-        cmdInfo->CheckInputs(*this, cmdNode, true);
-        cmdInfo->ProcessVar(*this, cmdNode);
+        TActionGraphEncoder actionGraph(Conf, Graph, UpdIter, &Module);
+        TActionInputResolver inputResolver;
+        auto submission = actionGraph.PrepareVariableSubmission(Node, AssumeCmd(varId));
+        if (inputResolver.Resolve(*cmdInfo, *this, submission, /* lastTry */ true) != EActionInputResolution::Ready) {
+            continue;
+        }
+        actionGraph.CompleteVariableSubmission(*cmdInfo, submission);
     }
 }
 

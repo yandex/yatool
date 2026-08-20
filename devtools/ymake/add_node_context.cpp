@@ -71,7 +71,7 @@ namespace {
         const auto dummyFileElemId = ctx.Graph.Names().FileConf.DummyFile().GetElemId();
         for (const auto& cacheId : *outputIncludes) {
             TFileView include = ctx.Graph.GetFileNameByCacheId(cacheId);
-            // Some resolving is already done in CheckInputs in macro processor
+            // Some resolving is already done by the producer-side action input resolver.
             if (include.GetTargetId() == dummyFileElemId) {
                 YDIAG(IPRP) << "    [skip OUTPUT_INCLUDE]" << include << Endl;
             } else if (include.IsType(NPath::Unset)) {

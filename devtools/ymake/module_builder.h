@@ -19,6 +19,8 @@
 #include <util/generic/hash_set.h>
 
 class TCommands;
+class TActionGraphEncoder;
+struct TCompiledGlobalBinding;
 
 struct TInducedDeps {
     TString Type;
@@ -37,6 +39,11 @@ bool IsForbiddenStatement(const TStringBuf& name);
 /// @brief This builds graph for a module
 class TModuleBuilder : public TModuleDirBuilder, public TModuleWrapper
 {
+    friend class TActionGraphEncoder;
+    friend TMaybe<TCompiledGlobalBinding> CompileGlobalBinding(
+        TModuleBuilder& moduleBuilder,
+        TStringBuf variableName
+    );
 public:
     struct TPeerQuery {
         enum class EAction {Store, Invoke, InvokeForEach};
@@ -138,8 +145,6 @@ public:
         return Module.GetAttrs().UseAllSrcs;
     }
 
-    void SaveInputResolution(const TVarStrEx& input, TStringBuf origInput, TFileView curDir);
-
     /// @brief Apply macro call processing as during ya.make load but with immediate
     ///        macro processing instead of call caching.
     void ProcessConfigMacroCalls(const TStringBuf& name, const TVector<TStringBuf>& args) {
@@ -192,8 +197,6 @@ private:
 
     void ApplyVarAsMacro(const TStringBuf& name, bool force = false);
     void AddLinkDep(TFileView name, const TString& command, TAddDepAdaptor& node, EModuleCmdKind cmdKind = EModuleCmdKind::Default);
-    void AddGlobalVarDep(const TStringBuf& varName, TAddDepAdaptor& node);
-    void AddGlobalVarDeps(TAddDepAdaptor& node);
     void AddGlobalDep();
     void AddFileGroupVars();
     void AddDartsVars();

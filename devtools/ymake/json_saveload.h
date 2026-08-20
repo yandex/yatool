@@ -68,7 +68,7 @@ private:
         scratchpad.varNodeName.replace(scratchpad.namePrefixSize, scratchpad.varNodeName.size() - scratchpad.namePrefixSize, varName);
 
         auto varElemId = graph.Names().CommandConf.GetIdNx(scratchpad.varNodeName);
-        Y_ASSERT(varElemId != TCmdElemId()); // guaranteed by TModuleBuilder::AddGlobalVarDep
+        Y_ASSERT(varElemId != TCmdElemId()); // guaranteed by TActionGraphEncoder::AttachGlobalBinding
         return varElemId;
     }
 

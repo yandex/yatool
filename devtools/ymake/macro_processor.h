@@ -23,9 +23,11 @@ class TModuleBuilder;
 class TBuildConfiguration;
 class TDepGraph;
 class TUpdIter;
-class TAddDepAdaptor;
 class TCommands;
-struct TNodeAddCtx;
+class TActionGraphEncoder;
+class TActionInputResolver;
+class TActionOutputResolver;
+struct TCompiledBindingExpression;
 
 bool IsInternalReservedVar(const TStringBuf& cur);
 
@@ -37,12 +39,6 @@ enum ESubstMode {
 };
 
 struct TCommandInfo {
-    enum ECmdInfoState {
-        OK = 0,
-        FAILED = 1,
-        SKIPPED = 2,
-    };
-
     using TSubstObserver = std::function<void(const TVarStr&)>;
 
     explicit TCommandInfo(const TBuildConfiguration& conf, TDepGraph* graph, TUpdIter* updIter, TModule* module = nullptr);
@@ -65,6 +61,13 @@ public:
 
 private:
     friend class TCmdProperty;
+    friend class TActionGraphEncoder;
+    friend class TActionInputResolver;
+    friend class TActionOutputResolver;
+    friend TCompiledBindingExpression CompileConfigurationBinding(
+        TCommandInfo& commandInfo,
+        const TVector<TStringBuf>& variableNames
+    );
     explicit TCommandInfo();
     struct TSpecFileLists {
         TSpecFileList Input;         // deps for the main output
@@ -143,13 +146,9 @@ public:
 
     void InitFromModule(const TModule& mod);
 
-    ECmdInfoState CheckInputs(TModuleBuilder& mod, TAddDepAdaptor& node, bool lastTry);
     const TVarStrEx* GetMainOutput() const {
         return MainOutput;
     }
-    bool Process(TModuleBuilder& mod, TAddDepAdaptor& node, bool finalTargetCmd);
-    bool ProcessVar(TModuleBuilder& mod, TAddDepAdaptor& node);
-    void AddCfgVars(const TVector<TDepsCacheId>& varLists, TNodeAddCtx& dst);
 
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
@@ -235,11 +234,6 @@ private:
     // Switches TSpecFiles representation from TSpecFileList to TSpecFileArr.
     void Finalize();
 
-    enum class EStructCmd {No, Yes};
-    enum class EExprRole {Cmd, Var};
-
-    TCmdElemId InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role);
-    void AddCmdNode(const TYVar& var, TCmdElemId elemId, EStructCmd structCmd, EExprRole role);
     // TODO: move MsgPad here, too?
     TString SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor = ECF_Unset);
     void FillCoords(const TYVar* origin, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& localVars, ECmdFormat cmdFormat, bool setAddCtxFilled = true);
@@ -259,7 +253,6 @@ private:
     void ApplyToolOptions(const TStringBuf macroName, const TVars& vars);
 
     void CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources);
-    void ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr);
 };
 
 void ParseRequirements(const TStringBuf requirements, THashMap<TString, TString>& result);

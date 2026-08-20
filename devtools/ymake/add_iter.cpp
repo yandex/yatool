@@ -1,5 +1,7 @@
 #include "add_node_context_inline.h"
 
+#include "model/action_graph.h"
+#include "model_producer/action_binding_builder.h"
 #include "add_iter.h"
 #include "add_iter_debug.h"
 #include "glob_helper.h"
@@ -992,7 +994,10 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
                 if (const auto* propValues = props.FindValues(TPropertyType{symbols, EVI_CommandProps, "CfgVars"})) {
                     auto& modData = Add->GetModuleData();
                     if (modData.CmdInfo) {
-                        modData.CmdInfo->AddCfgVars(propValues->Data(), *Add);
+                        TActionGraphEncoder encoder(*modData.CmdInfo);
+                        auto variableNames = encoder.ConfigurationBindingVariables(propValues->Data());
+                        auto binding = CompileConfigurationBinding(*modData.CmdInfo, variableNames);
+                        encoder.AddConfigurationBinding(std::move(binding), *Add);
                     }
                 }
             }

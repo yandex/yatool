@@ -1,5 +1,6 @@
 #include "macro_processor.h"
 
+#include "model/action_graph.h"
 #include "add_iter.h"
 #include "add_node_context_inline.h"
 #include "add_dep_adaptor.h"
@@ -68,26 +69,6 @@ namespace {
     };
 #endif
 
-    TVarStrEx* FindMainElemOrDefault(std::span<TVarStrEx> elems, ui32 defaultElemPos) {
-        if (elems.empty()) {
-            return nullptr;
-        }
-        auto filterMain = [](const auto& elem) { return elem.Main; };
-        auto it = FindIf(elems, filterMain);
-        TVarStrEx* mainElem = nullptr;
-        if (it != end(elems)) {
-            mainElem = &*it;
-            if (std::any_of(++it, end(elems), filterMain)) {
-                YConfWarn(NoMain) << "Two or more main elements; picked the first one" << Endl;
-            }
-        } else if (defaultElemPos != Max<ui32>()) {
-            if (elems.size() > 1) {
-                YConfWarn(NoMain) << "No explicit main element; picked the default one" << Endl;
-            }
-            mainElem = &elems[defaultElemPos];
-        }
-        return mainElem;
-    }
 
     bool OnlyMacroCall(const TVector<TMacroData>& macros) {
         for (const auto& macro : macros) {
@@ -148,25 +129,6 @@ namespace {
         return TString::Join(ns, name, suffix);
     }
 
-    bool CheckForDirectory(const TVarStrEx& var, const TYVar& cmdVar, TStringBuf msg) {
-        if (Y_UNLIKELY(var.IsDir)) {
-            TStringBuf cmdName;
-            auto tryParse = [&](const TYVar& var) {
-                if (var.size() != 1 || var[0].StructCmdForVars)
-                    return false;
-                TStringBuf cmd;
-                ui64 id;
-                ParseCommandLikeVariable(Get1(&var), id, cmdName, cmd);
-                return true;
-            };
-            if (!tryParse(cmdVar))
-                if (!cmdVar.BaseVal || !tryParse(*cmdVar.BaseVal))
-                    cmdName = "[unspecified macro]";
-            YConfErr(BadInput) << msg << " in " << cmdName << " " << var.Name << " points to a directory and cannot be processed. Please provide a file path instead." << Endl;
-            return false;
-        }
-        return true;
-    }
 } // namespace
 
 void ParseRequirements(const TStringBuf requirements, THashMap<TString, TString>& result) {
@@ -343,10 +305,10 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
             knownOutputs = &specFiles->Output;
         }
         auto compiled = CommandSink->Compile(command, *Conf, ownVars, true, {.KnownInputs = knownInputs, .KnownOutputs = knownOutputs});
-        const TCmdElemId cmdElemId = CommandSink->Add(*Graph, std::move(compiled.Expression));
-        GetCommandInfoFromStructCmd(*CommandSink, cmdElemId, compiled, false, ownVars);
-        auto res = Graph->Names().CmdNameById(cmdElemId).GetStr();
-        return TString(res);
+        const auto importedExpression = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module)
+            .ImportCommandExpression(std::move(compiled.Expression));
+        GetCommandInfoFromStructCmd(*CommandSink, importedExpression.Id, compiled, false, ownVars);
+        return TString(importedExpression.Reference);
     }
 
     TVector<TMacroData> bMacros;
@@ -399,90 +361,6 @@ THashMap<TString, TString> TCommandInfo::TakeRequirements() {
     return THashMap<TString, TString>();
 }
 
-TCmdElemId TCommandInfo::InitCmdNode(const TYVar& var, EStructCmd structCmd, EExprRole role) {
-    const TCmdElemId elemId = AssumeCmd(Graph->Names().AddName(EMNT_BuildCommand, Get1(&var)));
-    // we can have duplicate command entries even within a single Makefile
-    // e.g. SRCS(foo/a.cpp bar/a.cpp) may turn into `SRCScxx cpp cc=(a.cpp)' for both files
-    if (var.EntryPtr) {
-        return elemId;
-    }
-    AddCmdNode(var, elemId, structCmd, role);
-    return elemId;
-}
-
-void TCommandInfo::AddCmdNode(const TYVar& var, TCmdElemId elemId, EStructCmd structCmd, EExprRole role) {
-    Y_ENSURE(UpdIter != nullptr);
-
-    // The dependency graph must not store the legacy SET_APPEND "recursion" convention,
-    // where a variable's value is a continuation of itself. Such self-referential data is an
-    // internal continuation mechanism only and must be resolved before it reaches the graph;
-    // block it (under _DBG_DENY_RECURSIVE_VARS) so that any remaining producers surface.
-    if (Conf->DenyRecursiveVars && role == EExprRole::Var && var.size() == 1 && var[0].HasPrefix) {
-        const TStringBuf cmdName = var[0].Name;
-        // (a) old-school form: the value literally begins with "$NAME ..." (e.g. "0:MYVAR=$MYVAR ...")
-        if (IsSelfReferentialCmd(cmdName)) {
-            ythrow TError() << "refusing to store self-referential variable into the dependency graph: " << cmdName;
-        }
-        // (b) struct-cmd form: the value refers to a compiled expression which, when the variable
-        //     is not inlined (NoInline/NO_EXPAND/reserved), may itself reference NAME as a term.
-        if (structCmd == EStructCmd::Yes) {
-            const TStringBuf name = GetCmdName(cmdName);
-            const TCmdElemId exprId = Graph->Names().CommandConf.GetIdNx(GetCmdValue(cmdName));
-            if (exprId && UpdIter->YMake.Commands.CommandReferencesVar(exprId, name)) {
-                ythrow TError() << "refusing to store self-referential variable into the dependency graph: "
-                                << cmdName << " (compiled expression references " << name << ")";
-            }
-        }
-    }
-
-    if (Conf->ValidateCmdNodes) {
-        Y_ENSURE(var.size() == 1);
-        bool varHasPrefix = var[0].HasPrefix;
-        bool varIsStructCmd = TVersionedCmdId(elemId).IsNewFormat();
-        switch (structCmd) {
-            case EStructCmd::No: {
-                switch (role) {
-                    case EExprRole::Cmd: {
-                        Y_ENSURE(varHasPrefix && !varIsStructCmd);
-                        if (Conf->DeprecateNonStructCmdNodes)
-                            throw TNotImplemented() << "old-school commands have been deprecated";
-                        break;
-                    }
-                    case EExprRole::Var: {
-                        Y_ENSURE(varHasPrefix && !varIsStructCmd);
-                        if (Conf->DeprecateNonStructCmdNodes)
-                            throw TNotImplemented() << "old-school variables have been deprecated";
-                        break;
-                    }
-                }
-                break;
-            }
-            case EStructCmd::Yes: {
-                switch (role) {
-                    case EExprRole::Cmd: {
-                        Y_ENSURE(!varHasPrefix && varIsStructCmd);
-                        break;
-                    }
-                    case EExprRole::Var: {
-                        Y_ENSURE(varHasPrefix && !varIsStructCmd); // TODO mark it as struct-cmd, too?
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    TModule* module = var.Id ? Module : UpdIter->ParentModule;
-    TUpdEntryPtr entry = &*UpdIter->Nodes.Insert(MakeDepsCacheId(EMNT_BuildCommand, elemId), &UpdIter->YMake, module);
-    var.EntryPtr = entry;
-    entry->second.AddCtx->ElemId = elemId;
-    if (/*true*/ entry->second.AddCtx->Module == module) { // TODO: fix this condition. Id must be module id, not Makefile id.
-        entry->second.SetReassemble(true);
-        entry->second.SetOnceEntered(false);
-    }
-}
-
 void TCommandInfo::CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, const TYVar& dstBinding, const TVars& varDefinitionSources) {
 
     //
@@ -517,8 +395,9 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, cons
         // TODO: there's no point in allocating cmdElemId for expressions
         // that do _not_ have directly corresponding nodes
         // (and are linked as "0:VARNAME=S:123" instead)
-        auto cmdElemId = commands.Add(*Graph, std::move(compiled.Expression));
-        return std::make_tuple(cmdName, Graph->Names().CmdNameById(cmdElemId).GetStr(), TElemId(id), cmdElemId);
+        const auto importedExpression = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module)
+            .ImportCommandExpression(std::move(compiled.Expression));
+        return std::make_tuple(cmdName, importedExpression.Reference, TElemId(id), importedExpression.Id);
     };
 
     auto exprVars = commands.GetCommandVars(srcExpr);
@@ -527,12 +406,12 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, cons
         auto isGlobalReservedVar = IsGlobalReservedVar(exprVarName);
 
         if (isGlobalReservedVar) {
-            GetAddCtx(dstBinding)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, exprVarName));
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordReservedVariable(dstBinding, exprVarName);
         }
 
         if (exprVarName.ends_with("__LATEOUT__")) {
             auto [_ignore_cmdName, value, _ignore_id, _ignore_elemId] = mkCmd(exprVarName);
-            GetAddCtx(dstBinding)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::LATE_OUT, value));
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordLateOutput(dstBinding, value);
         }
 
         auto var = varDefinitionSources.Lookup(exprVarName);
@@ -555,7 +434,12 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, cons
                 subBinding.SetSingleVal(cmdName, value, id);
                 if (TVersionedCmdId(Graph->Names().CommandConf.GetId(value)).IsNewFormat())
                     subBinding[0].StructCmdForVars = true;
-                InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
+                Y_ENSURE(UpdIter != nullptr);
+                TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+                    subBinding,
+                    TActionGraphEncoder::EStorageFormat::Structured,
+                    TActionGraphEncoder::EExpressionRole::Binding
+                );
                 CollectVarsDeep(commands, subExpr, subBinding, varDefinitionSources);
             }
 
@@ -573,13 +457,18 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, cons
         } catch (const std::exception& e) {
             compiled = compilationFallback(e, exprVarName, EvalAll(var));
         }
-        const TCmdElemId subExpr = commands.Add(*Graph, std::move(compiled.Expression));
-        auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
+        const auto importedExpression = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module)
+            .ImportCommandExpression(std::move(compiled.Expression));
 
-        subBinding.SetSingleVal(exprVarName, subExprRef, TElemId());
+        subBinding.SetSingleVal(exprVarName, importedExpression.Reference, TElemId());
         subBinding[0].StructCmdForVars = true;
-        InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
-        CollectVarsDeep(commands, subExpr, subBinding, varDefinitionSources);
+        Y_ENSURE(UpdIter != nullptr);
+        TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+            subBinding,
+            TActionGraphEncoder::EStorageFormat::Structured,
+            TActionGraphEncoder::EExpressionRole::Binding
+        );
+        CollectVarsDeep(commands, importedExpression.Id, subBinding, varDefinitionSources);
 
     }
 
@@ -595,7 +484,13 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
 
     Cmd.SetSingleVal(Graph->Names().CmdNameById(cmdElemId).GetStr(), false);
     Cmd[0].StructCmdForVars = true;
-    AddCmdNode(Cmd, cmdElemId, EStructCmd::Yes, EExprRole::Cmd);
+    Y_ENSURE(UpdIter != nullptr);
+    TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RegisterCommand(
+        Cmd,
+        cmdElemId,
+        TActionGraphEncoder::EStorageFormat::Structured,
+        TActionGraphEncoder::EExpressionRole::Action
+    );
 
     for (const auto& input : compiled.Inputs.Take()) {
         TVarStrEx in(input.Name);
@@ -666,12 +561,18 @@ bool TCommandInfo::GetCommandInfoFromStructVar(
 ) {
     Cmd.SetSingleVal(Graph->Names().CmdNameById(varElemId).GetStr(), true);
     Cmd[0].StructCmdForVars = true;
-    AddCmdNode(Cmd, varElemId, EStructCmd::Yes, EExprRole::Var);
+    Y_ENSURE(UpdIter != nullptr);
+    TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RegisterCommand(
+        Cmd,
+        varElemId,
+        TActionGraphEncoder::EStorageFormat::Structured,
+        TActionGraphEncoder::EExpressionRole::Binding
+    );
 
     auto exprVars = commands.GetCommandVars(cmdElemId);
     for (auto&& exprVar : exprVars)
         if (IsGlobalReservedVar(exprVar, vars))
-            GetAddCtx(Cmd)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, exprVar));
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordReservedVariable(Cmd, exprVar);
 
     return true;
 }
@@ -685,22 +586,37 @@ bool TCommandInfo::GetCommandInfoFromMacro(const TStringBuf& realMacroName, EMac
         YConfErr(BadMacro) << "Trying to use undefined macro " << macroName << " in a command" << Endl;
         return false;
     }
-    const TCmdElemId jElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Cmd);
+    Y_ENSURE(UpdIter != nullptr);
+    const TCmdElemId jElemId = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+        *macroVar,
+        TActionGraphEncoder::EStorageFormat::Legacy,
+        TActionGraphEncoder::EExpressionRole::Action
+    );
     SBDIAG << "GetCommandInfoFromMacro " << macroName << " " << pattern << "\n";
 
     if (type == EMT_Usual) {
         Cmd.SetSingleVal(macroName, TString::Join("$", macroName), id, vars.Id);
         Cmd.BaseVal = macroVar;
-        InitCmdNode(Cmd, EStructCmd::No, EExprRole::Cmd);
+        Y_ENSURE(UpdIter != nullptr);
+        TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+            Cmd,
+            TActionGraphEncoder::EStorageFormat::Legacy,
+            TActionGraphEncoder::EExpressionRole::Action
+        );
         SubstMacro(macroVar, pattern, ESM_DoFillCoord, vars, ECF_Unset, true);
     } else {
         Y_ASSERT(type == EMT_MacroCall);
         Cmd.SetSingleVal(macroName, GlueCmd(args), id, vars.Id);
         Cmd.BaseVal = macroVar;
-        InitCmdNode(Cmd, EStructCmd::No, EExprRole::Cmd);
+        Y_ENSURE(UpdIter != nullptr);
+        TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+            Cmd,
+            TActionGraphEncoder::EStorageFormat::Legacy,
+            TActionGraphEncoder::EExpressionRole::Action
+        );
         MacroCall(macroVar, GetCmdValue(pattern), &Cmd, GetCmdValue(Get1(&Cmd)), ESM_DoFillCoord, vars, ECF_Unset, false);
     }
-    GetAddCtx(Cmd)->AddDep(EDT_Include, EMNT_BuildCommand, jElemId);
+    TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachLegacyAction(Cmd, jElemId);
 
     SBDIAG << "Macro '" << pattern << "', input: " << GetInputInternal().size() << ", output: " << GetOutputInternal().size() << ", includes: " << GetOutputIncludeInternal().size() << " cmd: " << Get1(&Cmd) << " id: " << Cmd.Id << "\n";
 
@@ -874,528 +790,6 @@ void TCommandInfo::Finalize() {
     }
 }
 
-TCommandInfo::ECmdInfoState TCommandInfo::CheckInputs(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode, bool lastTry) {
-    Finalize();
-
-    MainInput = FindMainElemOrDefault(GetInput(), MainInputCandidateIdx);
-    if (MainInput && !InitDirs(*MainInput, modBuilder, lastTry)) {
-        YDIAG(VV) << "Main input in " << Get1(&Cmd) << " is not ready, delay processing" << Endl;
-        return FAILED;
-    }
-
-    for (auto& input : GetInput()) {
-        if (input.IsGlob) {
-            continue;
-        }
-        const TString origInput = input.Name;
-        if (!modBuilder.ResolveSourcePath(input, InputDir, lastTry ? TModuleBuilder::LastTry : TModuleBuilder::Default) && !lastTry) {
-            YDIAG(VV) << "Input '" << input.Name << "' in " << Get1(&Cmd) << " is not ready, delay processing" << Endl;
-            return FAILED;
-        }
-
-        if (!input.DirAllowed && !CheckForDirectory(input, Cmd, "input dependency"sv)) {
-            return SKIPPED;
-        }
-
-        EMakeNodeType inputType = input.IsMacro
-            ? EMNT_UnknownCommand
-            : input.IsDir
-                ? EMNT_Directory
-                : (input.IsOutputFile ? EMNT_NonParsedFile : FileTypeByRoot(input.Name));
-
-        Y_ASSERT(input.ElemId); // must exists if ResolveSourcePath is true
-
-        modBuilder.SaveInputResolution(input, origInput, InputDir);
-
-        TAddDepAdaptor& node = inputNode.AddOutput(AssumeFile(input.ElemId), inputType, false);
-
-        if (!input.ByExtFailed) {
-            auto& modData = node.GetModuleData();
-            modData.UsedAsInput = true;
-            if (modData.BadCmdInput) {
-                if (input.IsOutputFile) {
-                    YConfInfo(BadAuto) << "`noauto' flag needed for " << input.Name << Endl;
-                } else {
-                    YConfInfo(BadAuto) << "file must not be added by extension: " << input.Name << Endl;
-                }
-
-                modData.BadCmdInput = false; // do not output this multiple times
-            }
-        }
-        //UpdIter->RecursiveAddNode(ci->NotFound? EMNT_MissingFile : EMNT_File, ci->Name, this);
-    }
-
-    TCommandInfo::ECmdInfoState state = OK;
-    ApplyToOutputIncludes([&](TStringBuf type, TSpecFileArr& outputIncludes) {
-        Y_UNUSED(type);
-
-        for (auto& outputInclude : outputIncludes) {
-            if (outputInclude.OutInclsFromInput) {
-                // Try to resolve as input immediately
-                modBuilder.ResolveSourcePath(outputInclude, InputDir, TModuleResolver::LastTry);
-                if (!CheckForDirectory(outputInclude, Cmd, "output include"sv)) {
-                    state = SKIPPED;
-                    return;
-                }
-            } else {
-                // Only try to resolve as known by default (without FS check),
-                // delay actual resolvig as include until InducedDeps property is applied.
-                modBuilder.ResolveAsKnownWithoutCheck(outputInclude);
-                auto resolveFile = modBuilder.MakeUnresolved(outputInclude.Name);
-                outputInclude.Name = modBuilder.GetStr(resolveFile);
-                outputInclude.ElemId = resolveFile.GetElemId();
-            }
-            Y_ASSERT(outputInclude.ElemId); // Must be filled in all ways
-        }
-    });
-
-    return state;
-}
-
-bool TCommandInfo::Process(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode, bool finalTargetCmd) {
-    TModule& mod = modBuilder.GetModule();
-    Y_ENSURE(UpdIter != nullptr);
-    const size_t startCountOuts = finalTargetCmd ? 0 : 1;
-    size_t numRealOut = finalTargetCmd ? 1 : 0;
-
-    TVersionedCmdId curCmdId(Cmd.EntryPtr ? AssumeCmd(ElemId(Cmd.EntryPtr->first)) : TCmdElemId());
-    TStringBuf curCmdName = Get1(&Cmd);
-    YDIAG(Dev) << "Process command: " << curCmdName << Endl;
-
-    TFileConf& fileConf = Graph->Names().FileConf;
-
-    Y_ASSERT(!fileConf.GetName(AssumeFile(inputNode.ElemId)).IsLink());
-    TStringBuf inputNodeName = fileConf.GetName(AssumeFile(inputNode.ElemId)).GetTargetStr();
-
-    const auto& ownEntries = mod.GetOwnEntries();
-    for (auto& output : GetOutput()) {
-        if (!modBuilder.FormatBuildPath(output, InputDir, BuildDir)) {
-            YConfErr(BadOutput) << "Directory " << output.Name << " is not allowed as output. Skip command: "
-                                << SkipId(curCmdName) << Endl;
-            return false;
-        }
-        YDIAG(Dev) << "Process: AddName " << output.Name << Endl;
-
-        if (const auto fid = fileConf.GetIdNx(output.Name)) {
-            if (ownEntries.has(fid)) {
-                YConfErr(DupSrc) << output.Name << " was already added in this project. Skip command: "
-                                 << SkipId(curCmdName) << Endl;
-                return false;
-            }
-
-            // We do not consider outputs of module command that macth main module output as a DupSrc issue
-            if (!mod.IgnoreDupSrc() && !(finalTargetCmd && fid == mod.GetId())) {
-                if (UpdIter->CheckNodeStatus({EMNT_NonParsedFile, fid}) == NGraphUpdater::ENodeStatus::Ready && !mod.GetSharedEntries().has(fid)) {
-                    ConfMsgManager()->AddDupSrcLink(fid, mod.GetId());
-                }
-            }
-
-            const TNodeId id = Graph->GetFileNodeById(fid).Id();
-            if (id == TNodeId::Invalid && !finalTargetCmd && inputNodeName == output.Name) {
-                YConfErr(BadOutput) << "The name of intermediate output " << output.Name
-                                    << " matches the module name. Skip command: " << SkipId(curCmdName) << Endl;
-                return false;
-            }
-
-            if (id != TNodeId::Invalid && Graph->GetFileNodeData(fid).NodeModStamp == fileConf.TimeStamps.CurStamp()) {
-                TNodeId cmdId = GetDepNodeWithType(id, *Graph, EDT_BuildCommand, EMNT_BuildCommand);
-                if (cmdId == TNodeId::Invalid) {
-                    // `finalTargetCmd` means either module command or global command, so we cannot just take modBuilder.GetNode().Id
-                    TNodeId mainId = GetDepNodeWithType(id, *Graph, EDT_OutTogether, finalTargetCmd ? modBuilder.GetNode().NodeType : EMNT_NonParsedFile);
-                    if (finalTargetCmd && mainId == TNodeId::Invalid) {
-                        // Second try for global command
-                        mainId = GetDepNodeWithType(id, *Graph, EDT_OutTogether, EMNT_NonParsedFile);
-                    }
-                    Y_ASSERT(mainId != TNodeId::Invalid);
-                    cmdId = GetDepNodeWithType(mainId, *Graph, EDT_BuildCommand, EMNT_BuildCommand);
-                    Y_ASSERT(cmdId != TNodeId::Invalid);
-                }
-                const auto cmdView = Graph->GetCmdName(Graph->Get(cmdId));
-                if (cmdView.IsNewFormat() || curCmdId.IsNewFormat()) {
-                    // TBD
-                } else {
-                    const auto cmdName = cmdView.GetStr();
-                    static constexpr TStringBuf touchCmd = "TOUCH";
-                    static constexpr TStringBuf initPy = "__init__.py";
-                    if (GetCmdValue(cmdName) != GetCmdValue(curCmdName) &&
-                            !(GetCmdName(cmdName) == touchCmd && GetCmdName(curCmdName) == touchCmd && NPath::Basename(output.Name) == initPy)) {
-                        YConfErr(BUID) << "Two different commands want to produce the output " << output.Name << ": "
-                                        << SkipId(cmdName) << " vs " << SkipId(curCmdName) << Endl;
-                    }
-                }
-            }
-        }
-        if (!output.ElemId) {
-            output.ElemId = Graph->Names().AddName(EMNT_File, output.Name);
-            output.OutputInThisModule = true;
-        }
-
-        if (output.AddToModOutputs) {
-            mod.ExtraOuts.push_back(AssumeFile(output.ElemId));
-        }
-
-        // This IncDir should basically enable only resolving of the exact output marked by `addincl` modifier
-        // There is no way to apply such precise filtering, but it is OK to add IncDir so late since the
-        // resolving subject is added to the graph later in this function.
-        if (output.AddToIncl) {
-            TStringBuf incl = NPath::Parent(output.Name);
-            // TODO: add only if included via "" from .h
-            modBuilder.AddIncdir(incl, EIncDirScope::Global, false);
-        }
-        numRealOut += !output.IsTmp;
-    }
-
-    if (!Cmd) {
-        return true;
-    }
-
-    if (!numRealOut) {
-        YConfErr(NoOutput) << "macro " << SkipId(curCmdName) << " resulted in no outputs, can't add to graph" << Endl;
-        return false;
-    }
-
-    // Determining the main output.
-    TFileElemId mainOutId = TFileElemId();
-    EMakeNodeType mainOutType = EMNT_NonParsedFile;
-    if (finalTargetCmd) {
-        mainOutId = AssumeFile(inputNode.ElemId);
-        mainOutType = inputNode.NodeType;
-    } else {
-        Y_ASSERT(!MainOutput);
-        MainOutput = FindMainElemOrDefault(GetOutput(), 0);
-        Y_ASSERT(MainOutput);
-        MainOutput->IsGlobal = MainOutput->IsGlobal || HasGlobalInput;
-        mainOutId = AssumeFile(MainOutput->ElemId);
-    }
-
-    TCmdElemId cmdElemId = AssumeCmd(Graph->Names().AddName(EMNT_BuildCommand, curCmdName));
-
-    // 0. Prepare OUTPUT_INCLUDES nodes (ParsedIncls.*)
-    THashMap<TStringBuf, TCreateParsedInclsResult> outputIncludeForType;
-    ApplyToOutputIncludes([&](TStringBuf type, const TSpecFileArr& outputIncludeArr){
-        if (type.empty()) {
-            type = "*";
-        }
-
-        TVector<TResolveFile> outputIncludes(Reserve(outputIncludeArr.size()));
-
-        for (const auto& outputInclude : outputIncludeArr) {
-            YDIAG(DG) << "Include dep: " << outputInclude.Name << " type: " << type << Endl;
-            Y_ASSERT(NPath::IsTypedPath(outputInclude.Name));
-            outputIncludes.emplace_back(modBuilder.AssumeResolved(outputInclude.Name));
-        }
-
-        outputIncludeForType.emplace(type, TNodeAddCtx::CreateParsedIncls(
-            Module, *Graph, *UpdIter, UpdIter->YMake,
-            mainOutType, mainOutId, type, outputIncludes
-        ));
-    });
-
-    auto addOutputIncludes = [&](TAddDepAdaptor& addCtx) {
-        for (const auto& [_, parsedIncludes]: outputIncludeForType) {
-            if (auto* node = parsedIncludes.Node) {
-                addCtx.AddDepIface(EDT_Property, node->NodeType, node->ElemId);
-            }
-        }
-    };
-
-    const bool hasExtraOuts = GetOutput().size() > startCountOuts;
-    const bool mainOutAsExtra = hasExtraOuts && !IsModuleType(mainOutType);
-
-    const bool addModuleNode = Conf->DedicatedModuleNode() && IsModuleType(mainOutType);
-    EMakeNodeType moduleType = EMNT_Last;
-    TAddDepAdaptor* moduleNode = nullptr;
-
-    auto makeMainNodes = [&]() {
-        EMakeNodeType fileNodeType = mainOutType;
-
-        Y_ASSERT(!fileConf.GetName(mainOutId).IsLink());
-        TStringBuf mainOutName = fileConf.GetName(mainOutId).GetTargetStr();
-
-        if (addModuleNode) {
-            Y_ASSERT(finalTargetCmd);
-            fileNodeType = EMNT_NonParsedFile;
-            moduleType = mainOutType;
-
-            static constexpr TStringBuf modulePrefix = "$L/MODULE/"sv;
-            TFileElemId moduleId = fileConf.Add(TString::Join(modulePrefix, mainOutName));
-            moduleNode = &inputNode.AddOutput(moduleId, mainOutType);
-        }
-
-        if (mainOutAsExtra) {
-            Y_ASSERT(IsFileType(fileNodeType));
-
-            // Это пока очень временный способ пометить специальный узел, в котором будут общие свойства команды.
-            static constexpr TStringBuf actionPrefix = "$L/ACTION/"sv;
-            TFileElemId actionId = fileConf.Add(TString::Join(actionPrefix, mainOutName));
-
-            TAddDepAdaptor& actionNode = inputNode.AddOutput(actionId, EMNT_NonParsedFile, !finalTargetCmd);
-            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, fileNodeType, !finalTargetCmd);
-
-            return std::make_pair(std::ref(actionNode), std::ref(mainOutNode));
-        } else {
-
-            TAddDepAdaptor& mainOutNode = inputNode.AddOutput(mainOutId, fileNodeType, !finalTargetCmd);
-            return std::make_pair(std::ref(mainOutNode), std::ref(mainOutNode));
-        }
-    };
-
-    auto [actionNode, mainOutNode] = makeMainNodes();
-
-    TVector<std::pair<std::reference_wrapper<TAddDepAdaptor>, TVarStrEx*>> outs;
-    outs.push_back({mainOutNode, MainOutput});
-
-    // 1. Inputs
-    const TCmdElemId groupId = AssumeCmd(Graph->Names().AddName(EMNT_Property, NStaticConf::INPUTS_MARKER));
-    for (auto& input : GetInput()) {
-        YDIAG(DG) << "Input dep: " << input.Name << Endl;
-
-        if (input.IsGlob) {
-            if (modBuilder.CurrentInputGroup != groupId) {
-                inputNode.AddDepIface(EDT_Group, EMNT_Property, groupId);
-                modBuilder.CurrentInputGroup = groupId;
-            }
-            ProcessGlobInput(actionNode, input.Name);
-            continue;
-        }
-
-        if (finalTargetCmd) {
-            modBuilder.AddDep(input, inputNode, true, groupId);
-        } else {
-            EMakeNodeType nodeType = EMNT_File;
-            if (input.IsMacro) {
-                nodeType = EMNT_UnknownCommand;
-            } else if (input.IsDir) {
-                nodeType = EMNT_MissingDir;
-            } else if (input.NotFound) {
-                nodeType = EMNT_MissingFile;
-            } else if (input.IsOutputFile) {
-                nodeType = EMNT_NonParsedFile;
-            }
-
-            if (nodeType == EMNT_NonParsedFile && TFileConf::IsLink(AssumeFile(input.ElemId))) {
-                TFileElemId targetId = TFileConf::GetTargetId(AssumeFile(input.ElemId));
-                auto inputNode = Graph->GetFileNodeById(targetId);
-                if (inputNode.IsValid() && IsModuleType(inputNode->NodeType)) {
-                    input.Name = NPath::GetTargetFromLink(input.Name);
-                    input.ElemId = targetId;
-                    nodeType = inputNode->NodeType;
-                }
-            }
-            actionNode.AddDepIface(EDT_BuildFrom, nodeType, input.ElemId);
-        }
-        if (TFileConf::IsLink(AssumeFile(input.ElemId)) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
-            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(AssumeFile(input.ElemId)));
-        }
-    }
-
-    // 2. Additional output files (we have to add them after the inputs or Induced deps processing will fail)
-    // NOTE: this was previously after BuildCommand!
-    if (hasExtraOuts) {
-        YDIAG(V) << "For " << inputNodeName << " deps.size = " << GetOutput().size() - startCountOuts << "\n";
-        for (auto& out : GetOutput()) {
-            if (out.ElemId == mainOutId) {
-                continue;
-            }
-
-            TAddDepAdaptor& extraOutNode = inputNode.AddOutput(AssumeFile(out.ElemId), EMNT_NonParsedFile);
-            outs.push_back({extraOutNode, &out});
-
-            out.IsGlobal = out.IsGlobal || HasGlobalInput;
-        }
-    }
-
-    {
-        THashSet<TPropertyType> inducedDepsToUse;
-        inducedDepsToUse.insert(TPropertyType{Graph->Names(), EVI_InducedDeps, "*"});
-        bool mainOut = true;
-        for (auto [outNodeRef, outVar] : outs) {
-            TAddDepAdaptor& outNode = outNodeRef;
-
-            if (mainOutAsExtra || !mainOut) {
-                YDIAG(Star) << "Linking main " << actionNode.ElemId << " <-> " << outNode.ElemId << Endl;
-                outNode.SetAction(&actionNode);
-                outNode.AddDepIface(EDT_OutTogether, actionNode.NodeType, actionNode.ElemId);
-                actionNode.AddDepIface(EDT_OutTogetherBack, outNode.NodeType, outNode.ElemId);
-            }
-
-            // Current implementation sets "pass induced" flags only for main output.
-            // It is considered bug, but correct behaviour should be enabled only after additional testing.
-            static constexpr bool oldPassMode = true;
-            const bool setPassFlags = oldPassMode ? mainOut : true;
-
-            // outVar is nullptr for "finalTargetCmd", which means this is a module target.
-            // And we do not pass induced dependencies through modules.
-            if (outVar) {
-                const TIndDepsRule* rule = outNode.SetDepsRuleByName(outVar->Name);
-                if (rule) {
-                    rule->InsertUseActionsTo(inducedDepsToUse);
-                }
-
-                if (setPassFlags) {
-                    auto setFlags = [&](TElemId elemId) {
-                        TNodeData& nodeData = Graph->GetFileNodeData(elemId);
-                        rule ? rule->ApplyNodeFlags(nodeData) : TIndDepsRule::ResetNodeFlags(nodeData);
-                    };
-
-                    setFlags(outNode.ElemId);
-
-                    if (mainOut && mainOutAsExtra) {
-                        setFlags(actionNode.ElemId);
-                    }
-                }
-            }
-
-            mainOut = false;
-        }
-
-        for (const auto& out : GetOutput()) {
-            UpdIter->MainOutputId[out.ElemId] = mainOutId;
-        }
-        UpdIter->PropsToUse[mainOutId] = std::move(inducedDepsToUse);
-    }
-
-    if (moduleNode) {
-        actionNode.AddDepIface(EDT_OutTogether, moduleNode->NodeType, moduleNode->ElemId);
-        moduleNode->AddDepIface(EDT_OutTogetherBack, actionNode.NodeType, actionNode.ElemId);
-    }
-
-    if (finalTargetCmd) {
-        for (const auto id : ownEntries) {
-            Y_ENSURE(UpdIter != nullptr);
-            auto modInfo = UpdIter->GetAddedModuleInfo(MakeDepFileCacheId(id));
-            Y_ASSERT(modInfo != nullptr);
-            if (modInfo != nullptr && modInfo->AdditionalOutput) {
-                actionNode.AddDepIface(EDT_OutTogether, EMNT_NonParsedFile, id);
-            }
-        }
-    }
-
-    // OUTPUT_INCLUDES of main output must appear after OutTogetherBack edges
-    for (auto [outNodeRef, _] : outs) {
-        addOutputIncludes(outNodeRef);
-    }
-
-    // 4. The command
-    YDIAG(DG) << "Cmd dep: " << curCmdName << " " << Cmd.Id << Endl;
-    actionNode.AddDepIface(EDT_BuildCommand, EMNT_BuildCommand, cmdElemId);
-
-    // 5. Imported variables
-    if (LocalVars) {
-        TVector<TStringBuf> names;
-        names.reserve(LocalVars->size());
-        for (auto& var : *LocalVars)
-            names.push_back(var.first);
-        Sort(names);
-        for (auto name : names) {
-            auto storedInProperties = name.ends_with("__LATEOUT__");
-            if (storedInProperties)
-                continue;
-            auto& var = LocalVars->at(name);
-            auto varElemId = InitCmdNode(var, EStructCmd::Yes, EExprRole::Var);
-            actionNode.AddUniqueDep(EDT_BuildCommand, EMNT_BuildVariable, varElemId);
-        }
-        LocalVars.Reset();
-    }
-    if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
-        if (GlobalVars) {
-            TVector<TStringBuf> names;
-            names.reserve(GlobalVars->size());
-            for (auto& var : *GlobalVars)
-                names.push_back(var.first);
-            Sort(names);
-            for (auto name : names) {
-                auto& var = GlobalVars->at(name);
-                auto varElemId = InitCmdNode(var, EStructCmd::Yes, EExprRole::Var);
-                actionNode.AddUniqueDep(EDT_Include, EMNT_BuildCommand, varElemId);
-            }
-            GlobalVars.Reset();
-        }
-    }
-
-    return true;
-}
-
-void TCommandInfo::ProcessGlobInput(TAddDepAdaptor& node, TStringBuf globStr) {
-
-    auto CreateGlobNode = [&node, this](const TModuleGlobInfo& globInfo) {
-        const auto globPatternId = globInfo.GlobPatternId;
-        const auto emnt = EMNT_BuildCommand;
-        node.AddUniqueDep(EDT_BuildFrom, emnt, globPatternId);
-        auto& [id, entryStats] = *UpdIter->Nodes.Insert(MakeDepsCacheId(emnt, globPatternId), &(UpdIter->YMake), Module);
-        auto& globNode = entryStats.GetAddCtx(Module, UpdIter->YMake);
-        globNode.NodeType = emnt;
-        globNode.ElemId = globPatternId;
-        entryStats.SetOnceEntered(false);
-        entryStats.SetReassemble(true);
-        PopulateGlobNode(globNode, globInfo);
-    };
-
-    try {
-        TExcludeMatcher excludeMatcher;
-        TUniqVector<TFileElemId> matches;
-        TGlobPattern glob(Graph->Names().FileConf, globStr, Module->GetDir());
-        for (const auto& result : glob.Apply(excludeMatcher)) {
-            matches.Push(Graph->Names().FileConf.ConstructLink(ELinkType::ELT_Text, result).GetElemId());
-        }
-        const TString globCmd = FormatCmd(Module->GetName().GetElemId(), NProps::LATE_GLOB, globStr);
-        TModuleGlobInfo globInfo = {
-            .GlobPatternId = AssumeCmd(Graph->Names().AddName(EMNT_BuildCommand, globCmd)),
-            .GlobPatternHash = AssumeCmd(Graph->Names().AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, glob.GetMatchesHash()))),
-            .WatchedDirs = glob.GetWatchDirs().Data(),
-            .MatchedFiles = matches.Take(),
-            .Excludes = {},
-            .ReferencedByVar = TCmdElemId(),
-        };
-        CreateGlobNode(globInfo);
-    } catch (const yexception& error){
-        YConfErr(Syntax) << "Invalid pattern in [[alt1]]" << globStr << "[[rst]]: " << error.what() << Endl;
-    }
-}
-
-bool TCommandInfo::ProcessVar(TModuleBuilder& modBuilder, TAddDepAdaptor& inputNode) {
-    Y_ENSURE(UpdIter != nullptr);
-    SBDIAG << "Process command: " << Get1(&Cmd) << Endl;
-
-    if (!Cmd) {
-        return true;
-    }
-
-    // 1. Inputs
-    for (auto& input : GetInput()) {
-        modBuilder.AddInputVarDep(input, inputNode);
-
-        if (TFileConf::IsLink(AssumeFile(input.ElemId)) && NPath::GetType(NPath::ResolveLink(input.Name)) == NPath::ERoot::Build) {
-            UpdIter->DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(AssumeFile(input.ElemId)));
-        }
-    }
-
-    return true;
-}
-
-void TCommandInfo::AddCfgVars(const TVector<TDepsCacheId>& varLists, TNodeAddCtx& dst) {
-    TStringStream cfgVars;
-    for (auto id : varLists) { // this loop is not optimized because there's hardly 1 element in varLists
-        TStringBuf name = Graph->GetCmdNameByCacheId(id).GetStr();
-        TVector<TStringBuf> vars;
-        Split(GetPropertyValue(name), " ", vars);
-        for (auto var : vars) {
-            cfgVars << TStringBuf(" ") << var << TStringBuf("=$") << var;
-        }
-    }
-
-    //Attach CFG_VARS to the source file
-    YDIAG(VV) << "CFG_VARS [" << Module->Vars.Id << "] -> " << cfgVars.Str() << Endl;
-    TYVar var;
-
-    auto compiled = UpdIter->YMake.Commands.Compile(cfgVars.Str(), *Conf, Module->Vars, false, {});
-    auto subExpr = UpdIter->YMake.Commands.Add(*Graph, std::move(compiled.Expression));
-    auto subExprRef = Graph->Names().CmdNameById(subExpr).GetStr();
-    auto subBinding = TYVar();
-    subBinding.SetSingleVal("CFG_VARS", subExprRef, TElemId());
-    auto cmdElemId = InitCmdNode(subBinding, EStructCmd::Yes, EExprRole::Var);
-    dst.AddDep(EDT_BuildCommand, EMNT_BuildVariable, cmdElemId);
-}
 
 void TCommandInfo::FillCoords(
     const TYVar* origin,
@@ -1434,7 +828,7 @@ void TCommandInfo::FillCoords(
 
         if (origin && GetAddCtx(*origin) && (IsGlobalReservedVar(macroData.Name) || (macroVar && macroVar->IsReservedName))) {
             // Track used reserved vars to substitute them properly
-            GetAddCtx(*origin)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, macroData.Name));
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordReservedVariable(*origin, macroData.Name);
         }
 
         if (origin && GetAddCtx(*origin) && macroData.Flags.Get(EMF_LateOut)) {
@@ -1446,7 +840,7 @@ void TCommandInfo::FillCoords(
                 YConfErr(MacroUse) << "Late out expression " << macroData.OrigFragment << " should have hide modifier flag." << Endl;
                 continue;
             }
-            GetAddCtx(*origin)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::LATE_OUT, macroData.OrigFragment));
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordLateOutput(*origin, macroData.OrigFragment);
         }
 
         if ((!macroVar || macroVar->DontExpand) && !macroData.RawString) {
@@ -1457,7 +851,12 @@ void TCommandInfo::FillCoords(
             Y_ASSERT(macroVar->size() == 1); // not implemented yet
             if (GetAddCtx(Cmd)) { // as a flag of graph construction mode
                 Y_ASSERT(GetId(Get1(macroVar)) == macroVar->Id);
-                const TCmdElemId macroVarElemId = InitCmdNode(*macroVar, EStructCmd::No, EExprRole::Var);
+                Y_ENSURE(UpdIter != nullptr);
+                const TCmdElemId macroVarElemId = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+                    *macroVar,
+                    TActionGraphEncoder::EStorageFormat::Legacy,
+                    TActionGraphEncoder::EExpressionRole::Binding
+                );
                 const TYVar* addMacroDataTo = origin;
                 if (macroVar->GenFromFile || localVars.IsIdDeeper(AssumeFile(origin->Id), AssumeFile(macroVar->Id))) {
                     addMacroDataTo = &Cmd;
@@ -1465,8 +864,13 @@ void TCommandInfo::FillCoords(
                         const TVars* baseVars = localVars.GetBase(AssumeFile(origin->Id));
                         const TYVar* macroVarFromBaseVars = baseVars->Lookup(macroData.Name);
                         if (macroVarFromBaseVars && !origin->AddCtxFilled) {
-                            const TCmdElemId macroVarFromBaseVarsElemId = InitCmdNode(*macroVarFromBaseVars, EStructCmd::No, EExprRole::Var);
-                            GetAddCtx(*origin)->AddUniqueDep(EDT_Include, EMNT_BuildCommand, macroVarFromBaseVarsElemId);
+                            Y_ENSURE(UpdIter != nullptr);
+                            const TCmdElemId macroVarFromBaseVarsElemId = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+                                *macroVarFromBaseVars,
+                                TActionGraphEncoder::EStorageFormat::Legacy,
+                                TActionGraphEncoder::EExpressionRole::Binding
+                            );
+                            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachLegacyBinding(*origin, macroVarFromBaseVarsElemId);
 
                             if (!macroVarFromBaseVars->AddCtxFilled) {
                                 FillAddCtx(*macroVarFromBaseVars, *baseVars);
@@ -1476,7 +880,7 @@ void TCommandInfo::FillCoords(
                 }
 
                 if (!addMacroDataTo->AddCtxFilled) {
-                    GetAddCtx(*addMacroDataTo)->AddUniqueDep(EDT_Include, EMNT_BuildCommand, macroVarElemId);
+                    TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachLegacyBinding(*addMacroDataTo, macroVarElemId);
                 }
             }
         }
@@ -1488,7 +892,7 @@ void TCommandInfo::FillCoords(
             }
             const TString tool = NPath::ConstructPath(toolValue, NPath::Source);
             SBDIAG << "Tool dep: " << tool << Endl;
-            GetAddCtx(*origin)->AddUniqueDep(EDT_Include, EMNT_Directory, tool.data());
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachToolDirectory(*origin, tool.data());
             continue;
         }
 
@@ -1610,7 +1014,7 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
         }
 
         if (IsGlobalReservedVar(tokenName)) {
-            GetAddCtx(var)->AddUniqueDep(EDT_Property, EMNT_Property, FormatProperty(NProps::USED_RESERVED_VAR, tokenName));
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordReservedVariable(var, tokenName);
         }
 
         if (token.Flags.Get(EMF_Tool) && !token.IsOwnArg) {
@@ -1620,7 +1024,7 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
             }
             const TString tool = NPath::ConstructPath(toolValue, NPath::Source);
             SBDIAG << "Tool dep: " << tool << Endl;
-            GetAddCtx(var)->AddUniqueDep(EDT_Include, EMNT_Directory, tool.data());
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachToolDirectory(var, tool.data());
             continue;
         }
 
@@ -1646,12 +1050,17 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
             if (!IsGlobalReservedVar(tokenName)) {
                 YConfWarn(UndefVar) << GetCmdName(Get1(&var)) << ": command dep " << tokenName << " not found\n";
                 YConfWarn(UndefVar) << "> HERE: " << Get1(&var) << Endl;
-                GetAddCtx(var)->AddDep(EDT_Include, EMNT_UnknownCommand, tokenName);
+                TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachMissingBinding(var, tokenName);
             }
         } else {
             const TStringBuf cmdStr = Get1(cmd);
-            const TCmdElemId cmdElemId = InitCmdNode(*cmd, EStructCmd::No, EExprRole::Var);
-            if (GetAddCtx(var)->AddUniqueDep(EDT_Include, EMNT_BuildCommand, cmdElemId)) {
+            Y_ENSURE(UpdIter != nullptr);
+            const TCmdElemId cmdElemId = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
+                *cmd,
+                TActionGraphEncoder::EStorageFormat::Legacy,
+                TActionGraphEncoder::EExpressionRole::Binding
+            );
+            if (TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachLegacyBinding(var, cmdElemId)) {
                 SBDIAG << "Command dep: " << cmdStr << Endl;
                 if (!cmd->AddCtxFilled) {
                     FillAddCtx(*cmd, vars);
