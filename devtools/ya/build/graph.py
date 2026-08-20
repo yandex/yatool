@@ -919,11 +919,12 @@ def finalize_graph(graph: graph_descr.DictGraph, opts):
         def iter_filter_nodes(filters, host=False):
             nonlocal python_binary_path
             promoted_renamed = set()
+            result_uids = set(graph['result'])
             for flt in filters:
                 for node, full_match in filter_nodes_by_output(
                     graph, flt, warn=False, host=host, any_match=opts.all_outputs_to_result
                 ):
-                    if node.get('uid') in graph['result']:
+                    if node.get('uid') in result_uids:
                         continue
                     if full_match:
                         yield node, False
