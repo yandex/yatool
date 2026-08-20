@@ -5,8 +5,14 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/app/modules/caller_info
     devtools/ya/core/common_opts
+    devtools/ya/core/report
     devtools/ya/yalibrary/agent_ui
 )
 
 END()
+
+RECURSE_FOR_TESTS(
+    tests
+)

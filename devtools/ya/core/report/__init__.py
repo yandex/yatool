@@ -51,6 +51,7 @@ class ReportTypes(object):
     HOST_HEALTH = 'host_health'
     PACKAGE_STATS = 'package_stats'
     CALLER_INFO = 'caller_info'
+    AGENT_OUTPUT = 'agent_output'
 
 
 @func.lazy
