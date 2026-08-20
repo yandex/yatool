@@ -9,7 +9,6 @@ import math
 import os
 import time
 import traceback
-from functools import cmp_to_key
 
 import exts.fs
 import exts.yjson as json
@@ -173,7 +172,7 @@ def print_all_tasks(graph, filename, display):
 
     tasks = [task for task in graph.get_all_nodes() if task.get_time_elapsed() is not None]
     if tasks:
-        tasks.sort(key=cmp_to_key(lambda x, y: (x.start_time - y.start_time) or (x.end_time - y.end_time)))
+        tasks.sort(key=lambda x: (x.start_time, x.end_time))
         initial_time = tasks[0].start_time
         if filename is not None:
             with open(filename, 'w') as output_file:
@@ -197,15 +196,13 @@ def print_longest_tasks(tasks, filename, display, ymake_stats=None):
         for configure_task in ymake_stats.threads_time:
             tasks.append(configure_task)
 
-    max_elapsed_len = 0
-    for task in tasks:
-        if task.get_time_elapsed() > 0:
-            max_elapsed_len = max(max_elapsed_len, get_int_length(task.get_time_elapsed()))
-
     json_tasks = []
 
     if len(tasks) > 0:
         tasks.sort(key=lambda x: -x.get_time_elapsed())
+
+        # After sorting the first task has the longest (and therefore the widest) elapsed time
+        max_elapsed_len = get_int_length(tasks[0].get_time_elapsed()) if tasks[0].get_time_elapsed() > 0 else 0
 
         profiler.profile_value('statistics_longest_task', tasks[0].get_time_elapsed())
 
@@ -221,9 +218,9 @@ def print_longest_tasks(tasks, filename, display, ymake_stats=None):
             )
         display.emit_message()
 
-        for task in tasks:
-            if len(json_tasks) < NUMBER_OF_TASKS_ELAPSED_TIME_TO_OUTPUT:
-                json_tasks.append(task.as_json())
+        # The full list is needed only for the file report, otherwise only top 10 tasks are used
+        json_limit = NUMBER_OF_TASKS_ELAPSED_TIME_TO_OUTPUT if filename is not None else 10
+        json_tasks = [task.as_json() for task in tasks[:json_limit]]
 
         if filename is not None:
             with open(filename, 'w') as output_file:
@@ -406,24 +403,33 @@ def print_biggest_copy_tasks(graph, filename, display):
 
 
 def print_cache_statistics(graph, filename, display):
-    all_run_tasks = graph.run_tasks.values()
-    dyn_cached_tasks_count = sum(1 for x in all_run_tasks if x.dynamically_resolved_cache)
-    local_cached_task_count = sum(
-        1 for x in graph.prepare_tasks.values() if x.get_type() == 'prepare:get from local cache'
-    )
-    dist_cached_task_count = sum(
-        1 for x in graph.prepare_tasks.values() if x.get_type() == 'prepare:get from dist cache'
-    )
+    dyn_cached_tasks_count = 0
+    failed_task_count = 0
+    not_cached_task_count = 0
+    tests_task_count = 0
+    for x in graph.run_tasks.values():
+        if x.dynamically_resolved_cache:
+            dyn_cached_tasks_count += 1
+        if x.abstract.status == AbstractTask.Status.FAILED:
+            failed_task_count += 1
+        if not x.from_cache and not x.dynamically_resolved_cache and x.get_time_elapsed():
+            not_cached_task_count += 1
+            if x.is_test():
+                tests_task_count += 1
+
+    local_cached_task_count = 0
+    dist_cached_task_count = 0
+    for x in graph.prepare_tasks.values():
+        task_type = x.get_type()
+        if task_type == 'prepare:get from local cache':
+            local_cached_task_count += 1
+        elif task_type == 'prepare:get from dist cache':
+            dist_cached_task_count += 1
+
     cached_task_count = dist_cached_task_count + local_cached_task_count + dyn_cached_tasks_count
-    failed_task_count = sum(1 for x in all_run_tasks if x.abstract.status == AbstractTask.Status.FAILED)
-    not_cached_tasks = tuple(
-        x for x in all_run_tasks if not x.from_cache and x.get_time_elapsed() and not x.dynamically_resolved_cache
-    )
-    not_cached_task_count = len(not_cached_tasks)
-    tests_task_count = sum(1 for x in not_cached_tasks if x.is_test())
     not_tests_task_count = not_cached_task_count - tests_task_count
     executed_task_count = not_cached_task_count + cached_task_count
-    all_run_tasks_count = len(all_run_tasks)
+    all_run_tasks_count = len(graph.run_tasks)
 
     logger.debug(
         'Run tasks %d: %d cached tasks (%d cache(s) resolved by dynamic uids), %d not cached, %d failed',
@@ -672,7 +678,7 @@ def get_int_length(x: float) -> int:
 _CTX_STAGE_DISPLAY_NAMES = {'context_creation': 'Configure time'}
 
 
-def print_summary_times(graph, tasks, display, ctx_stages=None):
+def print_summary_times(tasks, display, ctx_stages=None):
     task_by_type = {}
     time_by_type = collections.defaultdict(int)
     download_time_by_type = collections.defaultdict(float)
@@ -718,8 +724,23 @@ def print_summary_times(graph, tasks, display, ctx_stages=None):
     timeline = collections.defaultdict(list)
     execution_start_time = 0
     execution_end_time = 0
+    total_run_task_time = 0
+    total_tests_task_time = 0
+    total_failed_run_task_time = 0
     for task in tasks:
-        if task.get_time_elapsed() is not None and task.get_time_elapsed() > 0:
+        elapsed = task.get_time_elapsed()
+        if elapsed is None:
+            continue
+
+        # Total times are collected over run tasks only ('abstract' is the RunTask marker)
+        if hasattr(task, 'abstract'):
+            total_run_task_time += elapsed
+            if task.abstract.status == AbstractTask.Status.FAILED:
+                total_failed_run_task_time += elapsed
+            if 'test' == task.abstract.meta.get('node-type', None):
+                total_tests_task_time += elapsed
+
+        if elapsed > 0:
             setup_time(task)
             if not getattr(task, 'total_time', False):
                 if execution_start_time == 0:
@@ -769,17 +790,6 @@ def print_summary_times(graph, tasks, display, ctx_stages=None):
                 )
             )
 
-    total_run_task_time = 0
-    total_tests_task_time = 0
-    total_failed_run_task_time = 0
-    for task in graph.run_tasks.values():
-        elapsed = task.get_time_elapsed()
-        if elapsed is not None:
-            total_run_task_time += elapsed
-            if task.abstract.status == AbstractTask.Status.FAILED:
-                total_failed_run_task_time += elapsed
-            if 'test' == task.abstract.meta.get('node-type', None):
-                total_tests_task_time += elapsed
     display.emit_message()
     display.emit_message('Total tasks times:\n')
 
@@ -906,7 +916,7 @@ def print_graph_statistics(
     )
     stats['biggest_tasks'] = print_biggest_copy_tasks(graph, _make_file_path('biggest-tasks'), display)
     stats['summary_times'], stats['task_execution_msec'], stats['execution_stages_msec'] = print_summary_times(
-        graph, tasks, display, ctx_stages=ctx_stages
+        tasks, display, ctx_stages=ctx_stages
     )
     stats['substages'] = get_detailed_timings(tasks)
     print_stages(event_log, display)

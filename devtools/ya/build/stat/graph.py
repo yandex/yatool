@@ -32,7 +32,7 @@ _TimeElapsed = _OptionalTime
 
 # This is abstract task without linkage to machine, just as in json graph
 class AbstractTask:
-    __slots__ = ("uid", "meta", "status", "description", "depends_on")
+    __slots__ = ("uid", "meta", "status", "_description", "depends_on")
 
     class Status(enum.StrEnum):
         OK = 'OK'
@@ -42,13 +42,21 @@ class AbstractTask:
         self.uid = uid
         self.meta = meta
         self.status = AbstractTask.Status.OK
-        self.description = description
+        self._description = description
         self.depends_on: list[GraphNodeUid] = meta.get('deps', [])
+
+    @property
+    def description(self) -> str | None:
+        # Description is used only for tasks which end up in reports,
+        # so it's computed lazily to avoid formatting every graph node.
+        # format_paths always returns a non-empty string, so None means "not computed yet"
+        if self._description is None and self.meta:
+            self._description = format_paths(self.meta['inputs'], self.meta['outputs'], self.meta.get('kv', {}))
+        return self._description
 
     @classmethod
     def from_node(cls, node: GraphNode) -> tp.Self:
-        description = format_paths(node['inputs'], node['outputs'], node.get('kv', {}))
-        return cls(node['uid'], description, node)
+        return cls(node['uid'], None, node)
 
     @classmethod
     def from_uid(cls, uid: GraphNodeUid) -> tp.Self:
@@ -386,26 +394,45 @@ class GraphStats:
         return longest_path_node.critical_time, path
 
     def _calculate_critical_time(self, node: BaseTask) -> _Time:
-        """Combination of the DFS for topological sorting and the longest path calculation"""
+        """Iterative DFS for topological sorting combined with the longest path calculation.
+
+        Iterative to survive arbitrarily deep dependency chains without hitting the recursion limit.
+        """
         if node.critical_time is not None:
             return node.critical_time
-        if node.calculating_in_progress:
-            raise Exception("cyclic dependency detected")
-        node.calculating_in_progress = True
 
-        for dep_node in node.depends_on_ref:
-            tm = self._calculate_critical_time(dep_node)
-            if node.longest_path_dep is None or node.longest_path_dep.critical_time < tm:
-                node.longest_path_dep = dep_node
+        stack: list[BaseTask] = [node]
+        while stack:
+            n = stack[-1]
+            if n.critical_time is not None:
+                stack.pop()
+                continue
 
-        # At this point, all nodes that topologically come after the 'node'
-        # have already been visited and have the correct critical_time value.
+            if not n.calculating_in_progress:
+                # First visit: postpone the calculation until all dependencies are calculated
+                n.calculating_in_progress = True
+                has_unresolved_deps = False
+                for dep_node in n.depends_on_ref:
+                    if dep_node.critical_time is None:
+                        if dep_node.calculating_in_progress:
+                            raise Exception("cyclic dependency detected")
+                        stack.append(dep_node)
+                        has_unresolved_deps = True
+                if has_unresolved_deps:
+                    continue
 
-        node.critical_time = node.get_time_elapsed()
-        if node.longest_path_dep is not None:
-            node.critical_time += node.longest_path_dep.critical_time
+            # Second visit: all dependencies have the correct critical_time value
+            for dep_node in n.depends_on_ref:
+                if n.longest_path_dep is None or n.longest_path_dep.critical_time < dep_node.critical_time:
+                    n.longest_path_dep = dep_node
 
-        node.calculating_in_progress = False
+            n.critical_time = n.get_time_elapsed()
+            if n.longest_path_dep is not None:
+                n.critical_time += n.longest_path_dep.critical_time
+
+            n.calculating_in_progress = False
+            stack.pop()
+
         return node.critical_time
 
 
@@ -499,7 +526,8 @@ def _create_graph_with_distbuild_log(
     max_time: _OptionalTime = None
     wrong_ev_types: set[str] = set()
     for line in flog:
-        fields = line.rstrip().split(' ')
+        # No known event has more than 7 fields, extra fields are collected into the unused 8th one
+        fields = line.rstrip().split(' ', 7)
         if len(fields) < 3:
             continue
 
@@ -720,7 +748,8 @@ def create_graph_with_local_log(
 
     graph.set_time_elapsed(min_time, max_time)
 
-    logger.debug('Node count in the dependency graph is %d.', (len(list(graph.get_all_nodes()))))
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug('Node count in the dependency graph is %d.', sum(1 for _ in graph.get_all_nodes()))
     logger.debug('Dependency count in the graph is %d.', dependency_count)
 
     return graph
