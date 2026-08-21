@@ -731,6 +731,12 @@ def run_tests(opts):
                 metrics=info.metrics,
             )
             suite.chunk.tests.append(test_case)
+    if exit_code == 0:
+        launched_tests = {get_full_test_name(suite_name, test_name) for test_name in results.tests}
+        for test_case in empty_suite.chunk.tests:
+            if test_case.name not in launched_tests:
+                test_case.status = const.Status.SKIPPED
+                test_case.comment = "Test was filtered by the Go test runner"
     shared.dump_trace_file(empty_suite, opts.tracefile)
 
     if exit_code == 0 and cov_path and opts.go_toolchain:
