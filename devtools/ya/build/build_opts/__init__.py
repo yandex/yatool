@@ -556,11 +556,11 @@ class PythonBuildOptions(Options):
             # this is a local development option.
             ArgConsumer(
                 ['--ext-py'],
-                help='Build binaries without embedded python files and load them from the filesystem at runtime.'
-                'Only suitable for running tests to avoid linking binaries after every change in py-files.',
+                help='Load Python sources from the filesystem at runtime instead of embedding build-time bytecode. '
+                'Use for faster test iteration after Python source changes by avoiding test-binary relinking.',
                 hook=SetConstValueHook('external_py_files', True),
                 group=ADVANCED_OPT_GROUP,
-                visible=HelpLevel.ADVANCED,
+                visible=HelpLevel.BASIC,
             ),
         ]
 
@@ -1453,7 +1453,7 @@ class YaMakeOptions(Options):
             ),
             ArgConsumer(
                 ['--show-extra-progress'],
-                help='Print extra progress info',
+                help='Show completed/total build-task counts in line-by-line output (-T).',
                 hook=SetConstValueHook('ext_progress', True),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.ADVANCED,

@@ -179,7 +179,14 @@ def main(args):
     )
     p.add_argument('--mcp', action='store_const', const=True, default=False)
     if not opensource:
-        p.add_argument('--diag', action='store_const', const=True, default=False)
+        p.add_argument(
+            '--diag',
+            action='store_const',
+            const=True,
+            default=False,
+            help='Collect a debug log for this invocation, plus build configuration and graphs when available, and '
+            'upload the bundle to Sandbox; save resource.tar.gz locally if the upload fails.',
+        )
 
     a, args = p.parse_max(args[1:])
 

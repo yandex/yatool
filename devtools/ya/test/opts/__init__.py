@@ -781,7 +781,7 @@ class DebuggingOptions(devtools.ya.core.yarg.Options):
                 ),
                 hook=devtools.ya.core.yarg.SetConstValueHook('test_stderr', True),
                 subgroup=DEBUGGING_SUBGROUP,
-                visible=help_level.HelpLevel.ADVANCED,
+                visible=help_level.HelpLevel.BASIC,
             ),
             devtools.ya.core.yarg.ConfigConsumer('test_stderr'),
             TestArgConsumer(
