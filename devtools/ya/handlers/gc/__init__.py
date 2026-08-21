@@ -90,7 +90,9 @@ class CollectCacheOptions(LocalCacheOptions):
 
 class GarbageCollectionYaHandler(devtools.ya.core.yarg.CompositeHandler):
     def __init__(self):
-        devtools.ya.core.yarg.CompositeHandler.__init__(self, description='Collect garbage')
+        devtools.ya.core.yarg.CompositeHandler.__init__(
+            self, description='Clean local build cache and old build directories'
+        )
         self['cache'] = devtools.ya.core.yarg.OptsHandler(
             action=devtools.ya.app.execute(action=do_cache, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description='Strip build cache and old build directories',
