@@ -9,6 +9,27 @@ import library.python.func as func
 
 logger = logging.getLogger(__name__)
 
+# regexes for skipping contribs in llvm-cov export
+CONTRIB_EXPORT_SKIP_PATTERNS = [
+    '(/contrib/(libs|python|tools)/)',
+]
+
+# regexes for skipping generated files in llvm-cov export
+GENERATED_EXPORT_SKIP_PATTERNS = [
+    # protobuf and flatbuffers
+    r'(\.(pb|fbs)\.(h|cc|c)$)',
+    # GENERATE_ENUM_SERIALIZATION_*
+    r'(_serialized\.(h|cpp|cc|c)$)',
+    # SPLIT_CODEGEN kernel/web_factors_info/factors_codegen
+    r'(factors_gen\.\d+\.cc?p?p?$)',
+    # ragel generated files
+    r'(\.rl6\.cc?p?p?$)',
+    # python generated files
+    r'(\.pyx\.cc?p?p?$)',
+    # VCS info generated file
+    r'(/__vcs_version__.\w+$)',
+]
+
 
 @func.memoize()
 def get_top_level2_dirs(source_root):
@@ -39,36 +60,19 @@ def normalize_path(filename, source_root):
         pairs = pairs[1:]
 
 
-def get_default_export_skip_pattern():
-    # Provide default skip pattern to speed up coverage export
-    # and avoid processing generated files, which will be dropped later
-    pattern = "|".join(
-        [
-            '(/contrib/(libs|python|tools)/)',
-            # protobuf and flatbuffers
-            r'(\.(pb|fbs)\.(h|cc|c)$)',
-            # GENERATE_ENUM_SERIALIZATION_*
-            r'(_serialized\.(h|cpp|cc|c)$)',
-            # SPLIT_CODEGEN kernel/web_factors_info/factors_codegen
-            r'(factors_gen\.\d+\.cc?p?p?$)',
-            # ragel generated files
-            r'(\.rl6\.cc?p?p?$)',
-            # python generated files
-            r'(\.pyx\.cc?p?p?$)',
-            # VCS info generated file
-            r'(/__vcs_version__.\w+$)',
-        ]
-    )
-    return "({})".format(pattern)
+def get_default_llvm_export_args(include_generated=False, enable_contrib_coverage=False):
+    patterns = []
+    if not enable_contrib_coverage:
+        patterns += CONTRIB_EXPORT_SKIP_PATTERNS
+    if not include_generated:
+        patterns += GENERATED_EXPORT_SKIP_PATTERNS
 
-
-def get_default_llvm_export_args(include_generated=False):
-    if include_generated:
+    if not patterns:
         return []
-
+    regex = '({})'.format('|'.join(patterns))
     return [
         '--ignore-filename-regex',
-        get_default_export_skip_pattern(),
+        regex,
     ]
 
 

@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument('--mcdc-coverage', action='store_true')
     parser.add_argument('--branch-coverage', action='store_true')
     parser.add_argument('--include-generated', action='store_true')
+    parser.add_argument('--enable-contrib-coverage', action='store_true')
     parser.add_argument('--log-path')
     parser.add_argument(
         "--log-level",
@@ -266,7 +267,10 @@ def main():
             '--show-mcdc-non-executed-vectors',
         ]
 
-    cmd += lib_coverage.util.get_default_llvm_export_args(args.include_generated)
+    cmd += lib_coverage.util.get_default_llvm_export_args(
+        include_generated=args.include_generated,
+        enable_contrib_coverage=args.enable_contrib_coverage,
+    )
 
     def process_block(covtype, filename, data):
         # XXX temporary hack till https://st.yandex-team.ru/DEVTOOLS-3757 is done

@@ -43,6 +43,7 @@ def parse_args():
     parser.add_argument("--prefix-filter")
     parser.add_argument("--exclude-regexp")
     parser.add_argument("--include-generated", action="store_true")
+    parser.add_argument("--enable-contrib-coverage", action="store_true")
     parser.add_argument("--test-mode", action="store_true")
 
     parser.add_argument("--mcdc-coverage", action="store_true")
@@ -64,6 +65,7 @@ def get_file_stats(
     mcdc=False,
     branches=False,
     include_generated=False,
+    enable_contrib_coverage=False,
 ):
     cmd = [
         llvm_cov_bin,
@@ -73,7 +75,10 @@ def get_file_stats(
         "-instr-profile",
         indexed_profile,
         "-summary-only",
-    ] + lib_coverage.util.get_default_llvm_export_args(include_generated)
+    ] + lib_coverage.util.get_default_llvm_export_args(
+        include_generated=include_generated,
+        enable_contrib_coverage=enable_contrib_coverage,
+    )
 
     for binary in binaries:
         cmd += ["-object", binary]
@@ -184,6 +189,7 @@ def main():
         args.mcdc_coverage,
         args.branch_coverage,
         args.include_generated,
+        args.enable_contrib_coverage,
     )
 
     cmd = [
@@ -193,7 +199,10 @@ def main():
         "html",
         "-instr-profile",
         indexed_profile,
-    ] + lib_coverage.util.get_default_llvm_export_args(args.include_generated)
+    ] + lib_coverage.util.get_default_llvm_export_args(
+        include_generated=args.include_generated,
+        enable_contrib_coverage=args.enable_contrib_coverage,
+    )
 
     for binary in binaries:
         cmd += ["-object", binary]

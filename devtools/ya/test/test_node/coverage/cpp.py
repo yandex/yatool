@@ -254,6 +254,9 @@ def inject_clang_coverage_resolve_node(
     if opts.coverage_include_generated_code:
         cmd += ["--include-generated"]
 
+    if opts.enable_contrib_coverage:
+        cmd += ["--enable-contrib-coverage"]
+
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": True,
@@ -334,6 +337,9 @@ def inject_create_clang_coverage_report_node(graph, suites, coverage_tar_name, o
 
     if opts.coverage_include_generated_code:
         cmd += ["--include-generated"]
+
+    if opts.enable_contrib_coverage:
+        cmd += ["--enable-contrib-coverage"]
 
     test_uids = set()
     inputs = set()
