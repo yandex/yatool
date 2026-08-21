@@ -16,6 +16,7 @@ import sys
 import string
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from html import escape
 from typing import TYPE_CHECKING, Any
 
 import coverage
@@ -870,16 +871,6 @@ class IncrementalChecker:
 
 
 # Helpers for templates and generating HTML
-
-
-def escape(t: str) -> str:
-    """HTML-escape the text in `t`.
-
-    This is only suitable for HTML text, not attributes.
-
-    """
-    # Convert HTML special chars into HTML entities.
-    return t.replace("&", "&amp;").replace("<", "&lt;")
 
 
 def pair(ratio: tuple[int, int]) -> str:

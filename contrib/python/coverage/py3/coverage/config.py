@@ -354,11 +354,7 @@ class CoverageConfig(TConfigurable, TPluginConfig):
             if real_section:
                 for unknown in set(cp.options(section)) - options:
                     warn(
-                        "Unrecognized option '[{}] {}=' in config file {}".format(
-                            real_section,
-                            unknown,
-                            filename,
-                        ),
+                        f"Unrecognized option '[{real_section}] {unknown}=' in config file {filename}",
                     )
 
         # [paths] is special
