@@ -102,6 +102,10 @@ public:
     bool EraseMessagesByKind(const TStringBuf var, TFileElemId owner = TFileElemId()); // If owner == 0 erase for all owners
     bool HasMessagesByKind(const TStringBuf var, TFileElemId owner) const;
 
+    bool IsChkPeersCompleted() const noexcept;
+    void MarkChkPeersCompleted() noexcept;
+    void ResetChkPeers();
+
     void Load(const TBlob& blob);
     void Save(TMultiBlobBuilder& builder);
 
@@ -110,6 +114,16 @@ public:
     mutable bool HasConfigurationErrors = false;
 
 private:
+    // Persistent completion flags for checks whose diagnostics share this
+    // cache. To extend the blob, add the flag here, bump ChecksStateVersion,
+    // and add explicit serialization branches for every supported version.
+    struct TChecksState {
+        bool ChkPeersCompleted = false;
+
+        void Save(IOutputStream* output) const;
+        void Load(IInputStream* input);
+    };
+
     void SaveEvent(ETraceEvent what, const TString& event);
     TStringStream& SaveConfigureMessage(EConfMsgType type, TStringBuf var, size_t row = 0, size_t column = 0, bool useCache = true);
 
@@ -132,6 +146,7 @@ private:
     THashMap<TFileElemId, TSet<TFileElemId>> DupSrcMap;
     THashSet<TFileElemId> VisitedModules;
     NDetail::TConfigureTraceDeduplicator TracesDeduplicator;
+    TChecksState ChecksState;
 };
 
 TConfMsgManager* ConfMsgManager();

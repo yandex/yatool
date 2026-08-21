@@ -608,6 +608,13 @@ void TraceBypassEvent(const TBuildConfiguration& conf, const TYMake& yMake) {
     conf.ForeignTargetWriter->WriteBypassLine(NYMake::EventToStr(bypassEvent));
 };
 
+void PrepareChkPeers(bool graphBypassed) {
+    auto* manager = ConfMsgManager();
+    if (!Diag()->ChkPeers || !graphBypassed || !manager->IsChkPeersCompleted()) {
+        manager->ResetChkPeers();
+    }
+}
+
 asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBuildConfiguration& conf, TConfigurationExecutor exec) {
     TBuildGraphScope scope(*yMake.Get());
 
@@ -623,10 +630,12 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
     }
 
     yMake->CheckStartDirsChanges();
+    const bool graphBypassed = yMake->CanBypassConfigure();
+    PrepareChkPeers(graphBypassed);
     yMake->GraphChangesPredictionEvent();
     TraceBypassEvent(conf, *yMake);
 
-    if (yMake->CanBypassConfigure()) {
+    if (graphBypassed) {
         conf.DoNotWriteAllCaches();
     } else {
         ConfMsgManager()->ClearTopLevelMessages();
@@ -773,8 +782,9 @@ asio::awaitable<TMaybe<EBuildResult>> AnalysesStage(TBuildConfiguration& conf, T
         CheckTransitiveRequirements(yMake->GetRestoreContext(), yMake->StartTargets);
     }
 
-    if (!hasBadLoops && Diag()->ChkPeers && !yMake->CanBypassConfigure()) {
+    if (!hasBadLoops && Diag()->ChkPeers && !ConfMsgManager()->IsChkPeersCompleted()) {
         yMake->FindMissingPeerdirs();
+        ConfMsgManager()->MarkChkPeersCompleted();
     }
     co_return TMaybe<EBuildResult>();
 }

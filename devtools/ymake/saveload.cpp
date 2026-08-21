@@ -872,6 +872,11 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             YDebug() << "Deps cache has been loaded..." << Endl;
             PrevDepsFingerprint = prevDepsFingerprint;
             DepsCacheLoaded_ = true;
+            // A forced or version-check-bypassing load does not prove that the
+            // cached ChkPeers result belongs to the current analysis code.
+            if (forceLoad || Conf.NoChkYMakeChg || readResult != TCacheFileReader::Success) {
+                ConfMsgManager()->ResetChkPeers();
+            }
             NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheLoadTime), TimeSince(depsCacheLoadCheckpoint));
         } else {
             if (AreInternalConfigureCachesRequired(Conf)) {

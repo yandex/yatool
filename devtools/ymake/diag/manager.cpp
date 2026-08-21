@@ -12,6 +12,38 @@
 
 using TStreamMessage = TConfMsgManager::TStreamMessage;
 
+namespace {
+    constexpr ui32 ChecksStateVersion = 1;
+    constexpr TStringBuf ChkPeersMessageKind = "-WChkPeers";
+}
+
+void TConfMsgManager::TChecksState::Save(IOutputStream* output) const {
+    // The version describes the exact field sequence below. Adding or
+    // reordering check flags requires a version bump and a matching Load case.
+    ::Save(output, ChecksStateVersion);
+    ::Save(output, static_cast<ui8>(ChkPeersCompleted));
+}
+
+void TConfMsgManager::TChecksState::Load(IInputStream* input) {
+    *this = {};
+
+    ui32 version = 0;
+    ::Load(input, version);
+
+    // Keep explicit cases for old layouts. A new version must leave flags that
+    // are absent from an older layout incomplete and must reject unknown ones.
+    switch (version) {
+        case 1: {
+            ui8 chkPeersCompleted = 0;
+            ::Load(input, chkPeersCompleted);
+            ChkPeersCompleted = chkPeersCompleted != 0;
+            return;
+        }
+        default:
+            return;
+    }
+}
+
 TStringStream& TConfMsgManager::SaveConfigureMessage(EConfMsgType type, TStringBuf kind, size_t row, size_t column, bool isPersistent) {
     TFileElemId owner = Diag()->Where.back().first;
     Messages[owner].emplace_back(type, kind, TStringStream(), row, column, isPersistent);
@@ -196,6 +228,16 @@ void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
         output.Finish();
     }
     builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(confEventsData.data(), confEventsData.size())));
+
+    TString checksData;
+    {
+        TStringOutput output(checksData);
+        ChecksState.Save(&output);
+        output.Finish();
+    }
+    builder.AddBlob(new TBlobSaverMemory(
+        TBlob::Copy(checksData.data(), checksData.size())));
+    ChecksState = {};
 }
 
 template<typename Container>
@@ -229,6 +271,12 @@ void TConfMsgManager::Load(const TBlob& multi) {
         TMemoryInput input(blobs[2].Data(), blobs[2].Length());
         Load(&input, Events);
     }
+    if (blobs.size() > 3) {
+        TMemoryInput input(blobs[3].Data(), blobs[3].Length());
+        ChecksState.Load(&input);
+    } else {
+        ChecksState = {};
+    }
 }
 
 template<typename Container>
@@ -257,4 +305,17 @@ TConfMsgManager* ConfMsgManager() {
 void TConfMsgManager::ClearTopLevelMessages() {
     Messages[TFileElemId()].clear();
     Events[TFileElemId()].clear();
+}
+
+bool TConfMsgManager::IsChkPeersCompleted() const noexcept {
+    return ChecksState.ChkPeersCompleted;
+}
+
+void TConfMsgManager::MarkChkPeersCompleted() noexcept {
+    ChecksState.ChkPeersCompleted = true;
+}
+
+void TConfMsgManager::ResetChkPeers() {
+    ChecksState.ChkPeersCompleted = false;
+    EraseMessagesByKind(ChkPeersMessageKind);
 }
