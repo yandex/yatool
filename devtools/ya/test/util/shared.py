@@ -452,15 +452,35 @@ def concatenate_files(files, dst, max_file_size=0, before_callback=None, after_c
                     shutil.copyfileobj(file, dstfile)
 
 
-def run_under_gdb(cmd, gdb_path, tty='/dev/tty'):
+def get_user_home():
+    # type: () -> str | None
+    try:
+        import pwd as _pwd
+
+        return _pwd.getpwuid(os.getuid()).pw_dir
+    except (KeyError, AttributeError, ImportError):
+        return None
+
+
+def run_under_gdb(cmd, gdb_path, tty='/dev/tty', source_root=None):
     # TODO keep args in sync with run_with_gdb() from devtools/ya/test/programs/test_tool/run_test/run_test.py untill YA-724 is done
     extra_args = [gdb_path, '-iex', 'set demangle-style none', '-ex', 'set demangle-style auto']
-    source_root = os.environ.get("ORIGINAL_SOURCE_ROOT")
-    if source_root:
-        extra_args += ["-ex", "set substitute-path /-S/ {}/".format(source_root)]
+    effective_source_root = source_root or os.environ.get("ORIGINAL_SOURCE_ROOT")
+    if effective_source_root:
+        extra_args += ["-ex", "set substitute-path /-S/ {}/".format(effective_source_root)]
     extra_args += ["-ex", "set filename-display absolute", "--args"]
     cmd = extra_args + cmd
+
     additional_env = {"TERMINFO": os.path.abspath(os.path.join(gdb_path, "..", "..", "lib/terminfo"))}
+
+    if "HOME" not in os.environ:
+        user_home = get_user_home()
+        if user_home:
+            additional_env["HOME"] = user_home
+
+    if effective_source_root and "ORIGINAL_SOURCE_ROOT" not in os.environ:
+        additional_env["ORIGINAL_SOURCE_ROOT"] = effective_source_root
+
     return popen_tty(cmd, tty, additional_env)
 
 

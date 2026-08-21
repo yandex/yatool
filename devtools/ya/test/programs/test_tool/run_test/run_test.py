@@ -106,6 +106,20 @@ def run_with_gdb(gdb_path, tty, exec_func, source_root):
         command += ["--args"]
         kwargs["command"] = command + kwargs["command"]
 
+        env = kwargs.get("env")
+        if env is not None:
+            extra = {}
+            if "HOME" not in env:
+                user_home = shared.get_user_home()
+                if user_home:
+                    extra["HOME"] = user_home
+            if source_root and "ORIGINAL_SOURCE_ROOT" not in env:
+                extra["ORIGINAL_SOURCE_ROOT"] = source_root
+            if extra:
+                env = dict(env)
+                env.update(extra)
+                kwargs["env"] = env
+
         for name in ["stdout", "stderr"]:
             if name in kwargs:
                 kwargs[name] = tty
