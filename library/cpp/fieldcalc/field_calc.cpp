@@ -156,6 +156,18 @@ void calc_op::do_eval(const char** dd) const {
         return;
     }
 
+    if (Oper == OP_LOGICAL_OR || Oper == OP_LOGICAL_AND) {
+        left1.to_long();
+        if (Oper == OP_LOGICAL_OR && left1.res_long) {
+            result = true;
+            return;
+        }
+        if (Oper == OP_LOGICAL_AND && !left1.res_long) {
+            result = false;
+            return;
+        }
+    }
+
     eval_res_type right1 = Right.eval(dd);
     if (force_long) { // logical ops will be all long
         left1.to_long();
