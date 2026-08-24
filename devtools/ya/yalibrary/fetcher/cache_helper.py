@@ -51,16 +51,36 @@ def installed(resource_path):
     return False
 
 
+def _installation_stamp(resource_path):
+    """Return the identity of the installation guard, or ``None`` if it is absent.
+
+    A force-refetching process records this before waiting for the resource
+    lock.  If the guard changes while it waits, another process has already
+    refreshed the resource and the directory must not be removed again.
+    """
+    try:
+        stat = os.stat(os.path.join(resource_path, _GUARD_FILE_NAME))
+        return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime, stat.st_ctime
+    except OSError:
+        return None
+
+
 def install_resource(resource_path, installer, force_refetch=False):
     toolscache.notify_tool_cache(resource_path)
 
     install_stat = None
+    installation_stamp = _installation_stamp(resource_path)
     if not force_refetch and installed(resource_path):
         logger.debug('Resource seems to be installed in %s', resource_path)
         return install_stat, resource_path
 
     with safe_resource_lock(resource_path):
         if force_refetch and resource_path not in _refetched_paths:
+            current_stamp = _installation_stamp(resource_path)
+            if current_stamp != installation_stamp and installed(resource_path):
+                logger.debug('Resource was refreshed by another process in %s', resource_path)
+                _refetched_paths.add(resource_path)
+                return install_stat, resource_path
             logger.debug('Force refetch resource in path: %s', resource_path)
         elif installed(resource_path):
             logger.debug('Resource is already installed in %s', resource_path)
