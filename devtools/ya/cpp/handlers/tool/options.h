@@ -6,7 +6,6 @@
 namespace NYa::NTool {
     struct TToolOptions {
         TString ProgramName;
-        TStringBuf UnsupportedOption;
         bool PrintPath;
         bool PrintToolChainPath;
         bool PrintFastPathError;
@@ -14,6 +13,7 @@ namespace NYa::NTool {
         TString HostPlatform;
         TString ToolName;
         TVector<TString> ToolOptions;
+        bool Dummy;
 
         bool operator==(const TToolOptions&) const = default;
     };
@@ -21,6 +21,6 @@ namespace NYa::NTool {
     void ParseOptions(TToolOptions& options, const TVector<TStringBuf>& args);
 
     namespace NTest {
-        TVector<TStringBuf> GetUnsupportedOptions();
+        TVector<TStringBuf> GetLegacyOptions();
     }
 }

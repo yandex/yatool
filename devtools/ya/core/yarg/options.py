@@ -42,7 +42,15 @@ class Options(object):
         # type: (Options) -> None
         pass
 
-    def initialize(self, args, prefix=None, unknown_args_as_free=False, global_config=True, user_config=True):
+    def initialize(
+        self,
+        args,
+        prefix=None,
+        unknown_args_as_free=False,
+        stop_at_first_unknown_arg=False,
+        global_config=True,
+        user_config=True,
+    ):
         return self.params()
 
 
@@ -96,7 +104,15 @@ class _MergedOptions(Options):
 
         return merge_params(*[x.params() for x in self._opts])
 
-    def initialize(self, args, prefix=None, unknown_args_as_free=False, global_config=True, user_config=True):
+    def initialize(
+        self,
+        args,
+        prefix=None,
+        unknown_args_as_free=False,
+        stop_at_first_unknown_arg=False,
+        global_config=True,
+        user_config=True,
+    ):
         from devtools.ya.core.yarg.populate import populate  # to avoid circular import options <-> populate
 
         config_files = get_config_files(
@@ -107,6 +123,7 @@ class _MergedOptions(Options):
             args,
             env=os.environ,
             unknown_args_as_free=unknown_args_as_free,
+            stop_at_first_unknown_arg=stop_at_first_unknown_arg,
             config_files=config_files,
             prefix=prefix,
         )

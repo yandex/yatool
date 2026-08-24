@@ -1,11 +1,10 @@
 import os
 import sys
 import logging
+import typing
 
-from devtools.ya.core.common_opts import CrossCompilationOptions
 from devtools.ya.core.yarg import (
     ArgConsumer,
-    CompositeHandler,
     EnvConsumer,
     SetConstValueHook,
     SetValueHook,
@@ -13,25 +12,27 @@ from devtools.ya.core.yarg import (
     OptsHandler,
     FreeArgConsumer,
     ConfigConsumer,
-    ExtendHook,
     ShowHelpException,
-    SetAppendHook,
     NoValueDummyHook,
     UsageExample,
     ArgsValidatingException,
+    ShowHelpOptions,
+    BaseHandler,
+    Params,
+    merge_opts,
 )
 
 import devtools.ya.app
 
 from devtools.ya.build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, UniversalFetcherOptions
-from devtools.ya.core.yarg.groups import PRINT_CONTROL_GROUP
-from devtools.ya.core.yarg.help_level import HelpLevel
-from yalibrary.tools import environ, resource_id, tool, tools, toolchain_root
+from devtools.ya.core.yarg.help import format_help, format_examples
+from devtools.ya.core.yarg.handler import print_formatted
+from yalibrary import tools
 from yalibrary.toolscache import lock_resource
-from yalibrary.platform_matcher import is_darwin_rosetta
 import devtools.ya.core.config
 import devtools.ya.core.respawn
 import exts.process
+from exts.strtobool import strtobool
 from library.python import windows
 import exts.asyncthread
 
@@ -43,55 +44,160 @@ Check the tool's path in build/ya.conf.json since there is mismatch in real and 
 Please contact owners of the tool to fix that issue."""
 
 
-class ToolYaHandler(CompositeHandler):
+def get_legacy_options():
+    return [
+        LegacyYaToolOptions(),
+        SandboxAuthOptions(),
+    ]
+
+
+class ToolYaHandler(BaseHandler):
     description = 'Execute specific tool'
 
-    @staticmethod
-    def common_download_options():
-        return [SandboxAuthOptions(), CustomFetcherOptions(), UniversalFetcherOptions(), ToolsOptions()]
+    def __init__(self) -> None:
+        super().__init__()
+        self._action = devtools.ya.app.execute(action=do_tool, respawn=devtools.ya.app.RespawnType.OPTIONAL)
 
-    def __init__(self):
-        CompositeHandler.__init__(
-            self,
-            description=self.description,
-            examples=[
-                UsageExample('{prefix} --ya-help', 'Print yatool specific options'),
-                UsageExample('{prefix} --print-path', 'Print path to tool executable file'),
-                UsageExample(
-                    '{prefix} --force-update',
-                    'Check tool for updates before the update interval elapses',
-                ),
-            ],
+        legacy_options = get_legacy_options()
+        actual_options = [
+            YaToolOptions(),
+            ShowHelpOptions(),
+            CustomFetcherOptions(),
+            UniversalFetcherOptions(),
+            ToolsOptions(),
+        ]
+        free_args_options = [FreeArgsOption()]
+
+        # It's important that full_option_list reuses the same Options() objects as legacy_options
+        self._opt = merge_opts(actual_options + legacy_options + free_args_options)
+        self._legacy_opt = merge_opts(legacy_options + free_args_options)
+        self._examples = [
+            UsageExample("{prefix}", "Show this help and tool list"),
+            UsageExample("{prefix} --print-path <tool>", "Print path to the tool executable file"),
+            UsageExample(
+                "{prefix} --force-update <tool> [TOOL OPTIONS]",
+                "Check tool for updates before the update interval elapses",
+            ),
+        ]
+
+    def handle(self, root_handler: BaseHandler, args: list[str], prefix: list[str]) -> typing.Any:
+        params = None
+        try:
+            params = self._opt.initialize(
+                args,
+                prefix=prefix,
+                stop_at_first_unknown_arg=True,
+                user_config=strtobool(os.getenv("YA_LOAD_USER_CONF", "1")),
+            )
+            if not params.args:
+                raise ShowHelpException()
+        except ShowHelpException as exc:
+            OptsHandler.register_handler_run(prefix, args)
+            usage = self.description + "\n\n"
+            usage += self.format_usage(prefix) + "\n\n"
+            usage += format_examples(self.opts_recursive(tuple(prefix)))
+            usage += "\n" + self._format_help(exc.help_level, exc.help_search)
+            usage += "\n\nAvailable tools:\n" + _get_tool_list()
+            print_formatted(usage)
+            sys.exit(0)
+
+        old_free_args = params.args.copy()
+
+        # Here is a tricky part: legacy_opt.initialize() updates the same option objects as the self._opt.initialize() did.
+        # This combines the effect of both options locations: before the tool name and after it. Free args are rewritten.
+        self._legacy_opt.initialize(
+            old_free_args,
+            prefix=prefix,
+            unknown_args_as_free=True,
+            user_config=strtobool(os.getenv("YA_LOAD_USER_CONF", "1")),
         )
-        for x in tools():
-            self[x.name] = OptsHandler(
-                action=devtools.ya.app.execute(action=do_tool, respawn=devtools.ya.app.RespawnType.OPTIONAL),
-                description=x.description,
-                visible=x.visible,
-                opts=[ToolOptions(x.name)] + self.common_download_options(),
-                unknown_args_as_free=True,
+        # Get updated values from the options
+        params = self._opt.params()
+
+        if old_free_args != params.args and sys.stderr.isatty() and params.show_tool_options_warning:
+            sys.stderr.write(
+                "WARNING: specify internal ya tool options before the tool name: 'ya tool <ya options>... <tool name> <tool options>...\n"
             )
 
+        assert len(params.args) > 0, "Legacy options somehow are superset of full options (bug?)"
+        tool_name, params.args = params.args[0], params.args[1:]
+        if tool_name.startswith("-"):
+            raise ArgsValidatingException("Can't handle arg: {}. Tool name is expected".format(tool_name))
 
-class ToolOptions(Options):
-    def __init__(self, tool):
-        Options.__init__(self)
-        self.tool = tool
+        additional_handler_info = {
+            "tool_name": [tool_name],
+            "tool_args": params.args,
+        }
+        OptsHandler.register_handler_run(prefix, args, additional_handler_info=additional_handler_info)
+
+        params.tool = tool_name
+        return self._action(params)
+
+    @property
+    def options(self) -> Options:
+        return self._opt
+
+    def format_usage(self, prefix: list[str] | tuple[str, ...]) -> str:
+        return "[[imp]]Usage[[rst]]:\n  " + " ".join(prefix) + " [OPTIONS]... [tool_name [--] [TOOL OPTIONS]...]"
+
+    def opts_recursive(self, prefix: tuple[str, ...]) -> dict[tuple[str, ...], list[UsageExample]]:
+        return {prefix: self._examples}
+
+    def _format_help(self, help_level: int, search_query: str | None) -> str:
+        return format_help(self._opt, help_level, search_query=search_query)
+
+
+# All new ya tool options must be added here
+# Eventually all options should migrate from LegacyYaToolOptions to this class
+class YaToolOptions(Options):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tool = None  # Set by YaToolHandler.handle
+        self.show_tool_options_warning = False
+
+    @staticmethod
+    def consumer() -> list[ArgConsumer | EnvConsumer | ConfigConsumer]:
+        return [
+            ArgConsumer(["--disable-fastpath"], help="Always run python ya tool version", hook=NoValueDummyHook()),
+            ConfigConsumer("show_tool_options_warning"),
+            EnvConsumer(
+                "YA_SHOW_TOOL_OPTIONS_WARNING", hook=SetValueHook("show_tool_options_warning", transform=strtobool)
+            ),
+        ]
+
+    def postprocess(self) -> None:
+        super().postprocess()
+
+
+class FreeArgsOption(Options):
+    def __init__(self) -> None:
+        super().__init__()
+        self.args = []
+
+    @staticmethod
+    def consumer() -> list[FreeArgConsumer]:
+        return [
+            FreeArgConsumer(hook=SetValueHook(name="args")),
+        ]
+
+
+# As soon an option is no longer used after the tool name move it to the YaToolOption
+class LegacyYaToolOptions(Options):
+    def __init__(self) -> None:
+        super().__init__()
         self.print_path = None
         self.print_toolchain_path = None
         self.toolchain = None
         self.platform = None
-        self.target_platforms = []
+        self.target_platform = None
         self.need_resource_id = None
         self.show_help = False
-        self.tail_args = []
         self.host_platform = None
-        self.hide_arm64_host_warning = False
         self.force_update = False
         self.force_refetch = False
 
     @staticmethod
-    def consumer():
+    def consumer() -> list[ArgConsumer | EnvConsumer | ConfigConsumer]:
         return [
             ArgConsumer(
                 ['--print-path'],
@@ -103,7 +209,11 @@ class ToolOptions(Options):
                 help='Print path to toolchain root',
                 hook=SetConstValueHook('print_toolchain_path', True),
             ),
-            ArgConsumer(['--platform'], help="Set specific platform", hook=SetValueHook('platform')),
+            ArgConsumer(
+                ['--platform'],
+                help="Set specific platform. DEPRECATED: use --host-platform instead",
+                hook=SetValueHook('platform'),
+            ),
             ArgConsumer(['--host-platform'], help="Set host platform", hook=SetValueHook('host_platform')),
             EnvConsumer('YA_TOOL_HOST_PLATFORM', hook=SetValueHook('host_platform')),
             ArgConsumer(['--toolchain'], help="Specify toolchain", hook=SetValueHook('toolchain')),
@@ -112,78 +222,72 @@ class ToolOptions(Options):
                 help="Get resource id for specific platform (the platform should be specified)",
                 hook=SetConstValueHook('need_resource_id', True),
             ),
-            ArgConsumer(['--ya-help'], help="Show help", hook=SetConstValueHook('show_help', True)),
+            # Don't move to actual YaToolOptions. This option will die with LegacyYaToolOptions
+            ArgConsumer(
+                ['--ya-help'], help="Show help (deprecated)", visible=False, hook=SetConstValueHook('show_help', True)
+            ),
             ArgConsumer(
                 ['--target-platform'],
                 help='Target platform',
-                hook=SetAppendHook('target_platforms', values=CrossCompilationOptions.generate_target_platforms_cxx),
+                hook=SetValueHook('target_platform', transform=lambda x: x.upper()),
             ),
+            # Don't move to actual YaToolOptions. This option will die with LegacyYaToolOptions
             ArgConsumer(
                 ['--hide-arm64-host-warning'],
-                help='Hide MacOS arm64 host warning',
-                hook=SetConstValueHook('hide_arm64_host_warning', True),
-                group=PRINT_CONTROL_GROUP,
-                visible=HelpLevel.EXPERT if is_darwin_rosetta() else False,
+                help='Hide MacOS arm64 host warning (deprecated, no op)',
+                hook=NoValueDummyHook(),
+                visible=True,
             ),
-            EnvConsumer('YA_TOOL_HIDE_ARM64_HOST_WARNING', hook=SetConstValueHook('hide_arm64_host_warning', True)),
-            ConfigConsumer('hide_arm64_host_warning'),
             ArgConsumer(
                 ['--force-update'],
                 help='Check tool for updates before the update interval elapses',
                 hook=SetConstValueHook('force_update', True),
             ),
             ArgConsumer(['--force-refetch'], help='Refetch toolchain', hook=SetConstValueHook('force_refetch', True)),
-            ArgConsumer(['--print-fastpath-error'], help='Print fast path failure error', hook=NoValueDummyHook()),
-            FreeArgConsumer(help='arg', hook=ExtendHook(name='tail_args')),
+            ArgConsumer(
+                ["--no-fallback-to-python"],
+                help="Don't return to python if fast-path failed",
+                hook=NoValueDummyHook(),
+                visible=False,
+            ),
+            ArgConsumer(
+                ["--print-fastpath-error"], help="Print fast path failure error", hook=NoValueDummyHook(), visible=False
+            ),
         ]
 
-    def postprocess(self):
+    def postprocess(self) -> None:
         if self.show_help:
             raise ShowHelpException()
-        if self.toolchain and self.target_platforms:
+        if self.toolchain and self.target_platform:
             raise ArgsValidatingException("Do not use --toolchain and --target-platform args together")
         if self.force_update:
             os.environ['YA_TOOL_FORCE_UPDATE'] = "1"
 
 
-def _replace(s, transformations):
+def _replace(s: str, transformations: dict[str, str]) -> str:
     for k, v in transformations.items():
         s = s.replace('$({})'.format(k), v)
     return s
 
 
-def _useful_env_vars():
+def _useful_env_vars() -> dict[str, str]:
     return {'YA_TOOL': sys.argv[0]}
 
 
-def do_tool(params):
+def do_tool(params: Params) -> None:
     tool_name = params.tool
-    extra_args = params.tail_args
-    target_platform = params.target_platforms
+    extra_args = params.args
+    target_platform = params.target_platform
     host_platform = params.host_platform
-    if target_platform:
-        if len(target_platform) > 1:
-            raise Exception('Multiple target platforms are not supported by this code for now')
-        target_platform = target_platform[0]
-    else:
-        target_platform = None
-
-    if is_darwin_rosetta() and not host_platform and not params.hide_arm64_host_warning:
-        try:
-            import app_ctx
-
-            app_ctx.display.emit_message("You use x86_64 version of selected tool.")
-        except Exception:
-            logger.exception("Can't print arm64 warning message")
 
     for_platform = params.platform or params.host_platform or None
 
     if params.need_resource_id:
-        print(resource_id(tool_name, params.toolchain, for_platform))
+        print(tools.resource_id(tool_name, params.toolchain, for_platform))
         return
 
     tool_getter = exts.asyncthread.future(
-        lambda: tool(
+        lambda: tools.tool(
             tool_name,
             params.toolchain,
             target_platform=target_platform,
@@ -200,7 +304,7 @@ def do_tool(params):
     lock_result = False
 
     if params.print_toolchain_path:
-        print(toolchain_root(tool_name, params.toolchain, for_platform))
+        print(tools.toolchain_root(tool_name, params.toolchain, for_platform))
         lock_result = True
     elif params.print_path:
         print(tool_path)
@@ -215,9 +319,9 @@ def do_tool(params):
             env.pop(key, None)
 
         env.update(_useful_env_vars())
-        for key, value in environ(tool_name, params.toolchain).items():
+        for key, value in tools.environ(tool_name, params.toolchain).items():
             env[key] = _replace(
-                os.pathsep.join(value), {'ROOT': toolchain_root(tool_name, params.toolchain, for_platform)}
+                os.pathsep.join(value), {'ROOT': tools.toolchain_root(tool_name, params.toolchain, for_platform)}
             )
         if tool_name == 'gdb':
             # gdb does not fit in 8 MB stack with large cores (DEVTOOLS-5040).
@@ -274,4 +378,35 @@ def do_tool(params):
         )
 
     if lock_result:
-        lock_resource(toolchain_root(tool_name, params.toolchain, for_platform))
+        lock_resource(tools.toolchain_root(tool_name, params.toolchain, for_platform))
+
+
+def _get_tool_list() -> str:
+    tool_info_list = sorted([t for t in tools.tools() if t.visible], key=lambda t: t.name)
+
+    if not tool_info_list:
+        return ""
+
+    result = []
+    max_name_len = max((len(x.name) for x in tool_info_list))
+    for tool_info in tool_info_list:
+        desc_items = tool_info.description.split('\n')
+        result += _get_aligned_value(tool_info.name, desc_items, max_name_len + 5, prefix="  ")
+    return "\n".join(result)
+
+
+def _get_aligned_value(
+    key: str,
+    value: str | list[str] | None,
+    indent: int,
+    prefix: str = "",
+) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    result = []
+    for line in value:
+        result.append("{prefix}{key:{indent}}{line}".format(prefix=prefix, key=key, indent=indent, line=line))
+        key = ""
+    return result

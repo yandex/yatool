@@ -18,12 +18,22 @@ logger = logging.getLogger(__name__)
 
 
 class _Populate(object):
-    def __init__(self, opt, args, env=None, unknown_args_as_free=False, config_files=None, prefix=None):
-        # type: (Options, list[six.string_types], tp.Optional[dict], bool, list[str], list[str]) -> None
+    def __init__(
+        self,
+        opt,
+        args,
+        env=None,
+        unknown_args_as_free=False,
+        stop_at_first_unknown_arg=False,
+        config_files=None,
+        prefix=None,
+    ):
+        # type: (Options, list[six.string_types], tp.Optional[dict], bool, list[str], list[str], bool) -> None
         self.opt = opt
         self.args = args
         self.env = env
         self.unknown_args_as_free = unknown_args_as_free
+        self.stop_at_first_unknown_arg = stop_at_first_unknown_arg
         # Same config may be added by both global_config and user_config paths, duplicates causes ArgsBindingException
         self.config_files = list(dict.fromkeys(config_files)) if config_files else config_files
         self.prefix = (prefix or [])[1:]  # skip ya
@@ -189,6 +199,9 @@ class _Populate(object):
                 if args[0] == '--':
                     return result + args[1:]
 
+                if self.stop_at_first_unknown_arg:
+                    return args
+
                 if args[0].startswith('-') and args[0] != '-' and not self.unknown_args_as_free:
                     error_msg = 'Do not know what to do with {0} argument'.format(args[0])
 
@@ -217,9 +230,25 @@ class _Populate(object):
         return result
 
 
-def populate(opt, args, env=None, unknown_args_as_free=False, config_files=None, prefix=None):
-    # type: (Options, list[six.string_types], tp.Optional[dict], bool, list[str], list[str]) -> None
-    populator = _Populate(opt, args, env, unknown_args_as_free, config_files, prefix)
+def populate(
+    opt,
+    args,
+    env=None,
+    unknown_args_as_free=False,
+    stop_at_first_unknown_arg=False,
+    config_files=None,
+    prefix=None,
+):
+    # type: (Options, list[six.string_types], tp.Optional[dict], bool, list[str], list[str], bool) -> None
+    populator = _Populate(
+        opt,
+        args,
+        env=env,
+        unknown_args_as_free=unknown_args_as_free,
+        stop_at_first_unknown_arg=stop_at_first_unknown_arg,
+        config_files=config_files,
+        prefix=prefix,
+    )
     populator.populate()
 
 

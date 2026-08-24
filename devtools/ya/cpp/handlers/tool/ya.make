@@ -16,6 +16,7 @@ PEERDIR(
     devtools/local_cache/toolscache/proto
     devtools/ya/cpp/lib
     devtools/ya/cpp/lib/snowden
+    library/cpp/getopt
 )
 
 END()
