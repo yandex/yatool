@@ -213,13 +213,17 @@ def project_configure_error(event: dict) -> dict:
     ``event`` carries the NEvent.TDisplayMessage keys: 'Type', 'Sub',
     'Message', 'Mod' and optionally 'Where', 'Row', 'Column', 'Platform'
     (see DisplayMessageSubscriber in devtools/ya/build/ya_make.py).
+
+    The message comes from ymake with highlighting markup in it
+    (``[[alt1]]PEERDIR[[rst]]``, written by hand in devtools/ymake and in
+    the build/plugins configure-error strings); an agent reads plain text.
     """
     result = {'type': 'result', 'kind': 'configure', 'status': 'FAILED'}
     where = event.get('Where')
     if where:
         result['path'] = _configure_error_path(where)
 
-    text = (event.get('Message') or '').strip()
+    text = strip_markup(event.get('Message') or '').strip()
     if text:
         if 'Row' in event and 'Column' in event:
             text = f"{event['Row']}:{event['Column']}: {text}"
