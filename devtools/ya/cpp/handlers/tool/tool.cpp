@@ -2,8 +2,7 @@
 #include "toolchain.h"
 #include "toolscache.h"
 
-// TODO(DEVTOOLSSUPPORT-93035): temporarily disabled
-// #include <devtools/ya/cpp/lib/snowden/snowden.h>
+#include <devtools/ya/cpp/lib/snowden/snowden.h>
 
 #include <devtools/libs/yaplatform/platform.h>
 #include <devtools/ya/cpp/lib/class_registry.h>
@@ -49,8 +48,7 @@ namespace NYa::NTool {
 
         toolsCache.Destroy();
 
-        // TODO(DEVTOOLSSUPPORT-93035): temporarily disabled — interferes with ya tool tt gen in IDEA
-        // NSnowden::ReportToolExecutionEvent(config, options.ToolName, tool.ToolPath.GetPath());
+        NSnowden::ReportToolExecutionEvent(config, options.ToolName, tool.ToolPath.GetPath());
 
         ExecTool(config, tool, options.ToolOptions);
     }

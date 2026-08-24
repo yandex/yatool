@@ -1,19 +1,35 @@
 #include "snowden.h"
+#include "snowden_private.h"
 
 #include <devtools/ya/cpp/lib/logger.h>
 
+#include <util/generic/yexception.h>
+#include <util/stream/null.h>
 #include <util/system/env.h>
 #include <util/system/execpath.h>
 #include <util/system/shellcommand.h>
 
 namespace NYa::NSnowden {
-    namespace {
-
-        void SpawnPythonEntryPoint(const TString& entryPoint, const TList<TString>& args) {
+    namespace NPrivate {
+        TMaybe<int> RunPythonEntryPoint(
+            const TString& executable,
+            const TString& entryPoint,
+            const TList<TString>& args,
+            bool async
+        ) {
+#if defined(_unix_)
+            // Keep fd 0 occupied while TShellCommand creates its output pipes.
+            // Otherwise an output pipe can take fd 0 and close the redirected
+            // stdin in the child while rearranging descriptors after fork().
+            TFileHandle stdinReservation("/dev/null", OpenExisting | RdOnly | CloseOnExec);
+            Y_ENSURE(stdinReservation.IsOpen(), "Cannot reserve stdin for Snowden child process");
+#endif
             TShellCommandOptions opts;
+            TNullInput nullIn;
             opts
                 .SetDetachSession(true)
-                .SetAsync(true)
+                .SetAsync(async)
+                .SetInputStream(&nullIn)
                 .SetOutputStream(nullptr)
                 .SetErrorStream(nullptr);
 
@@ -24,8 +40,19 @@ namespace NYa::NSnowden {
                 opts.Environment["GSID"] = gsid;
             }
 
-            TShellCommand cmd(GetExecPath(), args, opts);
+            TShellCommand cmd(executable, args, opts);
             cmd.Run();
+            if (async) {
+                return Nothing();
+            }
+            return cmd.GetExitCode();
+        }
+    }
+
+    namespace {
+
+        void SpawnPythonEntryPoint(const TString& entryPoint, const TList<TString>& args) {
+            NPrivate::RunPythonEntryPoint(GetExecPath(), entryPoint, args, true);
         }
 
     } // namespace

@@ -9,3 +9,9 @@ PEERDIR(
 )
 
 END()
+
+RECURSE_FOR_TESTS(
+    integration_tests
+    test_helper
+    ut
+)
