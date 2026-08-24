@@ -26,6 +26,7 @@ class MakeYaHandler(devtools.ya.core.yarg.OptsHandler):
             opts=ya_make_options(
                 free_build_targets=True,
                 strip_idle_build_results=True,
+                enable_locking=True,
             ),
             visible=True,
         )

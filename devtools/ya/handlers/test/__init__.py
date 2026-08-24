@@ -47,6 +47,7 @@ class YaTestYaHandler(devtools.ya.core.yarg.OptsHandler):
                 free_build_targets=True,
                 is_ya_test=True,
                 strip_idle_build_results=True,
+                enable_locking=True,
             ),
             visible=True,
             extra_help=self.extra_help,

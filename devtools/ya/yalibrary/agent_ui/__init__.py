@@ -164,6 +164,17 @@ class AgentConsole:
         """
         self._activity = functor
 
+    @contextlib.contextmanager
+    def temporary_activity(self, functor: Callable[[], list]) -> Iterator[None]:
+        """Temporarily replace the running-task source and restore it on exit."""
+        previous = self._activity
+        self._activity = functor
+        try:
+            yield
+        finally:
+            if self._activity is functor:
+                self._activity = previous
+
     def _in_flight(self) -> int:
         """Count the tasks the runner is executing right now, 0 without a source."""
         activity = self._activity

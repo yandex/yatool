@@ -1,18 +1,103 @@
 import logging
 import os
 import time
+import types
+import typing
 
+import devtools.ya.core.config as core_config
 from devtools.ya.core import stage_tracer, stages_profiler
 from devtools.ya.yalibrary import sjson
 import exts.fs
 from exts.compress import ucopen
 from exts.decompress import udopen
+import library.python.filelock as filelock
 from yalibrary.monitoring import YaMonEvent
+import yalibrary.status_view as status_view
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("build_handler")
 stage_begin_time = {}
 distbuild_mock_data_dir_env = "__DISTBUILD_MOCK_DIR"
+YA_MAKE_LOCK_FILE = 'ya_make.lock'
+YA_MAKE_LOCK_POLL_INTERVAL = 0.1
+
+
+class _YaMakeLockWaitTask:
+    def __init__(self, owner_pid: typing.Callable[[], str]) -> None:
+        self._owner_pid = owner_pid
+
+    def owner_status(self) -> str:
+        return f"Another `ya make` is active (PID {self._owner_pid()})"
+
+    def status(self) -> str:
+        return f"{self.owner_status()}, waiting..."
+
+
+class YaMakeLock:
+    """Serialize opted-in ya make invocations sharing a cache root."""
+
+    def __init__(
+        self,
+        path: str,
+        display: typing.Any,
+        agent_console: typing.Any = None,
+        poll_interval: float = YA_MAKE_LOCK_POLL_INTERVAL,
+    ) -> None:
+        self._lock = filelock.PidFileLock(path)
+        self._display = display
+        self._agent_console = agent_console
+        self._poll_interval = poll_interval
+        self._acquired = False
+
+    def __enter__(self) -> 'YaMakeLock':
+        wait_status = status_view.Status()
+        listener = wait_status.listener()
+        wait_task = _YaMakeLockWaitTask(self._owner_pid)
+        listener.add(wait_task)
+        listener.started(wait_task)
+        term_view = status_view.TermView(wait_status, self._display, ninja=False, show_active_progress=False)
+        ticker = status_view.TickThrottle(term_view.tick, YA_MAKE_LOCK_POLL_INTERVAL)
+        try:
+            if self._agent_console is None:
+                waiting = self._acquire(wait_status, ticker)
+            else:
+                with self._agent_console.temporary_activity(wait_status.active):
+                    waiting = self._acquire(wait_status, ticker)
+        finally:
+            listener.finished(wait_task)
+
+        self._acquired = True
+        if waiting:
+            self._display.emit_status('')
+        return self
+
+    def _acquire(self, wait_status: status_view.Status, ticker: status_view.TickThrottle) -> bool:
+        waiting = False
+        while not self._lock.acquire(blocking=False):
+            if not waiting and self._agent_console is not None:
+                task, elapsed = wait_status.active()[-1]
+                logger.warning("%s, waiting for %.1fs...", task.owner_status(), elapsed)
+            ticker.tick()
+            waiting = True
+            time.sleep(self._poll_interval)
+        return waiting
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
+    ) -> None:
+        if self._acquired:
+            self._lock.release()
+            self._acquired = False
+
+    def _owner_pid(self) -> str:
+        try:
+            pid = self._lock.info.pid
+        except (OSError, ValueError):
+            return 'unknown'
+        return str(pid) if pid else 'unknown'
 
 
 def _to_json(data):
@@ -69,9 +154,17 @@ def monitoring_stage_finished(stage_name):
 
 
 def do_ya_make(params):
-    from devtools.ya.build import ya_make
-
     import app_ctx  # XXX
+
+    if getattr(params, 'locked', False):
+        lock_path = os.path.join(core_config.misc_root(), YA_MAKE_LOCK_FILE)
+        with YaMakeLock(lock_path, app_ctx.display, agent_console=getattr(app_ctx, 'agent_ui', None)):
+            return _do_ya_make(params, app_ctx)
+    return _do_ya_make(params, app_ctx)
+
+
+def _do_ya_make(params, app_ctx):
+    from devtools.ya.build import ya_make
 
     distbuild_mock = None
     if distbuild_mock_data_dir := os.environ.get(distbuild_mock_data_dir_env):

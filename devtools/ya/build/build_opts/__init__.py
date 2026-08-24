@@ -1461,6 +1461,31 @@ class YaMakeOptions(Options):
         ]
 
 
+class YaMakeLockOptions(Options):
+    def __init__(self):
+        self.locked = False
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--locked'],
+                help='Serialize with other locked ya make and ya test invocations sharing the same cache root',
+                hook=SetConstValueHook('locked', True),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--no-locked'],
+                help='Do not serialize, even when locking is enabled in ya.conf',
+                hook=SetConstValueHook('locked', False),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.BASIC,
+            ),
+            ConfigConsumer('locked'),
+        ]
+
+
 class ContentUidsOptions(Options):
     def __init__(self):
         self.content_uids = True
@@ -3427,7 +3452,9 @@ def ya_make_options(  # compat
     is_ya_test=False,
     strip_idle_build_results=False,
     build_type='debug',
+    enable_locking=False,
 ):
+    lock_options = [YaMakeLockOptions()] if enable_locking else []
     return (
         [
             ShowHelpOptions(),
@@ -3475,6 +3502,7 @@ def ya_make_options(  # compat
             SetNiceValueOptions(),
             ContentUidsOptions(),
         ]
+        + lock_options
         + test_opts.test_options(
             cache_tests,
             test_size_filters=test_size_filters,

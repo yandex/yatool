@@ -77,6 +77,7 @@ PEERDIR(
     devtools/ya/yalibrary/yandex/distbuild/distbs_consts
     library/python/cityhash
     library/python/compress
+    library/python/filelock
 )
 
 IF (NOT YA_OPENSOURCE)
