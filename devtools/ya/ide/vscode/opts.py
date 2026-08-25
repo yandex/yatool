@@ -53,7 +53,10 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         return [
             devtools.ya.core.yarg.ArgConsumer(
                 ["-P", "--project-output"],
-                help="Custom IDE workspace output directory",
+                help=(
+                    "Directory for generated IDE workspace files "
+                    "(must be outside Arcadia unless --allow-project-inside-arc is used)"
+                ),
                 hook=devtools.ya.core.yarg.SetValueHook("project_output"),
                 group=cls.GROUP,
             ),
@@ -65,7 +68,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--cpp"],
-                help="Configure workspace for C++ language",
+                help="Configure C++ and generate compile_commands.json for clangd",
                 hook=devtools.ya.core.yarg.SetConstAppendHook("languages", "CPP"),
                 group=cls.GROUP,
             ),
@@ -77,13 +80,13 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--py3"],
-                help="Configure workspace for Python 3 language",
+                help="Configure Python 3 paths and settings; write pyrightconfig.json by default",
                 hook=devtools.ya.core.yarg.SetConstAppendHook("languages", "PY3"),
                 group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 ["--use-arcadia-root"],
-                help="Use arcadia root as workspace folder",
+                help="Use Arcadia root as VS Code workspace folder; does not change the workspace output directory",
                 hook=devtools.ya.core.yarg.SetConstValueHook("use_arcadia_root", True),
                 group=cls.GROUP,
             ),

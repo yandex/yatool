@@ -168,7 +168,13 @@ def main(args):
         default=True if os.environ.get('YA_NO_TMP_DIR') in ("1", "yes") else False,
     )
     p.add_argument('--no-respawn', action='store_const', const=True, default=False)
-    p.add_argument('--print-path', action='store_const', const=True, default=False)
+    p.add_argument(
+        '--print-path',
+        action='store_const',
+        const=True,
+        default=False,
+        help='print the running ya executable path and exit',
+    )
     p.add_argument('--version', action='store_const', const=True, default=False)
     p.add_argument(
         '-v',

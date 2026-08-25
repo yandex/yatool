@@ -536,11 +536,21 @@ class RebuildOptions(Options):
     def consumer():
         return [
             ArgConsumer(
-                ['--rebuild'],
-                help='Rebuild all',
+                ['--ignore-build-cache'],
+                help=(
+                    'Ignore cached build results (much slower). '
+                    'Use only to diagnose cache problems; source changes are handled by normal builds'
+                ),
                 hook=SetConstValueHook('clear_build', True),
                 group=OPERATIONAL_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--rebuild'],
+                help='Deprecated alias for --ignore-build-cache',
+                hook=SetConstValueHook('clear_build', True),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=False,
             ),
         ]
 
@@ -1583,7 +1593,7 @@ class CreateSymlinksOptions(Options):
         return [
             ArgConsumer(
                 ['--no-src-links'],
-                help='Do not create any symlink in source directory',
+                help='Do not create any symlinks in target module directories (created by default)',
                 hook=SetConstValueHook('create_symlinks', False),
                 group=OUTPUT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,

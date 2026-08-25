@@ -41,6 +41,14 @@ class YaTestYaHandler(devtools.ya.core.yarg.OptsHandler):
                     '{prefix} -F "*subname*"',
                     'Build and run all tests matched by the filter',
                 ),
+                devtools.ya.core.yarg.UsageExample(
+                    '{prefix} path/to/module -X --test-stderr',
+                    'Rerun failures from the preceding run and stream stderr',
+                ),
+                devtools.ya.core.yarg.UsageExample(
+                    '{prefix} path/to/module -F "*test_name*" -Z',
+                    'Canonize one test selected by name',
+                ),
             ],
             description=self.description,
             opts=ya_make_options(

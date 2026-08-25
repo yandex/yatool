@@ -7,7 +7,10 @@ import devtools.ya.app
 
 
 class MakeYaHandler(devtools.ya.core.yarg.OptsHandler):
-    description = 'Build and run tests\nTo see more help use [[imp]]-hh[[rst]]/[[imp]]-hhh[[rst]]'
+    description = (
+        'Build targets and run tests. By default, build-result symlinks are created in target module directories.\n'
+        'To see more help use [[imp]]-hh[[rst]]/[[imp]]-hhh[[rst]]'
+    )
     stderr_help = '[[alt1]]To see more help use [[imp]]-hh[[rst]]/[[imp]]-hhh[[rst]]'
 
     def __init__(self):

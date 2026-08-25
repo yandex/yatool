@@ -23,7 +23,7 @@ class RunYaHandler(yarg.OptsHandler):
         yarg.OptsHandler.__init__(
             self,
             action=devtools.ya.app.execute(run, respawn=devtools.ya.app.RespawnType.MANDATORY),
-            description="Compile and run a target",
+            description="Compile and run one executable program",
             examples=[
                 yarg.UsageExample(
                     "{prefix} tools/uc --help",
@@ -41,7 +41,15 @@ class RunYaHandler(yarg.OptsHandler):
 
                 [[imp]]Extended mode.[[rst]]
                 In this mode you can use all 'ya make' options, but the delimiter '--' is needed to separate the target arguments from the 'ya make' ones:
-                  ya run [YA MAKE OPTIONS AND YA RUN OPTIONS] [TARGET] -- [ARGS]...\
+                  ya run [YA MAKE OPTIONS AND YA RUN OPTIONS] [TARGET] -- [ARGS]...
+
+                [[imp]]Executable targets.[[rst]]
+                ya run accepts exactly one executable target. To exercise library code manually,
+                create an executable target supported by the build system, make it depend on the
+                library, for example with PEERDIR, and run that target.
+
+                ya run builds the executable in a temporary output directory and launches it from
+                there.\
                 """),
         )
 

@@ -102,7 +102,8 @@ def test_options(
 
 class RunTestOptions(devtools.ya.core.yarg.Options):
     HelpString = (
-        'Run tests (-t runs only SMALL tests, -tt runs SMALL and MEDIUM tests, -ttt runs SMALL, MEDIUM and FAT tests)'
+        'Run tests (-t runs only SMALL tests, -tt runs SMALL and MEDIUM tests, '
+        '-ttt runs SMALL, MEDIUM and LARGE tests)'
     )
     RunAllTests = 3
 
@@ -328,7 +329,10 @@ class FilteringOptions(devtools.ya.core.yarg.Options):
         return [
             TestArgConsumer(
                 ['-X', '--last-failed-tests'],
-                help='Restart tests which failed in last run for chosen target',
+                help=(
+                    'Select tests that failed in the preceding run of the chosen targets. '
+                    'If no saved failures are found, run the selected targets normally.'
+                ),
                 hook=devtools.ya.core.yarg.SetConstValueHook('last_failed_tests', True),
                 subgroup=FILTERING_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
@@ -353,7 +357,8 @@ class FilteringOptions(devtools.ya.core.yarg.Options):
             TestArgConsumer(
                 ['-F', '--test-filter'],
                 help=(
-                    "Run tests matching <tests-filter>. A filter may match multiple tests. "
+                    "Run tests whose full names match <tests-filter> "
+                    "(for example, test.py::test_export). A filter may match multiple tests. "
                     "Asterisks '*' can be used to match test subsets. Chunks can also be filtered using a pattern "
                     "matching '[*] chunk'."
                 ),
@@ -370,7 +375,11 @@ class FilteringOptions(devtools.ya.core.yarg.Options):
             ),
             TestArgConsumer(
                 ['--test-type'],
-                help='Run only specified types of tests',
+                help=(
+                    'Run only test suites of the specified type. '
+                    'Common types: pytest, py3test, unittest, go_test, java. '
+                    'Use -L/--list-tests to see types present in the selected targets.'
+                ),
                 hook=devtools.ya.core.yarg.SetAppendHook('test_type_filters'),
                 subgroup=FILTERING_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,
@@ -398,7 +407,7 @@ class FilteringOptions(devtools.ya.core.yarg.Options):
             ),
             TestArgConsumer(
                 ['--test-filename'],
-                help='Run only tests with specified filenames (pytest and hermione only)',
+                help=('Run pytest or Hermione tests from specified source filenames ' '(for example, test_export.py).'),
                 hook=devtools.ya.core.yarg.SetAppendHook('test_files_filter'),
                 subgroup=FILTERING_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,
@@ -640,7 +649,7 @@ class CanonizationOptions(devtools.ya.core.yarg.Options):
                     'canonization_transport', upload_consts.UploadTransport.Skynet
                 ),
                 subgroup=CANONIZATION_SUBGROUP,
-                visible=help_level.HelpLevel.EXPERT,
+                visible=help_level.HelpLevel.ADVANCED,
             ),
             TestArgConsumer(
                 ['--canonize-via-http'],
@@ -649,11 +658,15 @@ class CanonizationOptions(devtools.ya.core.yarg.Options):
                     'canonization_transport', upload_consts.UploadTransport.Http
                 ),
                 subgroup=CANONIZATION_SUBGROUP,
-                visible=help_level.HelpLevel.EXPERT,
+                visible=help_level.HelpLevel.ADVANCED,
             ),
             TestArgConsumer(
                 ['--canon-diff'],
-                help='Show test canonical data diff, allowed values are r<revision>, rev1:rev2, HEAD, PREV',
+                help=(
+                    'Show canonical data diff. Use <rev1>:<rev2> to compare two revisions '
+                    '(for example, r123456:r123789). A single r<revision>, HEAD, or PREV '
+                    'compares that revision with the current checkout.'
+                ),
                 hook=devtools.ya.core.yarg.SetValueHook('test_diff'),
                 subgroup=CANONIZATION_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,

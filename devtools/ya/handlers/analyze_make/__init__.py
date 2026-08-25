@@ -165,8 +165,15 @@ class AnalyzeMakeYaHandler(devtools.ya.core.yarg.CompositeHandler):
         super().__init__('Analysis tools for ya make')
         self['timeline'] = devtools.ya.core.yarg.OptsHandler(
             action=execute(timeline.main),
-            description='Timeline of build events',
+            description='Create a JSON build timeline that can be opened in Perfetto',
             opts=basic_options(),
+            examples=[
+                devtools.ya.core.yarg.UsageExample('{prefix}', 'Use the latest suitable standard event log'),
+                devtools.ya.core.yarg.UsageExample(
+                    '{prefix} --evlog <path>',
+                    'Analyze an event log saved with ya make --evlog-file=<path>',
+                ),
+            ],
         )
         self['timebloat'] = devtools.ya.core.yarg.OptsHandler(
             action=execute(timebloat.main),
