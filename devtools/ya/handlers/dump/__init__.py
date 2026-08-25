@@ -236,7 +236,7 @@ class DumpYaHandler(CompositeHandler):
         )
         self['build-plan'] = OptsHandler(
             action=devtools.ya.app.execute(action=do_build_plan),
-            description='Build plan',
+            description='Output a JSON build plan',
             opts=self.common_opts
             + self.common_build_facade_opts()
             + [

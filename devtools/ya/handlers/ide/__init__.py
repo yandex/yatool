@@ -208,7 +208,10 @@ class IdeaOptions(yarg.Options):
             ),
             yarg.ArgConsumer(
                 ['-l', '--local'],
-                help='Only recurse reachable projects are idea modules',
+                help=(
+                    'Mark sources and tests only for target modules; '
+                    'export their PEERDIR dependencies as built artifacts.'
+                ),
                 hook=yarg.SetConstValueHook('local', True),
                 group=IdeaOptions.IDEA_OPT_GROUP,
             ),
@@ -728,7 +731,7 @@ class IdeYaHandler(yarg.CompositeHandler):
         )
         self['pycharm'] = yarg.OptsHandler(
             action=devtools.ya.app.execute(devtools.ya.ide.pycharm.do_pycharm),
-            description='Generate PyCharm project.',
+            description='Generate a PyCharm project in the current working directory for the selected targets.',
             opts=devtools.ya.ide.ide_common.ide_minimal_opts(targets_free=True)
             + [
                 PycharmOptions(),

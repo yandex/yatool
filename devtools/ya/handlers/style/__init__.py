@@ -185,6 +185,10 @@ class StyleYaHandler(devtools.ya.core.yarg.OptsHandler):
             self,
             action=devtools.ya.app.execute(action=stl.run_style, respawn=devtools.ya.app.RespawnType.OPTIONAL),
             description=self.description,
+            extra_help=(
+                'Without explicit filters, py, cpp, and go are enabled by default. '
+                'Multiple explicit file-type filters are combined.'
+            ),
             opts=[
                 StyleOptions(),
                 ReportOptions(),

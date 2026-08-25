@@ -538,8 +538,9 @@ class RebuildOptions(Options):
             ArgConsumer(
                 ['--ignore-build-cache'],
                 help=(
-                    'Ignore cached build results (much slower). '
-                    'Use only to diagnose cache problems; source changes are handled by normal builds'
+                    'Ignore cached build results for selected targets and their dependencies (much slower). '
+                    'Use only to diagnose cache problems; this does not clear the entire cache, and source '
+                    'changes are handled by normal builds.'
                 ),
                 hook=SetConstValueHook('clear_build', True),
                 group=OPERATIONAL_CONTROL_GROUP,

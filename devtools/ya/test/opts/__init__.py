@@ -407,7 +407,7 @@ class FilteringOptions(devtools.ya.core.yarg.Options):
             ),
             TestArgConsumer(
                 ['--test-filename'],
-                help=('Run pytest or Hermione tests from specified source filenames ' '(for example, test_export.py).'),
+                help='Run pytest or Hermione tests from specified source filenames (for example, test_export.py).',
                 hook=devtools.ya.core.yarg.SetAppendHook('test_files_filter'),
                 subgroup=FILTERING_SUBGROUP,
                 visible=help_level.HelpLevel.ADVANCED,
@@ -967,7 +967,7 @@ class UidCalculationOptions(devtools.ya.core.yarg.Options):
         return [
             TestArgConsumer(
                 ['--cache-tests'],
-                help='Use cache for tests',
+                help='Reuse cached test results when available. Results are only reused if the previous run was also with this flag.',
                 hook=devtools.ya.core.yarg.SetConstValueHook('cache_tests', True),
                 subgroup=UID_CALCULATION_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
@@ -979,7 +979,7 @@ class UidCalculationOptions(devtools.ya.core.yarg.Options):
             devtools.ya.core.yarg.ConfigConsumer('cache_tests'),
             TestArgConsumer(
                 ['--retest'],
-                help='No cache for tests',
+                help='Do not reuse cached test results',
                 hook=devtools.ya.core.yarg.SetConstValueHook('force_retest', True),
                 subgroup=UID_CALCULATION_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
