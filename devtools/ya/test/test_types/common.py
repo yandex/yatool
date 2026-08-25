@@ -825,7 +825,7 @@ class AbstractTestSuite(facility.Suite):
         fork_test_files = (self.meta.fork_test_files or 'off') == "on"
         # TODO remove when DEVTOOLS-6560 is dones
         # test_files_filter option implies FORK_TEST_FILES()
-        return fork_test_files or (self.supports_fork_test_files and opts.test_files_filter)
+        return fork_test_files or (self.supports_fork_test_files and getattr(opts, 'test_files_filter', []))
 
     def get_fork_partition_mode(self):
         return self.meta.test_partition or 'SEQUENTIAL'
