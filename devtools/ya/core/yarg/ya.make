@@ -23,16 +23,11 @@ PEERDIR(
     contrib/python/toml
     devtools/ya/app_config
     devtools/ya/core/config
+    devtools/ya/core/error
     devtools/ya/core/report
     devtools/ya/exts
     devtools/ya/yalibrary/display
 )
-
-IF (PYTHON2)
-    PEERDIR(
-        contrib/deprecated/python/typing
-    )
-ENDIF()
 
 END()
 
