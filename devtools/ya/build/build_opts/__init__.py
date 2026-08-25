@@ -312,10 +312,10 @@ class DumpReportOptions(Options):
             EnvConsumer('YA_DUMP_RAW_RESULTS', hook=SetConstValueHook('dump_raw_results', True)),
             ArgConsumer(
                 ['--jsonl-report'],
-                help='Dump build results when they are ready to the specified file in jsonl format',
+                help='Write build and test results to the specified JSONL file as they become ready',
                 hook=SetValueHook('json_line_report_file'),
                 group=AUTOCHECK_GROUP,
-                visible=HelpLevel.INTERNAL,
+                visible=HelpLevel.BASIC,
             ),
             EnvConsumer(
                 'YA_DUMP_RESULTS2_JSON',

@@ -129,13 +129,17 @@ class FilterOptions(devtools.ya.core.yarg.Options):
     @staticmethod
     def consumer():
         checks = list(stlr.StylerKind)
+        help_by_file_type = {
+            stlr.StylerKind.EOL: 'Remove trailing spaces and tabs from line ends',
+            stlr.StylerKind.EOF: 'Add a final newline to non-empty files that do not end with one',
+        }
         # temporary until stylua support for all platform is added
         checks_without_lua = [kind for kind in checks if kind != stlr.StylerKind.LUA]
 
         return [
             devtools.ya.core.yarg.ArgConsumer(
                 ['--{file_type}'.format(file_type=file_type)],
-                help='Process only {filetype} files'.format(filetype=file_type),
+                help=help_by_file_type.get(file_type, f'Process only {file_type} files'),
                 hook=devtools.ya.core.yarg.SetConstAppendHook('file_types', file_type),
                 group=devtools.ya.core.yarg.FILTERS_OPT_GROUP,
             )
