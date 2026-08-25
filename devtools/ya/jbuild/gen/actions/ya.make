@@ -21,14 +21,17 @@ PEERDIR(
     devtools/ya/jbuild/idea_templates
     devtools/ya/yalibrary/graph
     devtools/ya/yalibrary/rglob
-    devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
-    devtools/ya/yalibrary/vcs/arc
 )
+
+IF (PYTHON3)
+    PEERDIR(
+        devtools/ya/yalibrary/tools
+    )
+ENDIF()
 
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
-        devtools/ya/yalibrary/svn
         devtools/ya/yalibrary/yandex/sandbox
     )
 ENDIF()

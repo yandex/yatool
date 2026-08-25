@@ -24,7 +24,6 @@ from . import funcs
 import devtools.ya.core.resource as resource
 import sys
 import re
-import yalibrary.tools as tools
 import devtools.ya.build.targets
 
 logger = logging.getLogger(__name__)
@@ -1749,10 +1748,11 @@ def up_funcs(ctx, results_root, project_root, dry_run):
 
     def report():
         logger.info('Successfully generated idea project: %s', project_root)
-        # logger.info('Recommended JDK path: %s', op.dirname(op.dirname(tools.tool('java'))))
         logger.info(
             'Devtools IntelliJ plugin (Latest stable IDEA is required): https://a.yandex-team.ru/arc/trunk/arcadia/devtools/intellij/README.md'
         )
+        import yalibrary.tools as tools
+
         logger.info(
             'Codestyle config: %s. You can import this file with "File -> Manage IDE Settings -> Import settings..." command. '
             'After this choose "yandex-arcadia" in code style settings (Preferences -> Editor -> Code Style).',

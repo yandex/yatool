@@ -20,9 +20,15 @@ PEERDIR(
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/term
-    devtools/ya/yalibrary/tools
     library/python/strings
 )
+
+IF (PYTHON3)
+    PEERDIR(
+        devtools/ya/yalibrary/tools
+    )
+ENDIF()
+
 
 END()
 

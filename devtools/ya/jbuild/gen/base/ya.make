@@ -11,10 +11,4 @@ PEERDIR(
     devtools/ya/yalibrary/graph
 )
 
-IF (NOT YA_OPENSOURCE)
-    PEERDIR(
-        devtools/ya/yalibrary/checkout
-    )
-ENDIF()
-
 END()

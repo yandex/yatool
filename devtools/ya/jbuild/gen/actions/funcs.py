@@ -4,14 +4,14 @@ import os
 import exts.archive as archive
 import exts.fs as fs
 
-import yalibrary.tools as tools
-
 
 class JarError(Exception):
     mute = True
 
 
 def jarx(p, dest):
+    import yalibrary.tools as tools
+
     def f():
         cmd = [tools.tool('jar'), 'xvf', p]
         env = os.environ.copy()

@@ -25,7 +25,6 @@ PEERDIR(
     devtools/ya/yalibrary/find_root
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/platform_matcher
-    devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/upload/consts
 )
 
@@ -35,6 +34,7 @@ IF (PYTHON3)
         devtools/ya/core/user
         devtools/ya/core/yarg
         devtools/ya/core/common_opts
+        devtools/ya/yalibrary/tools
     )
 ENDIF()
 
