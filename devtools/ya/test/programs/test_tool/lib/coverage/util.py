@@ -9,9 +9,14 @@ import library.python.func as func
 
 logger = logging.getLogger(__name__)
 
+# regexes for skipping expensive files in llvm-cov export
+DEFAULT_EXPORT_SKIP_PATTERNS = [
+    '(/contrib/(python|tools)/)',
+]
+
 # regexes for skipping contribs in llvm-cov export
 CONTRIB_EXPORT_SKIP_PATTERNS = [
-    '(/contrib/(libs|python|tools)/)',
+    '(/contrib/libs/)',
 ]
 
 # regexes for skipping generated files in llvm-cov export
@@ -61,7 +66,7 @@ def normalize_path(filename, source_root):
 
 
 def get_default_llvm_export_args(include_generated=False, enable_contrib_coverage=False):
-    patterns = []
+    patterns = DEFAULT_EXPORT_SKIP_PATTERNS[:]
     if not enable_contrib_coverage:
         patterns += CONTRIB_EXPORT_SKIP_PATTERNS
     if not include_generated:
