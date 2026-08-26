@@ -1,9 +1,9 @@
 LIBRARY()
 
 IF (YA_OPENSOURCE)
-    YA_CONF_JSON(devtools/ya/opensource/ya.conf.json)
+    YA_TOOLS_CONF(devtools/ya/opensource)
 ELSE()
-    YA_CONF_JSON(build/ya.conf.json)
+    YA_TOOLS_CONF(build)
 ENDIF()
 
 END()
