@@ -147,6 +147,28 @@ class BuildRoot(object):
         self._outputs.append(new_output.replace('$(BUILD_ROOT)', self.path))
         self._original_outputs.append(new_output)
 
+    def _raise_integrity_error(self, msg):
+        error = [msg]
+        error.append("")
+        error.append("EXPECTED OUTPUTS:")
+        error.extend("  " + os.path.relpath(out, self.path) for out in self.output)
+        error.append("BUILD ROOT PATH:")
+        error.append(f"  {self.path}")
+        error.append("BUILD ROOT CONTENT:")
+        for root, dirs, files in os.walk(self.path):
+            if not (files or dirs):
+                error.append("  {}/".format(os.path.relpath(root, self.path)))
+            else:
+                for file in files:
+                    abs_path = os.path.join(root, file)
+                    relpath = os.path.relpath(abs_path, self.path)
+                    if stat.S_ISLNK(os.lstat(abs_path).st_mode):
+                        error.append(f"  {relpath} -> {os.readlink(abs_path)}")
+                    else:
+                        error.append(f"  {relpath}")
+
+        raise BuildRootIntegrityError("\n".join(error))
+
     def validate(self):
         outset = None
         brpath = None
@@ -155,7 +177,7 @@ class BuildRoot(object):
             try:
                 lst = os.lstat(x)
             except FileNotFoundError as e:
-                raise BuildRootIntegrityError(f'Cannot find {x} in build root') from e
+                raise self._raise_integrity_error(f'Cannot find {x} in build root') from e
 
             if stat.S_ISLNK(lst.st_mode):
                 brpath = brpath or pathlib.Path(self.path)
@@ -167,11 +189,11 @@ class BuildRoot(object):
                     # because the caching subsystem does not control the life cycle of the linkpath file.
                     # Even if symlink points to a file inside the buildroot,
                     # since the buildroot is an ephemeral entity that can be disposed of at any time.
-                    raise BuildRootIntegrityError(
+                    self._raise_integrity_error(
                         f'{x} (linkpath: {lpath}) is a symlink with an absolute path, which is why it cannot be cached correctly'
                     )
                 elif not xpath.resolve().is_relative_to(brpath.resolve()):
-                    raise BuildRootIntegrityError(
+                    self._raise_integrity_error(
                         f'{x} (real: {xpath.resolve()} linkpath: {lpath}) is a symlink output which points to a file outside the buildroot {self.path} (real: {brpath.resolve()})'
                     )
                 else:
@@ -183,11 +205,11 @@ class BuildRoot(object):
                         # relative and pointing to a file that is part of the node's output
                         pass
                     else:
-                        raise BuildRootIntegrityError(
+                        self._raise_integrity_error(
                             f'{x} (real: {xpath.resolve()} linkpath: {lpath}) is a symlink output pointing to a file that is not part of the output: {outset}'
                         )
             elif not stat.S_ISREG(lst.st_mode):
-                raise BuildRootIntegrityError(f'Invalid file type {x} ({lst.st_mode:o}) in build root')
+                self._raise_integrity_error(f'Invalid file type {x} ({lst.st_mode:o}) in build root')
 
         if self._validate_content:
             if self._compute_hash and os.path.exists(self._output_digests_file()):
@@ -195,7 +217,7 @@ class BuildRoot(object):
                 if cached_hash.version == acdigest.digest_current_version:
                     immediate_hash = self.read_output_digests(force_recalc=True)
                     if cached_hash.outputs_uid != immediate_hash.outputs_uid:
-                        raise BuildRootIntegrityError(
+                        self._raise_integrity_error(
                             'Content hash mismatch in {}: {} != {}'.format(self.path, cached_hash, immediate_hash)
                         )
 
