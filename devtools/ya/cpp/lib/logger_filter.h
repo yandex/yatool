@@ -10,7 +10,9 @@ namespace NYa {
     class TYaTokenFilter : TLogFormatter {
     public:
         explicit TYaTokenFilter(const TVector<TStringBuf>& args);
+        TString Sanitize(TStringBuf value) const;
         TString operator()(ELogPriority, TStringBuf message) const;
+
     private:
         THashSet<TString> Replacements_;
     };

@@ -3,17 +3,19 @@ import enum
 import getpass
 import logging
 
+from devtools.ya.core.user.consts import UserClass as _UserClassConsts
+
 logger = logging.getLogger(__name__)
 
 
 class UserClass(enum.StrEnum):
-    DISTBUILD = enum.auto()
-    ROBOT = enum.auto()
-    ROOT_USER = enum.auto()
-    SANDBOX = enum.auto()
-    USER = enum.auto()
-    ZOMB = enum.auto()
-    AGENT = enum.auto()
+    DISTBUILD = _UserClassConsts.DISTBUILD
+    ROBOT = _UserClassConsts.ROBOT
+    ROOT_USER = _UserClassConsts.ROOT_USER
+    SANDBOX = _UserClassConsts.SANDBOX
+    USER = _UserClassConsts.USER
+    ZOMB = _UserClassConsts.ZOMB
+    AGENT = _UserClassConsts.AGENT
 
 
 USER_CLASS_BY_NAME = {

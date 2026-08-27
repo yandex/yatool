@@ -1,10 +1,8 @@
 PY23_LIBRARY()
 
 PEERDIR(
-    contrib/python/distro
-    devtools/ya/core/sec
     devtools/ya/core/config
-    devtools/ya/core/gsid
+    devtools/ya/core/report_common
     devtools/ya/exts
     devtools/ya/yalibrary/chunked_queue
     # devtools/ya/yalibrary/snowden

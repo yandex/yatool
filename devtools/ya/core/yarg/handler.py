@@ -398,6 +398,7 @@ class OptsHandler(BaseHandler):
         handler = {
             'args': [strings.to_unicode(arg, strings.guess_default_encoding()) for arg in args],
             'prefix': prefix,
+            'handler_source': 'python_dispatch',
         }
         if additional_handler_info:
             handler.update(additional_handler_info)

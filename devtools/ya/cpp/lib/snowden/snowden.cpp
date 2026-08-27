@@ -2,6 +2,7 @@
 #include "snowden_private.h"
 
 #include <devtools/ya/cpp/lib/logger.h>
+#include <devtools/ya/cpp/lib/logger_filter.h>
 
 #include <util/generic/yexception.h>
 #include <util/stream/null.h>
@@ -72,16 +73,44 @@ namespace NYa::NSnowden {
         }
     }
 
-    void ReportCppHandlerEvent(const TString& handlerName) {
+    TVector<TString> ExtractHandlerArguments(
+        const TVector<TString>& expandedArgs,
+        const TString& handlerName
+    ) {
+        for (size_t i = 1; i < expandedArgs.size(); ++i) {
+            if (expandedArgs[i] == handlerName) {
+                return TVector<TString>(expandedArgs.begin() + i + 1, expandedArgs.end());
+            }
+        }
+        return expandedArgs;
+    }
+
+    void ReportCppHandlerEvent(
+        const TString& handlerName,
+        const TVector<TString>& expandedArgs
+    ) {
         try {
+            TVector<TStringBuf> argViews;
+            argViews.reserve(expandedArgs.size());
+            for (const auto& arg : expandedArgs) {
+                argViews.push_back(arg);
+            }
+            const TYaTokenFilter filter(argViews);
+
+            TList<TString> eventArgs = {
+                "--key=handler",
+                "--prefix=ya",
+                TString("--prefix=") + handlerName,
+                "--handler-source=cpp_dispatch",
+            };
+            for (const auto& arg : ExtractHandlerArguments(expandedArgs, handlerName)) {
+                eventArgs.push_back(TString("--arg=") + filter.Sanitize(arg));
+            }
             SpawnPythonEntryPoint(
                 "yalibrary.snowden:push_event_main",
-                {
-                    "--key",   "cpp_handler",
-                    "--field", TString("handler_name=") + handlerName,
-                }
+                eventArgs
             );
-            DEBUG_LOG << "[snowden] CppHandler event push initiated: " << handlerName << "\n";
+            DEBUG_LOG << "[snowden] Handler event push initiated: " << handlerName << "\n";
         } catch (...) {
             DEBUG_LOG << "[snowden] ReportCppHandlerEvent failed silently\n";
         }
