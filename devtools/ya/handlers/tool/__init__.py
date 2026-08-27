@@ -124,6 +124,8 @@ class ToolYaHandler(BaseHandler):
         if tool_name.startswith("-"):
             raise ArgsValidatingException("Can't handle arg: {}. Tool name is expected".format(tool_name))
 
+        tool_name = _guess_tool_name(tool_name)
+
         additional_handler_info = {
             "tool_name": [tool_name],
             "tool_args": params.args,
@@ -409,4 +411,30 @@ def _get_aligned_value(
     for line in value:
         result.append("{prefix}{key:{indent}}{line}".format(prefix=prefix, key=key, indent=indent, line=line))
         key = ""
+    return result
+
+
+def _guess_tool_name(orig_tool_name):
+    all_tool_names = sorted(t.name for t in tools.tools())
+    if orig_tool_name in all_tool_names:
+        return orig_tool_name
+
+    import pylev
+
+    result = orig_tool_name
+    for tool_name in all_tool_names:
+        new_result = None
+        if tool_name.startswith(orig_tool_name):
+            new_result = tool_name
+        elif len(orig_tool_name) > 2:
+            l_dist = pylev.damerau_levenshtein(orig_tool_name, tool_name)
+            if l_dist < 2:
+                new_result = tool_name
+        if new_result:
+            # too many similar handlers
+            if result != orig_tool_name:
+                return orig_tool_name
+
+            result = new_result
+
     return result

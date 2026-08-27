@@ -5,6 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    contrib/python/pylev
     devtools/ya/app
     devtools/ya/build/build_opts
     devtools/ya/core/common_opts
