@@ -53,7 +53,7 @@ namespace NYMake::NResourcePacker {
             auto threshold = Unit_.Get("YMAKE_OBJCOPY_LARGE_RESOURCE_THR");
             append_if(threshold.size() > 0, cmdArgs, "--large_resource_thr"sv, threshold);
             append_if(Objects_.paths.size() > 0, cmdArgs, "--inputs"sv, "${input:__PATHS}"sv, "--keys"sv, "$__KEYS"sv);
-            append_if(Objects_.kvs.size() > 0, cmdArgs, "--kvs"sv, Objects_.kvs);
+            append_if(Objects_.kvs.size() > 0, cmdArgs, "--kvs"sv, "$__KVS"sv);
             append(cmdArgs,
                    "TOOL"sv, Unit_.Get("_TOOL_RESCOMPRESSOR"), Unit_.Get("_TOOL_RESCOMPILER"),
                    "OUT_GLOBAL"sv, "$__OUT"sv);
@@ -72,6 +72,7 @@ namespace NYMake::NResourcePacker {
             extras["__KEYS"].Assign(Objects_.keys);
             extras["__KEYS"].NoInline = true;
             extras["__KEYS"].DontParse = true;
+            extras["__KVS"].Assign(Objects_.kvs);
 
             RunMacro("RUN_PYTHON3"sv, cmdArgs, extras);
 

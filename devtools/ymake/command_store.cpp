@@ -52,9 +52,15 @@ const NPolexpr::TExpression* TCommands::Get(TStringBuf name, const TCmdConf *con
 }
 
 const NCommands::TSyntax& TCommands::Parse(const TBuildConfiguration& conf, const NCommands::TModRegistry& mods, TMacroValues& values, TString src) {
+    if (Y_UNLIKELY(src.empty())) {
+        static const NCommands::TSyntax empty_syntax;
+        return empty_syntax;
+    }
+
     auto result = ParserCache.find(src);
-    if (result == ParserCache.end())
+    if (Y_UNLIKELY(result == ParserCache.end())) {
         result = ParserCache.emplace(src, NCommands::Parse(&conf, mods, values, src)).first;
+    }
     return result->second;
 }
 
@@ -782,7 +788,7 @@ TCommands::TInliner::Inline(const NCommands::TSyntax& ast) {
     checkRecursionStuff();
     InlineCommands(ast.Script, writer);
     checkRecursionStuff();
-    return {result, std::move(SideChannels)};
+    return {std::move(result), std::move(SideChannels)};
 }
 
 void TCommands::TInliner::CheckDepth() {
