@@ -1982,7 +1982,13 @@ class YaMake:
                 except ImportError:
                     raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
 
-                return LarryClient(callback, self.ctx.graph, self.ctx.src_dir).build(self.opts.larry_addr)
+                return LarryClient(
+                    callback,
+                    self.ctx.graph,
+                    self.ctx.src_dir,
+                    display=self.app_ctx.display,
+                    output_replacements=self.ctx.output_replacements,
+                ).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
 
