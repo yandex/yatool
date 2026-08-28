@@ -2,6 +2,7 @@ PY3_LIBRARY()
 
 PY_SRCS(
     __init__.py
+    classify.py
     log_handler.py
     projection.py
     subscriber.py

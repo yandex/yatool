@@ -6,6 +6,7 @@ no tailing, no JsonLineReport involvement.
 """
 
 import contextlib
+import dataclasses
 import json
 import logging
 import queue
@@ -17,6 +18,7 @@ from typing import IO
 
 import devtools.ya.core.error as core_error
 
+from devtools.ya.yalibrary.agent_ui import classify
 from devtools.ya.yalibrary.agent_ui import projection
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,8 @@ class AgentConsole:
         self._exit_codes: list[int | None] = []
         self._test_counts: dict[str, int] = {}
         self._configure_errors: list[dict] = []
+        self._configure_failed = False
+        self._outcome: classify.Outcome | None = None
         self._counts_lock = threading.Lock()
         self._stopped = False
         self._thread = threading.Thread(target=self._loop, name='agent-console', daemon=True)
@@ -50,13 +54,28 @@ class AgentConsole:
         """Start the writer thread."""
         self._thread.start()
 
+    def set_outcome(self, exit_code: int | None, exception: BaseException | None = None) -> None:
+        """Record the real outcome of the run, as seen by the module stack.
+
+        The build aggregate only knows about the builds that opened a
+        frame; the outcome knows about the whole command, so once it is
+        recorded the summary reports it instead. The exception, when the
+        run died of one, becomes the summary text.
+        """
+        self._outcome = classify.Outcome(exit_code=exit_code, exception=exception)
+
     def stop(self) -> None:
         """Emit the summary event and stop the writer thread; idempotent."""
         if self._stopped:
             return
         self._stopped = True
         exit_code = self._summary_exit_code()
-        if self._builds == 0 and self._configure_errors:
+        # The hard path: the configuration died before any build frame opened.
+        # On the soft path (--keep-going) the failure is noted by the sink
+        # instead, from the configure entries of the report.
+        configure_died = self._builds == 0 and bool(self._configure_errors)
+        configure_failed = configure_died or self._configure_failed
+        if configure_died:
             # The configuration failed hard before any build frame opened
             # (ConfigurationError in Context.__init__): the buffered errors
             # are the only diagnostics the stream will get. On the soft
@@ -65,12 +84,49 @@ class AgentConsole:
             # simply dropped there.
             self._emit_configure_errors()
             exit_code = core_error.ExitCodes.CONFIGURE_ERROR
+        if self._outcome is not None:
+            exit_code = self._outcome.exit_code
         summary = {'type': 'summary', 'exit_code': exit_code}
+        # The verdict does not depend on how the code became known: a build
+        # that failed on its own is as diagnosable as an outcome pushed in
+        # from the module stack.
+        outcome = self._outcome if self._outcome is not None else classify.Outcome(exit_code=exit_code)
+        summary.update(self._describe_outcome(dataclasses.replace(outcome, configure_failed=configure_failed)))
         if self._test_counts:
             summary['tests'] = dict(sorted(self._test_counts.items()))
         self.emit(summary)
         self._queue.put(_STOP)
         self._thread.join()
+
+    def _describe_outcome(self, outcome: classify.Outcome) -> dict:
+        """Turn the recorded outcome into the verdict fields of the summary.
+
+        A description that cannot be produced must not take the summary down
+        with it, so the exception wall keeps the exit code reportable.
+        """
+        fields: dict = {}
+        try:
+            verdict = classify.classify(outcome)
+            if verdict is not None:
+                fields['category'] = verdict.category
+                fields['action'] = verdict.action
+            if outcome.exception is not None:
+                text = projection.plain_message_text(str(outcome.exception))
+                if text:
+                    fields['text'] = text
+        except Exception:
+            logger.exception("Failed to describe the run outcome for the agent console")
+        return fields
+
+    def note_configure_failed(self) -> None:
+        """Record that the run collected configure errors.
+
+        Called by the sink for the soft (--keep-going) path, where the build
+        runs on and the failure would otherwise be visible only as individual
+        result events. The summary verdict reads this instead of the exit
+        code, which does not report a broken configuration yet (YA-1456).
+        """
+        self._configure_failed = True
 
     def buffer_configure_error(self, event: dict) -> None:
         """Buffer a raw NEvent.TDisplayMessage error from the configure stage.
@@ -308,6 +364,8 @@ class _BuildSink:
         try:
             statuses = []
             for entry in entries:
+                if projection.is_configure_failure(entry):
+                    self._console.note_configure_failed()
                 status = projection.test_case_status(entry)
                 if status:
                     statuses.append(status)

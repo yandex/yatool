@@ -75,6 +75,16 @@ def test_case_status(entry: dict) -> str | None:
     return entry.get('status')
 
 
+def is_configure_failure(entry: dict) -> bool:
+    """Tell a report entry that carries a configuration failure from any other.
+
+    Configure entries are produced for every target (see
+    add_configure_results in devtools/ya/build/reports/autocheck_report.py);
+    only the ones that collected errors are marked failed.
+    """
+    return entry.get('type') == 'configure' and entry.get('status') == 'FAILED'
+
+
 def project_result(entry: dict) -> dict | None:
     """Project a report entry into a compact agent event.
 
