@@ -29,7 +29,8 @@ class ConfigureSubscriber(event_handling.SubscriberSpecifiedTopics):
     Module counters are aggregated across instances. Error display messages
     are only buffered on the console: on the normal path they reach the
     stream through the report pipeline, and the buffer is emitted only when
-    the configuration fails hard.
+    the configuration fails hard. Warnings have no such second route — the
+    report pipeline carries failures — so they go straight to the stream.
     """
 
     topics = {
@@ -62,8 +63,14 @@ class ConfigureSubscriber(event_handling.SubscriberSpecifiedTopics):
     def _process(self, event: dict) -> None:
         typename = event['_typename']
         if typename == 'NEvent.TDisplayMessage':
-            if event.get('Type') == 'Error':
+            # ymake message types are Error, Warn, Info and Debug (see
+            # msgTypesAsString in devtools/ymake/diag/display.cpp); the two
+            # chatty lower ones stay out of the stream.
+            message_type = event.get('Type')
+            if message_type == 'Error':
                 self._console.buffer_configure_error(event)
+            elif message_type == 'Warn':
+                self._console.emit_configure_warning(event)
             return
 
         to_emit = []

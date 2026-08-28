@@ -46,6 +46,9 @@ class AgentConsole:
         self._configure_errors: list[dict] = []
         self._configure_failed = False
         self._outcome: classify.Outcome | None = None
+        # (path, text) of every configure warning already written out.
+        self._seen_configure_warnings: set = set()
+        self._configure_warnings_lock = threading.Lock()
         self._counts_lock = threading.Lock()
         self._stopped = False
         self._thread = threading.Thread(target=self._loop, name='agent-console', daemon=True)
@@ -94,6 +97,13 @@ class AgentConsole:
         summary.update(self._describe_outcome(dataclasses.replace(outcome, configure_failed=configure_failed)))
         if self._test_counts:
             summary['tests'] = dict(sorted(self._test_counts.items()))
+        if self._seen_configure_warnings:
+            # Configure warnings fail nothing, so they leave no trace in
+            # exit_code: without a count here an agent that reads only the
+            # summary never learns they happened. The number is the deduped
+            # one — exactly how many configure_warning events the stream
+            # carries.
+            summary['configure_warnings'] = len(self._seen_configure_warnings)
         self.emit(summary)
         self._queue.put(_STOP)
         self._thread.join()
@@ -139,6 +149,34 @@ class AgentConsole:
         if self._builds:
             return
         self._configure_errors.append(event)
+
+    def emit_configure_warning(self, event: dict) -> None:
+        """Project and write out a raw NEvent.TDisplayMessage warning.
+
+        Called by ConfigureSubscriber from event-queue threads. Unlike
+        errors, warnings are written as they arrive: they do not imply a
+        failure, so routing them through the hard-failure buffer would drop
+        them on every build that configures successfully.
+
+        One configuration runs several ymake instances (host tools + target
+        platforms) and each reports the same warning, hence the dedup. The
+        configure_warning event carries no platform, so the copies collapse
+        into one — the human display keeps them apart instead (see
+        DisplayMessageSubscriber in devtools/ya/build/ya_make.py).
+        """
+        try:
+            projected = projection.project_configure_warning(event)
+        except Exception:
+            logger.exception("Failed to project a configure warning for the agent console")
+            return
+        if projected is None:
+            return
+        key = (projected.get('path'), projected['text'])
+        with self._configure_warnings_lock:
+            if key in self._seen_configure_warnings:
+                return
+            self._seen_configure_warnings.add(key)
+        self.emit(projected)
 
     def _emit_configure_errors(self) -> None:
         emitted: list[dict] = []

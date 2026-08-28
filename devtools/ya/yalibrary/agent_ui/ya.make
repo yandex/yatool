@@ -13,7 +13,6 @@ PEERDIR(
     devtools/ya/core/event_handling
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/loggers/file_log
-    library/python/strings
 )
 
 END()

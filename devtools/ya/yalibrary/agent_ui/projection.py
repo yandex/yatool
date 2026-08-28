@@ -7,7 +7,6 @@ JsonLineReport wraps as ``{"time", "type": "result", "data": entry}``.
 
 import os
 
-from library.python import strings
 from yalibrary.display import strip_markup
 
 # Wire statuses that carry no failure information
@@ -25,8 +24,6 @@ _FIELD_MAPPING = (
     ('duration', 'duration'),
     ('toolchain', 'toolchain'),
 )
-
-_TEXT_LIMIT = 1000
 
 
 def _entry_level(entry: dict) -> str | None:
@@ -54,12 +51,12 @@ def _entry_text(entry: dict) -> str | None:
     if not snippet:
         return None
 
-    text = strip_markup(snippet).strip()
-    if not text:
-        return None
-    # Keep the tail: build errors are prefixed with the whole compiler
-    # command line while the diagnosis is at the end.
-    return strings.truncate(text, _TEXT_LIMIT, whence=strings.Whence.Start)
+    # Forwarded whole: the snippet is already bounded upstream by
+    # REPORT_SNIPPET_LIMIT (see truncate_snippet in
+    # devtools/ya/build/reports/utils.py), which cuts the middle and keeps
+    # both ends. Cutting again here would drop one of them — for javac that
+    # is the `error:` lines, which come before the warnings and the summary.
+    return strip_markup(snippet).strip() or None
 
 
 def test_case_status(entry: dict) -> str | None:
@@ -184,25 +181,18 @@ def project_running(active: list) -> dict | None:
         text = strip_markup(status).strip()
         if not text:
             continue
-        entries.append({'text': strings.truncate(text, _TEXT_LIMIT), 'elapsed': int(elapsed)})
+        entries.append({'text': text, 'elapsed': int(elapsed)})
     if not entries:
         return None
     return {'current_longest': max(entries, key=lambda entry: entry['elapsed']), 'total': len(entries)}
 
 
 def plain_message_text(text: str) -> str | None:
-    """Strip markup and truncate a free-form message, keeping the tail.
-
-    The tail carries the diagnosis both in build errors (prefixed with the
-    compiler command line) and in logged tracebacks.
-    """
-    text = strip_markup(text).strip()
-    if not text:
-        return None
-    return strings.truncate(text, _TEXT_LIMIT, whence=strings.Whence.Start)
+    """Strip markup off a free-form message and forward it whole."""
+    return strip_markup(text).strip() or None
 
 
-def _configure_error_path(where: str) -> str:
+def _configure_path(where: str) -> str:
     """Normalize a ymake Where reference the way build reports do.
 
     Mirrors fix_dir in devtools/ya/build/ya_make.py: ``$S/dir/ya.make``
@@ -217,25 +207,57 @@ def _configure_error_path(where: str) -> str:
     return where
 
 
+def _configure_message_text(event: dict) -> str | None:
+    """Plain-text body of a TDisplayMessage, prefixed with its position.
+
+    The message comes from ymake with highlighting markup in it
+    (``[[alt1]]PEERDIR[[rst]]``, written by hand in devtools/ymake and in
+    the build/plugins configure-error strings); an agent reads plain text.
+    """
+    text = strip_markup(event.get('Message') or '').strip()
+    if not text:
+        return None
+    if 'Row' in event and 'Column' in event:
+        text = f"{event['Row']}:{event['Column']}: {text}"
+    return text
+
+
 def project_configure_error(event: dict) -> dict:
     """Project a buffered TDisplayMessage error into a configure result event.
 
     ``event`` carries the NEvent.TDisplayMessage keys: 'Type', 'Sub',
     'Message', 'Mod' and optionally 'Where', 'Row', 'Column', 'Platform'
     (see DisplayMessageSubscriber in devtools/ya/build/ya_make.py).
-
-    The message comes from ymake with highlighting markup in it
-    (``[[alt1]]PEERDIR[[rst]]``, written by hand in devtools/ymake and in
-    the build/plugins configure-error strings); an agent reads plain text.
     """
     result = {'type': 'result', 'kind': 'configure', 'status': 'FAILED'}
     where = event.get('Where')
     if where:
-        result['path'] = _configure_error_path(where)
+        result['path'] = _configure_path(where)
 
-    text = strip_markup(event.get('Message') or '').strip()
+    text = _configure_message_text(event)
     if text:
-        if 'Row' in event and 'Column' in event:
-            text = f"{event['Row']}:{event['Column']}: {text}"
-        result['text'] = strings.truncate(text, _TEXT_LIMIT)
+        result['text'] = text
+    return result
+
+
+def project_configure_warning(event: dict) -> dict | None:
+    """Project a TDisplayMessage warning into a configure_warning event.
+
+    Its own event type, next to configure_started/progress/finished: a
+    configure warning does not fail the build, so it is not a ``result``
+    (those stay synonymous with "something failed"), and it belongs to the
+    configure stage rather than to the free-form ``message`` log stream.
+    An agent that only wants failures filters it out by type alone.
+
+    Returns None for a message that carries no text.
+    """
+    text = _configure_message_text(event)
+    if not text:
+        return None
+
+    result = {'type': 'configure_warning'}
+    where = event.get('Where')
+    if where:
+        result['path'] = _configure_path(where)
+    result['text'] = text
     return result
