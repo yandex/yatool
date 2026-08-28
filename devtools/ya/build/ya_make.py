@@ -1982,12 +1982,14 @@ class YaMake:
                 except ImportError:
                     raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
 
+                sandbox_token = self.app_ctx.fetcher_params[2] or ''
                 return LarryClient(
                     callback,
                     self.ctx.graph,
                     self.ctx.src_dir,
                     display=self.app_ctx.display,
                     output_replacements=self.ctx.output_replacements,
+                    sandbox_token=sandbox_token,
                 ).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
