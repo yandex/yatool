@@ -7,9 +7,9 @@
     #include <sched.h>
     #include <unistd.h>
 
-    #include <util/stream/file.h>
-    #include <util/folder/path.h>
     #include <util/string/builder.h>
+    #include <util/system/file.h>
+    #include <util/system/yassert.h>
 
     #ifndef PR_SET_CHILD_SUBREAPER
         #define PR_SET_CHILD_SUBREAPER 36
@@ -77,7 +77,7 @@ namespace {
         kill(pid, SIGSTOP);
 #endif
     }
-}
+} // namespace
 #ifndef CLONE_NEWUTS
     #define CLONE_NEWUTS 0x04000000
 #endif
@@ -131,37 +131,108 @@ namespace NProcUtil {
     }
 
 #if defined(_linux_)
-    void SetGroupsDeny() {
-        const TFsPath filename = TFsPath("/proc/self/setgroups");
-        TFileOutput{filename}.Write("deny");
+    namespace {
+        constexpr TStringBuf APPARMOR_PROFILE = "rootlesskit";
+
+        void WriteProcFile(TStringBuf filename, TStringBuf value) {
+            TFile file(TString(filename), OpenExisting | WrOnly | Seq | CloseOnExec);
+            file.Write(value.data(), value.size());
+        }
+
+        void ChangeAppArmorProfile() {
+            // These are Linux LSM procfs ABI paths, not distribution-specific paths.
+            // Prefer the AppArmor-specific interface and fall back to the legacy shared LSM interface.
+            constexpr TStringBuf paths[] = {
+                "/proc/self/attr/apparmor/current",
+                "/proc/self/attr/current",
+            };
+            const TString command = TStringBuilder() << "changeprofile " << APPARMOR_PROFILE;
+
+            for (const auto path : paths) {
+                if (access(path.data(), F_OK) == 0) {
+                    WriteProcFile(path, command);
+                    return;
+                }
+            }
+
+            ythrow yexception() << "AppArmor process attribute interface is unavailable";
+        }
+
+        void SetGroupsDeny() {
+            WriteProcFile("/proc/self/setgroups", "deny");
+        }
+
+        void MapId(TStringBuf filename, uint32_t from, uint32_t to) {
+            const TString mapping = TStringBuilder() << from << ' ' << to << ' ' << 1;
+            WriteProcFile(filename, mapping);
+        }
+
+        bool ProbeNetworkIsolation(ENetworkIsolationStrategy strategy) {
+            const pid_t pid = fork();
+            if (pid < 0) {
+                return false;
+            }
+
+            if (pid == 0) {
+                try {
+                    UnshareNs(strategy);
+                    _exit(0);
+                } catch (...) {
+                    _exit(1);
+                }
+            }
+
+            int status = 0;
+            pid_t waitResult;
+            do {
+                waitResult = waitpid(pid, &status, 0);
+            } while (waitResult < 0 && errno == EINTR);
+
+            return waitResult == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+        }
+    } // namespace
+
+    ENetworkIsolationStrategy DetectNetworkIsolationStrategy() {
+        if (ProbeNetworkIsolation(ENetworkIsolationStrategy::Direct)) {
+            return ENetworkIsolationStrategy::Direct;
+        }
+
+        if (ProbeNetworkIsolation(ENetworkIsolationStrategy::AppArmorRootlesskit)) {
+            return ENetworkIsolationStrategy::AppArmorRootlesskit;
+        }
+
+        return ENetworkIsolationStrategy::Unsupported;
     }
 
-    void MapId(TString& filename, uint32_t from, uint32_t to) {
-        const TFsPath path = TFsPath(filename);
-        TFileOutput{path}.Write(TStringBuilder() << from << ' ' << to << ' ' << 1);
-    }
+    void UnshareNs(ENetworkIsolationStrategy strategy) {
+        Y_ASSERT(strategy != ENetworkIsolationStrategy::Unsupported);
+        if (strategy == ENetworkIsolationStrategy::AppArmorRootlesskit) {
+            ChangeAppArmorProfile();
+        }
 
-    void UnshareNs() {
-        char hostbuffer[256];
-        gethostname(hostbuffer, sizeof(hostbuffer));
+        char hostbuffer[256] = {};
+        if (gethostname(hostbuffer, sizeof(hostbuffer)) != 0) {
+            ythrow TSystemError() << "Cannot read hostname before creating network namespace";
+        }
+        hostbuffer[sizeof(hostbuffer) - 1] = '\0';
         TString newHostName(hostbuffer);
 
         uid_t real_euid = geteuid();
         gid_t real_egid = getegid();
         int unshare_flags = CLONE_NEWNET | CLONE_NEWUSER | CLONE_NEWUTS;
 
-        unshare(unshare_flags);
-        sethostname(newHostName.c_str(), static_cast<int>(newHostName.size()));
+        if (unshare(unshare_flags) != 0) {
+            ythrow TSystemError() << "Cannot create user, network and UTS namespaces";
+        }
+        if (sethostname(newHostName.c_str(), newHostName.size()) != 0) {
+            ythrow TSystemError() << "Cannot restore hostname in private UTS namespace";
+        }
 
-        TString umap = "/proc/self/uid_map";
-        TString gmap = "/proc/self/gid_map";
-
-        MapId(umap, 0, real_euid);
+        MapId("/proc/self/uid_map", 0, real_euid);
         SetGroupsDeny();
-        MapId(gmap, 0, real_egid);
+        MapId("/proc/self/gid_map", 0, real_egid);
 
-        // setting localhost up
-        NNetNs::IfUp("lo", "10.1.1.1", "255.255.255.0");
+        NNetNs::IfUp("lo", "127.0.0.1", "255.0.0.0");
     }
 
     bool LinuxBecomeSubreaper(std::function<void()> cleanupAfterFork) {
@@ -230,4 +301,4 @@ namespace NProcUtil {
         return jobHandle;
     }
 #endif
-}
+} // namespace NProcUtil

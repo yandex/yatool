@@ -22,7 +22,6 @@
 #include <util/system/shellcommand.h>
 #include <util/thread/factory.h>
 
-
 namespace {
     TAtomic ShutdownRequested(0);
 
@@ -108,13 +107,19 @@ namespace {
         options.SetQuoteArguments(true);
         return options;
     }
-}
+} // namespace
 
 class RunnerImpl final: public NExternalExecutor::Runner::Service {
 public:
-    RunnerImpl(bool cacheStderr)
+    RunnerImpl(bool cacheStderr, NProcUtil::ENetworkIsolationStrategy networkIsolation)
         : CacheStderr(cacheStderr)
+#if defined(_linux_)
+        , NetworkIsolation(networkIsolation)
+#endif
     {
+#if !defined(_linux_)
+        Y_UNUSED(networkIsolation);
+#endif
     }
 
     grpc::Status Ping(grpc::ServerContext* /*context*/,
@@ -194,8 +199,12 @@ public:
         options.SetNice(command->GetNice());
 #if defined(_linux_)
         const NExternalExecutor::TRequirements requirements = command->GetRequirements();
-        if (requirements.GetNetwork() == NExternalExecutor::TRequirements::RESTRICTED) {
-            options.SetFuncAfterFork(NProcUtil::UnshareNs);
+        if (requirements.GetNetwork() == NExternalExecutor::TRequirements::RESTRICTED &&
+            NetworkIsolation != NProcUtil::ENetworkIsolationStrategy::Unsupported) {
+            const auto strategy = NetworkIsolation;
+            options.SetFuncAfterFork([strategy]() {
+                NProcUtil::UnshareNs(strategy);
+            });
         }
 #endif
         for (const auto& env : command->GetEnv()) {
@@ -253,15 +262,26 @@ public:
 
 private:
     bool CacheStderr;
+#if defined(_linux_)
+    NProcUtil::ENetworkIsolationStrategy NetworkIsolation;
+#endif
 };
 
 void RunServer(const TString address, bool cacheStderr, bool debug) {
+#if defined(_linux_)
+    const auto networkIsolation = NProcUtil::DetectNetworkIsolationStrategy();
+    if (networkIsolation == NProcUtil::ENetworkIsolationStrategy::Unsupported) {
+        Cerr << "Warning: network isolation is unavailable; restricted commands will run with full network access" << Endl;
+    }
+#else
+    const auto networkIsolation = NProcUtil::ENetworkIsolationStrategy::Unsupported;
+#endif
     NProcUtil::TSubreaperApplicant applicant = NProcUtil::TSubreaperApplicant();
 
     SetAsyncSignalHandler(SIGINT, RequestShutdown);
     SetAsyncSignalHandler(SIGTERM, RequestShutdown);
 
-    RunnerImpl service(cacheStderr);
+    RunnerImpl service(cacheStderr, networkIsolation);
     grpc::ServerBuilder builder;
     builder.AddListeningPort(address.c_str(), grpc::InsecureServerCredentials());
     builder.RegisterService(&service);

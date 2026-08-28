@@ -4,52 +4,55 @@
 #include "netns.h"
 
 #if defined(_linux_)
-#include <string.h>
-#include <unistd.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
+    #include <string.h>
+    #include <unistd.h>
+    #include <net/if.h>
+    #include <arpa/inet.h>
+    #include <sys/ioctl.h>
+    #include <sys/socket.h>
 
-#include <util/system/yassert.h>
+    #include <util/generic/yexception.h>
+    #include <util/system/file.h>
 #endif
 
 namespace NNetNs {
 #if defined(_linux_)
-    int CreateSocket(int domain, int type, int protocol) {
-        int sock_fd = socket(domain, type, protocol);
-
-        Y_ASSERT(sock_fd >= 0 && "cannot open socket");
-
-        return sock_fd;
-    }
+    namespace {
+        void IoctlOrThrow(int fd, unsigned long request, struct ifreq* ifr, TStringBuf action) {
+            if (ioctl(fd, request, ifr) != 0) {
+                ythrow TSystemError() << action;
+            }
+        }
+    } // namespace
 
     void IfUp(const TString& ifname, const TString& ip, const TString& netmask) {
-        int sock_fd = CreateSocket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
+        const int fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
+        if (fd < 0) {
+            ythrow TSystemError() << "Cannot open network namespace control socket";
+        }
+        TFile socketFile(fd, "network namespace control socket");
+
+        Y_ENSURE(ifname.size() < IFNAMSIZ, "Network interface name is too long: " << ifname);
         struct ifreq ifr;
         memset(&ifr, 0, sizeof(struct ifreq));
-        strncpy(ifr.ifr_name, ifname.c_str(), ifname.length());
+        memcpy(ifr.ifr_name, ifname.data(), ifname.size());
 
         struct sockaddr_in saddr;
         memset(&saddr, 0, sizeof(struct sockaddr_in));
         saddr.sin_family = AF_INET;
         saddr.sin_port = 0;
 
-        char *p = (char *) &saddr;
+        Y_ENSURE(inet_pton(AF_INET, ip.c_str(), &saddr.sin_addr) == 1, "Invalid IPv4 address: " << ip);
+        memcpy(&ifr.ifr_addr, &saddr, sizeof(struct sockaddr));
+        IoctlOrThrow(socketFile.GetHandle(), SIOCSIFADDR, &ifr, "Cannot set network namespace interface address");
 
-        saddr.sin_addr.s_addr = inet_addr(ip.c_str());
-        memcpy(((char *) &(ifr.ifr_addr)), p, sizeof(struct sockaddr));
-        Y_ASSERT(!ioctl(sock_fd, SIOCSIFADDR, &ifr) && "cannot set ip addr");
+        Y_ENSURE(inet_pton(AF_INET, netmask.c_str(), &saddr.sin_addr) == 1, "Invalid IPv4 netmask: " << netmask);
+        memcpy(&ifr.ifr_netmask, &saddr, sizeof(struct sockaddr));
+        IoctlOrThrow(socketFile.GetHandle(), SIOCSIFNETMASK, &ifr, "Cannot set network namespace interface netmask");
 
-        saddr.sin_addr.s_addr = inet_addr(netmask.c_str());
-        memcpy(((char *) &(ifr.ifr_addr)), p, sizeof(struct sockaddr));
-        Y_ASSERT(!ioctl(sock_fd, SIOCSIFNETMASK, &ifr) && "cannot set ip addr");
-
-        ifr.ifr_flags |= IFF_UP | IFF_BROADCAST |
-                         IFF_RUNNING | IFF_MULTICAST;
-
-        Y_ASSERT(!ioctl(sock_fd, SIOCSIFFLAGS, &ifr) && "cannot set flags for addr");
-        close(sock_fd);
+        IoctlOrThrow(socketFile.GetHandle(), SIOCGIFFLAGS, &ifr, "Cannot read network namespace interface flags");
+        ifr.ifr_flags |= IFF_UP;
+        IoctlOrThrow(socketFile.GetHandle(), SIOCSIFFLAGS, &ifr, "Cannot bring network namespace interface up");
     }
 #endif
-}
+} // namespace NNetNs

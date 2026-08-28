@@ -4,25 +4,31 @@
 #include <functional>
 
 #include <util/system/platform.h>
-#include <util/generic/string.h>
 #include <util/system/winint.h>
 
 namespace NProcUtil {
+    enum class ENetworkIsolationStrategy {
+        Direct,
+        AppArmorRootlesskit,
+        Unsupported,
+    };
+
     class TSubreaperApplicant {
-        public:
-            explicit TSubreaperApplicant();
-            void Close();
+    public:
+        explicit TSubreaperApplicant();
+        void Close();
 #if defined(_win_)
-        private:
-            HANDLE JobHandle;
+    private:
+        HANDLE JobHandle;
 #endif
-        };
+    };
 
     void TerminateChildren();
 #if defined(_linux_)
     bool LinuxBecomeSubreaper(std::function<void()> cleanupAfterFork = []() -> void {});
-    void UnshareNs();
+    ENetworkIsolationStrategy DetectNetworkIsolationStrategy();
+    void UnshareNs(ENetworkIsolationStrategy strategy);
 #elif defined(_win_)
     void* WinCreateSubreaperJob();
 #endif
-}
+} // namespace NProcUtil
