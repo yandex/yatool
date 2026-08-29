@@ -37,6 +37,8 @@ namespace NUniversalFetcher {
                 opts.SocketTimeout(Params_.SocketTimeout);
                 opts.ConnectTimeout(Params_.ConnectTimeout);
                 opts.MaxRedirectCount(Params_.MaxRedirectCount);
+                // A body cut short mid-transfer becomes THttpTruncatedBodyException, not a short file.
+                opts.StrictContentLength(Params_.VerifyContentLength);
 
                 auto dstPath = dstPath_;
                 // TODO(trofimenkov): Support Content-Disposition: attachment; filename="filename.jpg"
@@ -70,6 +72,14 @@ namespace NUniversalFetcher {
                             .Attrs = NJson::TJsonMap({
                                 {"http_code", e.GetStatusCode()}
                             })
+                        };
+                    } catch (const THttpTruncatedBodyException& e) {
+                        Log() << ELogPriority::TLOG_WARNING << "Truncated response body, error=" << e.what() << ", request_id=" << requestId;
+
+                        Metrics_->OnFetchContentLengthMismatch();
+                        return {
+                            EFetchStatus::RetriableError,
+                            e.what()
                         };
                     } catch (const THttpException& e) {
                         return {
@@ -142,6 +152,9 @@ namespace NUniversalFetcher {
         }
         if (json.Has("max_redirect_count")) {
             ret.MaxRedirectCount = json["max_redirect_count"].GetUIntegerSafe();
+        }
+        if (json.Has("verify_content_length")) {
+            ret.VerifyContentLength = json["verify_content_length"].GetBooleanSafe();
         }
         return ret;
     }
