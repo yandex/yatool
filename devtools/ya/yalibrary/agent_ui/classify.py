@@ -3,8 +3,8 @@
 The exit code is not derived here a second time: ya already chooses it once,
 in configure_exit_code_definition (devtools/ya/app) for a run that died of an
 exception and in YaMake._calc_exit_code for one that built and tested. This
-module only gives that code the name ExitCodes gives it, plus the action an
-agent is expected to take.
+module only gives that code the name ExitCodes gives it, plus the advice an
+agent needs to act on it.
 """
 
 import dataclasses
@@ -24,7 +24,7 @@ class Outcome:
 @dataclasses.dataclass(frozen=True)
 class Verdict:
     category: str
-    action: str
+    advice: str
 
 
 _CATEGORY_BY_EXIT_CODE = {
@@ -39,20 +39,63 @@ _CATEGORY_BY_EXIT_CODE = {
     core_error.ExitCodes.USAGE_ERROR: 'usage_error',
 }
 
-# The action an agent is expected to take is a function of the category alone;
-# it travels as a separate field for the agent's convenience.
-_ACTION_BY_CATEGORY = {
-    'generic_error': 'fix_code',
-    'unhandled_exception': 'report',
-    'configure_error': 'fix_makefile',
-    'no_tests_collected': 'fix_command',
-    'test_failed': 'fix_code',
-    'infrastructure_error': 'rerun_as_is',
-    # Not retriable is the opposite of rerun_as_is: the same run fails the same
-    # way, so the error itself has to be looked at.
-    'not_retriable_error': 'report',
-    'yt_store_fetch_error': 'rerun_as_is',
-    'usage_error': 'fix_command',
+# What to do about the outcome is a function of the category alone; it travels
+# as a separate field so that the agent does not have to know the table. The
+# advice is prose rather than a slug: a slug would only repeat the category,
+# while the agent's next step turns on things a name cannot hold — where the
+# failure can hide, which events carry the diagnosis, whether a rerun is worth
+# anything.
+_ADVICE_BY_CATEGORY = {
+    'generic_error': (
+        "The run failed without an exit code of its own. The failed build and test events of this stream, "
+        "and the `text` field of this summary, carry the diagnosis — read them and fix what they name. "
+        "Rerunning the same command unchanged fails the same way."
+    ),
+    'unhandled_exception': (
+        "ya itself crashed: the failure is in the build system, not in the code being built. The `text` field "
+        "holds the exception, the full traceback is in the ya log (`$YA_CACHE_DIR/logs`, `~/.ya/logs` by "
+        "default). Do not rework the command around the crash — report it with the log."
+    ),
+    'configure_error': (
+        "Configuration failed, so the build description has to be fixed before anything else. The error is not "
+        "necessarily in the ya.make of the target: it can come from any file the configuration pulls in — an "
+        ".inc, a macro, or the ya.make of a module reached through PEERDIR or RECURSE. Read the configure "
+        "events of this stream for the file and the line they name instead of assuming the target's own "
+        "ya.make. Build and test failures collected under a broken configuration may disappear once it is "
+        "fixed, so fix the configuration first and rerun."
+    ),
+    'no_tests_collected': (
+        "Tests were requested but none was collected, so nothing ran and nothing is known to be broken. What "
+        "needs fixing is the command, not the code: check the target path, the `-F` filter, and the test sizes "
+        "the run allows (`-t`, `-tt`, `-ttt`). `ya test -L` on the target lists what there is to run."
+    ),
+    'test_failed': (
+        "Tests ran and some of them failed. Every failure is a separate event of this stream carrying `path`, "
+        "`name` and the `text` of the failure — fix the code or the test they name. A rerun of the same "
+        "command fails the same way, so change something before rerunning."
+    ),
+    'infrastructure_error': (
+        "The run died of an error ya treats as temporary — network, disk space, a service that was briefly "
+        "unavailable — not of anything in the code. Rerun the same command as is. If the failure repeats, the "
+        "environment is what to look at (free space, network access, tokens), still not the command."
+    ),
+    # Not retriable is the opposite of infrastructure_error: the same run fails
+    # the same way, so the error itself has to be looked at.
+    'not_retriable_error': (
+        "The run died of an error explicitly marked as not retriable: the same command fails the same way, so "
+        "a rerun buys nothing. Read the `text` field of this summary — if it names something the command or "
+        "the code can fix, fix that; otherwise report the failure together with the ya log."
+    ),
+    'yt_store_fetch_error': (
+        "A node could not be fetched from the distributed cache; the command itself is fine. Rerun it as is — "
+        "the cache is usually reachable on the next attempt. If it keeps failing, `--no-yt-store` gets the run "
+        "through by building everything locally."
+    ),
+    'usage_error': (
+        "ya rejected the command line itself, so nothing was configured or built: an unknown option, a value "
+        "it does not accept, or a target that is not a path in the repository. Fix the invocation — "
+        "`ya <subcommand> --help` lists what is accepted — and leave the code alone."
+    ),
 }
 
 
@@ -75,4 +118,4 @@ def classify(outcome: Outcome) -> Verdict | None:
         # A code ExitCodes does not name still failed the run; the result
         # events carry what exactly went wrong.
         category = _CATEGORY_BY_EXIT_CODE.get(outcome.exit_code, 'generic_error')
-    return Verdict(category=category, action=_ACTION_BY_CATEGORY[category])
+    return Verdict(category=category, advice=_ADVICE_BY_CATEGORY[category])

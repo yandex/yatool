@@ -119,7 +119,7 @@ class AgentConsole:
             verdict = classify.classify(outcome)
             if verdict is not None:
                 fields['category'] = verdict.category
-                fields['action'] = verdict.action
+                fields['advice'] = verdict.advice
             if outcome.exception is not None:
                 text = projection.plain_message_text(str(outcome.exception))
                 if text:

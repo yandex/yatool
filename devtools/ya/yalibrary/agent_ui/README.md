@@ -12,7 +12,7 @@ JSONL-поток событий вместо человеческого терм
 |---|---|
 | `__init__.py` | `AgentConsole` (владеет потоком и единственным писателем-тредом) и `_BuildSink` — член списка репортов `ReportGenerator` |
 | `projection.py` | Чистые проекции report-записей и ymake-сообщений в события; без состояния и ввода-вывода |
-| `classify.py` | Называет исход прогона: код выхода → `category` + `action` в событии `summary` |
+| `classify.py` | Называет исход прогона: код выхода → `category` + `advice` в событии `summary` |
 | `subscriber.py` | `ConfigureSubscriber` — обрамляет стадию configure событиями и разбирает `NEvent.TDisplayMessage` |
 | `log_handler.py` | `AgentLogHandler` — пробрасывает записи корневого Python-логгера уровня WARNING и выше |
 
@@ -49,37 +49,42 @@ auto/explicit репортится телеметрией записью `AGENT_
 | `artifact` | `path`, `platform`, `files` | закрытие кадра |
 | `build_finished` | `build`, `exit_code` | закрытие кадра |
 | `message` | `severity`, `text` | запись Python-логгера уровня WARNING и выше, дедуп по `(severity, text)` |
-| `summary` | `exit_code`, `category`, `action`, `text`, `tests`, `configure_warnings` | завершение команды |
+| `summary` | `exit_code`, `category`, `advice`, `text`, `tests`, `configure_warnings` | завершение команды |
 
 `result` со `status: OK`, `SKIPPED` или `DISCOVERED` в поток не попадает: события —
 это провалы, а успешные тесты только считаются для `summary.tests`.
 
 Все поля `summary`, кроме `exit_code`, появляются, только когда есть что показать:
-`category` и `action` — когда есть вердикт, `text` — когда прогон умер от исключения,
+`category` и `advice` — когда есть вердикт, `text` — когда прогон умер от исключения,
 `tests` и `configure_warnings` — когда что-то посчиталось.
 
 ## Вердикт прогона в событии `summary`
 
 `classify.py` называет исход прогона, чтобы агент понимал следующий шаг. Событие `summary`
-несёт, помимо `exit_code`, пару полей `category` (как называется исход) и `action` (что с ним
-делать). Код выхода здесь не выводится второй раз: `ya` выбирает его один раз — в
-`configure_exit_code_definition` (`app/__init__.py`) для прогона, умершего от исключения, и в
-`YaMake._calc_exit_code` для собранного. `category` — имя, которое коду даёт
+несёт, помимо `exit_code`, пару полей `category` (как называется исход) и `advice` (что с ним
+делать — связный текст, а не слаг). Код выхода здесь не выводится второй раз: `ya` выбирает
+его один раз — в `configure_exit_code_definition` (`app/__init__.py`) для прогона, умершего от
+исключения, и в `YaMake._calc_exit_code` для собранного. `category` — имя, которое коду даёт
 `core/error.ExitCodes`.
 
-| код | `category` | `action` |
+| код | `category` | о чём `advice` |
 |---|---|---|
-| 1 | `generic_error` | `fix_code` |
-| 3 | `unhandled_exception` | `report` |
-| 4 | `usage_error` | `fix_command` |
-| 8 | `configure_error` | `fix_makefile` |
-| 9 | `no_tests_collected` | `fix_command` |
-| 10 | `test_failed` | `fix_code` |
-| 12 | `infrastructure_error` | `rerun_as_is` |
-| 13 | `not_retriable_error` | `report` |
-| 14 | `yt_store_fetch_error` | `rerun_as_is` |
-| прочий ненулевой | `generic_error` | `fix_code` |
+| 1 | `generic_error` | читать `text` и события упавших сборок и тестов |
+| 3 | `unhandled_exception` | упал сам `ya`, нужен трейс из лога и репорт |
+| 4 | `usage_error` | чинить командную строку, код не трогать |
+| 8 | `configure_error` | чинить описание сборки: не только `ya.make` цели, но и то, что она подтягивает |
+| 9 | `no_tests_collected` | ничего не запускалось: путь, `-F`, размеры тестов, `ya test -L` |
+| 10 | `test_failed` | чинить код или тест из событий с `path`/`name`/`text` |
+| 12 | `infrastructure_error` | перезапустить как есть, при повторе смотреть окружение |
+| 13 | `not_retriable_error` | перезапуск бесполезен, разбирать сам `text` |
+| 14 | `yt_store_fetch_error` | перезапустить как есть, при повторе `--no-yt-store` |
+| прочий ненулевой | `generic_error` | как для 1 |
 | 0 или отсутствует | вердикта нет | — |
+
+Текст совета — функция одной лишь `category`, поэтому таблица `_ADVICE_BY_CATEGORY` живёт
+рядом с ней в `classify.py`. Слаг вроде `fix_makefile` не удержал бы того, ради чего совет
+нужен: где именно прячется поломка, какие события её описывают и стоит ли вообще
+перезапускать прогон.
 
 ### Почему `configure_error` — исключение
 
