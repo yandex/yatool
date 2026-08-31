@@ -148,6 +148,7 @@ class DumpYaHandler(CompositeHandler):
                 PeerDirectoriesOptions(),
                 YMakeDebugOptions(),
                 CustomBuildRootOptions(),
+                DumpModulesOptions(),
             ],
         )
         self['module-info'] = OptsHandler(
@@ -457,7 +458,22 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
 
 
 def do_modules(params):
-    _do_dump(gen_modules, params)
+    modules = _do_dump(gen_modules, params, write_stdout=not params.json_modules)
+    if params.json_modules:
+        result = []
+        for line in modules.stdout.splitlines():
+            parts = line.split(maxsplit=3)
+            if len(parts) < 3 or parts[0] != 'module:':
+                continue
+            module = {
+                'module_type': parts[1],
+                'module_dir': parts[2],
+            }
+            if len(parts) == 4:
+                module['output'] = parts[3]
+            result.append(module)
+        json.dump(result, sys.stdout, indent=4, sort_keys=True)
+        sys.stdout.write('\n')
 
 
 def do_module_info(params, write_stdout=True):
@@ -535,6 +551,22 @@ def get_canondata_paths(arc_root, test):
 
 
 DUMP_OPTS_GROUP = Group("Dump options", 0)
+
+
+class DumpModulesOptions(Options):
+    def __init__(self):
+        self.json_modules = False
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--json'],
+                help='Dump modules in json format',
+                hook=SetConstValueHook('json_modules', True),
+                group=DUMP_OPTS_GROUP,
+            ),
+        ]
 
 
 class SplitByTypeOptions(Options):
