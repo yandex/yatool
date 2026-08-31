@@ -34,12 +34,8 @@ namespace NYa::NSnowden {
                 .SetOutputStream(nullptr)
                 .SetErrorStream(nullptr);
 
+            opts.Environment = NYa::Environ();
             opts.Environment["Y_PYTHON_ENTRY_POINT"] = entryPoint;
-
-            const TString gsid = GetEnv("GSID");
-            if (!gsid.empty()) {
-                opts.Environment["GSID"] = gsid;
-            }
 
             TShellCommand cmd(executable, args, opts);
             cmd.Run();
