@@ -10,6 +10,7 @@ cdef extern from "devtools/ya/app_config/lib/config.h" namespace "NYa::NConfig" 
     cdef bool HaveOAuthSupport
     cdef TString JunkRoot
     cdef TString ExtraConfRoot
+    cdef bool SupportsToolTiers
 
 
 documentation_url = DocumentationUrl.decode()
@@ -20,3 +21,4 @@ in_house = InHouse
 have_oauth_support = HaveOAuthSupport
 junk_root = JunkRoot.decode()
 extra_conf_root = ExtraConfRoot.decode()
+supports_tool_tiers = SupportsToolTiers

@@ -140,7 +140,7 @@ def host_platform_name():
 
 
 def mine_platform_name(s):
-    aliases = {k.upper(): v for k, v in devtools.ya.core.config.config().get('toolchain_aliases', {}).items()}
+    aliases = {k.upper(): v for k, v in tools.toolchain_aliases().items()}
     if s.upper() in aliases:
         platform_name = aliases[s.upper()].upper()
         logger.debug('Platform %s is alias for %s', s, platform_name)

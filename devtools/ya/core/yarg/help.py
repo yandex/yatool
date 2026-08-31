@@ -113,9 +113,11 @@ def format_help(options, help_level=HelpLevel.BASIC, search_query=None):
 
 
 class ShowHelpOptions(Options):
-    def __init__(self):
+    def __init__(self, raise_exception=True):
         self._print_help_level = 0
         self._print_help_search = None
+        self._raise_exception = raise_exception
+        self.help_exception = None
 
     @staticmethod
     def consumer():
@@ -143,7 +145,9 @@ class ShowHelpOptions(Options):
         if self._print_help_search and self._print_help_level == 0:
             self._print_help_level = 1
         if self._print_help_level:
-            raise ShowHelpException(self._print_help_level, self._print_help_search)
+            self.help_exception = ShowHelpException(self._print_help_level, self._print_help_search)
+            if self._raise_exception:
+                raise self.help_exception
 
 
 class UsageExample(object):

@@ -10,6 +10,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/yalibrary/find_root
     contrib/python/six
+    library/python/resource
 )
 
 IF (PYTHON3)

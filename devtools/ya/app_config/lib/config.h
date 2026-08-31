@@ -11,4 +11,5 @@ namespace NYa::NConfig {
     extern const bool HaveOAuthSupport;
     extern const TString JunkRoot;
     extern const TString ExtraConfRoot;
+    extern const bool SupportsToolTiers;
 }

@@ -4,9 +4,9 @@ import os
 import os.path
 import sys
 import logging
+from library.python.resource import resfs_files, resfs_read
 
 import six
-
 import yalibrary.find_root
 
 import devtools.ya.core.resource
@@ -15,6 +15,8 @@ from exts import strtobool
 from library.python import func
 
 logger = logging.getLogger(__name__)
+
+YA_TOOLS_RESOURCE_PREFIX = "yatools"
 
 
 def home_dir():
@@ -168,7 +170,13 @@ def extra_conf_dir():
     return getattr(app_config, 'extra_conf_root', None)
 
 
-def _get_config(name="ya.conf.json"):
+def supports_tool_tiers():
+    import app_config
+
+    return getattr(app_config, 'supports_tool_tiers', False)
+
+
+def _get_config(name="ya.conf.json", try_resource=True):
     try:
         root = find_root()
         for path in _get_config_dirs():
@@ -178,13 +186,9 @@ def _get_config(name="ya.conf.json"):
                 return config
     except CannotDetermineRootException:
         pass
-    if devtools.ya.core.resource.am_i_binary() and name == "ya.conf.json":
-        conf_res = devtools.ya.core.resource.try_get_resource('ya.conf.json')
-        if conf_res is not None:
-            logger.debug('Use conf from resource')
-            return json.loads(conf_res)
-    else:
-        config = _try_read_from(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', name))
+
+    if try_resource:
+        config = _try_read_from_resource(name)
         if config is not None:
             return config
 
@@ -198,11 +202,10 @@ def _get_config_from_arc_rel_path(path):
         config = _try_read_from(abs_path)
         if config is not None:
             return config
-    if devtools.ya.core.resource.am_i_binary():
-        conf_res = devtools.ya.core.resource.try_get_resource(path)
-        if conf_res is not None:
-            logger.debug('Read config "{}" from resource'.format(path))
-            return json.loads(conf_res)
+
+    config = _try_read_from_resource(path)
+    if config is not None:
+        return config
 
     raise MissingConfigError('Cannot find config "{}"'.format(path))
 
@@ -215,6 +218,13 @@ def _try_read_from(f):
             return json.load(config_file)
 
     return None
+
+
+def _try_read_from_resource(path):
+    conf_res = resfs_read(path, builtin=True)
+    if conf_res:
+        logger.debug('Read config "{}" from resource'.format(path))
+        return json.loads(conf_res)
 
 
 def _add_simple_tool(cfg, name, info):
@@ -255,6 +265,37 @@ def config():
     return _preprocess(_get_config())
 
 
+def list_tool_configs(path):
+    root = find_root(fail_on_error=False)
+    if root:
+        for cfg_dir in _get_config_dirs():
+            abs_path = os.path.join(root, cfg_dir, path)
+            if os.path.isdir(abs_path):
+                return [f for f in os.listdir(abs_path) if not os.path.isdir(os.path.join(abs_path, f))]
+
+    prefix = "/".join([YA_TOOLS_RESOURCE_PREFIX, path])
+    if not prefix.endswith("/"):
+        prefix += "/"
+    return [r2 for r2 in (r[len(prefix) :] for r in resfs_files(prefix)) if "/" not in r2]
+
+
+def get_tool_config(path):
+    root = find_root(fail_on_error=False)
+    if root:
+        for cfg_dir in _get_config_dirs():
+            abs_path = os.path.join(root, cfg_dir, path)
+            config = _try_read_from(abs_path)
+            if config is not None:
+                return config
+
+    resource_path = "/".join([YA_TOOLS_RESOURCE_PREFIX, path])
+    config = _try_read_from_resource(resource_path)
+    if config is not None:
+        return config
+
+    raise MissingConfigError('Cannot find config ' + path)
+
+
 @func.memoize()
 def config_from_arc_rel_path(path):
     '''
@@ -291,13 +332,13 @@ def merge_mappings(mappings):
 @func.lazy
 def mapping():
     if has_mapping():
-        mappings = [_get_config(name="mapping.conf.json")]
+        mappings = [_get_config(name="mapping.conf.json", try_resource=False)]
         try:
             ext_mapping_file = os.environ.get('YA_TOOLS_EXT_CONFIG_FILE')
             if ext_mapping_file is not None:
                 mappings.append(config_from_arc_rel_path(ext_mapping_file))
             else:
-                mappings.append(_get_config(name="ext_mapping.conf.json"))
+                mappings.append(_get_config(name="ext_mapping.conf.json", try_resource=False))
         except MissingConfigError:
             pass
 

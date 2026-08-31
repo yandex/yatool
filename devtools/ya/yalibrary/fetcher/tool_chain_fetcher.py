@@ -94,6 +94,14 @@ def get_formula_value(formula):
         return formula
 
 
+def get_formula_platforms(formula):
+    formula = get_formula_value(formula)
+    if "by_platform" in formula:
+        return list(formula["by_platform"].keys())
+    else:
+        return []
+
+
 _ToolChainInfo = namedtuple('_ToolChainInfo', 'where')
 
 

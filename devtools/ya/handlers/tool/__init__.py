@@ -1,7 +1,10 @@
+import json
 import os
 import sys
 import logging
 import typing
+
+from collections import defaultdict
 
 from devtools.ya.core.yarg import (
     ArgConsumer,
@@ -12,6 +15,7 @@ from devtools.ya.core.yarg import (
     OptsHandler,
     FreeArgConsumer,
     ConfigConsumer,
+    SetAppendHook,
     ShowHelpException,
     NoValueDummyHook,
     UsageExample,
@@ -40,8 +44,17 @@ logger = logging.getLogger(__name__)
 
 TOOL_REAL_AND_SUPPOSED_PATHS_ARE_MISSMATCHED_MSG = """Executable for tool `{tool_name}` is not found at {tool_path}.
 You can run ya tool {tool_name} --print-path to check where tool is located on FS.
-Check the tool's path in build/ya.conf.json since there is mismatch in real and supposed paths.
+Check the tool's path in build/ya.conf.json or build/tools/tools/{tool_name}.tool.json since there is mismatch in real and supposed paths.
 Please contact owners of the tool to fix that issue."""
+
+TOOL_TIER_HEADERS = {
+    tools.TOOL_TIER_OFFICIAL: "OFFICIAL - have owners, supported and actively developed",
+    tools.TOOL_TIER_COMMUNITY: "COMMUNITY - have owners, but no reliable support",
+    tools.TOOL_TIER_UNSUPPORTED: "UNSUPPORTED - useful tools without explicit owners. Use at your own risk",
+    tools.TOOL_TIER_INFRASTRUCTURE: "INFRASTRUCTURE - supported by DEVTOOLS",
+    tools.TOOL_TIER_DEPRECATED: "DEPRECATED - are subject to remove. Don't use",
+    tools.TOOL_TIER_UNSPECIFIED: "UNSPECIFIED - no information about tier",
+}
 
 
 def get_legacy_options():
@@ -61,7 +74,7 @@ class ToolYaHandler(BaseHandler):
         legacy_options = get_legacy_options()
         actual_options = [
             YaToolOptions(),
-            ShowHelpOptions(),
+            ShowHelpOptions(raise_exception=False),
             CustomFetcherOptions(),
             UniversalFetcherOptions(),
             ToolsOptions(),
@@ -73,7 +86,13 @@ class ToolYaHandler(BaseHandler):
         self._legacy_opt = merge_opts(legacy_options + free_args_options)
         self._examples = [
             UsageExample("{prefix}", "Show this help and tool list"),
-            UsageExample("{prefix} --print-path <tool>", "Print path to the tool executable file"),
+            UsageExample("{prefix} --list", "List official tools"),
+            UsageExample("{prefix} --list --json", "List official tools in JSON format"),
+            UsageExample("{prefix} --list --show-all", "List all tools"),
+            UsageExample("{prefix} --card <tool>", "Show tool details"),
+            UsageExample("{prefix} --card --json <tool>", "Show tool details in JSON format"),
+            UsageExample("{prefix} --card --with-path", "Show tool details with tool paths"),
+            UsageExample("{prefix} --print-path <tool>", "Print path to tool executable file"),
             UsageExample(
                 "{prefix} --force-update <tool> [TOOL OPTIONS]",
                 "Check tool for updates before the update interval elapses",
@@ -89,7 +108,10 @@ class ToolYaHandler(BaseHandler):
                 stop_at_first_unknown_arg=True,
                 user_config=strtobool(os.getenv("YA_LOAD_USER_CONF", "1")),
             )
-            if not params.args:
+            # We disable an exception in ShowHelpOptions because we want the show_all and flat_list parameters to be read from configs
+            if params.help_exception is not None:
+                raise params.help_exception
+            if not (params.args or params.list):
                 raise ShowHelpException()
         except ShowHelpException as exc:
             OptsHandler.register_handler_run(prefix, args)
@@ -97,7 +119,9 @@ class ToolYaHandler(BaseHandler):
             usage += self.format_usage(prefix) + "\n\n"
             usage += format_examples(self.opts_recursive(tuple(prefix)))
             usage += "\n" + self._format_help(exc.help_level, exc.help_search)
-            usage += "\n\nAvailable tools:\n" + _get_tool_list()
+            usage += "\n\nAvailable tools:\n" + _get_tool_list(
+                None, show_all=params.show_all, flat_list=params.flat_list
+            )
             print_formatted(usage)
             sys.exit(0)
 
@@ -119,20 +143,31 @@ class ToolYaHandler(BaseHandler):
                 "WARNING: specify internal ya tool options before the tool name: 'ya tool <ya options>... <tool name> <tool options>...\n"
             )
 
-        assert len(params.args) > 0, "Legacy options somehow are superset of full options (bug?)"
-        tool_name, params.args = params.args[0], params.args[1:]
-        if tool_name.startswith("-"):
-            raise ArgsValidatingException("Can't handle arg: {}. Tool name is expected".format(tool_name))
-
-        tool_name = _guess_tool_name(tool_name)
+        tool = None
+        name_parts = []
+        while params.args:
+            name, params.args = params.args[0], params.args[1:]
+            if name.startswith("-"):
+                raise ArgsValidatingException("Can't handle arg: {}. Tool name is expected".format(name))
+            name_parts.append(name)
+            try:
+                tool = self._get_tool(name_parts, params)
+            except tools.ToolNotFoundException:
+                if len(name_parts) > 1:
+                    raise
+                # try to guess first name part
+                name_parts[0] = _guess_tool_name(name_parts[0])
+                tool = self._get_tool(name_parts, params)
+            if tool.config.type != tools.TOOL_TYPE_PARENT:
+                break
 
         additional_handler_info = {
-            "tool_name": [tool_name],
+            "tool_name": name_parts,
             "tool_args": params.args,
         }
         OptsHandler.register_handler_run(prefix, args, additional_handler_info=additional_handler_info)
 
-        params.tool = tool_name
+        params.tool = tool
         return self._action(params)
 
     @property
@@ -148,6 +183,20 @@ class ToolYaHandler(BaseHandler):
     def _format_help(self, help_level: int, search_query: str | None) -> str:
         return format_help(self._opt, help_level, search_query=search_query)
 
+    def _get_tool(self, name_parts: list[str], params: Params) -> tools._XTool:
+        # To be compatible with the old code
+        if params.need_resource_id or params.print_toolchain_path:
+            for_platform = params.platform or params.host_platform or None
+        else:
+            for_platform = params.host_platform or None
+        return tools.xtool(
+            name_parts,
+            toolchain_extra=params.toolchain,
+            for_platform=for_platform,
+            target_platform=params.target_platform,
+            force_refetch=params.force_refetch,
+        )
+
 
 # All new ya tool options must be added here
 # Eventually all options should migrate from LegacyYaToolOptions to this class
@@ -155,12 +204,58 @@ class YaToolOptions(Options):
     def __init__(self) -> None:
         super().__init__()
         self.tool = None  # Set by YaToolHandler.handle
+        self.list = False
+        self.json = False
+        self.flat_list = True
+        self.show_all = True
+        self.card = False
+        self.with_path = False
         self.show_tool_options_warning = False
+        self.tags = []
 
     @staticmethod
     def consumer() -> list[ArgConsumer | EnvConsumer | ConfigConsumer]:
         return [
             ArgConsumer(["--disable-fastpath"], help="Always run python ya tool version", hook=NoValueDummyHook()),
+            ArgConsumer(
+                ["--json"],
+                help="Dump tools info in JSON format",
+                hook=SetConstValueHook("json", True),
+            ),
+            ArgConsumer(
+                ["--list"],
+                help="Hide ya tool help and show available tools only",
+                hook=SetConstValueHook("list", True),
+            ),
+            ArgConsumer(
+                ["--show-all"],
+                help="Show all tools, including deprecated ones",
+                hook=SetConstValueHook("show_all", True),
+            ),
+            ArgConsumer(
+                ["--tag"],
+                help="Show tools with specified tag only. Example: '--tag t1,t2 --tag t3' - show tool with both 't1' and 't2' tags or tag 't3'",
+                hook=SetAppendHook("tags"),
+            ),
+            ConfigConsumer("show_all"),
+            EnvConsumer("YA_TOOL_SHOW_ALL", hook=SetValueHook("show_all", transform=strtobool)),
+            ArgConsumer(
+                ["--flat-list"],
+                help="Dont't group tool list by tiers",
+                hook=SetConstValueHook("flat_list", True),
+            ),
+            ConfigConsumer("flat_list"),
+            EnvConsumer("YA_TOOL_FLAT_LIST", hook=SetValueHook("flat_list", transform=strtobool)),
+            ArgConsumer(
+                ["--card"],
+                help="Show detailed tool information",
+                hook=SetConstValueHook("card", True),
+            ),
+            ArgConsumer(
+                ["--with-path]"],
+                help="Add paths to --card output. Note: triggers tool fetching",
+                hook=SetConstValueHook("with_path", True),
+            ),
             ConfigConsumer("show_tool_options_warning"),
             EnvConsumer(
                 "YA_SHOW_TOOL_OPTIONS_WARNING", hook=SetValueHook("show_tool_options_warning", transform=strtobool)
@@ -266,38 +361,37 @@ class LegacyYaToolOptions(Options):
             os.environ['YA_TOOL_FORCE_UPDATE'] = "1"
 
 
-def _replace(s: str, transformations: dict[str, str]) -> str:
-    for k, v in transformations.items():
-        s = s.replace('$({})'.format(k), v)
-    return s
-
-
 def _useful_env_vars() -> dict[str, str]:
     return {'YA_TOOL': sys.argv[0]}
 
 
 def do_tool(params: Params) -> None:
-    tool_name = params.tool
-    extra_args = params.args
-    target_platform = params.target_platform
-    host_platform = params.host_platform
+    tool = params.tool
 
-    for_platform = params.platform or params.host_platform or None
-
-    if params.need_resource_id:
-        print(tools.resource_id(tool_name, params.toolchain, for_platform))
+    if params.card:
+        if tool is None:
+            raise ArgsValidatingException("--card requires tool name")
+        print(_get_tool_card(tool, params))
         return
 
-    tool_getter = exts.asyncthread.future(
-        lambda: tools.tool(
-            tool_name,
-            params.toolchain,
-            target_platform=target_platform,
-            for_platform=host_platform,
-            force_refetch=params.force_refetch,
+    if tool is None or tool.config.type == tools.TOOL_TYPE_PARENT:
+        parent_parts = tool.config.name_parts if tool is not None else None
+        print(
+            _get_tool_list(
+                parent_parts,
+                show_all=params.show_all,
+                tags=params.tags,
+                flat_list=params.flat_list,
+                as_json=params.json,
+            )
         )
-    )
-    tool_path = tool_getter()
+        return
+
+    extra_args = params.args
+
+    # The executable() method starts tool fetching
+    # Do it in an async thread to allow break the program with Ctrl-C
+    tool_path = exts.asyncthread.future(tool.executable)()
 
     if windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
         logger.debug('Rename tool for win: %s', tool_path)
@@ -306,7 +400,7 @@ def do_tool(params: Params) -> None:
     lock_result = False
 
     if params.print_toolchain_path:
-        print(tools.toolchain_root(tool_name, params.toolchain, for_platform))
+        print(tool.toolchain_root())
         lock_result = True
     elif params.print_path:
         print(tool_path)
@@ -321,11 +415,9 @@ def do_tool(params: Params) -> None:
             env.pop(key, None)
 
         env.update(_useful_env_vars())
-        for key, value in tools.environ(tool_name, params.toolchain).items():
-            env[key] = _replace(
-                os.pathsep.join(value), {'ROOT': tools.toolchain_root(tool_name, params.toolchain, for_platform)}
-            )
-        if tool_name == 'gdb':
+        for key, value in tool.environ().items():
+            env[key] = os.pathsep.join(value)
+        if tool.name == 'gdb':
             # gdb does not fit in 8 MB stack with large cores (DEVTOOLS-5040).
             try:
                 import resource as r
@@ -353,7 +445,7 @@ def do_tool(params: Params) -> None:
                 extra_args = ['-ex', 'set substitute-path /-S/ {}/'.format(arc_root)] + extra_args
                 extra_args = ['-ex', 'set filename-display absolute'] + extra_args
         if (
-            tool_name == 'arc'
+            tool.name == 'arc'
             and params.username not in {'sandbox', 'root'}
             and os.getenv('YA_ALLOW_TOOL_ARC', 'no') != 'yes'
         ):
@@ -368,7 +460,7 @@ def do_tool(params: Params) -> None:
             ReportTypes.TOOL_EXECUTION,
             {
                 'tool_launch_method': 'python_tool_launcher',
-                'tool_name': tool_name,
+                'tool_name': tool.name,
                 'tool_path': tool_path,
                 'extra_args': extra_args,
             },
@@ -376,25 +468,173 @@ def do_tool(params: Params) -> None:
         exts.process.execve(tool_path, extra_args, env=env)
     else:
         raise ArgsValidatingException(
-            TOOL_REAL_AND_SUPPOSED_PATHS_ARE_MISSMATCHED_MSG.format(tool_name=tool_name, tool_path=tool_path)
+            TOOL_REAL_AND_SUPPOSED_PATHS_ARE_MISSMATCHED_MSG.format(tool_name=tool.name, tool_path=tool_path)
         )
 
     if lock_result:
-        lock_resource(tools.toolchain_root(tool_name, params.toolchain, for_platform))
+        lock_resource(tool.toolchain_root())
 
 
-def _get_tool_list() -> str:
-    tool_info_list = sorted([t for t in tools.tools() if t.visible], key=lambda t: t.name)
+def _get_tool_flat_list(tool_cfg_list: list[tools._ToolConfig], max_name_len: int) -> list[str]:
+    result = []
+    for tool_cfg in tool_cfg_list:
+        desc_items = tool_cfg.description.split('\n')
+        if tool_cfg.tier.tier == tools.TOOL_TIER_DEPRECATED:
+            desc_items.append("DEPRECATED: {}".format(tool_cfg.tier.deprecation_cause))
+        result += _get_aligned_value(tool_cfg.name, desc_items, max_name_len + 5, prefix="  ")
+    return result
 
-    if not tool_info_list:
-        return ""
+
+def _get_tool_list(
+    parent_parts: tuple[str, ...] | None,
+    show_all: bool = False,
+    tags: list[str] | None = None,
+    flat_list: bool = False,
+    as_json: bool = False,
+) -> str:
+    tool_cfg_list = tools.tools(parent_parts)
+    total_tool_count = len(tool_cfg_list)
+    # Don't apply filters to child tools or if a full tool list is requested
+    if not parent_parts and not show_all:
+        # Note: if tiers are disabled (for example, in Open Source) all tools have an 'unspecified' tier
+        tool_cfg_list = [
+            t for t in tool_cfg_list if t.tier.tier in (tools.TOOL_TIER_OFFICIAL, tools.TOOL_TIER_UNSPECIFIED)
+        ]
+    if tags:
+        # Apply tag filter
+        tag_filters = []
+        for t in tags:
+            if t := set(y for y in (x.strip() for x in t.split(",")) if y):
+                tag_filters.append(t)
+
+        filtered_cfg_list = []
+        for tool_cfg in tool_cfg_list:
+            tool_tags = set(tool_cfg.tags or [])
+            if tool_tags and any(f <= tool_tags for f in tag_filters):
+                filtered_cfg_list.append(tool_cfg)
+        tool_cfg_list = filtered_cfg_list
+
+    filtered_tool_count = len(tool_cfg_list)
+
+    tool_cfg_list.sort(key=lambda t: t.name)
+
+    if as_json:
+        result = []
+        for tool_cfg in tool_cfg_list:
+            tier_info = tool_cfg.tier
+            item = {
+                "name": tool_cfg.name,
+                "tier": tier_info.tier,
+                "is_parent": tool_cfg.type == tools.TOOL_TYPE_PARENT,
+                "description": tool_cfg.description,
+            }
+            if tier_info.tier == tools.TOOL_TIER_DEPRECATED:
+                item["deprecation_cause"] = tier_info.deprecation_cause
+            result.append(item)
+        return json.dumps(result, indent=4)
+
+    # It's safe to set max_name_len to zero if tool_cfg_list is empty
+    max_name_len = max((len(x.name) for x in tool_cfg_list)) if tool_cfg_list else 0
+    if parent_parts or flat_list:
+        result = _get_tool_flat_list(tool_cfg_list, max_name_len)
+    else:
+        result = []
+        grouped_tools = defaultdict(list)
+        for tool_cfg in tool_cfg_list:
+            grouped_tools[tool_cfg.tier.tier].append(tool_cfg)
+        for tier, header in TOOL_TIER_HEADERS.items():
+            if cfgs := grouped_tools.get(tier):
+                result.append(header + ":")
+                result += _get_tool_flat_list(cfgs, max_name_len)
+                result.append("")
+
+    if filtered_tool_count < total_tool_count:
+        result.append("")
+        result.append(
+            "Showing {} official tools out of {} total. Use --show-all to see the full list.".format(
+                filtered_tool_count, total_tool_count
+            )
+        )
+
+    return "\n".join(result)
+
+
+def _get_tool_card(tool: tools._XTool, params: Params) -> str:
+    SIMPLE_ATTRS = ("owners", "docs", "source", "examples", "releases", "tags", "skill", "host_platforms")
+
+    tool_card = {
+        "name": tool.name,
+        "description": tool.config.description,
+        "tier": tool.config.tier.tier,
+    }
+    if tool.config.availability != tools.TOOL_AVAILABILITY_FULL:
+        tool_card["description"] = "[HIDDEN - NOT FOR PUBLIC USE] " + tool_card["description"]
+    _add_if_not_empty(tool_card, "tier", tool.config.tier.tier)
+    if tool.config.tier.tier == tools.TOOL_TIER_DEPRECATED:
+        tool_card["deprecation_cause"] = tool.config.tier.deprecation_cause
+    _add_if_not_empty(tool_card, "revised", tool.config.tier.revised)
+    if support := tool.config.support:
+        support_card = {k: v for k, v in support.__dict__.items() if v}
+        _add_if_not_empty(tool_card, "support", support_card)
+    for attr in SIMPLE_ATTRS:
+        _add_if_not_empty(tool_card, attr, getattr(tool.config, attr))
+    is_parent = tool.config.type == tools.TOOL_TYPE_PARENT
+    if is_parent:
+        tool_card["is_parent"] = True
+    elif params.with_path:
+        tool_card["executable"] = tool.executable()
+        tool_card["toolchain_root"] = tool.toolchain_root()
+        tool_card["resource_url"] = tool.resource_url()
+
+    if params.json:
+        return json.dumps(tool_card, indent=4)
 
     result = []
-    max_name_len = max((len(x.name) for x in tool_info_list))
-    for tool_info in tool_info_list:
-        desc_items = tool_info.description.split('\n')
-        result += _get_aligned_value(tool_info.name, desc_items, max_name_len + 5, prefix="  ")
+    description_lines = tool_card["description"].split("\n")
+    header = "{} - {}{}{}".format(
+        tool_card["name"],
+        description_lines[0],
+        " [PARENT]" if is_parent else "",
+        (
+            " [DEPRECATED: {}]".format(tool_card["deprecation_cause"])
+            if tool_card["tier"] == tools.TOOL_TIER_DEPRECATED
+            else ""
+        ),
+    )
+    result.append(header)
+    result.append("Config:")
+    if len(description_lines) > 1:
+        result += _get_text_card_value("description", description_lines)
+    for attr in ("host_platforms", "tier", "revised", "owners"):
+        result += _get_text_card_value(attr, tool_card.get(attr))
+    if support := tool_card.get("support"):
+        support_lines = sum([_get_aligned_value(k + ":", v, indent=12) for k, v in support.items()], [])
+        result += _get_text_card_value("support", support_lines)
+    for attr in ("source", "releases", "docs", "skill"):
+        result += _get_text_card_value(attr, tool_card.get(attr))
+    result += _get_text_card_value("tags", ", ".join(tool_card.get("tags", [])))
+    if examples := tool_card.get("examples"):
+        result.append("")
+        result.append("Examples:")
+        result += _get_aligned_value("", examples, indent=0, prefix="  ")
+    if not is_parent and params.with_path:
+        result.append("")
+        result.append("Paths:")
+        for attr in ("executable", "toolchain_root", "resource_url"):
+            result += _get_text_card_value(attr, tool_card.get(attr))
+
     return "\n".join(result)
+
+
+def _add_if_not_empty(dict: dict[str, typing.Any], key: str, value: typing.Any) -> bool:
+    if value:
+        dict[key] = value
+        return True
+    return False
+
+
+def _get_text_card_value(key: str, value: str | list[str] | None) -> list[str]:
+    return _get_aligned_value(key, value, 17, prefix="  ", key_suffix=" - ")
 
 
 def _get_aligned_value(
@@ -402,12 +642,15 @@ def _get_aligned_value(
     value: str | list[str] | None,
     indent: int,
     prefix: str = "",
+    key_suffix: str = "",
 ) -> list[str]:
     if not value:
         return []
     if isinstance(value, str):
         value = [value]
     result = []
+    if key_suffix:
+        key = "{key:{indent}}{key_suffix}".format(key=key, indent=indent - len(key_suffix), key_suffix=key_suffix)
     for line in value:
         result.append("{prefix}{key:{indent}}{line}".format(prefix=prefix, key=key, indent=indent, line=line))
         key = ""
@@ -415,7 +658,7 @@ def _get_aligned_value(
 
 
 def _guess_tool_name(orig_tool_name):
-    all_tool_names = sorted(t.name for t in tools.tools())
+    all_tool_names = sorted(t.name for t in tools.tools(visible_only=False))
     if orig_tool_name in all_tool_names:
         return orig_tool_name
 

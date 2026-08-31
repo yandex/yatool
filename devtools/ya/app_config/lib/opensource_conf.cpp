@@ -9,4 +9,5 @@ namespace NYa::NConfig {
     const bool HaveOAuthSupport = false;
     const TString JunkRoot = "junk/{username}";
     const TString ExtraConfRoot = "devtools/ya/opensource";
+   const bool SupportsToolTiers = false;
 }
