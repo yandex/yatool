@@ -9,3 +9,7 @@ PEERDIR(
 )
 
 END()
+
+RECURSE(
+    tests
+)

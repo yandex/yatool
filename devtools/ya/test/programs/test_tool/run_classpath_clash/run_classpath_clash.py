@@ -22,8 +22,18 @@ _TAB = ' ' * 4
 INTERFACE_JAR_SUFFIX = '-interface.jar'
 
 
-def is_interface_jar(filename):
-    return filename.endswith(INTERFACE_JAR_SUFFIX)
+def find_interface_jars(files):
+    files = set(files)
+    interface_jars = set()
+    for filename in files:
+        if not filename.endswith(INTERFACE_JAR_SUFFIX):
+            continue
+
+        full_jar = filename[: -len(INTERFACE_JAR_SUFFIX)] + '.jar'
+        if full_jar in files:
+            interface_jars.add(filename)
+
+    return interface_jars
 
 
 # because reasons
@@ -101,6 +111,7 @@ def strip_unique_jars(classmap):
 @timeit
 def get_clashed_classes(build_root, jar_files, ignored, strict):
     files = [os.path.join(build_root, i) for i in sorted(jar_files)]
+    interface_jars = find_interface_jars(files)
     classmap = build_classnames_map(files, ignored)
 
     classmap = strip_unique_jars(classmap)
@@ -129,7 +140,7 @@ def get_clashed_classes(build_root, jar_files, ignored, strict):
             # Suppress the interface-jar vs full-jar false positive: a stripped
             # ijar class is not a runtime clash with the same class bundled in a
             # full/uber jar. Pairs of two ijars or two full jars stay checked.
-            if is_interface_jar(fst['name']) != is_interface_jar(snd['name']):
+            if (fst['name'] in interface_jars) != (snd['name'] in interface_jars):
                 continue
             intersect = [
                 i
