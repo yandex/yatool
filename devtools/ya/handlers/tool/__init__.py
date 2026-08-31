@@ -30,7 +30,7 @@ import devtools.ya.app
 
 from devtools.ya.build.build_opts import CustomFetcherOptions, SandboxAuthOptions, ToolsOptions, UniversalFetcherOptions
 from devtools.ya.core.yarg.help import format_help, format_examples
-from devtools.ya.core.yarg.handler import print_formatted
+from devtools.ya.core.yarg.handler import print_formatted, SimpleHandler
 from yalibrary import tools
 from yalibrary.toolscache import lock_resource
 import devtools.ya.core.config
@@ -70,6 +70,7 @@ class ToolYaHandler(BaseHandler):
     def __init__(self) -> None:
         super().__init__()
         self._action = devtools.ya.app.execute(action=do_tool, respawn=devtools.ya.app.RespawnType.OPTIONAL)
+        self._cached_sub_handlers = None
 
         legacy_options = get_legacy_options()
         actual_options = [
@@ -83,6 +84,7 @@ class ToolYaHandler(BaseHandler):
 
         # It's important that full_option_list reuses the same Options() objects as legacy_options
         self._opt = merge_opts(actual_options + legacy_options + free_args_options)
+        self._completion_opt = merge_opts(actual_options + legacy_options)
         self._legacy_opt = merge_opts(legacy_options + free_args_options)
         self._examples = [
             UsageExample("{prefix}", "Show this help and tool list"),
@@ -172,7 +174,14 @@ class ToolYaHandler(BaseHandler):
 
     @property
     def options(self) -> Options:
-        return self._opt
+        return self._completion_opt
+
+    @property
+    def sub_handlers(self):
+        if self._cached_sub_handlers is not None:
+            return self._cached_sub_handlers
+        self._cached_sub_handlers = self._recursive_sub_handlers()
+        return self._cached_sub_handlers
 
     def format_usage(self, prefix: list[str] | tuple[str, ...]) -> str:
         return "[[imp]]Usage[[rst]]:\n  " + " ".join(prefix) + " [OPTIONS]... [tool_name [--] [TOOL OPTIONS]...]"
@@ -196,6 +205,30 @@ class ToolYaHandler(BaseHandler):
             target_platform=params.target_platform,
             force_refetch=params.force_refetch,
         )
+
+    def _recursive_sub_handlers(self, parent: tuple[str] | None = None) -> dict[str, SimpleHandler] | None:
+        parent = parent or ()
+        sub_handlers = {}
+        for tool_cfg in tools.tools(parent):
+            if tool_cfg.type == tools.TOOL_TYPE_PARENT:
+                nested_sub_handlers = self._recursive_sub_handlers(tool_cfg.name_parts)
+            else:
+                nested_sub_handlers = None
+            sub_handlers[tool_cfg.name_parts[-1]] = _FakeToolHandler(nested_sub_handlers)
+        return sub_handlers
+
+
+class _FakeToolHandler(SimpleHandler):
+    def __init__(self, sub_handlers: dict[str, SimpleHandler] | None):
+        self._sub_handlers = sub_handlers
+
+    @property
+    def sub_handlers(self) -> dict[str, SimpleHandler] | None:
+        return self._sub_handlers
+
+    @property
+    def options(self) -> Options:
+        return merge_opts([])
 
 
 # All new ya tool options must be added here
