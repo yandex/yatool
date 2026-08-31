@@ -472,7 +472,7 @@ class BuildRootSet(object):
                 lock = filelock.FileLock(stamp_fname)
                 if lock.acquire(blocking=False):
                     logger.debug("Removing %s", cur_name)
-                    fs.remove_tree_safe(cur_name)
+                    self._remove_tree(cur_name)
                 else:
                     logger.debug("Cannot get lock %s for %s ", stamp_fname, cur_name)
             except Exception as e:
@@ -512,7 +512,7 @@ class BuildRootSet(object):
         except Exception:
             pass
 
-    def _rm_rf_root(self):
+    def _rm_rf(self, path):
         # XXX See DEVTOOLSSUPPORT-41205
         try:
             import signal
@@ -525,9 +525,19 @@ class BuildRootSet(object):
             pdeath = None
 
         subprocess.call(
-            ["rm", "-rf", fs.fix_path_encoding(self._build_root)],
+            ["rm", "-rf", fs.fix_path_encoding(path)],
             preexec_fn=pdeath,
         )
+
+    def _remove_tree(self, path):
+        if windows.on_win():
+            fs.remove_tree_safe(path)
+            return
+
+        try:
+            self._rm_rf(path)
+        except OSError:
+            fs.remove_tree_safe(path)
 
     def cleanup(self):
         if self._keep:
@@ -540,13 +550,7 @@ class BuildRootSet(object):
                 acquired = self._flock.acquire(blocking=False)
                 if acquired:
                     logger.debug('Removing root %s', self._build_root)
-                    if windows.on_win():
-                        fs.remove_tree_safe(self._build_root)
-                    else:
-                        try:
-                            self._rm_rf_root()
-                        except OSError:
-                            fs.remove_tree_safe(self._build_root)
+                    self._remove_tree(self._build_root)
                 else:
                     logger.debug('Not removing root %s, lock was not acquired', self._build_root)
             finally:
