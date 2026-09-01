@@ -285,7 +285,7 @@ class YaToolOptions(Options):
                 hook=SetConstValueHook("card", True),
             ),
             ArgConsumer(
-                ["--with-path]"],
+                ["--with-path"],
                 help="Add paths to --card output. Note: triggers tool fetching",
                 hook=SetConstValueHook("with_path", True),
             ),
