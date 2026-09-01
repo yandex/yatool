@@ -420,6 +420,10 @@ def do_tool(params: Params) -> None:
         )
         return
 
+    if params.need_resource_id:
+        print(tool.resource_url())
+        return
+
     extra_args = params.args
 
     # The executable() method starts tool fetching
