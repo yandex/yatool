@@ -100,7 +100,7 @@ namespace NYa::NTool {
                 const TStringBuf arg = args[i];
                 if (arg.StartsWith("-")) {
                     if (arg == "--") {
-                        return args.subspan(i + 1);
+                        return args.subspan(i);
                     }
                     TStringBuf value = arg;
                     const TStringBuf optionName = value.NextTok('=');
@@ -132,6 +132,11 @@ namespace NYa::NTool {
         }
 
         TArgsSpan ParseLegacyOptions(TToolOptions& options, TArgsSpan args) {
+            // Remove "--" after tool name and don't parse other options
+            if (!args.empty() && args.front() == "--") {
+                return args.subspan(1);
+            }
+
             TVector<TOptionDef> optionDefs{};
             for (const auto& [name, ptr] : LEGACY_OPTIONS) {
                 if (const auto ptrToTypedOptPtr = std::get_if<TBoolToolOptionPtr>(&ptr)) {
@@ -145,7 +150,7 @@ namespace NYa::NTool {
                     );
                 }
             }
-            return Parse(
+            auto restArgs = Parse(
                 optionDefs,
                 args,
                 [&](TStringBuf arg) {
@@ -158,6 +163,27 @@ namespace NYa::NTool {
                     return true;
                 }
             );
+            if (restArgs.empty() || restArgs.front() != "--") {
+                return restArgs;
+            }
+
+            // In previous fast-path version any legacy option (even after "--") causes fallback to Python.
+            // Python ya tool variant removes the first "--", so we'll do the same for compatibility
+            bool fallback = false;
+            for (const auto arg : restArgs) {
+                for (TStringBuf opt : LEGACY_UNSUPPORTED_OPTIONS) {
+                    if (arg == opt || arg.Before('=') == opt) {
+                        fallback = true;
+                        break;
+                    }
+                }
+            }
+            if (fallback) {
+                // Remove "--" at front
+                return restArgs.subspan(1);
+            } else {
+                return restArgs;
+            }
         }
     }
 

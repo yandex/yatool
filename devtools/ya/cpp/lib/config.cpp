@@ -36,7 +36,7 @@ namespace NYa {
     const TString YA_CONF_JSON_FILE = "ya.conf.json";
     const TFsPath YA_CONF_JSON_PATH = TFsPath("build") / YA_CONF_JSON_FILE;
     const TString RES_FS_ROOT = "resfs/file";
-    const TString YA_CONF_JSON_RESOURCE_KEY = RES_FS_ROOT + "/ya.conf.json";
+    const TString YA_CONF_JSON_RESOURCE_KEY = "ya.conf.json";
 
     THashMap<TString, TString> Environ(bool(*filter)(const TString& key, const TString& val)) {
         THashMap<TString, TString> result{};
@@ -220,8 +220,8 @@ namespace NYa {
 
                 if (!arcadiaRoot) {
                     const TString resFsPath = RES_FS_ROOT + "/" + resourcePath;
-                    DEBUG_LOG << "Load config from resource: " << resourcePath << "\n";
-                    TString data = NResource::Find(resourcePath);
+                    DEBUG_LOG << "Load config from resource: " << resFsPath << "\n";
+                    TString data = NResource::Find(resFsPath);
                     NYa::NEdl::LoadJson(data, value);
                     return value;
                 }
