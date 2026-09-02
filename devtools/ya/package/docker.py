@@ -2,6 +2,7 @@ import collections
 import logging
 import os
 import re
+import shutil
 
 import requests
 
@@ -9,28 +10,30 @@ import exts.archive
 import exts.fs
 import exts.yjson as json
 
-import package.source
-import package.fs_util
 import package.process
 
 from devtools.ya.package import const
 from library.python import tmp
+from library.python import func
 
 logger = logging.getLogger(__name__)
 PackageInfo = collections.namedtuple('PackageInfo', ['image_tag', 'digest'])
 
-DOCKER_BIN_PATHS = [
+_ADDITIONAL_DOCKER_BIN_PATHS = [
     "/usr/bin/docker",
     "/usr/local/bin/docker",
     "/opt/homebrew/bin/docker",
 ]
 
 
+@func.lazy
 def get_docker_binary():
-    for p in DOCKER_BIN_PATHS:
+    if path := shutil.which("docker"):
+        return path
+    for p in _ADDITIONAL_DOCKER_BIN_PATHS:
         if os.path.exists(p):
             return p
-    raise Exception("Docker binary not found by {}".format(DOCKER_BIN_PATHS))
+    raise Exception("Docker binary not found".format())
 
 
 def get_image_name(registry, repository, image_name, package_name, package_version):

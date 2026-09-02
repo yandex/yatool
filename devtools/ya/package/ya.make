@@ -58,6 +58,7 @@ PEERDIR(
     devtools/ya/yalibrary/vcs/vcsversion
     devtools/ya/yalibrary/yandex/sandbox/misc
     library/python/compress
+    library/python/func
     library/python/resource
     library/python/strings
 )
