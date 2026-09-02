@@ -1069,9 +1069,9 @@ namespace {
         }
 
         /// DEPENDENCY_MANAGEMENT_TRANSPARENT stores a thin Closure on the tool module (direct PEERDIR nodes only).
-        /// When a consumer merges that module in MergeClosure, expand through its Direct peers' full
-        /// ManagedPeers.Closure (e.g. IJAR -> FULL_JAR_COMPILATION classpath) without bloating the
-        /// tool's own MANAGED_PEERS_CLOSURE / ResolveConflicts graph.
+        /// When a consumer merges that module in MergeClosure, expose its Direct peers and, when
+        /// they pass peers, their ManagedPeers.Closure (e.g. IJAR -> FULL_JAR_COMPILATION classpath)
+        /// without bloating the tool's own MANAGED_PEERS_CLOSURE / ResolveConflicts graph.
         NDetail::TPeersClosure BuildExpandedTransparentClosure(
             const TManagedPeers& transparentRecord,
             const TDependencyManagementRules& rules) const {
@@ -1095,7 +1095,11 @@ namespace {
             };
             for (const auto& resolved : transparentRecord.Direct) {
                 const auto depIt = ManagedPeers.find(resolved.Id);
-                if (depIt == ManagedPeers.end()) {
+                const TModule* depModule = GetModule(resolved.Id);
+                Y_ASSERT(depModule);
+                // Match ordinary PEERDIR propagation: the peer itself is visible, while its
+                // closure crosses the edge only when that peer has PASS_PEERS enabled.
+                if (depIt == ManagedPeers.end() || !depModule->PassPeers()) {
                     expanded.Merge(resolved.Id, EmptyPeersClosure, 1);
                 } else {
                     // The direct children of a DEPENDENCY_MANAGEMENT_TRANSPARENT node are logically
