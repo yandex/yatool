@@ -45,6 +45,8 @@ namespace {
         NVariableDefs::VAR_EXCLUDE_VALUE,
         NVariableDefs::VAR_IGNORE_JAVA_DEPENDENCIES_CONFIGURATION,
         NVariableDefs::VAR_JAVA_DEPENDENCIES_CONFIGURATION_VALUE,
+        NVariableDefs::VAR_JAVA_DEPENDENCY_VIEW,
+        NVariableDefs::VAR_JAVA_IMPL_PEERS,
         NVariableDefs::VAR_NON_NAMAGEABLE_PEERS,
         NVariableDefs::VAR_DART_CLASSPATH_DEPS,
         NVariableDefs::VAR_DART_CLASSPATH,
@@ -246,6 +248,23 @@ void TModule::Save(TModuleSavedState& saved) const {
     saved.RawIncludes = RawIncludes;
 
     saved.ConfigVars = ConfigVars;
+    if (const auto implPeers = Get(NVariableDefs::VAR_JAVA_IMPL_PEERS); !implPeers.empty()) {
+        const auto implPeersId = AssumeCmd(Symbols.AddName(
+            EMNT_Property,
+            FormatProperty(NVariableDefs::VAR_JAVA_IMPL_PEERS, implPeers)));
+        bool replaced = false;
+        for (auto& configVarId : saved.ConfigVars) {
+            const auto property = Symbols.CmdNameById(configVarId).GetStr();
+            if (GetPropertyName(property) == NVariableDefs::VAR_JAVA_IMPL_PEERS) {
+                configVarId = implPeersId;
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) {
+            saved.ConfigVars.push_back(implPeersId);
+        }
+    }
     saved.Provides = ProvidesId;
 }
 

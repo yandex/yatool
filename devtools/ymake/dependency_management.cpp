@@ -483,12 +483,15 @@ namespace {
         }
     };
 
-    enum class EPeerResolution {Unversioned, Default, Direct, Managed, Transitive};
+    enum class EPeerResolution : ui8 {Unversioned, Default, Direct, Managed, Transitive};
+    enum class EJavaDependencyScope : ui8 {Api, Impl};
     struct TResolvedPeer
     {
         TNodeId Id;
         EPeerResolution Resolution;
+        EJavaDependencyScope Scope = EJavaDependencyScope::Api;
     };
+    static_assert(sizeof(TResolvedPeer) == 2 * sizeof(TNodeId));
     struct TResolutionInfo {
         unsigned MinDepth;
         TResolvedPeer Resolution;
@@ -728,13 +731,18 @@ namespace {
                 const auto [pos, inserted] = ManagedPeers.emplace(parentItem.Node().Id(), TManagedPeers{});
                 Y_ASSERT(inserted);
                 record = &pos->second;
+                const auto implPeerDirIds = GetJavaImplPeerDirIds(*parent);
                 for (TNodeId peerId : parentItem.Peers) {
                     const TModule* peer = GetModule(peerId);
                     Y_ASSERT(peer);
                     if (IsGhost(*parent, *peer)) {
                         continue;
                     }
-                    record->Direct.push_back({peerId, EPeerResolution::Unversioned});
+                    record->Direct.push_back({
+                        peerId,
+                        EPeerResolution::Unversioned,
+                        implPeerDirIds.contains(peer->GetDirId()) ? EJavaDependencyScope::Impl : EJavaDependencyScope::Api,
+                    });
                 }
                 for (auto unpeer : parentItem.UnmanageablePeers) {
                     record->UnmanageablePeers.emplace_back(unpeer);
@@ -923,7 +931,11 @@ namespace {
             parent.Set(MANAGED_PEERS, ToPeerListVar(peersRecord.Direct, EPathType::Moddir));
             auto managedPeers = PreorderSort(
                 peersRecord.Direct,
-                ResolveConflicts(TConflictResolver{rules, ContribsDict, RestoreContext.Graph.Names().FileConf}, peersRecord.Direct, peersRecord.Closure));
+                ResolveConflicts(
+                    TConflictResolver{rules, ContribsDict, RestoreContext.Graph.Names().FileConf},
+                    peersRecord.Direct,
+                    peersRecord.Closure),
+                parent.Get(NVariableDefs::VAR_JAVA_DEPENDENCY_VIEW) == "COMPILE"sv);
             auto& listsStore = RestoreContext.Modules.GetNodeListStore();
             auto& parentPeerIds = RestoreContext.Modules.GetModuleNodeIds(parent.GetId());
             // filter managed peers by dependency management tags
@@ -971,6 +983,7 @@ namespace {
             bool hasDefaultResolutionPeers = false;
             auto& fileConf = RestoreContext.Graph.Names().FileConf;
             const auto unittestDir = parent.Get("UNITTEST_DIR");
+            const auto implPeerDirIds = GetJavaImplPeerDirIds(parent);
             for (const TNodeId peerId : rawPeers) {
                 const TModule* peer = GetModule(peerId);
                 Y_ASSERT(peer);
@@ -980,6 +993,9 @@ namespace {
                 }
 
                 TFileView peerDir = peer->GetDir();
+                const auto scope = implPeerDirIds.contains(peer->GetDirId())
+                    ? EJavaDependencyScope::Impl
+                    : EJavaDependencyScope::Api;
                 // TODO(svidyuk) hack for JTEST_FOR. There are 2 better solutions
                 //  * Implement tgt modifier ${tgt:UNITTEST_DIR} in a way suitable to use in dart file rendering
                 //  * Remove JTEST_FOR module
@@ -1002,7 +1018,7 @@ namespace {
                         // right before this function returns (guarded by hasDefaultResolutionPeers,
                         // since this is a rare misconfiguration and the cleanup pass should not run
                         // on every invocation), see below.
-                        managedPeers.push_back({proxyIt->second, EPeerResolution::Default});
+                        managedPeers.push_back({proxyIt->second, EPeerResolution::Default, scope});
                         hasDefaultResolutionPeers = true;
                         continue;
                     }
@@ -1016,7 +1032,7 @@ namespace {
                             << "[[rst]]"
                             << Endl;
                     } else {
-                        managedPeers.push_back({libIt->second, EPeerResolution::Managed});
+                        managedPeers.push_back({libIt->second, EPeerResolution::Managed, scope});
                     }
                     continue;
                 }
@@ -1025,7 +1041,7 @@ namespace {
                 if (rules.ForbidDirectPeerdirs && isContrib) {
                     YConfErr(Misconfiguration) << "PEERDIR to [[alt1]]direct[[rst]] version: [[imp]]" << peerDir.CutAllTypes() << "[[rst]]" << Endl;
                 }
-                managedPeers.push_back({peerId, isContrib ? EPeerResolution::Direct : EPeerResolution::Unversioned});
+                managedPeers.push_back({peerId, isContrib ? EPeerResolution::Direct : EPeerResolution::Unversioned, scope});
 
                 if (rawPeers.size() == 1 && !Proxies.contains(peer->GetId()) && fileConf.Parent(peerDir) == parent.GetDir() && DMConf.IsContribWithVer(*peer)) {
                     Proxies.emplace(parent.GetId(), peerId);
@@ -1033,9 +1049,9 @@ namespace {
             }
 
             if (rules.RequireDM) {
-                for (const auto& [lib, resolution]: managedPeers) {
-                    if (resolution != EPeerResolution::Managed && resolution != EPeerResolution::Unversioned) {
-                        const TModule* peer = GetModule(lib);
+                for (const auto& managedPeer: managedPeers) {
+                    if (managedPeer.Resolution != EPeerResolution::Managed && managedPeer.Resolution != EPeerResolution::Unversioned) {
+                        const TModule* peer = GetModule(managedPeer.Id);
                         Y_ASSERT(peer);
                         YConfErr(Misconfiguration)
                             << "Dependency version resolved [[alt1]]without DEPENDENCY_MANAGEMENT[[rst]]: [[imp]]"
@@ -1129,7 +1145,8 @@ namespace {
                 const auto* m = GetModule(id);
                 return m && m->GetAttrs().DepManagementTransparent;
             };
-            for (auto [peerId, _] : directPeers) {
+            for (const auto& directPeer : directPeers) {
+                const auto peerId = directPeer.Id;
                 const auto& peerRecord = ManagedPeers.at(peerId);
                 const TModule* peerModule = GetModule(peerId);
                 if (peerModule && peerModule->GetAttrs().DepManagementTransparent) {
@@ -1263,16 +1280,12 @@ namespace {
             return resolver.Finalize();
         }
 
-        TVector<TNodeId> PreorderSort(TArrayRef<const TResolvedPeer> managedDirectPeers, const THashMap<TNodeId, TResolutionInfo>& conflictsResolution) const {
-            TUniqVector<TNodeId> res;
-            PreorderSort(managedDirectPeers, conflictsResolution, res);
-            return res.Take();
-        }
-
-        void PreorderSort(
+        template <bool SkipTransitiveImpl>
+        TVector<TNodeId> DoPreorderSort(
             TArrayRef<const TResolvedPeer> managedDirectPeers,
-            const THashMap<TNodeId, TResolutionInfo>& conflictsResolution,
-            TUniqVector<TNodeId>& res) const {
+            const THashMap<TNodeId, TResolutionInfo>& conflictsResolution
+        ) const {
+            TUniqVector<TNodeId> res;
             TVector<TArrayRef<const TResolvedPeer>> stack;
             stack.push_back(managedDirectPeers);
 
@@ -1284,6 +1297,11 @@ namespace {
 
                 const TResolvedPeer cur = stack.back().front();
                 stack.back() = stack.back().subspan(1);
+                if constexpr (SkipTransitiveImpl) {
+                    if (stack.size() > 1 && cur.Scope == EJavaDependencyScope::Impl) {
+                        continue;
+                    }
+                }
 
                 const auto resolutionIt = conflictsResolution.find(cur.Id);
                 if (resolutionIt == conflictsResolution.end()) {
@@ -1297,6 +1315,35 @@ namespace {
                     stack.push_back(curPeers);
                 }
             }
+            return res.Take();
+        }
+
+        TVector<TNodeId> PreorderSort(
+            TArrayRef<const TResolvedPeer> managedDirectPeers,
+            const THashMap<TNodeId, TResolutionInfo>& conflictsResolution,
+            bool skipTransitiveImpl
+        ) const {
+            return skipTransitiveImpl
+                ? DoPreorderSort<true>(managedDirectPeers, conflictsResolution)
+                : DoPreorderSort<false>(managedDirectPeers, conflictsResolution);
+        }
+
+        THashSet<TFileElemId> GetJavaImplPeerDirIds(const TModule& module) const {
+            THashSet<TFileElemId> dirs;
+            if (module.Get(NVariableDefs::VAR_JAVA_DEPENDENCY_VIEW).empty()) {
+                return dirs;
+            }
+
+            const auto noDiag = [](NPath::EDirConstructIssue, const TStringBuf&) {};
+            for (const auto peer : StringSplitter(module.Get(NVariableDefs::VAR_JAVA_IMPL_PEERS)).Split(' ').SkipEmpty()) {
+                const TString dir = NPath::IsExternalPath(peer)
+                    ? TString{peer}
+                    : NPath::ConstructYDir(peer, TStringBuf(), noDiag);
+                if (!dir.empty()) {
+                    dirs.insert(RestoreContext.Graph.Names().FileConf.GetStoredName(dir).GetElemId());
+                }
+            }
+            return dirs;
         }
 
     private:
