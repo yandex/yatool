@@ -20,6 +20,18 @@ _TAB = ' ' * 4
 # real runtime clash. Clashes between two interface jars (or two full jars) are
 # still genuine and must be reported.
 INTERFACE_JAR_SUFFIX = '-interface.jar'
+IJAR_MANIFEST_ATTRIBUTE = b'Injecting-Rule-Kind: arcadia_ijar'
+MANIFEST_PATH = 'META-INF/MANIFEST.MF'
+
+
+def has_ijar_marker(filename):
+    try:
+        with zipfile.ZipFile(filename) as jar:
+            manifest = jar.read(MANIFEST_PATH)
+    except (KeyError, OSError, zipfile.BadZipFile):
+        return False
+
+    return IJAR_MANIFEST_ATTRIBUTE in manifest.splitlines()
 
 
 def find_interface_jars(files):
@@ -30,7 +42,10 @@ def find_interface_jars(files):
             continue
 
         full_jar = filename[: -len(INTERFACE_JAR_SUFFIX)] + '.jar'
-        if full_jar in files:
+        # Keep recognizing unmarked ijars produced before the manifest marker
+        # was added, but use the marker when the corresponding full jar is not
+        # present on the checked classpath.
+        if full_jar in files or has_ijar_marker(filename):
             interface_jars.add(filename)
 
     return interface_jars
