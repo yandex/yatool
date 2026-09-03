@@ -2,6 +2,7 @@ import codecs
 import json
 import logging
 import os
+import shlex
 import shutil
 import stat
 import time
@@ -113,6 +114,17 @@ def set_inline_script(build_dir: str, script_name: str, command: str):
     package_json.setdefault("scripts", {})[script_name] = command
     with open(package_json_path, "wb") as package_json_file:
         package_json_file.write(json.dumps(package_json).encode("utf-8"))
+
+
+def get_script_command(build_dir: str, script_name: str) -> str | None:
+    with open(pm_utils.build_pj_path(build_dir), "rb") as package_json_file:
+        package_json = json.load(package_json_file)
+    return package_json.get("scripts", {}).get(script_name)
+
+
+def format_command_log(cwd: str, cmd: list[str], script_command: str | None) -> str:
+    command_comment = f" # ({' '.join(script_command.splitlines())})" if script_command else ""
+    return f"cd {cwd} && {shlex.join(cmd)}{command_comment}"
 
 
 def create_suite(cwd: str, log_path: str) -> PerformedTestSuite:
@@ -233,11 +245,14 @@ def run(args: CliArgs):
     if args.command:
         set_inline_script(build_dir, args.script_name, args.command)
     cmd = get_cmd(args)
+    executed_script_name = cmd[-1]
+    script_command = get_script_command(build_dir, executed_script_name)
     suite = create_suite(cwd, args.log_path)
 
     # Create progress listener that will watch the report file
     watcher = ReportFileWatcher(report_path, suite, args.script_name, args.tracefile)
 
+    logger.info("%s", format_command_log(cwd, cmd, script_command))
     start_time = time.monotonic()
     res = execute(
         cmd,
@@ -249,6 +264,8 @@ def run(args: CliArgs):
         timeout=10000000,  # without timeout process_progress_listener is not called periodically
         process_progress_listener=watcher,
     )
+    elapsed = time.monotonic() - start_time
+    logger.info("Package.json script %r completed in %.3f s", executed_script_name, elapsed)
     messages = []
     if res.exit_code != 0:
         messages = [
@@ -262,7 +279,7 @@ def run(args: CliArgs):
         name=f"{args.test_type}::node-run",
         status=Status.FAIL if res.exit_code != 0 else Status.GOOD,
         comment=simplify_colors("\n".join(messages)),
-        elapsed=time.monotonic() - start_time,
+        elapsed=elapsed,
         logs={os.path.basename(node_run_log): node_run_log},
     )
     suite.chunk.tests.append(test_case)
