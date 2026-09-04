@@ -58,6 +58,23 @@ class YcmergeError(error_base.Error):
     MESSAGE = 'ycmerge failed'
 
 
+class YmakeCrashedBySignalError(error_base.Error):
+    """YMake was killed by a signal that indicates a broken host environment.
+
+    `ya` reports such a crash as `YMake crashed` with `ya` itself exiting with code 1,
+    so the signal number can only be recovered from the ymake backtrace header in stderr.
+    """
+
+    # signal.SIGBUS and signal.SIGSEGV, same as in BROKEN_HOST_ENVIRONMENT_YA_EXIT_CODES
+    BROKEN_HOST_SIGNALS = (7, 11)
+
+    ERROR_RE = re.compile(
+        r'Signal (?:{}), backtrace is:.*?YMake crashed'.format('|'.join(str(s) for s in BROKEN_HOST_SIGNALS)),
+        re.DOTALL,
+    )
+    MESSAGE = 'ymake crashed with a segmentation fault or a bus error'
+
+
 class YmakeCrashedError(error_base.Error):
     ERROR_RE = re.compile('YMake crashed')
     MESSAGE = 'ymake crashed'

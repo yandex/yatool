@@ -14,6 +14,7 @@ UNRETRIABLE_ERRORS = [
     errors.YaArgsBindingError,
     errors.YaConfError,
     errors.YcmergeError,
+    errors.YmakeCrashedBySignalError,  # must precede the more generic YmakeCrashedError
     errors.YmakeCrashedError,
     errors.YmakeFailedError,
     errors.YMakeConfigureError,
@@ -50,4 +51,5 @@ BROKEN_HOST_ENVIRONMENT_YA_EXIT_CODES = frozenset([
 BROKEN_HOST_ENVIRONMENT_ERRORS = frozenset([
     errors.FailedToReadDirDuringConfInitializationError,
     errors.IOErrorFromYmakeConf,
+    errors.YmakeCrashedBySignalError,
 ])
