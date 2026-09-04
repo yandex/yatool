@@ -398,7 +398,6 @@ def gen_vscode_workspace(params):
         build_opts.ya_make_options(free_build_targets=True) + [bc.CompilationDatabaseOptions()],
     )
     params.ya_make_extra.append('-DBUILD_LANGUAGES=CPP')
-    params.ya_make_extra.append("-DCONSISTENT_DEBUG=yes")
     extra_params = ya_make_opts.initialize(params.ya_make_extra)
     params = devtools.ya.core.yarg.merge_params(extra_params, params)
     params.flags.update(extra_params.flags)

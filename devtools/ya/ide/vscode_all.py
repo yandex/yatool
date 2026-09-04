@@ -62,7 +62,7 @@ class VSCodeProject:
 
         flags = copy.copy(params.flags)
         ya_make_opts = devtools.ya.core.yarg.merge_opts(build_opts.ya_make_options(free_build_targets=True))
-        extra_values = ["-DBUILD_LANGUAGES=%s" % " ".join(params.languages), "-DCONSISTENT_DEBUG=yes", "--prefetch"]
+        extra_values = ["-DBUILD_LANGUAGES=%s" % " ".join(params.languages), "--prefetch"]
         params.ya_make_extra.extend(extra_values)
         extra_params = ya_make_opts.initialize(params.ya_make_extra)
         ya_make_opts.postprocess2(extra_params)
