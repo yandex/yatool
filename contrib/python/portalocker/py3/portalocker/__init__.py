@@ -16,10 +16,10 @@ you need lives directly on this module:
 - `RedisLock` is a distributed lock built on Redis pubsub, for
   coordinating processes that do not share a filesystem. It requires the
   optional ``redis`` dependency; when that package is not installed,
-  `RedisLock` is still importable as ``None`` so that
-  ``import portalocker`` never fails, but constructing it raises at that
-  point rather than at import time. Install it with
-  ``pip install "portalocker[redis]"``.
+  `RedisLock` is still importable - as a stub class whose constructor
+  raises ``ImportError`` - so that ``import portalocker`` never fails
+  and the missing dependency is only reported at use time. Install it
+  with ``pip install "portalocker[redis]"``.
 - `lock` and `unlock` are the low-level, platform-specific primitives that
   the classes above are built on; reach for them only if the context
   managers do not fit your use case.
@@ -42,11 +42,39 @@ from .utils import (
 )
 
 try:
-    from .redis import RedisLock
-except ImportError:  # pragma: no cover
+    from .redis import RedisLock  # pyright: ignore[reportAssignmentType]
+except ImportError:
     # `redis` is an optional dependency; keep the attribute importable so
-    # `portalocker.RedisLock` fails at use time, not import time.
-    RedisLock = None  # type: ignore[assignment,misc]  # ty: ignore[invalid-assignment]
+    # the missing dependency surfaces at use time, not import time. Before
+    # 4.2.0 the fallback was `None`, so constructing it failed with the
+    # baffling "TypeError: 'NoneType' object is not callable".
+
+    class RedisLock:  # type: ignore[no-redef]
+        """Stub for the optional Redis-backed lock.
+
+        Bound to ``portalocker.RedisLock`` only when the optional
+        ``redis`` package is not installed. Constructing it names the
+        missing dependency and how to install it, instead of failing
+        with an inscrutable ``TypeError``.
+        """
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            """Report the missing optional dependency.
+
+            Args:
+                args: Ignored, accepted for signature compatibility.
+                kwargs: Ignored, accepted for signature compatibility.
+
+            Raises:
+                ImportError: Always. ``RedisLock`` needs the optional
+                    redis dependency, installable with
+                    ``pip install "portalocker[redis]"``.
+            """
+            raise ImportError(
+                'portalocker.RedisLock requires the optional redis '
+                'dependency. Install it with: '
+                'pip install "portalocker[redis]"'
+            )
 
 
 #: The package name on Pypi
@@ -67,6 +95,8 @@ __url__ = __about__.__url__
 AlreadyLocked = exceptions.AlreadyLocked
 #: Exception thrown if an error occurred during locking
 LockException = exceptions.LockException
+#: Exception thrown when a held `RedisLock` was revoked from outside
+LockLostError = exceptions.LockLostError
 
 
 #: Lock a file. Note that this is an advisory lock on Linux/Unix systems
@@ -87,7 +117,8 @@ LOCK_SH: constants.LockFlags = constants.LockFlags.SHARED
 #: Acquire the lock in a non-blocking fashion.
 LOCK_NB: constants.LockFlags = constants.LockFlags.NON_BLOCKING
 
-#: Remove an existing lock held by this process.
+#: Flag used internally by `unlock` to release a held lock. Passing it
+#: to `lock` raises ``RuntimeError`` since 4.2.0 - call `unlock` instead.
 LOCK_UN: constants.LockFlags = constants.LockFlags.UNBLOCK
 
 #: Locking flags enum
@@ -106,6 +137,7 @@ __all__ = [
     'Lock',
     'LockException',
     'LockFlags',
+    'LockLostError',
     'NamedBoundedSemaphore',
     'PidFileLock',
     'RLock',

@@ -66,6 +66,12 @@ this process acquired the lock:
         else:
             print(f'worker already running as PID {holder_pid}')
 
+One exception to the inspection-oriented entry: when another process holds
+the lock but its PID cannot be read (a missing or corrupt PID file),
+entering raises ``portalocker.AlreadyLocked`` instead of returning
+``None``, since ``None`` is the we-are-the-holder answer and reporting it
+without a readable holder would run the block next to a live holder.
+
 Use ``fail_closed()`` when the protected body must only run after acquisition:
 
 .. code-block:: python
@@ -195,6 +201,7 @@ To make sure your cache generation scripts don't race, use the `Lock` class:
 To customize the opening and locking a manual approach is also possible:
 
 >>> import portalocker
+>>> open('somefile', 'a').close()  # the 'r+' mode needs an existing file
 >>> file = open('somefile', 'r+')
 >>> portalocker.lock(file, portalocker.LockFlags.EXCLUSIVE)
 >>> _ = file.seek(12)

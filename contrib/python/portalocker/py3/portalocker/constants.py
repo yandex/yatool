@@ -23,9 +23,11 @@ Manually unlock, only needed internally
 import enum
 import os
 
-# The actual tests will execute the code anyhow so the following code can
-# safely be ignored from the coverage tests
-if os.name == 'nt':  # pragma: no cover
+# Each branch is measured on the platform it belongs to and only excluded
+# on the platforms where it cannot run (see the coverage_conditional_plugin
+# rules in pyproject.toml). The final `else` can only run on a platform the
+# test suite itself does not support, hence the `nt-or-posix` exclusion.
+if os.name == 'nt':  # pragma: not-nt
     import msvcrt
 
     #: exclusive lock
@@ -37,7 +39,7 @@ if os.name == 'nt':  # pragma: no cover
     #: unlock
     LOCK_UN = msvcrt.LK_UNLCK  # type: ignore[attr-defined]
 
-elif os.name == 'posix':  # pragma: no cover
+elif os.name == 'posix':  # pragma: not-posix
     import fcntl
 
     #: exclusive lock
@@ -49,7 +51,7 @@ elif os.name == 'posix':  # pragma: no cover
     #: unlock
     LOCK_UN = fcntl.LOCK_UN
 
-else:  # pragma: no cover
+else:  # pragma: nt-or-posix
     raise RuntimeError('PortaLocker only defined for nt and posix platforms')
 
 
@@ -95,6 +97,8 @@ class LockFlags(enum.IntFlag):
     #: becomes available.
     NON_BLOCKING = LOCK_NB
     #: Release a lock previously acquired on the same file. Used
-    #: internally by `portalocker.unlock`; most callers use a context
-    #: manager (`Lock`/`RLock`) instead of applying this flag directly.
+    #: internally by `portalocker.unlock` and never passed to
+    #: `portalocker.lock`, which rejects UNBLOCK-bearing flags with
+    #: ``RuntimeError`` since 4.2.0. Call `portalocker.unlock` (or use a
+    #: context manager such as `Lock`/`RLock`) to release a lock.
     UNBLOCK = LOCK_UN
