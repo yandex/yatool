@@ -64,7 +64,11 @@
     wsc = ( [ \t\v\f\r] | ("/*" ( any* -- "*/" ) >ClearComment "*/") %^ProcessComment );
     ws = wsc*;
 
-    import_simple = ( ws ( [a-zA-Z0-9_.]+ wsc+ )? ( '"' ^'\n'* $AddChar :> '"' ) ) >ClearImport @AddImport;
+    import_path =
+        ( '"' ^[ \t\r\n"]* $AddChar :> '"' )
+      | ( '`' ^[ \t\r\n`]* $AddChar :> '`' );
+
+    import_simple = ( ws ( [a-zA-Z0-9_.]+ wsc+ )? import_path ) >ClearImport @AddImport;
 
     cpp_comment_content = ^'\n'* >*ClearComment %^ProcessComment $err(Skip);
 
@@ -106,4 +110,3 @@ void ScanGoImports(const TStringBuf input, TVector<TParsedFile>& parsedFiles) {
         assert(false);
     }
 }
-
