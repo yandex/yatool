@@ -29,6 +29,7 @@ namespace NYa {
 
         // Fill envp
         TVector<TString> envHolder;
+        envHolder.reserve(env.size());  // Important. envHolder should not reallocate on push_back
         TVector<char *> envp;
         for (const auto & [key, value] : env) {
             envHolder.push_back(Join("=", key, value));
