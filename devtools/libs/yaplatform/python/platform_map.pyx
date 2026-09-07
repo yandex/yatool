@@ -21,7 +21,7 @@ cdef TString GraphJsonNameFromJson(TStringBuf varNameWithHash, TStringBuf mappin
 def mapping_var_name_from_json(base_name, mapping_json):
     mapping_json = six.ensure_binary(mapping_json)
     base_name = six.ensure_binary(base_name)
-    return MappingVarNameFromJson(base_name, mapping_json)
+    return six.ensure_str(MappingVarNameFromJson(base_name, mapping_json))
 
 def graph_json_from_resource_json(name, mapping_json):
     mapping_json = six.ensure_binary(mapping_json)

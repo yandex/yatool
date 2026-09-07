@@ -48,12 +48,12 @@ Check the tool's path in build/ya.conf.json or build/tools/tools/{tool_name}.too
 Please contact owners of the tool to fix that issue."""
 
 TOOL_TIER_HEADERS = {
-    tools.TOOL_TIER_OFFICIAL: "OFFICIAL - have owners, supported and actively developed",
-    tools.TOOL_TIER_COMMUNITY: "COMMUNITY - have owners, but no reliable support",
-    tools.TOOL_TIER_UNSUPPORTED: "UNSUPPORTED - useful tools without explicit owners. Use at your own risk",
-    tools.TOOL_TIER_INFRASTRUCTURE: "INFRASTRUCTURE - supported by DEVTOOLS",
-    tools.TOOL_TIER_DEPRECATED: "DEPRECATED - are subject to remove. Don't use",
-    tools.TOOL_TIER_UNSPECIFIED: "UNSPECIFIED - no information about tier",
+    tools.ToolTier.OFFICIAL: "OFFICIAL - have owners, supported and actively developed",
+    tools.ToolTier.COMMUNITY: "COMMUNITY - have owners, but no reliable support",
+    tools.ToolTier.UNSUPPORTED: "UNSUPPORTED - useful tools without explicit owners. Use at your own risk",
+    tools.ToolTier.INFRASTRUCTURE: "INFRASTRUCTURE - supported by DEVTOOLS",
+    tools.ToolTier.DEPRECATED: "DEPRECATED - are subject to remove. Don't use",
+    tools.ToolTier.UNSPECIFIED: "UNSPECIFIED - no information about tier",
 }
 
 
@@ -160,7 +160,7 @@ class ToolYaHandler(BaseHandler):
                 # try to guess first name part
                 name_parts[0] = _guess_tool_name(name_parts[0])
                 tool = self._get_tool(name_parts, params)
-            if tool.config.type != tools.TOOL_TYPE_PARENT:
+            if tool.config.type != tools.ToolType.PARENT:
                 break
 
         additional_handler_info = {
@@ -210,7 +210,7 @@ class ToolYaHandler(BaseHandler):
         parent = parent or ()
         sub_handlers = {}
         for tool_cfg in tools.tools(parent):
-            if tool_cfg.type == tools.TOOL_TYPE_PARENT:
+            if tool_cfg.type == tools.ToolType.PARENT:
                 nested_sub_handlers = self._recursive_sub_handlers(tool_cfg.name_parts)
             else:
                 nested_sub_handlers = None
@@ -407,7 +407,7 @@ def do_tool(params: Params) -> None:
         print(_get_tool_card(tool, params))
         return
 
-    if tool is None or tool.config.type == tools.TOOL_TYPE_PARENT:
+    if tool is None or tool.config.type == tools.ToolType.PARENT:
         parent_parts = tool.config.name_parts if tool is not None else None
         print(
             _get_tool_list(
@@ -516,7 +516,7 @@ def _get_tool_flat_list(tool_cfg_list: list[tools._ToolConfig], max_name_len: in
     result = []
     for tool_cfg in tool_cfg_list:
         desc_items = tool_cfg.description.split('\n')
-        if tool_cfg.tier.tier == tools.TOOL_TIER_DEPRECATED:
+        if tool_cfg.tier.tier == tools.ToolTier.DEPRECATED:
             desc_items.append("DEPRECATED: {}".format(tool_cfg.tier.deprecation_cause))
         result += _get_aligned_value(tool_cfg.name, desc_items, max_name_len + 5, prefix="  ")
     return result
@@ -535,7 +535,7 @@ def _get_tool_list(
     if not parent_parts and not show_all:
         # Note: if tiers are disabled (for example, in Open Source) all tools have an 'unspecified' tier
         tool_cfg_list = [
-            t for t in tool_cfg_list if t.tier.tier in (tools.TOOL_TIER_OFFICIAL, tools.TOOL_TIER_UNSPECIFIED)
+            t for t in tool_cfg_list if t.tier.tier in (tools.ToolTier.OFFICIAL, tools.ToolTier.UNSPECIFIED)
         ]
     if tags:
         # Apply tag filter
@@ -562,10 +562,10 @@ def _get_tool_list(
             item = {
                 "name": tool_cfg.name,
                 "tier": tier_info.tier,
-                "is_parent": tool_cfg.type == tools.TOOL_TYPE_PARENT,
+                "is_parent": tool_cfg.type == tools.ToolType.PARENT,
                 "description": tool_cfg.description,
             }
-            if tier_info.tier == tools.TOOL_TIER_DEPRECATED:
+            if tier_info.tier == tools.ToolTier.DEPRECATED:
                 item["deprecation_cause"] = tier_info.deprecation_cause
             result.append(item)
         return json.dumps(result, indent=4)
@@ -604,10 +604,10 @@ def _get_tool_card(tool: tools._XTool, params: Params) -> str:
         "description": tool.config.description,
         "tier": tool.config.tier.tier,
     }
-    if tool.config.availability != tools.TOOL_AVAILABILITY_FULL:
+    if tool.config.availability != tools.ToolAvailability.FULL:
         tool_card["description"] = "[HIDDEN - NOT FOR PUBLIC USE] " + tool_card["description"]
     _add_if_not_empty(tool_card, "tier", tool.config.tier.tier)
-    if tool.config.tier.tier == tools.TOOL_TIER_DEPRECATED:
+    if tool.config.tier.tier == tools.ToolTier.DEPRECATED:
         tool_card["deprecation_cause"] = tool.config.tier.deprecation_cause
     _add_if_not_empty(tool_card, "revised", tool.config.tier.revised)
     if support := tool.config.support:
@@ -615,7 +615,7 @@ def _get_tool_card(tool: tools._XTool, params: Params) -> str:
         _add_if_not_empty(tool_card, "support", support_card)
     for attr in SIMPLE_ATTRS:
         _add_if_not_empty(tool_card, attr, getattr(tool.config, attr))
-    is_parent = tool.config.type == tools.TOOL_TYPE_PARENT
+    is_parent = tool.config.type == tools.ToolType.PARENT
     if is_parent:
         tool_card["is_parent"] = True
     elif params.with_path:
@@ -634,7 +634,7 @@ def _get_tool_card(tool: tools._XTool, params: Params) -> str:
         " [PARENT]" if is_parent else "",
         (
             " [DEPRECATED: {}]".format(tool_card["deprecation_cause"])
-            if tool_card["tier"] == tools.TOOL_TIER_DEPRECATED
+            if tool_card["tier"] == tools.ToolTier.TOOL_TIER_DEPRECATED
             else ""
         ),
     )
