@@ -1,6 +1,7 @@
 #include "options.h"
 
 #include <util/generic/algorithm.h>
+#include <util/generic/hash_set.h>
 #include <util/generic/maybe.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
@@ -24,6 +25,13 @@ namespace NYa::NTool {
         using TArgsSpan = std::span<const TStringBuf>;
 
         const TStringBuf TOOL_HANDLER_NAME = "tool";
+
+        const THashSet<TStringBuf> VALID_YA_OPTIONS = {
+            "-v",
+            "--verbose",
+            "--no-report",
+            "--precise",
+        };
 
         // These options are still allowed after the tool name
         const TStringBuf LEGACY_UNSUPPORTED_OPTIONS[] = {
@@ -182,11 +190,11 @@ namespace NYa::NTool {
 
         options.ProgramName = args[0];
         curArgs = curArgs.subspan(1);
-        if (curArgs[0] == "-v" || args[0] == "--verbose") {
+        while (!curArgs.empty() && VALID_YA_OPTIONS.contains(curArgs[0])) {
             curArgs = curArgs.subspan(1);
-            // 2: TOOL_HANDLER_NAME + tool_name
-            Y_ENSURE(curArgs.size() >= 2, "Too few args");
         }
+        // 2: TOOL_HANDLER_NAME + tool_name
+        Y_ENSURE(curArgs.size() >= 2, "Too few args");
 
         Y_ENSURE(
             curArgs[0] == TOOL_HANDLER_NAME,
