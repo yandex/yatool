@@ -827,29 +827,30 @@ def configure_report_interceptor(ctx, report_events, intent=None):
     _ya_pid_path = None
     _snowden_store_dir = None
     _snowden_user_class = None
-    if app_config.in_house:
-        from yalibrary import snowden
-        from yalibrary.snowden import SnowdenMode
+    if parsed_report_events:
+        if app_config.in_house:
+            from yalibrary import snowden
+            from yalibrary.snowden import SnowdenMode
 
-        _snowden_user_class = user.classify_user(ctx.username)
-        snowden_mode = snowden.resolve_snowden_mode(_snowden_user_class)
+            _snowden_user_class = user.classify_user(ctx.username)
+            snowden_mode = snowden.resolve_snowden_mode(_snowden_user_class)
 
-        if snowden_mode == SnowdenMode.STANDALONE:
-            _snowden_store_dir = snowden.snowden_dir()
-            snowden.touch_version_dir(_snowden_store_dir)
-            snowden.ensure_daemon(_snowden_store_dir, shard='report')
-            _ya_pid_path = snowden.register_ya_pid(_snowden_store_dir)
-            try:
-                snowden.cleanup_old_versions()
-            except Exception:
-                logger.debug('Failed to cleanup old snowden versions', exc_info=True)
+            if snowden_mode == SnowdenMode.STANDALONE:
+                _snowden_store_dir = snowden.snowden_dir()
+                snowden.touch_version_dir(_snowden_store_dir)
+                snowden.ensure_daemon(_snowden_store_dir, shard='report')
+                _ya_pid_path = snowden.register_ya_pid(_snowden_store_dir)
+                try:
+                    snowden.cleanup_old_versions()
+                except Exception:
+                    logger.debug('Failed to cleanup old snowden versions', exc_info=True)
 
-            from exts.process import register_pre_execve_hook
+                from exts.process import register_pre_execve_hook
 
-            def _pre_execve_cleanup():
-                telemetry.stop_reporter()
+                def _pre_execve_cleanup():
+                    telemetry.stop_reporter()
 
-            register_pre_execve_hook(_pre_execve_cleanup)
+                register_pre_execve_hook(_pre_execve_cleanup)
 
     init_reporter_kwargs = {
         'suppressions': sec.mine_suppression_filter(params_dict),
@@ -974,7 +975,7 @@ def configure_report_interceptor(ctx, report_events, intent=None):
         )
         telemetry.stop_reporter()  # flush urgent reports
 
-        if app_config.in_house and snowden_mode == SnowdenMode.STANDALONE:
+        if app_config.in_house and _ya_pid_path is not None:
             from yalibrary import snowden
 
             try:

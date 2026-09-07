@@ -6,11 +6,29 @@
 
 #include <util/generic/yexception.h>
 #include <util/stream/null.h>
+#include <util/string/type.h>
 #include <util/system/env.h>
 #include <util/system/execpath.h>
 #include <util/system/shellcommand.h>
 
 namespace NYa::NSnowden {
+    bool ReportingDisabled(const TVector<TString>& expandedArgs) {
+        const TString noReport = GetEnv("YA_NO_REPORT");
+        if (IsTrue(noReport)) {
+            return true;
+        }
+        for (size_t i = 1; i < expandedArgs.size(); ++i) {
+            const auto& arg = expandedArgs[i];
+            if (!arg.empty() && arg[0] != '-') {
+                break;
+            }
+            if (arg == "--no-report") {
+                return true;
+            }
+        }
+        return false;
+    }
+
     namespace NPrivate {
         TMaybe<int> RunPythonEntryPoint(
             const TString& executable,
@@ -56,7 +74,7 @@ namespace NYa::NSnowden {
 
     void EnsureDaemon(const IConfig& /*config*/) {
         try {
-            if (GetEnv("YA_SNOWDEN_MODE") != "standalone") {
+            if (ReportingDisabled({}) || GetEnv("YA_SNOWDEN_MODE") != "standalone") {
                 return;
             }
             SpawnPythonEntryPoint(
@@ -86,6 +104,9 @@ namespace NYa::NSnowden {
         const TVector<TString>& expandedArgs
     ) {
         try {
+            if (ReportingDisabled(expandedArgs)) {
+                return;
+            }
             TVector<TStringBuf> argViews;
             argViews.reserve(expandedArgs.size());
             for (const auto& arg : expandedArgs) {
@@ -118,6 +139,9 @@ namespace NYa::NSnowden {
         const TString& toolPath
     ) {
         try {
+            if (ReportingDisabled({})) {
+                return;
+            }
             SpawnPythonEntryPoint(
                 "yalibrary.snowden:push_event_main",
                 {

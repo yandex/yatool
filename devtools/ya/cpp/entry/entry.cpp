@@ -207,8 +207,10 @@ namespace NYa {
                 DEBUG_LOG << "Ya changed its pgid: " << newPgid << "\n";
             }
             DEBUG_LOG << "Start handler " << handlerName << "\n";
-            NSnowden::EnsureDaemon(config);
-            NSnowden::ReportCppHandlerEvent(handlerName, expandedArgs);
+            if (!NSnowden::ReportingDisabled(expandedArgs)) {
+                NSnowden::EnsureDaemon(config);
+                NSnowden::ReportCppHandlerEvent(handlerName, expandedArgs);
+            }
             // If handler has no fall back to python it just does exit() and doesn't return here.
             handlerPtr->Run(args);
             DEBUG_LOG << "Fallback to python\n";

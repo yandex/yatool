@@ -6,6 +6,8 @@
 #include <util/generic/vector.h>
 
 namespace NYa::NSnowden {
+    bool ReportingDisabled(const TVector<TString>& expandedArgs);
+
     // No-op unless YA_SNOWDEN_MODE == "standalone", never throws.
     void EnsureDaemon(const IConfig& config);
 
