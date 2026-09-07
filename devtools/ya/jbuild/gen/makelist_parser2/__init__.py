@@ -122,6 +122,7 @@ def obtain_targets_graph2(dart, cpp_graph):
 
     by_path = {}
     extra_idea_paths = {}
+    runtime_peers_by_path = {}
 
     def strip_root(s):
         return s[3:]
@@ -139,6 +140,11 @@ def obtain_targets_graph2(dart, cpp_graph):
     # Add targets from dart
     for entry in dart:
         path = graph_base.hacked_normpath(strip_root(entry['PATH']))
+        if consts.RUNTIME_MANAGED_PEERS_CLOSURE in entry:
+            peers = entry[consts.RUNTIME_MANAGED_PEERS_CLOSURE].split()
+            runtime_peers_by_path[path] = peers
+            all_java_peerdirs.update(map(strip_root, peers))
+            continue
         module_type = entry['MODULE_TYPE']
         module_args = entry['MODULE_ARGS'].split() if 'MODULE_ARGS' in entry else []
         managed_peers = entry[consts.MANAGED_PEERS].split() if consts.MANAGED_PEERS in entry else []
@@ -269,5 +275,15 @@ def obtain_targets_graph2(dart, cpp_graph):
 
                 if dep_path in by_path:
                     target.deps.append(by_path[dep_path])
+
+    # Graph edge order is not classpath order; use the runnable/testable module's resolved closure.
+    for path, peers in runtime_peers_by_path.items():
+        if path not in by_path:
+            continue
+        for peer in peers:
+            dep_path = graph_base.hacked_normpath(strip_root(peer))
+            dep_target = by_path.get(dep_path)
+            if dep_path != path and dep_target and dep_target.provides_jar():
+                by_path[path].runtime_deps.append(dep_target)
 
     return by_path

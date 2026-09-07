@@ -8,6 +8,7 @@ class Target(object):
     def __init__(self, path, deps):
         self.path = path
         self.deps = deps
+        self.runtime_deps = []
 
     # Jar
     def provides_jar(self):

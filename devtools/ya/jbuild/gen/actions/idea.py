@@ -196,8 +196,8 @@ def idea_results(ctx, nodes):
             return
 
         if target.is_idea_target():
-            for peer in target.plain[consts.MANAGED_PEERS_CLOSURE][0]:
-                peer = ctx.by_path[strip_root(peer)]
+            peers = [ctx.by_path[strip_root(p)] for p in target.plain[consts.MANAGED_PEERS_CLOSURE][0]]
+            for peer in peers + target.runtime_deps:
                 if peer.provides_jar():
                     yield node_by_output[(peer.output_jar_path(), node.FILE)]
             return
@@ -1330,6 +1330,13 @@ def process_path(path, ctx, results_root, project_root, relativize_cache, dry_ru
         dep_paths = [cached_relativize(op.dirname(x), relativize_cache) for x in cp if x != target.output_jar_path()]
         dep_paths = list(map(graph_base.hacked_normpath, list(graph_base.uniq_first_case(dep_paths))))
         dep_scopes = ['COMPILE' for __ in dep_paths]
+        seen = set(dep_paths)
+        for peer in target.runtime_deps:
+            dep_path = peer.path
+            if dep_path not in seen and dep_path != path:
+                seen.add(dep_path)
+                dep_paths.append(dep_path)
+                dep_scopes.append('RUNTIME')
         processors = list(compile.iter_processors(target.plain))
         javac_flags = []
         for k, v in compile.get_ya_make_flags(target.plain, consts.JAVAC_FLAGS).items():
@@ -1450,10 +1457,12 @@ def collapse_ut(by_path, is_jtest, is_jtest_for, jtest_for_wat, is_junit5, is_ju
             module.test_data |= ut.test_data or set()
             merge_jvm_args(module.jvm_args, ut.jvm_args)
 
-            store = frozenset(module.dep_paths)
+            store = dict(zip(module.dep_paths, module.dep_scopes))
 
-            for ut_dep in ut.dep_paths:
-                if ut_dep not in store and ut_dep != d:
+            for ut_dep, ut_scope in zip(ut.dep_paths, ut.dep_scopes):
+                if ut_dep != d and (ut_dep not in store or (store[ut_dep] == 'RUNTIME' and ut_scope == 'COMPILE')):
+                    # RUNTIME does not cover test compilation; keep it for production
+                    # execution and add TEST visibility without widening the compile API.
                     module.dep_paths.append(ut_dep)
                     module.dep_scopes.append('TEST')
             if not module.jdk_version or not ut.jdk_version:
