@@ -8,12 +8,14 @@
 #include <library/cpp/resource/resource.h>
 
 #include <util/folder/path.h>
+#include <util/folder/iterator.h>
 #include <util/generic/algorithm.h>
 #include <util/generic/lazy_value.h>
 #include <util/generic/hash_set.h>
 #include <util/generic/singleton.h>
 #include <util/stream/file.h>
 #include <util/string/cast.h>
+#include <util/string/join.h>
 #include <util/string/type.h>
 #include <util/system/env.h>
 #include <util/system/user.h>
@@ -37,6 +39,7 @@ namespace NYa {
     const TFsPath YA_CONF_JSON_PATH = TFsPath("build") / YA_CONF_JSON_FILE;
     const TString RES_FS_ROOT = "resfs/file";
     const TString YA_CONF_JSON_RESOURCE_KEY = "ya.conf.json";
+    const TString YA_TOOLS_RESOURCE_PREFIX = RES_FS_ROOT + "/yatools";
 
     THashMap<TString, TString> Environ(bool(*filter)(const TString& key, const TString& val)) {
         THashMap<TString, TString> result{};
@@ -112,6 +115,63 @@ namespace NYa {
                 }
                 FormulaCache_.emplace(arcadiaPath, ConfigImpl<NYaConfJson::TFormula>(arcadiaPath));
                 return FormulaCache_[arcadiaPath];
+            }
+
+            TVector<TString> ListToolConfigs(const TFsPath& path) const override {
+                const TFsPath arcadiaRoot = ArcadiaRoot();
+                if (arcadiaRoot) {
+                    for (const TFsPath& configDir : ToolConfigDirs()) {
+                        const TFsPath directory = arcadiaRoot / configDir / path;
+                        if (!directory.IsDirectory()) {
+                            continue;
+                        }
+
+                        TVector<TString> result;
+                        TDirIterator it(directory, TDirIterator::TOptions(FTS_LOGICAL).SetMaxLevel(1).SetSortByName());
+                        for (const auto& entry : it) {
+                            const TFsPath entryPath{entry.fts_path};
+                            if (entryPath.IsFile()) {
+                                result.push_back(entryPath.Basename());
+                            }
+                        }
+                        return result;
+                    }
+                }
+
+                const TString prefix = Join('/', YA_TOOLS_RESOURCE_PREFIX, path.GetPath(), "");
+                NResource::TResources resources;
+                NResource::FindMatch(prefix, &resources);
+
+                TVector<TString> result;
+                for (const auto& resource : resources) {
+                    TStringBuf name = resource.Key;
+                    if (name.SkipPrefix(prefix) && !name.Contains('/')) {
+                        result.push_back(TString{name});
+                    }
+                }
+                Sort(result);
+                return result;
+            }
+
+            TMaybe<TString> ReadToolConfig(const TFsPath& path) const override {
+                const TFsPath arcadiaRoot = ArcadiaRoot();
+                if (arcadiaRoot) {
+                    for (const TFsPath& configDir : ToolConfigDirs()) {
+                        const TFsPath configPath = arcadiaRoot / configDir / path;
+                        if (configPath.IsFile()) {
+                            DEBUG_LOG << "Load tool config from: " << configPath << "\n";
+                            return TFileInput(configPath.GetPath()).ReadAll();
+                        }
+                    }
+                }
+
+                const TString resourcePath = Join('/', YA_TOOLS_RESOURCE_PREFIX, path.GetPath());
+                TString data;
+                if (NResource::FindExact(resourcePath, &data)) {
+                    DEBUG_LOG << "Load tool config from resource: " << resourcePath << "\n";
+                    return data;
+                }
+                return Nothing();
             }
 
         private:
@@ -213,6 +273,19 @@ namespace NYa {
                 return ConfigImpl<NYaConfJson::TYaConf>(configDirs, YA_CONF_JSON_RESOURCE_KEY);
             }
 
+            TVector<TFsPath> ToolConfigDirs() const {
+                if (TFsPath yaToolConf = GetEnv("YA_TOOLS_CONFIG_PATH")) {
+                    return {yaToolConf};
+                }
+
+                TVector<TFsPath> result;
+                if (TFsPath extraPath = NConfig::ExtraConfRoot) {
+                    result.push_back(extraPath);
+                }
+                result.push_back("build");
+                return result;
+            }
+
             template <class T>
             T ConfigImpl(const TVector<TFsPath> arcadiaPaths, const TString& resourcePath) const {
                 TFsPath arcadiaRoot = ArcadiaRoot();
@@ -247,6 +320,7 @@ namespace NYa {
                 TVector<TFsPath> arcadiaPaths = {arcadiaPath};
                 return ConfigImpl<T>(arcadiaPaths, arcadiaPath.GetPath());
             }
+
         private:
             TLazyValue<TFsPath> HomeDir_;
             TLazyValue<TFsPath> MiscRoot_;

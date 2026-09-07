@@ -11,8 +11,8 @@ namespace NYa::NTool {
         bool PrintFastPathError;
         bool NoFallbackToPython;
         TString HostPlatform;
-        TString ToolName;
-        TVector<TString> ToolOptions;
+        TVector<TString> Args;
+        bool SwallowDoubleDash;
         bool Dummy;
 
         bool operator==(const TToolOptions&) const = default;

@@ -33,7 +33,8 @@ namespace NYa::NYaConfJson {
     };
 
     struct TLatestMatched {
-        TLatestMatched() : UpdateInterval(86400)
+        TLatestMatched()
+            : UpdateInterval(86400)
         {
         }
 
@@ -120,6 +121,56 @@ namespace NYa::NYaConfJson {
             ((TBottles) Bottles),
             ((TToolChains) ToolChains, "toolchain")
         )
+
+        Y_EDL_DEFAULT_MEMBER((NYa::NEdl::TBlackHole) Unknown)
+
+        void Finish() {
+            for (auto& [name, bottle] : Bottles) {
+                bottle.Name = name;
+            }
+        }
+    };
+
+    using TSimpleToolExecutable = std::variant<TString, TVector<TString>>;
+
+    struct TSimpleToolDefinition {
+        Y_EDL_MEMBERS(
+            ((TMaybe<TFormula>) Formula),
+            ((TMaybe<TVector<TString>>) Platforms),
+            ((TMaybe<TSimpleToolExecutable>) Executable),
+            ((TToolChainEnv) Env)
+        )
+
+        Y_EDL_DEFAULT_MEMBER((NYa::NEdl::TBlackHole) Unknown)
+    };
+
+    struct TToolDescription {
+        TToolDescription()
+            : Availability("full")
+        {
+        }
+
+        Y_EDL_MEMBERS(
+            ((TString) Type),
+            ((TString) Description),
+            ((TString) Availability),
+            ((TMaybe<TSimpleToolDefinition>) Definition)
+        )
+
+        Y_EDL_DEFAULT_MEMBER((NYa::NEdl::TBlackHole) Unknown)
+    };
+
+    struct TToolConfig {
+        Y_EDL_MEMBERS(
+            ((TToolDescription) Tool))
+
+        Y_EDL_DEFAULT_MEMBER((NYa::NEdl::TBlackHole) Unknown)
+    };
+
+    struct TToolchainsConfig {
+        Y_EDL_MEMBERS(
+            ((TToolChains) ToolChains, "toolchains"),
+            ((TBottles) Bottles))
 
         Y_EDL_DEFAULT_MEMBER((NYa::NEdl::TBlackHole) Unknown)
 

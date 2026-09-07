@@ -1,4 +1,5 @@
 #include "options.h"
+#include "tool_config.h"
 #include "toolchain.h"
 #include "toolscache.h"
 
@@ -15,11 +16,35 @@
 #include <util/string/join.h>
 #include <util/generic/yexception.h>
 
-
 namespace NYa::NTool {
+    namespace {
+        void ProcessDoubleDashes(TToolInvocation& invocation, bool swallowDoubleDash) {
+            auto& opts = invocation.ToolOptions;
+            if (opts.empty()) {
+                return;
+            }
+            // Remove the double dash immediately after the tool name.
+            if (opts.front() == "--") {
+                opts.erase(opts.begin());
+                return;
+            }
+            if (!swallowDoubleDash) {
+                return;
+            }
+            for (auto it = opts.begin(); it != opts.end(); ++it) {
+                if (*it == "--") {
+                    opts.erase(it);
+                    return;
+                }
+            }
+        }
+    }
+
     void ToolFastPath(const TToolOptions& options) {
         const IConfig& config = GetConfig();
-        DEBUG_LOG << "Run tool fast path: " << options.ToolName << " " << JoinSeq(" ", options.ToolOptions) << "\n";
+        TToolInvocation invocation = LoadToolInvocation(config, options.Args);
+        ProcessDoubleDashes(invocation, options.SwallowDoubleDash);
+        DEBUG_LOG << "Run tool fast path: " << invocation.ToolName << " " << JoinSeq(" ", invocation.ToolOptions) << "\n";
         DEBUG_LOG << "Cwd: " << TFsPath::Cwd() << "\n";
         DEBUG_LOG << "Home: " << config.HomeDir() << "\n";
         DEBUG_LOG << "Ya dir: " << config.MiscRoot() << "\n";
@@ -28,7 +53,7 @@ namespace NYa::NTool {
         TCanonizedPlatform forPlatform = options.HostPlatform ? TCanonizedPlatform(options.HostPlatform) : MyPlatform();
         DEBUG_LOG << "Platform: '" << forPlatform.AsString() << "'\n";
 
-        NTool::TTool tool = NTool::GetTool(config, options.ToolName, forPlatform);
+        NTool::TTool tool = NTool::GetTool(config, invocation.Config, invocation.ToolName, forPlatform);
         DEBUG_LOG << "Tool chain path: '" << tool.ToolChainPath << "'\n";
         DEBUG_LOG << "Tool path: '" << tool.ToolPath << "'\n";
 
@@ -48,9 +73,9 @@ namespace NYa::NTool {
 
         toolsCache.Destroy();
 
-        NSnowden::ReportToolExecutionEvent(config, options.ToolName, tool.ToolPath.GetPath());
+        NSnowden::ReportToolExecutionEvent(config, invocation.ToolName, tool.ToolPath.GetPath());
 
-        ExecTool(config, tool, options.ToolOptions);
+        ExecTool(config, tool, invocation.ToolOptions);
     }
 
     struct TToolHandler : public IYaHandler {

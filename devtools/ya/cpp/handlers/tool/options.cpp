@@ -66,14 +66,12 @@ namespace NYa::NTool {
                 : OptionName{optionName}
                 , BoolArgumentTarget(boolTarget)
             {
-
             }
 
             TOptionDef(const TStringBuf optionName, TString* stringTarget)
                 : OptionName{optionName}
                 , StringArgumentTarget(stringTarget)
             {
-
             }
 
             bool RequiredArgument() const {
@@ -132,11 +130,6 @@ namespace NYa::NTool {
         }
 
         TArgsSpan ParseLegacyOptions(TToolOptions& options, TArgsSpan args) {
-            // Remove "--" after tool name and don't parse other options
-            if (!args.empty() && args.front() == "--") {
-                return args.subspan(1);
-            }
-
             TVector<TOptionDef> optionDefs{};
             for (const auto& [name, ptr] : LEGACY_OPTIONS) {
                 if (const auto ptrToTypedOptPtr = std::get_if<TBoolToolOptionPtr>(&ptr)) {
@@ -156,10 +149,10 @@ namespace NYa::NTool {
                 [&](TStringBuf arg) {
                     for (TStringBuf opt : LEGACY_UNSUPPORTED_OPTIONS) {
                         if (arg == opt || arg.Before('=') == opt) {
-                            ythrow yexception() << "Unsupported option is found: '" << arg <<"'";
+                            ythrow yexception() << "Unsupported option is found: '" << arg << "'";
                         }
                     }
-                    options.ToolOptions.push_back(TString(arg));
+                    options.Args.push_back(TString(arg));
                     return true;
                 }
             );
@@ -168,22 +161,17 @@ namespace NYa::NTool {
             }
 
             // In previous fast-path version any legacy option (even after "--") causes fallback to Python.
-            // Python ya tool variant removes the first "--", so we'll do the same for compatibility
-            bool fallback = false;
+            // Python ya tool variant removes the first "--", so we'll do the same for compatibility.
+            // Detect the case here and apply it later after extracting the tool name.
             for (const auto arg : restArgs) {
                 for (TStringBuf opt : LEGACY_UNSUPPORTED_OPTIONS) {
                     if (arg == opt || arg.Before('=') == opt) {
-                        fallback = true;
+                        options.SwallowDoubleDash = true;
                         break;
                     }
                 }
             }
-            if (fallback) {
-                // Remove "--" at front
-                return restArgs.subspan(1);
-            } else {
-                return restArgs;
-            }
+            return restArgs;
         }
     }
 
@@ -224,21 +212,16 @@ namespace NYa::NTool {
             curArgs,
             [](TStringBuf) {return false;}
         );
-        Y_ENSURE(!curArgs.empty() && !curArgs[0].starts_with("-"), "Tool name is missing");
-
-        options.ToolName = curArgs[0];
-        curArgs = curArgs.subspan(1);
-
         curArgs = ParseLegacyOptions(options, curArgs);
-        options.ToolOptions.insert(options.ToolOptions.end(), curArgs.begin(), curArgs.end());
+        options.Args.insert(options.Args.end(), curArgs.begin(), curArgs.end());
 
         if (!options.HostPlatform) {
             if (TString HostPlatform = GetEnv("YA_TOOL_HOST_PLATFORM")) {
                 options.HostPlatform = HostPlatform;
             }
         }
-        Y_ENSURE(options.ToolName, "Tool name is missing");
-   }
+        Y_ENSURE(!options.Args.empty() && !TStringBuf{options.Args[0]}.StartsWith("-"), "Tool name is missing");
+    }
 
     namespace NTest {
         TVector<TStringBuf> GetLegacyOptions() {
@@ -253,4 +236,3 @@ namespace NYa::NTool {
         }
     }
 }
-

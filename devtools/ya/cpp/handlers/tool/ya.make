@@ -3,6 +3,7 @@ LIBRARY()
 SRCS(
     GLOBAL tool.cpp
     options.cpp
+    tool_config.cpp
     toolchain.cpp
     toolchain_helpers.cpp
     GLOBAL toolchain_by_platform.cpp
