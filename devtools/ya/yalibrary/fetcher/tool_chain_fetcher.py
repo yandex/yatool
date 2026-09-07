@@ -397,6 +397,8 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
             'order': '-id',
             'limit': limit,
         }
+        if 'releases' in self.__params['query']:
+            sb_api_query['releases'] = self.__params['query']['releases']
         if 'attributes' in self.__params['query']:
             sb_api_query['attrs'] = self.__params['query']['attributes'].copy()
         if platforms is None:

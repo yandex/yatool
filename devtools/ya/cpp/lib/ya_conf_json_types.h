@@ -28,6 +28,7 @@ namespace NYa::NYaConfJson {
         Y_EDL_MEMBERS(
             ((TString) ResourceType),
             ((TString) Owner),
+            ((TMaybe<TString>) Releases),
             ((TLatestMatchedQueryAttributes) Attributes)
         )
     };
