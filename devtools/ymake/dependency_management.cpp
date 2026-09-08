@@ -1651,7 +1651,7 @@ namespace {
 
         static constexpr const char* NORMAL = "[[imp]]{path}[[rst]]";
         static constexpr const char* SUBMODULE = "[[imp]]{path}@{type}[[rst]]";
-        static constexpr const char* CONFLICT = "[[unimp]]{path} (omitted because of [[c:yellow]]confict with {conflict_resolution}[[unimp]])[[rst]]";
+        static constexpr const char* CONFLICT = "[[unimp]]{path} (omitted because of [[c:yellow]]conflict with {conflict_resolution}[[unimp]])[[rst]]";
         static constexpr const char* MANAGED = "[[imp]]{path}[[unimp]] (replaced from [[c:blue]]{orig}[[unimp]] because of [[c:blue]]DEPENDENCY_MANAGEMENT[[unimp]])[[rst]]";
         static constexpr const char* DUPLICATE = "[[unimp]]{path} (*)[[rst]]";
         static constexpr const char* EXCLUDED = "[[unimp]]{path} (omitted because of [[c:red]]EXCLUDE[[unimp]])[[rst]]";
