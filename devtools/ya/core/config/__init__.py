@@ -27,10 +27,15 @@ def home_dir():
 
         pw_dir = pwd.getpwuid(os.getuid()).pw_dir
         if os.path.isabs(pw_dir):
-            return pw_dir
+            return os.path.realpath(pw_dir)
     except (ImportError, KeyError):
         pass
-    return os.environ.get("HOME", None) or os.path.expanduser("~")  # after or for windows
+
+    home = os.environ.get("HOME", None) or os.path.expanduser("~")  # after or for windows
+    if os.path.isabs(home):
+        return os.path.realpath(home)
+
+    raise RuntimeError("Cannot find home dir")
 
 
 # no caching to make testing possible
