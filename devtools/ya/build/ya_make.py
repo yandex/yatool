@@ -1990,6 +1990,7 @@ class YaMake:
                     display=self.app_ctx.display,
                     output_replacements=self.ctx.output_replacements,
                     sandbox_token=sandbox_token,
+                    result_context=self.ctx,
                 ).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
