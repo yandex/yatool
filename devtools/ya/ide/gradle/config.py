@@ -48,6 +48,7 @@ class _JavaSemConfig(SemConfig):
         if platform_matcher.is_windows():
             raise YaIdeGradleException("Windows is not supported in ya ide gradle")
         self.start_cwd: Path = Path().cwd()
+        self.provided_make_args: list[str] = params.ya_make_extra.copy()
         super().__init__(SemLang.JAVA(), params)
         self.logger = logging.getLogger(type(self).__name__)
         if not self.params.remove:

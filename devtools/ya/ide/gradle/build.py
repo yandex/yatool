@@ -63,20 +63,13 @@ class _Builder:
         import app_ctx
 
         try:
-            if build_all_langs:
-                ya_make_opts = yarg.merge_opts(
-                    build_opts.ya_make_options(build_type='release', free_build_targets=True)
-                )
-                opts = yarg.merge_params(ya_make_opts.initialize([]))
-            else:
-                ya_make_opts = yarg.merge_opts(
-                    build_opts.ya_make_options(build_type='release', free_build_targets=True)
-                )
-                opts = yarg.merge_params(
-                    ya_make_opts.initialize(self.config.params.ya_make_extra + ['-DSOURCES_JAR=yes'])
-                )
+            ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release', free_build_targets=True))
+            extra_args = self.config.provided_make_args
+            if not build_all_langs:
+                extra_args = self.config.params.ya_make_extra + ['-DSOURCES_JAR=yes']
                 if proto_rel_targets:
                     build_rel_targets += proto_rel_targets
+            opts = yarg.merge_params(ya_make_opts.initialize(extra_args))
 
             opts.bld_dir = self.config.params.bld_dir
             opts.arc_root = str(self.config.arcadia_root)
