@@ -634,7 +634,7 @@ def _get_tool_card(tool: tools._XTool, params: Params) -> str:
         " [PARENT]" if is_parent else "",
         (
             " [DEPRECATED: {}]".format(tool_card["deprecation_cause"])
-            if tool_card["tier"] == tools.ToolTier.TOOL_TIER_DEPRECATED
+            if tool_card["tier"] == tools.ToolTier.DEPRECATED
             else ""
         ),
     )
