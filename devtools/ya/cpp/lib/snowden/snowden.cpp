@@ -2,7 +2,9 @@
 #include "snowden_private.h"
 
 #include <devtools/ya/cpp/lib/logger.h>
-#include <devtools/ya/cpp/lib/logger_filter.h>
+
+#include <library/cpp/json/json_value.h>
+#include <library/cpp/json/json_writer.h>
 
 #include <util/generic/yexception.h>
 #include <util/stream/null.h>
@@ -30,6 +32,18 @@ namespace NYa::NSnowden {
     }
 
     namespace NPrivate {
+        TShellCommandOptions BuildPythonEntryPointOptions(bool async) {
+            TShellCommandOptions opts;
+            opts
+                .SetDetachSession(true)
+                .SetAsync(async)
+                .SetUseShell(false)
+                .SetQuoteArguments(true)
+                .SetOutputStream(nullptr)
+                .SetErrorStream(nullptr);
+            return opts;
+        }
+
         TMaybe<int> RunPythonEntryPoint(
             const TString& executable,
             const TString& entryPoint,
@@ -43,14 +57,9 @@ namespace NYa::NSnowden {
             TFileHandle stdinReservation("/dev/null", OpenExisting | RdOnly | CloseOnExec);
             Y_ENSURE(stdinReservation.IsOpen(), "Cannot reserve stdin for Snowden child process");
 #endif
-            TShellCommandOptions opts;
+            TShellCommandOptions opts = BuildPythonEntryPointOptions(async);
             TNullInput nullIn;
-            opts
-                .SetDetachSession(true)
-                .SetAsync(async)
-                .SetInputStream(&nullIn)
-                .SetOutputStream(nullptr)
-                .SetErrorStream(nullptr);
+            opts.SetInputStream(&nullIn);
 
             opts.Environment = NYa::Environ();
             opts.Environment["Y_PYTHON_ENTRY_POINT"] = entryPoint;
@@ -61,6 +70,63 @@ namespace NYa::NSnowden {
                 return Nothing();
             }
             return cmd.GetExitCode();
+        }
+
+        TList<TString> BuildToolHandlerEventArguments(
+            const TVector<TString>& expandedArgs,
+            const TVector<TString>& toolNameParts,
+            const TVector<TString>& toolArgs
+        ) {
+            NJson::TJsonValue prefix{NJson::JSON_ARRAY};
+            prefix.AppendValue("ya");
+            prefix.AppendValue("tool");
+
+            NJson::TJsonValue args{NJson::JSON_ARRAY};
+            for (const auto& arg : ExtractHandlerArguments(expandedArgs, "tool")) {
+                args.AppendValue(arg);
+            }
+
+            NJson::TJsonValue toolName{NJson::JSON_ARRAY};
+            for (const auto& part : toolNameParts) {
+                toolName.AppendValue(part);
+            }
+
+            NJson::TJsonValue handlerToolArgs{NJson::JSON_ARRAY};
+            for (const auto& arg : toolArgs) {
+                handlerToolArgs.AppendValue(arg);
+            }
+
+            NJson::TJsonValue value{NJson::JSON_MAP};
+            value["prefix"] = std::move(prefix);
+            value["args"] = std::move(args);
+            value["handler_source"] = "cpp_dispatch";
+            value["tool_name"] = std::move(toolName);
+            value["tool_args"] = std::move(handlerToolArgs);
+            return {
+                "--key=handler",
+                TString("--value-json=") + NJson::WriteJson(value, false),
+            };
+        }
+
+        TList<TString> BuildToolExecutionEventArguments(
+            const TString& toolName,
+            const TString& toolPath,
+            const TVector<TString>& toolArgs
+        ) {
+            NJson::TJsonValue args{NJson::JSON_ARRAY};
+            for (const auto& arg : toolArgs) {
+                args.AppendValue(arg);
+            }
+
+            NJson::TJsonValue value{NJson::JSON_MAP};
+            value["tool_launch_method"] = "cpp_fast_path";
+            value["tool_name"] = toolName;
+            value["tool_path"] = toolPath;
+            value["extra_args"] = std::move(args);
+            return {
+                "--key=tool_execution",
+                TString("--value-json=") + NJson::WriteJson(value, false),
+            };
         }
     }
 
@@ -99,57 +165,32 @@ namespace NYa::NSnowden {
         return expandedArgs;
     }
 
-    void ReportCppHandlerEvent(
-        const TString& handlerName,
-        const TVector<TString>& expandedArgs
+    void ReportToolHandlerEvent(
+        const TVector<TString>& expandedArgs,
+        const TVector<TString>& toolNameParts,
+        const TVector<TString>& toolArgs
     ) {
         try {
-            if (ReportingDisabled(expandedArgs)) {
-                return;
-            }
-            TVector<TStringBuf> argViews;
-            argViews.reserve(expandedArgs.size());
-            for (const auto& arg : expandedArgs) {
-                argViews.push_back(arg);
-            }
-            const TYaTokenFilter filter(argViews);
-
-            TList<TString> eventArgs = {
-                "--key=handler",
-                "--prefix=ya",
-                TString("--prefix=") + handlerName,
-                "--handler-source=cpp_dispatch",
-            };
-            for (const auto& arg : ExtractHandlerArguments(expandedArgs, handlerName)) {
-                eventArgs.push_back(TString("--arg=") + filter.Sanitize(arg));
-            }
             SpawnPythonEntryPoint(
                 "yalibrary.snowden:push_event_main",
-                eventArgs
+                NPrivate::BuildToolHandlerEventArguments(expandedArgs, toolNameParts, toolArgs)
             );
-            DEBUG_LOG << "[snowden] Handler event push initiated: " << handlerName << "\n";
+            DEBUG_LOG << "[snowden] Handler event push initiated: tool\n";
         } catch (...) {
-            DEBUG_LOG << "[snowden] ReportCppHandlerEvent failed silently\n";
+            DEBUG_LOG << "[snowden] ReportToolHandlerEvent failed silently: " << CurrentExceptionMessage() << "\n";
         }
     }
 
     void ReportToolExecutionEvent(
         const IConfig& /*config*/,
         const TString& toolName,
-        const TString& toolPath
+        const TString& toolPath,
+        const TVector<TString>& toolArgs
     ) {
         try {
-            if (ReportingDisabled({})) {
-                return;
-            }
             SpawnPythonEntryPoint(
                 "yalibrary.snowden:push_event_main",
-                {
-                    "--key",   "tool_execution",
-                    "--field", "tool_launch_method=cpp_fast_path",
-                    "--field", TString("tool_name=") + toolName,
-                    "--field", TString("tool_path=") + toolPath,
-                }
+                NPrivate::BuildToolExecutionEventArguments(toolName, toolPath, toolArgs)
             );
             DEBUG_LOG << "[snowden] ToolExecution event push initiated: " << toolName << "\n";
         } catch (...) {

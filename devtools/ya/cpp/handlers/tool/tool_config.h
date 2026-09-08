@@ -8,6 +8,7 @@
 
 namespace NYa::NTool {
     struct TToolInvocation {
+        TVector<TString> NameParts;
         TString ToolName;
         TVector<TString> ToolOptions;
         NYaConfJson::TYaConf Config;

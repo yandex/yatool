@@ -6,6 +6,7 @@ SRCS(
 
 PEERDIR(
     devtools/ya/cpp/lib
+    library/cpp/json
 )
 
 END()

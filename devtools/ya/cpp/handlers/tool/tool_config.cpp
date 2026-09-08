@@ -236,6 +236,7 @@ namespace NYa::NTool {
 
 
         return {
+            .NameParts = std::move(nameParts),
             .ToolName = toolName,
             .ToolOptions = TVector<TString>{args.begin() + consumed, args.end()},
             .Config = std::move(toolConfig),

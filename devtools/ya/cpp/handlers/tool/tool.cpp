@@ -40,7 +40,13 @@ namespace NYa::NTool {
         }
     }
 
-    void ToolFastPath(const TToolOptions& options) {
+    void ToolFastPath(const TToolOptions& options, const TVector<TStringBuf>& args) {
+        TVector<TString> expandedArgs;
+        expandedArgs.reserve(args.size());
+        for (const auto& arg : args) {
+            expandedArgs.emplace_back(arg);
+        }
+
         const IConfig& config = GetConfig();
         TToolInvocation invocation = LoadToolInvocation(config, options.Args);
         ProcessDoubleDashes(invocation, options.SwallowDoubleDash);
@@ -63,17 +69,34 @@ namespace NYa::NTool {
         if (options.PrintToolChainPath) {
             Cout << tool.ToolChainPath << Endl;
             toolsCache->Lock(tool.ToolChainPath);
+            if (!NSnowden::ReportingDisabled(expandedArgs)) {
+                NSnowden::EnsureDaemon(config);
+                NSnowden::ReportToolHandlerEvent(expandedArgs, invocation.NameParts, invocation.ToolOptions);
+            }
             return;
         }
         if (options.PrintPath) {
             Cout << tool.ToolPath << Endl;
             toolsCache->Lock(tool.ToolChainPath);
+            if (!NSnowden::ReportingDisabled(expandedArgs)) {
+                NSnowden::EnsureDaemon(config);
+                NSnowden::ReportToolHandlerEvent(expandedArgs, invocation.NameParts, invocation.ToolOptions);
+            }
             return;
         }
 
         toolsCache.Destroy();
 
-        NSnowden::ReportToolExecutionEvent(config, invocation.ToolName, tool.ToolPath.GetPath());
+        if (!NSnowden::ReportingDisabled(expandedArgs)) {
+            NSnowden::EnsureDaemon(config);
+            NSnowden::ReportToolHandlerEvent(expandedArgs, invocation.NameParts, invocation.ToolOptions);
+            NSnowden::ReportToolExecutionEvent(
+                config,
+                invocation.ToolName,
+                tool.ToolPath.GetPath(),
+                invocation.ToolOptions
+            );
+        }
 
         ExecTool(config, tool, invocation.ToolOptions);
     }
@@ -83,7 +106,7 @@ namespace NYa::NTool {
             TToolOptions options{};
             try {
                 ParseOptions(options, args);
-                ToolFastPath(options);
+                ToolFastPath(options, args);
             } catch (const yexception& e) {
                 TStringStream err;
                 err << "Tool fast path failed with error: " << e.what() << "\n";

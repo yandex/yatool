@@ -16,14 +16,16 @@ namespace NYa::NSnowden {
         const TString& handlerName
     );
 
-    void ReportCppHandlerEvent(
-        const TString& handlerName,
-        const TVector<TString>& expandedArgs
+    void ReportToolHandlerEvent(
+        const TVector<TString>& expandedArgs,
+        const TVector<TString>& toolNameParts,
+        const TVector<TString>& toolArgs
     );
 
     void ReportToolExecutionEvent(
         const IConfig& config,
         const TString& toolName,
-        const TString& toolPath
+        const TString& toolPath,
+        const TVector<TString>& toolArgs
     );
 } // namespace NYa::NSnowden
