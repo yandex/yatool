@@ -17,6 +17,7 @@ struct TExecContext: TNonCopyable {
     std::shared_ptr<TProgressManager> ProgressManager;
     std::shared_ptr<TModuleStagesStatsManager> ModStatsManager;
     std::shared_ptr<TDiagCtrl> DiagCtrl;
+    unsigned int DisplayCutoff = 4;
 
     TExecContext(
         std::shared_ptr<NCommonDisplay::TLockedStream> lockedStream,

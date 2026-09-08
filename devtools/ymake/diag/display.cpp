@@ -2,6 +2,8 @@
 
 #include "trace.h"
 
+#include <devtools/ymake/context_executor.h>
+
 #include <util/stream/str.h>
 #include <util/stream/file.h>
 #include <util/stream/output.h>
@@ -38,22 +40,34 @@ namespace {
     private:
         TFlusher Flusher;
     };
+} // namespace
+
+void TDisplay::SetCutoff(EConfMsgType value) noexcept {
+    if (auto* context = CurrentContext<TExecContext>) {
+        context->DisplayCutoff = static_cast<unsigned int>(value);
+    } else {
+        FallbackCutoff_.store(value, std::memory_order_relaxed);
+    }
 }
 
-void TDisplay::SetStream(TLockedStream* stream) {
-    this->Stream = stream;
+EConfMsgType TDisplay::GetCutoff() const noexcept {
+    if (const auto* context = CurrentContext<TExecContext>) {
+        return static_cast<EConfMsgType>(context->DisplayCutoff);
+    }
+    return FallbackCutoff_.load(std::memory_order_relaxed);
 }
 
 const TDisplay::TMsgType TDisplay::msgTypesAsString[4] = {
     std::make_pair(TStringBuf("Error"), TStringBuf("bad")),
-    std::make_pair(TStringBuf("Warn"),  TStringBuf("warn")),
-    std::make_pair(TStringBuf("Info"),  TStringBuf("imp")),
-    std::make_pair(TStringBuf("Debug"), TStringBuf("unimp"))
-};
+    std::make_pair(TStringBuf("Warn"), TStringBuf("warn")),
+    std::make_pair(TStringBuf("Info"), TStringBuf("imp")),
+    std::make_pair(TStringBuf("Debug"), TStringBuf("unimp"))};
 
 TStreamMessage TDisplay::PrepareStream(EConfMsgType msgType, TStringBuf sub, TStringBuf path, size_t row, size_t column) {
     static const ui32 pid = GetPID();
 
+    auto* targetStream = LockedStream();
+    const auto cutoff = GetCutoff();
     const auto [type, mod] = msgTypesAsString[static_cast<ui32>(msgType)];
     TString where = ToString(path);
     if (row != 0 && column != 0) {
@@ -66,9 +80,9 @@ TStreamMessage TDisplay::PrepareStream(EConfMsgType msgType, TStringBuf sub, TSt
     }
 
     TStreamMessage stream = new TChildOutputStream(
-        [this, prefix, msgType, type = type, mod = mod, sub, path, row, column, where](const TString& s) {
-            if (this->Stream != nullptr && msgType < Cutoff) {
-                this->Stream->Emit(prefix + s);
+        [prefix, msgType, type = type, mod = mod, sub, path, row, column, where, targetStream, cutoff](const TString& s) {
+            if (msgType < cutoff) {
+                targetStream->Emit(prefix + s);
             }
             NEvent::TDisplayMessage msg;
             msg.SetType(type.data());
@@ -85,10 +99,8 @@ TStreamMessage TDisplay::PrepareStream(EConfMsgType msgType, TStringBuf sub, TSt
             msg.SetPID(pid);
             ConfMsgManager()->ReportConfigureEvent(
                 (msgType == EConfMsgType::Error || msgType == EConfMsgType::Warning) ? ETraceEvent::E : ETraceEvent::D,
-                NYMake::EventToStr(msg)
-            );
-        }
-    );
+                NYMake::EventToStr(msg));
+        });
     return stream;
 }
 

@@ -6,6 +6,8 @@
 #include <util/stream/output.h>
 #include <util/generic/hash.h>
 
+#include <atomic>
+
 using namespace NCommonDisplay;
 
 enum class EConfMsgType {
@@ -18,8 +20,7 @@ enum class EConfMsgType {
 
 class TDisplay : private TNonCopyable {
 private:
-    TLockedStream* Stream;
-    EConfMsgType Cutoff = EConfMsgType::Count;
+    std::atomic<EConfMsgType> FallbackCutoff_ = EConfMsgType::Count;
     using TMsgType = std::pair<TStringBuf, TStringBuf>;
     static const TMsgType msgTypesAsString[4];
 
@@ -27,11 +28,11 @@ public:
     typedef TAutoPtr<IOutputStream> TStreamMessage;
     TStreamMessage NewConfMsg(EConfMsgType type, TStringBuf msg, TStringBuf path = TStringBuf(), size_t row = 0, size_t column = 0);
 
-    void SetStream(TLockedStream* stream = nullptr);
-    void SetCutoff(EConfMsgType val) noexcept {Cutoff = val;}
+    void SetCutoff(EConfMsgType val) noexcept;
 
 private:
     TStreamMessage PrepareStream(EConfMsgType msgType, TStringBuf sub, TStringBuf path, size_t row = 0, size_t column = 0);
+    EConfMsgType GetCutoff() const noexcept;
 };
 
 TDisplay* Display();

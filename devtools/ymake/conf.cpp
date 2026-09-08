@@ -267,13 +267,13 @@ void TBuildConfiguration::PostProcessCacheOptions() {
 }
 
 void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
-    if (!DisableHumanReadableOutput) {
-        Display()->SetStream(LockedStream());
-    }
-    if (WarnLevel) {
+    if (DisableHumanReadableOutput) {
+        Display()->SetCutoff(EConfMsgType::Error);
+    } else if (WarnLevel) {
         auto warnLevel = static_cast<EConfMsgType>(*WarnLevel);
-        if (warnLevel >= EConfMsgType::Error && warnLevel <= EConfMsgType::Count)
+        if (warnLevel >= EConfMsgType::Error && warnLevel <= EConfMsgType::Count) {
             Display()->SetCutoff(warnLevel);
+        }
     }
 
     const auto runStageChekpoint = MakeCheckpoint<THPClock>();
