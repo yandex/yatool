@@ -108,6 +108,7 @@ class AbstractTestSuite(facility.Suite):
         self.preresults = []
         self.flaky = False
         self.uid = None
+        self.self_uid = None
         self.save_old_canondata = False
         self._test_data_map = None
         self._requirements_map = None

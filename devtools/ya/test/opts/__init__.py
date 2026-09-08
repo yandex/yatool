@@ -2099,6 +2099,7 @@ class InterimOptions(devtools.ya.core.yarg.Options):
         self.remove_tos = False
         self.test_fail_exit_code = error.ExitCodes.TEST_FAILED
         self.detect_leaks_in_pytest = True
+        self.enable_test_nodes_self_uid = False
         self.fail_maven_export_with_tests = False
         self.use_jstyle_server = False
         self.setup_pythonpath_env = True
@@ -2173,6 +2174,7 @@ class InterimOptions(devtools.ya.core.yarg.Options):
                 'YA_TEST_FAILURE_CODE', hook=devtools.ya.core.yarg.SetValueHook('test_fail_exit_code')
             ),
             devtools.ya.core.yarg.ConfigConsumer('detect_leaks_in_pytest'),
+            devtools.ya.core.yarg.ConfigConsumer('enable_test_nodes_self_uid'),
             # See DEVTOOLS-9388
             devtools.ya.core.yarg.EnvConsumer(
                 'YA_FAIL_MAVEN_EXPORT_WITH_TESTS',

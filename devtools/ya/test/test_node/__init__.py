@@ -284,15 +284,23 @@ class TestFramer(object):
             # Timeout is not expected to be None - use MAX_TIMEOUT instead of disabling timeout
             suite.set_timeout(MAX_TIMEOUT)
 
-        suite.uid = get_suite_uid(
+        suite.self_uid = get_suite_self_uid(
             suite,
             self.arc_root,
             self.opts,
             self.distbuild_runner,
             out_dir,
         )
+        suite.uid = get_suite_uid(
+            suite,
+            self.opts,
+            self_uid=suite.self_uid,
+        )
         if suite.special_runner == 'yt' and self.opts.run_tagged_tests_on_yt and not suite.is_skipped():
-            suite.uid = "yt-{}".format(suite.uid)
+            suite.uid = f"{suite.special_runner}-{suite.uid}"
+            # Random-UID modes, notably canonization, intentionally have no self UID.
+            if suite.self_uid is not None:
+                suite.self_uid = f"{suite.special_runner}-{suite.self_uid}"
 
         # Skipped and non-skipped suite must provide same uid,
         # that's why all uid-affecting configuration should be done before
@@ -347,6 +355,7 @@ class TestFramer(object):
                 ],
                 'deps': [],
                 'inputs': [SCRIPT_APPEND_FILE],
+                'self_uid': uid,
                 'kv': {'p': 'CP', 'pc': 'light-blue'},
                 'outputs': [output],
                 'priority': 0,
@@ -363,6 +372,22 @@ class TestFramer(object):
             self.context_generator_cache[platform_descriptor] = uid
 
         return self.context_generator_cache[platform_descriptor]
+
+
+def get_test_node_uid(suite, opts, retry=None, split_test_factor=1, split_index=0, split_file=None):
+    if split_test_factor > 1 or retry is not None or suite.fork_test_files_requested(opts):
+        uid_prefix = suite.uid.split("-")[0]
+        return uid_gen.get_test_node_uid([suite.uid, split_index, retry, split_file], uid_prefix)
+    return suite.uid
+
+
+def get_test_node_self_uid(suite, opts, retry=None, split_test_factor=1, split_index=0, split_file=None):
+    if suite.self_uid is None:
+        return None
+    if split_test_factor > 1 or retry is not None or suite.fork_test_files_requested(opts):
+        self_uid_prefix = suite.self_uid.split("-")[0]
+        return uid_gen.get_test_node_uid([suite.self_uid, split_index, retry, split_file], self_uid_prefix)
+    return suite.self_uid
 
 
 def create_test_node(
@@ -914,11 +939,22 @@ def create_test_node(
         inputs |= set(extra_inputs)
         node_cmds = extra_cmds + node_cmds
 
-    if split_test_factor > 1 or retry is not None or suite.fork_test_files_requested(opts):
-        uid_prefix = suite.uid.split("-")[0]
-        uid = uid_gen.get_test_node_uid([suite.uid, split_index, retry, split_file], uid_prefix)
-    else:
-        uid = suite.uid
+    uid = get_test_node_uid(
+        suite,
+        opts,
+        retry=retry,
+        split_test_factor=split_test_factor,
+        split_index=split_index,
+        split_file=split_file,
+    )
+    self_uid = get_test_node_self_uid(
+        suite,
+        opts,
+        retry=retry,
+        split_test_factor=split_test_factor,
+        split_index=split_index,
+        split_file=split_file,
+    )
 
     node = {
         "backup": backup,
@@ -946,6 +982,9 @@ def create_test_node(
 
     if node_timeout:
         node["timeout"] = node_timeout
+
+    if opts.enable_test_nodes_self_uid and node["cache"] and self_uid is not None:
+        node["self_uid"] = self_uid
 
     if node_tag:
         node["tag"] = node_tag
@@ -1310,7 +1349,7 @@ def _build_test_paths_hashes_detail(paths):
     return "\n".join(lines)
 
 
-def get_suite_uid(
+def get_suite_self_uid(
     suite,
     arc_root,
     opts,
@@ -1318,7 +1357,7 @@ def get_suite_uid(
     out_dir,
 ):
     if _need_random_uid(suite, opts):
-        uid = uid_gen.get_random_uid()
+        return None
     else:
         # XXX required redesign
         uid_changing_opts = (
@@ -1339,8 +1378,6 @@ def get_suite_uid(
 
         run_cmd = suite.get_run_cmd(opts, retry=None, for_dist_build=is_for_distbuild)
         active_uid_opts = ["{}={}".format(x, getattr(opts, x)) for x in uid_changing_opts if getattr(opts, x, None)]
-
-        deps = list(suite.get_build_dep_uids())
 
         paths = testdeps.get_test_related_paths(suite, arc_root, opts)
         paths.extend([os.path.join(arc_root, "ya")])
@@ -1371,7 +1408,6 @@ def get_suite_uid(
                 suite.get_fork_mode(),
                 suite.get_split_factor(opts),
             ]
-            + deps
             + sorted(suite._original_requirements.items())
             + affecting_tags
             + [sbr_uid_ext_part]
@@ -1401,12 +1437,12 @@ def get_suite_uid(
         imprint_parts.append(str(suite.fork_test_files_requested(opts)))
         imprint_parts.append(str(suite.get_fork_partition_mode()))
 
-        uid = '-'.join(map(str, [_f for _f in ['test', imprint.combine_imprints(*imprint_parts)] if _f]))
+        self_uid = '-'.join(map(str, [_f for _f in ['test', imprint.combine_imprints(*imprint_parts)] if _f]))
 
         if getattr(opts, 'log_uid_calc', False):
             test_paths_hashes_detail = _build_test_paths_hashes_detail(paths)
             logger.debug(
-                "Suite uid for %s/%s: %s\n"
+                "Suite self uid for %s/%s: %s\n"
                 "  [suite imprint]\n"
                 "    name: %s\n"
                 "    project_path: %s\n"
@@ -1415,7 +1451,6 @@ def get_suite_uid(
                 "    timeout: %s\n"
                 "    fork_mode: %s\n"
                 "    split_factor: %s\n"
-                "    deps: %s\n"
                 "    requirements: %s\n"
                 "    affecting_tags: %s\n"
                 "    sbr_uid_ext: %s\n"
@@ -1436,7 +1471,7 @@ def get_suite_uid(
                 "    fork_partition_mode: %s",
                 suite.project_path,
                 suite.name,
-                uid,
+                self_uid,
                 suite.name,
                 suite.project_path,
                 test_paths_hashes,
@@ -1444,7 +1479,6 @@ def get_suite_uid(
                 suite.timeout,
                 suite.get_fork_mode(),
                 suite.get_split_factor(opts),
-                deps,
                 sorted(suite._original_requirements.items()),
                 affecting_tags,
                 sbr_uid_ext_part,
@@ -1464,6 +1498,33 @@ def get_suite_uid(
                 suite.fork_test_files_requested(opts),
                 suite.get_fork_partition_mode(),
             )
+
+    return self_uid
+
+
+def get_suite_uid(
+    suite,
+    opts,
+    *,
+    self_uid,
+):
+    if _need_random_uid(suite, opts):
+        return uid_gen.get_random_uid()
+
+    assert self_uid is not None, "self_uid is required for a stable suite UID"
+
+    deps = list(suite.get_build_dep_uids())
+    uid = '-'.join(map(str, [_f for _f in ['test', imprint.combine_imprints(self_uid, *deps)] if _f]))
+
+    if getattr(opts, 'log_uid_calc', False):
+        logger.debug(
+            "Suite uid for %s/%s: %s\n" "    self_uid: %s\n" "    deps: %s",
+            suite.project_path,
+            suite.name,
+            uid,
+            self_uid,
+            deps,
+        )
 
     return uid
 
@@ -1504,8 +1565,10 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
     test_uids = [node["uid"] for node in test_nodes]
     if retry is not None:
         uid = suite.uid + "-run{}".format(retry)
+        self_uid = f"{suite.self_uid}-run{retry}" if suite.self_uid is not None else None
     else:
         uid = suite.uid
+        self_uid = suite.self_uid
     out_dir = test_common.get_test_suite_work_dir(
         "$(BUILD_ROOT)",
         suite.project_path,
@@ -1684,6 +1747,9 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         "cmds": cmds,
     }
 
+    if opts.enable_test_nodes_self_uid and node["cache"] and self_uid is not None:
+        node["self_uid"] = self_uid
+
     intermediate_test_nodes(test_nodes)
 
     if opts and getattr(opts, 'clang_coverage', False):
@@ -1707,6 +1773,7 @@ def get_merger_root_path(suites):
 def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_to_remote_store):
     test_uids = [node["uid"] for node in test_nodes]
     uid = suite.uid
+    self_uid = suite.self_uid
     out_dir = suite.work_dir()
 
     node_log_path = os.path.join(out_dir, "results_merge.log")
@@ -1788,6 +1855,9 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_t
         },
         "cmds": [{"cmd_args": cmd, "cwd": "$(BUILD_ROOT)"}],
     }
+
+    if opts.enable_test_nodes_self_uid and node["cache"] and self_uid is not None:
+        node["self_uid"] = self_uid
 
     intermediate_test_nodes(test_nodes)
 
