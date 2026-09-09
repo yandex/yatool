@@ -8,6 +8,7 @@
 
 #include <devtools/ymake/make_plan/make_plan.h>
 
+#include <library/cpp/iterator/enumerate.h>
 #include <library/cpp/on_disk/multi_blob/multiblob_builder.h>
 
 #include <mutex>
@@ -23,11 +24,19 @@
 #include <util/memory/blob.h>
 #include <util/random/random.h>
 #include <util/stream/file.h>
+#include <util/stream/length.h>
 #include <util/string/join.h>
 #include <util/string/split.h>
 #include <variant>
 
 namespace {
+    // The default JSON cache size is approximately 0.5Gb
+    // In order to prevent wasting disk space due to corrupted memory usage.
+    // The upper bound is 32 Gb.
+    constexpr size_t JSON_CACHE_EXTREMELY_MAX_SIZE = (32ULL << 30ULL); // 32Gb
+
+    constexpr ui64 JSON_CACHE_FORMAT_VERSION = 3;
+
     const TStringBuf JOINED_START("[");
     const TStringBuf JOINED_END("]");
     const TStringBuf JOINED_PART_START("\"");
@@ -241,14 +250,17 @@ namespace {
 
 TMd5Sig JsonConfHash(const TBuildConfiguration& conf) {
     auto fakeIdValue = conf.CommandConf.Get1("JSON_CACHE_FAKE_ID");
-    if (fakeIdValue.empty()) {
-        return conf.YmakeConfWoRulesMD5;
-    }
-    TMd5Sig fakeIdMd5Sig;
+    TMd5Sig result;
     MD5 md5;
-    md5.Update(fakeIdValue);
-    md5.Final(fakeIdMd5Sig.RawData);
-    return fakeIdMd5Sig;
+    if (fakeIdValue.empty()) {
+        md5.Update(TStringBuf(reinterpret_cast<const char*>(conf.YmakeConfWoRulesMD5.RawData), sizeof(conf.YmakeConfWoRulesMD5.RawData)));
+    } else {
+        md5.Update(fakeIdValue);
+    }
+    md5.Update("ymake-json-cache-format:");
+    md5.Update(ToString(JSON_CACHE_FORMAT_VERSION));
+    md5.Final(result.RawData);
+    return result;
 }
 
 TMakeNodeSavedState::TMakeNodeSavedState(const TMakeNode& node, const TStringBuf& nodeName, const TStringBuf& nodeCacheUid, const TStringBuf& nodeRenderId, const TBuildConfiguration& conf, NCache::TConversionContext& context) {
@@ -448,6 +460,174 @@ void TMakeNodeCached::WriteTaredOutputsArr(TJsonWriterFuncArgs&& funcArgs) const
     }
 }
 
+namespace {
+    constexpr ui64 LAZY_NODES_MAGIC = 0x594d4a534e4f4445ULL; // "YMJSNODE"
+
+    struct TLazyNodeRecord {
+        NCache::TCached CacheUid;
+        NCache::TCached InvalidationId;
+        NCache::TCached PartialMatchId;
+        ui8 StrictInputs;
+
+        ui64 Offset;
+        ui64 Size;
+
+        Y_SAVELOAD_DEFINE(CacheUid, InvalidationId, PartialMatchId, StrictInputs, Offset, Size);
+    };
+
+    template <typename T>
+    size_t SerializedSize(const T& value) {
+        TNullOutput nullOutput;
+        TCountingOutput countingOutput(&nullOutput);
+        ::Save(&countingOutput, value);
+        Y_ENSURE(countingOutput.Counter() <= JSON_CACHE_EXTREMELY_MAX_SIZE, "JSON cache value is too large to serialize");
+        return static_cast<size_t>(countingOutput.Counter());
+    }
+}
+
+class TLazyMakePlanNodes {
+public:
+    class TRecordsRange {
+    public:
+        class TConstIterator {
+        public:
+            using iterator_category = std::input_iterator_tag;
+            using value_type = TLazyNodeRecord;
+            using difference_type = std::ptrdiff_t;
+            using pointer = const TLazyNodeRecord*;
+            using reference = const TLazyNodeRecord&;
+
+            reference operator*() const {
+                if (!Loaded_) {
+                    Current_ = Owner_->ReadRecord(Index_);
+                    Loaded_ = true;
+                }
+                return Current_;
+            }
+
+            pointer operator->() const {
+                return &operator*();
+            }
+
+            TConstIterator& operator++() {
+                ++Index_;
+                Loaded_ = false;
+                return *this;
+            }
+
+            TConstIterator operator++(int) {
+                auto result = *this;
+                ++*this;
+                return result;
+            }
+
+            bool operator==(const TConstIterator& other) const {
+                return Owner_ == other.Owner_ && Index_ == other.Index_;
+            }
+
+            bool operator!=(const TConstIterator& other) const {
+                return !(*this == other);
+            }
+
+        private:
+            friend class TRecordsRange;
+
+            TConstIterator(const TLazyMakePlanNodes* owner, size_t index)
+                : Owner_(owner)
+                , Index_(index)
+            {
+            }
+
+            const TLazyMakePlanNodes* Owner_;
+            size_t Index_;
+            mutable TLazyNodeRecord Current_{};
+            mutable bool Loaded_ = false;
+        };
+
+        TConstIterator begin() const {
+            return {Owner_, 0};
+        }
+
+        TConstIterator end() const {
+            return {Owner_, Owner_->Size()};
+        }
+
+    private:
+        friend class TLazyMakePlanNodes;
+
+        explicit TRecordsRange(const TLazyMakePlanNodes* owner)
+            : Owner_(owner)
+        {
+        }
+
+        const TLazyMakePlanNodes* Owner_;
+    };
+
+    TLazyMakePlanNodes(TBlob index, TBlob payload)
+        : Index_(std::move(index))
+        , Payload_(std::move(payload))
+    {
+        TMemoryInput input(Index_.Data(), Index_.Size());
+        ui64 magic;
+        ::Load(&input, magic);
+        Y_ENSURE(magic == LAZY_NODES_MAGIC, "Unsupported JSON cache nodes format");
+        ui64 version;
+        ::Load(&input, version);
+        Y_ENSURE(version == JSON_CACHE_FORMAT_VERSION, "Unsupported JSON cache nodes format");
+
+        Count_ = ::LoadSize(&input);
+        RecordsOffset_ = Index_.Size() - input.Avail();
+        RecordSize_ = SerializedSize(TLazyNodeRecord{});
+        Y_ENSURE(input.Avail() % RecordSize_ == 0 && Count_ == input.Avail() / RecordSize_, "Invalid JSON cache nodes index size");
+    }
+
+    size_t Size() const {
+        return Count_;
+    }
+
+    TRecordsRange Records() const {
+        return TRecordsRange(this);
+    }
+
+    TLazyNodeRecord Record(ui64 index) const {
+        Y_ASSERT(index < Count_);
+        return ReadRecord(static_cast<size_t>(index));
+    }
+
+    TStringBuf Payload(const TLazyNodeRecord& record) const {
+        Y_ENSURE(record.Offset <= Payload_.Size() && record.Size <= Payload_.Size() - record.Offset, "Invalid JSON cache node payload range");
+        return TStringBuf(Payload_.AsCharPtr() + record.Offset, record.Size);
+    }
+
+    void Load(ui64 index, TMakeNodeSavedState& result) const {
+        const auto record = Record(index);
+        const auto payload = Payload(record);
+        TMemoryInput input(payload.data(), payload.size());
+        ::Load(&input, result);
+        Y_ENSURE(input.Exhausted(), "Trailing data in JSON cache node payload");
+        Y_ENSURE(
+            result.CachedNode.Uid == record.CacheUid &&
+            result.InvalidationId == record.InvalidationId &&
+            result.PartialMatchId == record.PartialMatchId &&
+            static_cast<ui8>(result.StrictInputs) == record.StrictInputs,
+            "JSON cache node metadata differs between index and payload");
+    }
+
+private:
+    TLazyNodeRecord ReadRecord(size_t index) const {
+        TLazyNodeRecord record;
+        TMemoryInput input(Index_.AsCharPtr() + RecordsOffset_ + index * RecordSize_, RecordSize_);
+        ::Load(&input, record);
+        return record;
+    }
+
+    TBlob Index_;
+    TBlob Payload_;
+    size_t Count_ = 0;
+    size_t RecordsOffset_ = 0;
+    size_t RecordSize_ = 0;
+};
+
 bool TMakeNodeSavedState::TCacheId::operator==(const TMakeNodeSavedState::TCacheId& rhs) const {
     return std::tie(Id, StrictInputs) == std::tie(rhs.Id, rhs.StrictInputs);
 }
@@ -479,15 +659,17 @@ bool TMakePlanCache::LoadFromFile() {
     NYMake::TTraceStageWithTimer stage{"Load JSON cache", MON_NAME(EYmakeStats::JSONCacheLoadTime)};
 
     TCacheFileReader cacheReader(Conf, false, false, JsonConfHash);
-    auto readResult = cacheReader.Read(CachePath);
+    const auto readMode = SaveToCache ? TCacheFileReader::EFileReadMode::Copy : TCacheFileReader::EFileReadMode::Mmap;
+    auto readResult = cacheReader.Read(CachePath, readMode);
     if (readResult != TCacheFileReader::EReadResult::Success) {
         TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedJSONCache, readResult);
         return false;
     }
 
     TBlob& names = cacheReader.GetNextBlob();
-    TBlob& nodes = cacheReader.GetNextBlob();
-    Load(names, nodes);
+    TBlob& nodesIndex = cacheReader.GetNextBlob();
+    TBlob& nodesPayload = cacheReader.GetNextBlob();
+    Load(names, nodesIndex, nodesPayload);
 
     YDebug() << "Json cache has been loaded..." << Endl;
     return true;
@@ -512,8 +694,8 @@ bool TMakePlanCache::RestoreByCacheUid(const TStringBuf& uid, TMakeNode* result)
     return RestoreNode(uid, false, result);
 }
 
-const TMakeNodeSavedState* TMakePlanCache::GetCachedNodeByCacheUid(const TStringBuf& uid) {
-    return GetCachedNode(uid, false);
+bool TMakePlanCache::GetCachedNodeByCacheUid(const TStringBuf& uid, TMakeNodeSavedState& result) {
+    return GetCachedNode(uid, false, result);
 }
 
 NCache::TConversionContext& TMakePlanCache::GetConversionContext(const TMakeNode* refreshedMakeNode) {
@@ -531,13 +713,13 @@ bool TMakePlanCache::RestoreByRenderId(const TStringBuf& renderId, TMakeNode* re
     return RestoreNode(renderId, true, result);
 }
 
-const TMakeNodeSavedState* TMakePlanCache::GetCachedNode(const TStringBuf& id, bool partialMatch) {
+bool TMakePlanCache::GetCachedNode(const TStringBuf& id, bool partialMatch, TMakeNodeSavedState& result) {
     Stats.Inc(partialMatch ? NStats::EJsonCacheStats::PartialMatchRequests : NStats::EJsonCacheStats::FullMatchRequests);
     TMakeNodeSavedState::TCacheId cacheId;
     {
         auto lock = LockContextIfNeeded();
         if (!ConversionContext_->GetNames().Has(id)) {
-            return nullptr;
+            return false;
         }
         ConversionContext_->Convert(id, cacheId.Id);
     }
@@ -545,18 +727,38 @@ const TMakeNodeSavedState* TMakePlanCache::GetCachedNode(const TStringBuf& id, b
     const auto& matchMap = partialMatch ? PartialMatchMap : FullMatchMap;
     auto restoredIt = matchMap.find(cacheId);
     if (restoredIt == matchMap.end()) {
-        return nullptr;
+        return false;
+    }
+
+    const ui64 restoredIndex = restoredIt->second;
+    {
+        auto lock = LockContextIfNeeded();
+        if (FailedRestoredNodes.contains(restoredIndex)) {
+            return false;
+        }
+    }
+
+    try {
+        RestoredNodes->Load(restoredIndex, result);
+    } catch (const std::exception& error) {
+        {
+            auto lock = LockContextIfNeeded();
+            FailedRestoredNodes.insert(restoredIndex);
+        }
+        YWarn() << "Cannot restore a lazy JSON cache node, rendering it again: " << error.what() << Endl;
+        return false;
     }
     Stats.Inc(partialMatch ? NStats::EJsonCacheStats::PartialMatchSuccess : NStats::EJsonCacheStats::FullMatchSuccess);
-    return &restoredIt->second.get();
+    return true;
 }
 
 bool TMakePlanCache::RestoreNode(const TStringBuf& id, bool partialMatch, TMakeNode* result) {
-    const auto* cachedNode = GetCachedNode(id, partialMatch);
-    if (!cachedNode) {
+    TMakeNodeSavedState cachedNode;
+    if (!GetCachedNode(id, partialMatch, cachedNode)) {
         return false;
     }
-    cachedNode->Restore(*ConversionContext_, result);
+    auto lock = LockContextIfNeeded();
+    cachedNode.Restore(*ConversionContext_, result);
     return true;
 }
 
@@ -585,8 +787,8 @@ void TMakePlanCache::LoadFromContext(const TString& context) {
 
     auto blob = TBlob::FromString(context);
     TSubBlobs blobs(blob);
-    Y_ENSURE(blobs.size() == 2);
-    Load(blobs[0], blobs[1]);
+    Y_ENSURE(blobs.size() == 3);
+    Load(blobs[0], blobs[1], blobs[2]);
 }
 
 TString TMakePlanCache::SaveToContext() {
@@ -605,24 +807,22 @@ TString TMakePlanCache::SaveToContext() {
     return context;
 }
 
-void TMakePlanCache::Load(TBlob& namesBlob, TBlob& nodesBlob) {
+void TMakePlanCache::Load(TBlob& namesBlob, TBlob& nodesIndexBlob, TBlob& nodesPayloadBlob) {
     FullMatchMap.clear();
     PartialMatchMap.clear();
+    FailedRestoredNodes.clear();
 
     Stats.Set(NStats::EJsonCacheStats::AddedItems, 0);
     AddedNodes.clear();
 
     Names.Load(namesBlob);
 
-    RestoredNodes.clear();
-    TMemoryInput nodes(nodesBlob.Data(), nodesBlob.Length());
-    RestoredNodes.resize(::LoadSize(&nodes));
-    ::LoadRange(&nodes, RestoredNodes.begin(), RestoredNodes.end());
-    Stats.Set(NStats::EJsonCacheStats::LoadedItems, RestoredNodes.size());
+    RestoredNodes = MakeHolder<TLazyMakePlanNodes>(nodesIndexBlob, nodesPayloadBlob);
+    Stats.Set(NStats::EJsonCacheStats::LoadedItems, RestoredNodes->Size());
 
-    for (TMakeNodeSavedState& node : RestoredNodes) {
-        FullMatchMap.emplace(TMakeNodeSavedState::TCacheId{node.CachedNode.Uid, node.StrictInputs}, std::reference_wrapper<TMakeNodeSavedState>(node));
-        PartialMatchMap.emplace(TMakeNodeSavedState::TCacheId{node.PartialMatchId, node.StrictInputs}, std::reference_wrapper<TMakeNodeSavedState>(node));
+    for (const auto [index, node] : Enumerate(RestoredNodes->Records())) {
+        FullMatchMap.emplace(TMakeNodeSavedState::TCacheId{node.CacheUid, node.StrictInputs != 0}, index);
+        PartialMatchMap.emplace(TMakeNodeSavedState::TCacheId{node.PartialMatchId, node.StrictInputs != 0}, index);
     }
 
     Stats.Set(NStats::EJsonCacheStats::FullMatchLoadedItems, FullMatchMap.size());
@@ -636,28 +836,80 @@ void TMakePlanCache::Save(TMultiBlobBuilder& builder) {
         updatedNodes.insert({added.InvalidationId, added.StrictInputs});
     }
 
-    EraseIf(RestoredNodes, [&updatedNodes](const TMakeNodeSavedState& state) {
-        return updatedNodes.contains(TMakeNodeSavedState::TCacheId{state.InvalidationId, state.StrictInputs});
-    });
+    const auto shouldKeep = [this, &updatedNodes](size_t index, const TLazyNodeRecord& record) {
+        return !FailedRestoredNodes.contains(index) &&
+               !updatedNodes.contains(TMakeNodeSavedState::TCacheId{record.InvalidationId, record.StrictInputs != 0});
+    };
+
+    size_t oldItems = 0;
+    if (RestoredNodes) {
+        for (const auto [index, record] : Enumerate(RestoredNodes->Records())) {
+            if (!shouldKeep(index, record)) {
+                continue;
+            }
+            try {
+                RestoredNodes->Payload(record);
+                ++oldItems;
+            } catch (const std::exception& error) {
+                FailedRestoredNodes.insert(index);
+                YWarn() << "Cannot retain a lazy JSON cache node, dropping it: " << error.what() << Endl;
+            }
+        }
+    }
+    const size_t totalItems = oldItems + AddedNodes.size();
 
     auto* namesBuilder = new TMultiBlobBuilder();
     Names.Save(*namesBuilder);
     builder.AddBlob(namesBuilder);
 
-    TString nodes;
+    TString index;
+    TString payload;
     {
-        TStringOutput nodesOutput(nodes);
-        size_t totalSize = RestoredNodes.size() + AddedNodes.size();
-        ::SaveSize(&nodesOutput, totalSize);
-        ::SaveRange(&nodesOutput, RestoredNodes.begin(), RestoredNodes.end());
-        ::SaveRange(&nodesOutput, AddedNodes.begin(), AddedNodes.end());
-        Stats.Set(NStats::EJsonCacheStats::OldItemsSaved, RestoredNodes.size());
-        Stats.Set(NStats::EJsonCacheStats::NewItemsSaved, AddedNodes.size());
-        Stats.Set(NStats::EJsonCacheStats::TotalItemsSaved, totalSize);
-        nodesOutput.Finish();
-    }
+        TStringOutput indexOutput(index);
+        TStringOutput payloadStream(payload);
+        TCountingOutput payloadOutput(&payloadStream);
+        ::Save(&indexOutput, LAZY_NODES_MAGIC);
+        ::Save(&indexOutput, JSON_CACHE_FORMAT_VERSION);
+        ::SaveSize(&indexOutput, totalItems);
 
-    builder.AddBlob(new TBlobSaverMemory(TBlob::Copy(nodes.data(), nodes.size())));
+        if (RestoredNodes) {
+            for (const auto [recordIndex, sourceRecord] : Enumerate(RestoredNodes->Records())) {
+                if (!shouldKeep(recordIndex, sourceRecord)) {
+                    continue;
+                }
+
+                const auto sourcePayload = RestoredNodes->Payload(sourceRecord);
+                auto record = sourceRecord;
+                record.Offset = payloadOutput.Counter();
+                payloadOutput.Write(sourcePayload.data(), sourcePayload.size());
+                ::Save(&indexOutput, record);
+            }
+        }
+
+        for (const auto& added : AddedNodes) {
+            const ui64 nodeOffset = payloadOutput.Counter();
+            ::Save(&payloadOutput, added);
+            ::Save(&indexOutput, TLazyNodeRecord{
+                added.CachedNode.Uid,
+                added.InvalidationId,
+                added.PartialMatchId,
+                static_cast<ui8>(added.StrictInputs),
+                nodeOffset,
+                payloadOutput.Counter() - nodeOffset,
+            });
+        }
+
+        payloadStream.Finish();
+        indexOutput.Finish();
+    }
+    Y_ENSURE(index.size() <= JSON_CACHE_EXTREMELY_MAX_SIZE, "JSON cache node index is too large to serialize");
+    Y_ENSURE(payload.size() <= JSON_CACHE_EXTREMELY_MAX_SIZE, "JSON cache node payload is too large to serialize");
+    builder.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(std::move(index))));
+    builder.AddBlob(new TBlobSaverMemory(TBlob::FromStringSingleThreaded(std::move(payload))));
+
+    Stats.Set(NStats::EJsonCacheStats::OldItemsSaved, oldItems);
+    Stats.Set(NStats::EJsonCacheStats::NewItemsSaved, AddedNodes.size());
+    Stats.Set(NStats::EJsonCacheStats::TotalItemsSaved, totalItems);
 }
 
 TString TMakePlanCache::GetStatistics() const {

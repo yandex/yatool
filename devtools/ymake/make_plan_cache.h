@@ -21,6 +21,7 @@ class TJSONVisitor;
 class TYMake;
 class TBlob;
 class TMultiBlobBuilder;
+class TLazyMakePlanNodes;
 
 namespace NCache {
     using TCached = ui32;
@@ -136,6 +137,7 @@ public:
 
 public:
     friend class TMakePlanCache;
+    friend class TLazyMakePlanNodes;
 };
 
 template <>
@@ -149,7 +151,7 @@ TMd5Sig JsonConfHash(const TBuildConfiguration& conf);
 
 class TMakePlanCache {
 private:
-    using TRestoredNodesMap = THashMap<TMakeNodeSavedState::TCacheId, std::reference_wrapper<TMakeNodeSavedState>>;
+    using TRestoredNodesMap = THashMap<TMakeNodeSavedState::TCacheId, ui64>;
 
     const TBuildConfiguration& Conf;
 
@@ -160,12 +162,13 @@ private:
 
     TNameStore Names;
 
-    TDeque<TMakeNodeSavedState> RestoredNodes;
+    THolder<TLazyMakePlanNodes> RestoredNodes;
     TDeque<TMakeNodeSavedState> AddedNodes;
 
     TRestoredNodesMap FullMatchMap;
     // TODO: Remove after switching to new UIDs implementation.
     TRestoredNodesMap PartialMatchMap;
+    THashSet<ui64> FailedRestoredNodes;
 
     THolder<NCache::TConversionContext> ConversionContext_;
 
@@ -176,7 +179,7 @@ public:
     ~TMakePlanCache();
 
     bool RestoreByCacheUid(const TStringBuf& uid, TMakeNode* result);
-    const TMakeNodeSavedState* GetCachedNodeByCacheUid(const TStringBuf& uid);
+    bool GetCachedNodeByCacheUid(const TStringBuf& uid, TMakeNodeSavedState& result);
     NCache::TConversionContext& GetConversionContext(const TMakeNode* refreshedMakeNode = nullptr);
     NCache::TConversionContext GetConstConversionContext(const TMakeNode* refreshedMakeNode = nullptr);
 
@@ -202,9 +205,9 @@ public:
     NStats::TJsonCacheStats Stats{"JSON cache stats"};
 
 private:
-    const TMakeNodeSavedState* GetCachedNode(const TStringBuf& id, bool partialMatch);
+    bool GetCachedNode(const TStringBuf& id, bool partialMatch, TMakeNodeSavedState& result);
     bool RestoreNode(const TStringBuf& id, bool partialMatch, TMakeNode* result);
 
-    void Load(TBlob& namesBlob, TBlob& nodesBlob);
+    void Load(TBlob& namesBlob, TBlob& nodesIndexBlob, TBlob& nodesPayloadBlob);
     void Save(TMultiBlobBuilder& builder);
 };

@@ -41,6 +41,11 @@ public:
     };
     using enum EReadResult;
 
+    enum class EFileReadMode {
+        Copy,
+        Mmap,
+    };
+
     enum ERejectCacheReason: ui64 {
         ERCR_Unknown            = 0,
         ERCR_ManualDisabled     = 1, // cache load manual disabled
@@ -52,7 +57,7 @@ public:
 
     TCacheFileReader(const TBuildConfiguration& conf, bool forceLoad, bool useExtraConf, TConfHash confHash = DefaultConfHash, TConfHash extraConf = ExtraConfHash);
 
-    EReadResult Read(const TFsPath& file);
+    EReadResult Read(const TFsPath& file, EFileReadMode mode = EFileReadMode::Copy);
 
     bool HasNextBlob() const;
     TBlob& GetNextBlob();

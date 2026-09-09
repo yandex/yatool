@@ -334,13 +334,15 @@ namespace {
 
         const auto cacheUid = renderer.CalculateCacheUid();
         {
-            const auto* cachedNode = cache.GetCachedNodeByCacheUid(cacheUid);
-            BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, static_cast<bool>(cachedNode));
-            if (cachedNode) {
+            TMakeNodeSavedState cachedNode;
+            const bool cacheHit = cache.GetCachedNodeByCacheUid(cacheUid, cachedNode);
+            BINARY_LOG(UIDs, NExportJson::TCacheSearch, yMake.Graph, nodeId, EDebugUidType::Cache, cacheUid, cacheHit);
+            if (cacheHit) {
                 cache.Stats.Inc(NStats::EJsonCacheStats::NoRendered);
+                auto lock = cache.LockContextIfNeeded();
                 auto context = cache.GetConstConversionContext(&node);
-                renderer.RefreshEmptyMakeNode(node, *cachedNode, context);
-                jsonWriter.WriteArrayValue(nodesArr, *cachedNode, &context);
+                renderer.RefreshEmptyMakeNode(node, cachedNode, context);
+                jsonWriter.WriteArrayValue(nodesArr, cachedNode, &context);
                 return;
             }
         }

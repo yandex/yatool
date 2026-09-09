@@ -454,8 +454,8 @@ TCacheFileReader::TCacheFileReader(const TBuildConfiguration& conf, bool forceLo
 {
 }
 
-TCacheFileReader::EReadResult TCacheFileReader::Read(const TFsPath& path) {
-    auto blob = TBlob::FromFileContent(path);
+TCacheFileReader::EReadResult TCacheFileReader::Read(const TFsPath& path, EFileReadMode mode) {
+    auto blob = mode == EFileReadMode::Mmap ? TBlob::FromFile(path) : TBlob::FromFileContent(path);
 
     try {
         SubBlobs.Reset(new TSubBlobs(blob));
