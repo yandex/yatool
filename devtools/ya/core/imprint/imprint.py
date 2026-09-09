@@ -13,6 +13,8 @@ from devtools.ya.core.config import misc_root, find_root
 from .base import SimpleMapper, BaseCache, BaseFileCache
 from .change_list import ChangeList
 
+_scandir = getattr(os, "scandir", None)
+
 
 class ArcPath:
     strong_mode = False
@@ -291,6 +293,37 @@ class Imprint:
             if yield_dirs:
                 yield abs_path
 
+            if _scandir is not None:
+                pending = [abs_path]
+                while pending:
+                    root = pending.pop()
+                    dirs, files = [], []
+                    try:
+                        # Child stat calls used to skip readable directories without search permission.
+                        os.stat(os.path.join(root, "."))
+                        with _scandir(root) as entries:
+                            for entry in entries:
+                                try:
+                                    if entry.is_dir(follow_symlinks=False):
+                                        if entry.name not in self._excluded_dirs:
+                                            dirs.append(entry.path)
+                                    elif not entry.name.endswith('.pyc') and entry.is_file(follow_symlinks=False):
+                                        files.append(entry.path)
+                                except OSError:
+                                    continue
+                    except OSError:
+                        continue
+
+                    if yield_dirs:
+                        for path in dirs:
+                            yield path
+                    for path in files:
+                        yield path
+                    if do_recursively:
+                        pending.extend(reversed(dirs))
+                return
+
+            # Python 2 has no os.scandir; keep the existing traversal there.
             for root, dirs, files in os2.fastwalk(abs_path):
                 for d in [p for p in dirs if not self._is_build_dir(os.path.join(root, p))]:
                     dirs.remove(d)
