@@ -154,6 +154,7 @@ class ArcInfo(VCSData):
             revision_info = cls._get_last_svn_revision(vcs_root)
         else:
             revision_info = get_default_revision_info()
+            revision_info.dirty = cls._get_arc_status_dirty(vcs_root, timeout=timeout)
         logger.debug('Arc info: %s, %s', arc_json_out, str(revision_info))
 
         return cls.from_revision_info(arc_info_string=arc_json_out, revision_info=revision_info)
@@ -223,6 +224,33 @@ class ArcInfo(VCSData):
         cls._arc_info_cache[key] = arc_json_out
 
         return arc_json_out
+
+    @classmethod
+    def _get_arc_status_dirty(cls, arc_root: str, *, timeout: int | None = None) -> bool:
+        env = os.environ.copy()
+        env['TZ'] = ''
+        status_args = [
+            'status',
+            '--json',
+            '-u',
+            'all',
+            '--no-ahead-behind',
+            '--no-sync-status',
+            '--no-bisect-status',
+        ]
+        try:
+            status_json_out = cls._execute_command(status_args, env=env, cwd=arc_root, timeout=timeout)
+            return cls._parse_arc_status_dirty(status_json_out)
+        except Exception:
+            logger.debug('Failed to get arc working copy status; assuming dirty', exc_info=True)
+            return True
+
+    @staticmethod
+    def _parse_arc_status_dirty(status_json_out: str) -> bool:
+        status = json.loads(status_json_out).get('status')
+        if not isinstance(status, dict):
+            raise ValueError('Unexpected arc status JSON')
+        return any(status.values())
 
     @classmethod
     def _get_last_svn_revision(cls, arc_root: str) -> ArcRevisionInfo:
