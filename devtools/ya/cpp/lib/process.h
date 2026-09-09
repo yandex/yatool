@@ -6,6 +6,6 @@
 #include <util/folder/path.h>
 
 namespace NYa {
-    using TExecve = std::function<void(TFsPath bin, TVector<TString> args, const THashMap<TString, TString>& env, const TFsPath& cwd)>;
-    void Execve(TFsPath bin, TVector<TString> args, const THashMap<TString, TString>& env, const TFsPath& cwd);
+    using TExecve = std::function<void(const TFsPath& bin, const TVector<TString>& args, const THashMap<TString, TString>& env, const TFsPath& cwd)>;
+    void Execve(const TFsPath& bin, const TVector<TString>& args, const THashMap<TString, TString>& env, const TFsPath& cwd);
 }

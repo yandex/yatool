@@ -219,12 +219,16 @@ namespace NYa {
             }
 
             int ToolCacheVersionImpl() {
+#ifdef _win32_
+                return 3;  // ya-tc is not supported on Windows
+#else
                 TString userName = GetUsername();
                 bool robotEnv = userName.Contains("sandbox") || userName.Contains("teamcity");
                 if (ArcadiaRoot() && !robotEnv && IsTrue(GetEnv("YA_TC", "1"))) {
                     return 4;
                 }
                 return 3;
+#endif
             }
 
             TFsPath ToolRootImpl() {
