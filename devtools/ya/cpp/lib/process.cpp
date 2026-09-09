@@ -18,7 +18,10 @@ namespace NYa {
         // Use explicit process starting
         auto opts = TShellCommandOptions()
             .SetUseShell(false)
-            .SetQuoteArguments(true);
+            .SetQuoteArguments(true)
+            .SetInputStream(nullptr)
+            .SetInheritOutput(true)
+            .SetInheritError(true);
         opts.Environment = env;
 
         TShellCommand cmd(bin.GetPath(), TList<TString>{args.begin(), args.end()}, opts, cwd);
