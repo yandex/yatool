@@ -138,7 +138,9 @@ namespace {
         }
     }
 
-    TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
+    // Keep catch handlers out of the coroutine frame: this boundary avoids
+    // observed exception-handler crashes in optimized Windows builds (YMAKE-2292).
+    Y_NO_INLINE TMaybe<EBuildResult> InitConf(const TVector<const char*>& value, TBuildConfiguration& conf, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
         try {
             TOpts opts;
             opts.ArgPermutation_ = REQUIRE_ORDER;
