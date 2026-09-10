@@ -439,34 +439,36 @@ def create_iml(path, by_path, project_root, ctx):
                 if os.path.islink(abs_path):
                     if not any(i for i in candidates if candidate.startswith(i)):
                         candidates.add(candidate)
-        exclude_dirs += list(sorted(candidates))
+        exclude_dirs += sorted(candidates.difference(exclude_dirs))
 
     contains_test = False
     for cr in sorted(m.contents, key=lambda x: x.path.replace(PROJECT_DIR, ctx.opts.arc_root).replace('\\', '/')):
-        if path2.path_startswith(cr.path, PROJECT_DIR):
+        content_path = cr.path
+        if path2.path_startswith(content_path, PROJECT_DIR):
             if ctx.opts.iml_in_project_root:
-                cr.path = op.join(MODULE_DIR, op.relpath(cr.path, op.join(PROJECT_DIR, path)))
+                content_path = op.join(MODULE_DIR, op.relpath(content_path, op.join(PROJECT_DIR, path)))
             else:
-                cr.path = cr.path.replace(PROJECT_DIR, project_root)
+                content_path = content_path.replace(PROJECT_DIR, project_root)
         elif ctx.opts.iml_in_project_root and ctx.opts.iml_keep_relative_paths:
-            cr.path = op.join(MODULE_DIR, op.relpath(cr.path, os.path.dirname(os.path.abspath(iml_path))))
+            content_path = op.join(MODULE_DIR, op.relpath(content_path, os.path.dirname(os.path.abspath(iml_path))))
 
-        cont = et.SubElement(c, 'content', attrib={'url': 'file://' + fix_windows(cr.path)})
+        cont = et.SubElement(c, 'content', attrib={'url': 'file://' + fix_windows(content_path)})
 
         for exc in exclude_dirs:
             if ctx.opts.iml_in_project_root:
-                exc_path = op.normpath(op.join(cr.path, exc))
+                # Normalize only after IDEA expands $MODULE_DIR$, otherwise '..' removes the macro.
+                exc_path = op.join(content_path, exc)
             else:
-                exc_path = os.path.join(cr.path, exc).replace(PROJECT_DIR, project_root)
+                exc_path = os.path.join(content_path, exc).replace(PROJECT_DIR, project_root)
             et.SubElement(cont, 'excludeFolder').attrib = {'url': 'file://' + fix_windows(exc_path)}
 
         for res in resource_dirs:
             if ctx.opts.iml_in_project_root and ctx.opts.iml_keep_relative_paths:
-                res_path = op.join(cr.path, res)
+                res_path = op.join(content_path, res)
             elif ctx.opts.iml_in_project_root:
-                res_path = op.join(MODULE_DIR, op.relpath(cr.path, os.path.join(project_root, path)), res)
+                res_path = op.join(MODULE_DIR, op.relpath(content_path, os.path.join(project_root, path)), res)
             else:
-                res_path = os.path.join(cr.path, res).replace(PROJECT_DIR, project_root)
+                res_path = os.path.join(content_path, res).replace(PROJECT_DIR, project_root)
             attrib = collections.OrderedDict()
             attrib['url'] = 'file://' + fix_windows(res_path)
             attrib['type'] = 'java-resource'
@@ -479,28 +481,21 @@ def create_iml(path, by_path, project_root, ctx):
             if root.is_test:
                 contains_test = True
 
-            if path2.path_startswith(root.path, PROJECT_DIR):
-                if ctx.opts.iml_in_project_root and ctx.opts.iml_keep_relative_paths and root.generated:
-                    relpath_temp = os.path.relpath(root.path, PROJECT_DIR)
-                    root.path = op.join(
-                        MODULE_DIR, op.relpath('.', os.path.join('.', os.path.dirname(relpath_temp))), relpath_temp
-                    )
-                    cont.attrib['url'] = 'file://' + fix_windows(root.path)
-                elif ctx.opts.iml_in_project_root:
-                    root.path = op.join(MODULE_DIR, op.relpath(root.path, op.join(PROJECT_DIR, path)))
+            root_path = root.path
+            if path2.path_startswith(root_path, PROJECT_DIR):
+                if ctx.opts.iml_in_project_root:
+                    root_path = op.join(MODULE_DIR, op.relpath(root_path, op.join(PROJECT_DIR, path)))
                 else:
-                    root.path = root.path.replace(PROJECT_DIR, project_root)
+                    root_path = root_path.replace(PROJECT_DIR, project_root)
             elif ctx.opts.iml_in_project_root and ctx.opts.iml_keep_relative_paths:
-                root.path = op.join(MODULE_DIR, op.relpath(root.path, os.path.dirname(os.path.abspath(iml_path))))
+                root_path = op.join(MODULE_DIR, op.relpath(root_path, os.path.dirname(os.path.abspath(iml_path))))
 
             if root.ignored:
-                et.SubElement(cont, 'excludeFolder').attrib = {'url': 'file://' + fix_windows(root.path)}
+                et.SubElement(cont, 'excludeFolder').attrib = {'url': 'file://' + fix_windows(root_path)}
 
             else:
-                rp = root.path
-
                 attr = collections.OrderedDict()
-                attr['url'] = 'file://' + fix_windows(rp)
+                attr['url'] = 'file://' + fix_windows(root_path)
 
                 if root.is_resource:
                     if root.is_test:
@@ -703,19 +698,91 @@ def has_parent_module(module, all_roots):
     return True
 
 
+def get_module_group(item, all_roots, content_root_paths, ctx):
+    group_name = None
+    group_modules = getattr(ctx.opts, 'group_modules', None)
+
+    if group_modules:
+        parts = [x for x in item.path.split(op.sep) if x]
+        sep = '/' if group_modules == 'tree' else '.'
+
+        if item.is_content_root:
+            if getattr(ctx.opts, 'group_content_root_modules', False):
+                # The module itself represents the last path component.
+                group_name = sep.join(parts[:-1])
+        elif len(item.contents) == 1 and any(path2.path_startswith(item.path, root) for root in content_root_paths):
+            # Keep modules nested in an explicit content root in its folder-backed subtree.
+            pass
+        elif has_parent_module(item, all_roots):
+            # Do not generate a group if the module is fully contained in other modules.
+            pass
+        elif len(item.contents) > 1:
+            # Always generate a separate group for the module if it contains more than one content root.
+            #
+            # This is needed because if a module has multiple content roots it will have an additional
+            # node in the source tree that is named after the module.
+            #
+            # Example source tree for module direct/api5 without this group may look like this:
+            # - direct:         <-- project root
+            #   - direct-api5:  <-- additional tree node that contains both content roots
+            #     - api5        <-- first content root that corresponds to source path "direct/api5"
+            #     - generated   <-- second content root for generated sources
+            #
+            # Here the additional node is named "direct-api5" (this is the name of the IDEA module), which can
+            # be very long for deeply nested modules and does not correspond to module path in source tree.
+            #
+            # With a separate group the same tree looks like this:
+            # - direct:           <-- project root
+            #   - api5:           <-- (!) new separate group
+            #     - direct-api5   <-- additional tree node that contains both content roots
+            #       - api5        <-- first content root that corresponds to source path "direct/api5"
+            #       - generated   <-- second content root for generated sources
+            #
+            # This tree is more deeply nested, but now items in project root will have reasonable names
+            # ("api5" instead of "direct-api5") and will be sorted in the right order.
+            group_name = sep.join(parts)
+        else:
+            # Generate a parent group for the module if there is no parent module.
+            group_name = sep.join(parts[:-1])
+
+    module_groups = getattr(ctx.opts, 'idea_module_groups', {})
+    if item.name in module_groups:
+        # An empty override intentionally places the module into the project root.
+        group_name = module_groups[item.name]
+
+    return group_name
+
+
 def get_modules_and_libs(by_path, project_root, ctx):
     modules, libs = {}, set()
+
+    content_root_paths = {
+        v.path
+        for v in by_path.values()
+        if isinstance(v, Module) and v.is_content_root and getattr(ctx.opts, 'group_content_root_modules', False)
+    }
 
     all_roots = {
         cr.path
         for v in by_path.values()
-        # Ignore content-root modules to preserve current grouping behavior: content roots are always
-        # separate modules in the project root that duplicate all sources in the tree.
+        # Content-root modules duplicate all sources in the tree and must not affect parent-module detection.
         if isinstance(v, Module) and not v.is_content_root
         for cr in v.contents
     }
 
-    for _, item in sorted(by_path.items()):
+    module_groups = {
+        path: get_module_group(item, all_roots, content_root_paths, ctx)
+        for path, item in by_path.items()
+        if isinstance(item, Module)
+    }
+    tree_group_paths = set()
+    if getattr(ctx.opts, 'group_modules', None) == 'tree':
+        for group in module_groups.values():
+            if group:
+                parts = group.split('/')
+                tree_group_paths.update('/'.join(parts[:size]) for size in range(1, len(parts) + 1))
+
+    for path, item in sorted(by_path.items()):
         if isinstance(item, Module):
             if not ctx.opts.iml_in_project_root:
                 modulesroot = ctx.opts.arc_root
@@ -729,49 +796,19 @@ def get_modules_and_libs(by_path, project_root, ctx):
             attrib['fileurl'] = 'file://' + iml_p
             attrib['filepath'] = iml_p
 
-            if ctx.opts.group_modules:
-                parts = [x for x in item.path.split(op.sep) if x]
-                sep = '/' if ctx.opts.group_modules == 'tree' else '.'
-
-                group_name = None
-                if item.is_content_root:
-                    # Content roots should always be in root.
-                    pass
-                elif has_parent_module(item, all_roots):
-                    # Do not generate a group if the module is fully contained in other modules.
-                    pass
-                elif len(item.contents) > 1:
-                    # Always generate a separate group for the module if it contains more than one content root.
-                    #
-                    # This is needed because if a module has multiple content roots it will have an additional
-                    # node in the source tree that is named after the module.
-                    #
-                    # Example source tree for module direct/api5 without this group may look like this:
-                    # - direct:         <-- project root
-                    #   - direct-api5:  <-- additional tree node that contains both content roots
-                    #     - api5        <-- first content root that corresponds to source path "direct/api5"
-                    #     - generated   <-- second content root for generated sources
-                    #
-                    # Here the additional node is named "direct-api5" (this is the name of the IDEA module), which can
-                    # be very long for deeply nested modules and does not correspond to module path in source tree.
-                    #
-                    # With a separate group the same tree looks like this:
-                    # - direct:           <-- project root
-                    #   - api5:           <-- (!) new separate group
-                    #     - direct-api5   <-- additional tree node that contains both content roots
-                    #       - api5        <-- first content root that corresponds to source path "direct/api5"
-                    #       - generated   <-- second content root for generated sources
-                    #
-                    # This tree is more deeply nested, but now items in project root will have reasonable names
-                    # ("api5" instead of "direct-api5") and will be sorted in the right order.
-                    group_name = sep.join(parts)
-                else:
-                    # Generate a parent group for the module if there is no parent module.
-                    parts = parts[:-1]
-                    group_name = sep.join(parts)
-
-                if group_name:
-                    attrib['group'] = group_name
+            group_name = module_groups[path]
+            if (
+                item.is_content_root
+                and getattr(ctx.opts, 'group_content_root_modules', False)
+                and item.name not in getattr(ctx.opts, 'idea_module_groups', {})
+            ):
+                content_group = '/'.join(part for part in item.path.split(op.sep) if part)
+                if content_group in tree_group_paths:
+                    # Multi-root modules may already create a group with the folder's name.
+                    # Put the folder inside that group instead of creating a duplicate sibling.
+                    group_name = content_group
+            if group_name:
+                attrib['group'] = group_name
 
             modules[iml_p] = attrib
 

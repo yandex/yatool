@@ -170,6 +170,8 @@ class IdeaOptions(yarg.Options):
         self.idea_project_root = None
         self.local = False
         self.group_modules = None
+        self.group_content_root_modules = False
+        self.idea_module_groups = {}
         self.dry_run = False
         self.ymake_bin = None
         self.iml_in_project_root = False
@@ -219,6 +221,18 @@ class IdeaOptions(yarg.Options):
                 ['--group-modules'],
                 help='Group idea modules according to paths',
                 hook=yarg.SetValueHook('group_modules', values=('tree', 'flat')),
+                group=IdeaOptions.IDEA_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                ['--group-content-root-modules'],
+                help='Place generated content-root modules into their path-based module groups',
+                hook=yarg.SetConstValueHook('group_content_root_modules', True),
+                group=IdeaOptions.IDEA_OPT_GROUP,
+            ),
+            yarg.ArgConsumer(
+                ['--idea-module-group'],
+                help='Override an IDEA module group as MODULE=GROUP; use MODULE= to place it in the project root',
+                hook=yarg.DictPutHook('idea_module_groups'),
                 group=IdeaOptions.IDEA_OPT_GROUP,
             ),
             yarg.ArgConsumer(
@@ -331,6 +345,8 @@ class IdeaOptions(yarg.Options):
             yarg.ConfigConsumer('idea_project_root'),
             yarg.ConfigConsumer('local'),
             yarg.ConfigConsumer('group_modules'),
+            yarg.ConfigConsumer('group_content_root_modules'),
+            yarg.ConfigConsumer('idea_module_groups'),
             yarg.ConfigConsumer('dry_run'),
             yarg.ConfigConsumer('iml_in_project_root'),
             yarg.ConfigConsumer('iml_keep_relative_paths'),
@@ -360,6 +376,15 @@ class IdeaOptions(yarg.Options):
 
         if self.iml_keep_relative_paths and not self.iml_in_project_root:
             raise yarg.ArgsValidatingException('--iml-keep-relative-paths can be used only with --iml-in-project-root')
+
+        if self.group_content_root_modules and not self.group_modules:
+            raise yarg.ArgsValidatingException('--group-content-root-modules can be used only with --group-modules')
+
+        for module_name, group_name in self.idea_module_groups.items():
+            if not module_name or group_name is None:
+                raise yarg.ArgsValidatingException(
+                    '--idea-module-group must use MODULE=GROUP syntax; an empty GROUP places the module in the root'
+                )
 
         for p in self.exclude_dirs:
             if os.path.isabs(p):
