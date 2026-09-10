@@ -10,6 +10,7 @@ from devtools.ya.test.const import Status
 from devtools.ya.test.facility import TestCase
 from devtools.ya.test.system.process import execute
 from devtools.ya.test.test_types.common import PerformedTestSuite
+from devtools.ya.test.util import shared
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,15 @@ def parse_args(argv=None):
     parser.add_argument("--nodejs-dir", help="Path to the Node.js resource", required=True)
     parser.add_argument("--test-config", help="Stylelint config filename", required=True)
     parser.add_argument("--trace", help="Path to the output trace log", required=True)
+    parser.add_argument("--log-path", dest="log_path", help="Log file path")
+    parser.add_argument(
+        "--log-level",
+        dest="log_level",
+        help="Logging level",
+        action="store",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
 
     parser.add_argument("files", nargs='*')
 
@@ -118,6 +128,7 @@ def fill_suite(build_dir, report_json, trace):
 
 def main():
     args = parse_args()
+    shared.setup_logging(args.log_level, args.log_path)
 
     src_dir = os.path.join(args.source_root, args.project_path)
     build_dir = os.path.join(args.build_root, args.project_path)

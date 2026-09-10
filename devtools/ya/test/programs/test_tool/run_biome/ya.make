@@ -14,6 +14,7 @@ PEERDIR(
     devtools/ya/test/facility
     devtools/ya/test/system
     devtools/ya/test/test_types
+    devtools/ya/test/util
 )
 
 END()

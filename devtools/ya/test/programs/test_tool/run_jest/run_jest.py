@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import signal
-import sys
 import six
 
 from devtools.ya.test import const
@@ -57,6 +56,15 @@ def parse_args():
     parser.add_argument("--nodejs")
     parser.add_argument("--ts-config-path", dest="ts_config_path", help="tsconfig.json path", required=True)
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--log-path", dest="log_path", help="Log file path")
+    parser.add_argument(
+        "--log-level",
+        dest="log_level",
+        help="Logging level",
+        action="store",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
     parser.add_argument("--ts-coverage-path", default="")
 
     args = parser.parse_args()
@@ -190,22 +198,13 @@ def parse_jest_stdout(opts, results_stream):
     return suite
 
 
-def setup_logging(verbose):
-    level = logging.DEBUG if verbose else logging.ERROR
-    logging.basicConfig(
-        level=level,
-        stream=sys.stdout,
-        format="%(asctime)s (%(relativeCreated)d): %(levelname)s: [%(process)d|%(thread)d]: %(message)s",
-    )
-
-
 def on_timeout(_signum, _frame):
     raise process.SignalInterruptionError()
 
 
 def main():
     args = parse_args()
-    setup_logging(args.verbose)
+    shared.setup_logging(args.log_level, args.log_path)
 
     if hasattr(signal, "SIGUSR2"):
         signal.signal(signal.SIGUSR2, on_timeout)
