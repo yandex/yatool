@@ -52,6 +52,15 @@ public class YaToolTraceListener implements TestExecutionListener {
     }
 
     @Override
+    public void dynamicTestRegistered(TestIdentifier testIdentifier) {
+        synchronized (listener) {
+            if (isTest(testIdentifier)) {
+                registerExpectedTest(testIdentifier);
+            }
+        }
+    }
+
+    @Override
     public void testPlanExecutionStarted(TestPlan testPlan) {
         synchronized (listener) {
             logger.info("Test plan execution started");
@@ -268,9 +277,10 @@ public class YaToolTraceListener implements TestExecutionListener {
     }
 
     private void registerExpectedTest(TestIdentifier testIdentifier) {
-        expectedTests.add(testIdentifier);
-        logger.info("testRegistered [%s]", testIdentifier.getDisplayName());
-        listener.reportPartiallyFinished(testIdentifier, TestStatus.not_launched);
+        if (expectedTests.add(testIdentifier)) {
+            logger.info("testRegistered [%s]", testIdentifier.getDisplayName());
+            listener.reportPartiallyFinished(testIdentifier, TestStatus.not_launched);
+        }
     }
 
     public TraceListener<String, TestIdentifier> getListener() {

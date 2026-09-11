@@ -8,10 +8,12 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.engine.config.DefaultJupiterConfiguration;
 import org.junit.jupiter.engine.config.JupiterConfiguration;
 import org.junit.jupiter.engine.descriptor.JupiterEngineDescriptor;
 import org.junit.jupiter.engine.execution.JupiterEngineExecutionContext;
+import org.junit.platform.commons.support.AnnotationSupport;
 import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
@@ -76,7 +78,7 @@ public class Junit5TemplateTestLookupV_5_12 implements Junit5TemplateTestLookup 
                     }
                 }
             }
-            if (method != null) {
+            if (method != null && AnnotationSupport.isAnnotated(method, TestTemplate.class)) {
                 TestTemplateYaTestDescriptorV_5_12 descriptor = new TestTemplateYaTestDescriptorV_5_12(
                         UniqueId.parse(test.getUniqueId()), clazz, method, List::of, configuration, request);
                 JupiterEngineExecutionContext context = descriptor.prepare(executionContext);
