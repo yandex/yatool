@@ -214,6 +214,14 @@ def _get_env_arg(opts, suite):
     if opts and getattr(opts, 'test_env'):
         test_env.extend(opts.test_env)
 
+    if (
+        opts
+        and getattr(opts, 'gdb', False)
+        and suite.is_test_built_in
+        and not any(entry.partition('=')[0] == 'HOME' for entry in test_env)
+    ):
+        test_env.insert(0, 'HOME')
+
     gkv = dict(it.split('::', 1) for it in suite.get_global_resources())
 
     def replace_global_resource(x):

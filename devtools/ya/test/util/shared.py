@@ -16,6 +16,7 @@ import time
 
 import six
 
+import devtools.ya.core.config as core_config
 from library.python import tmp, func
 from devtools.ya.test import const
 from devtools.ya.test.util import tools
@@ -455,17 +456,20 @@ def concatenate_files(files, dst, max_file_size=0, before_callback=None, after_c
 def get_user_home():
     # type: () -> str | None
     try:
-        import pwd as _pwd
-
-        return _pwd.getpwuid(os.getuid()).pw_dir
-    except (KeyError, AttributeError, ImportError):
+        return core_config.home_dir()
+    except RuntimeError:
         return None
 
 
 def run_under_gdb(cmd, gdb_path, tty='/dev/tty', source_root=None):
     # TODO keep args in sync with run_with_gdb() from devtools/ya/test/programs/test_tool/run_test/run_test.py untill YA-724 is done
     extra_args = [gdb_path, '-iex', 'set demangle-style none', '-ex', 'set demangle-style auto']
-    effective_source_root = source_root or os.environ.get("ORIGINAL_SOURCE_ROOT")
+    effective_source_root = (
+        source_root
+        or os.environ.get("ORIGINAL_SOURCE_ROOT")
+        or os.environ.get("ARCADIA_SOURCE_ROOT")
+        or os.environ.get("YA_SOURCE_ROOT")
+    )
     if effective_source_root:
         extra_args += ["-ex", "set substitute-path /-S/ {}/".format(effective_source_root)]
     extra_args += ["-ex", "set filename-display absolute", "--args"]

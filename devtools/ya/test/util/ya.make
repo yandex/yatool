@@ -8,6 +8,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/core/config
     devtools/ya/test/const
     devtools/ya/test/system/process
     devtools/ya/yalibrary/formatter
