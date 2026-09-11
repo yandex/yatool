@@ -224,7 +224,10 @@ namespace NYa {
 #else
                 TString userName = GetUsername();
                 bool robotEnv = userName.Contains("sandbox") || userName.Contains("teamcity");
-                if (ArcadiaRoot() && !robotEnv && IsTrue(GetEnv("YA_TC", "1"))) {
+                auto yaTcEnv = GetEnv("YA_TC");
+                bool forceYaTc = IsTrue(yaTcEnv);
+                bool disableYaTc = IsFalse(yaTcEnv);
+                if ((ArcadiaRoot() || forceYaTc) && !robotEnv && !disableYaTc) {
                     return 4;
                 }
                 return 3;
