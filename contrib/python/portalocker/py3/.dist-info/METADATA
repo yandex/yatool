@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: portalocker
-Version: 4.2.0
+Version: 4.3.0
 Summary: Cross-platform file locking, with Redis, PID-file and bounded-semaphore locks
 Keywords: locking,locks,with,statement,windows,linux,unix
 Author: Rick van Hattem
@@ -53,6 +53,7 @@ Requires-Dist: pytest-timeout>=2.1.0 ; extra == 'tests'
 Requires-Dist: pytest-rerunfailures>=15.1 ; extra == 'tests'
 Requires-Dist: coverage-conditional-plugin>=0.9 ; extra == 'tests'
 Requires-Dist: types-pywin32>=310.0.0.20250429 ; extra == 'tests'
+Requires-Dist: typing-extensions>=4.4 ; extra == 'tests'
 Requires-Dist: pywin32>=226 ; sys_platform == 'win32' and extra == 'win32'
 Requires-Python: >=3.10
 Project-URL: homepage, https://github.com/wolph/portalocker/

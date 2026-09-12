@@ -14,11 +14,59 @@ import typing
 
 # spellchecker: off
 # fmt: off
-#: Every mode string accepted by the built-in `open()`, spelled out
-#: explicitly - including the binary forms - so type checkers reject a
-#: typo'd mode string instead of letting it fail at runtime. The legacy
-#: universal-newline (`U`) modes are deliberately absent: Python 3.11
-#: removed them, and 3.10 only accepted them with a warning.
+#: Every text mode string accepted by the built-in `open()`, spelled out
+#: explicitly so type checkers reject a typo'd mode string instead of
+#: letting it fail at runtime. Kept separate from `BinaryMode` so
+#: `portalocker.Lock` can infer ``IO[str]`` filehandles from the mode.
+#: The legacy universal-newline (`U`) modes are deliberately absent:
+#: Python 3.11 removed them, and 3.10 only accepted them with a warning.
+TextMode = typing.Literal[
+    # Read text
+    'r', 'rt', 'tr',
+    # Write text
+    'w', 'wt', 'tw',
+    # Append text
+    'a', 'at', 'ta',
+    # Exclusive creation text
+    'x', 'xt', 'tx',
+    # Read and write text
+    'r+', '+r', 'rt+', 'r+t', '+rt', 'tr+', 't+r', '+tr',
+    # Write and read text
+    'w+', '+w', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
+    # Append and read text
+    'a+', '+a', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',
+    # Exclusive creation and read text
+    'x+', '+x', 'xt+', 'x+t', '+xt', 'tx+', 't+x', '+tx',
+]
+#: Every binary mode string accepted by the built-in `open()`, the
+#: counterpart of `TextMode` that makes `portalocker.Lock` infer
+#: ``IO[bytes]`` filehandles.
+BinaryMode = typing.Literal[
+    # Read binary
+    'rb', 'br',
+    # Write binary
+    'wb', 'bw',
+    # Append binary
+    'ab', 'ba',
+    # Exclusive creation binary
+    'xb', 'bx',
+    # Read and write binary
+    'rb+', 'r+b', '+rb', 'br+', 'b+r', '+br',
+    # Write and read binary
+    'wb+', 'w+b', '+wb', 'bw+', 'b+w', '+bw',
+    # Append and read binary
+    'ab+', 'a+b', '+ab', 'ba+', 'b+a', '+ba',
+    # Exclusive creation and read binary
+    'xb+', 'x+b', '+xb', 'bx+', 'b+x', '+bx',
+]
+#: Every mode string accepted by the built-in `open()`, text and binary
+#: combined. Spelled out flat instead of as ``TextMode | BinaryMode`` so
+#: ``typing.get_args(Mode)`` keeps returning the mode strings themselves,
+#: which the common runtime validation idiom
+#: ``mode in typing.get_args(Mode)`` depends on; on a union of Literals
+#: `typing.get_args` returns the two Literal aliases instead of their
+#: members. The test suite pins this literal to be exactly the union of
+#: `TextMode` and `BinaryMode`, statically and at runtime.
 Mode = typing.Literal[
     # Text modes
     # Read text
