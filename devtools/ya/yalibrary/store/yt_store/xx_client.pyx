@@ -20,6 +20,7 @@ import collections
 import logging
 import threading
 import time
+import weakref
 
 from devtools.ya.core import config as core_config
 from devtools.ya.core import monitoring as core_monitoring
@@ -270,9 +271,18 @@ cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace 
         ) except +raise_yt_store_error
 
 
+_stores = []
+_exiting = False
+
+
 @atexit.register
-def on_exit():
+def _on_exit():
+    global _exiting
+    _exiting = True
     AtExit()
+    for ref in _stores:
+        if store := ref():
+            store.shutdown()
 
 
 InitializeLogger()
@@ -302,7 +312,6 @@ cdef class YtStoreImpl:
     _data_dir: str
     _is_heater: bool
     _stager: stage_tracer.StageTracer.GroupStageTracer | None
-    _exiting: bool
 
     def __init__(
         self,
@@ -331,7 +340,6 @@ cdef class YtStoreImpl:
         self._data_dir = data_dir
         self._is_heater = crit_level == "put"
         self._stager = stager
-        self._exiting = False
         self._allow_tar = allow_tar
         self._yt_cache_excluded_p = YT_CACHE_EXCLUDED_P - {'GO'} if allow_go else YT_CACHE_EXCLUDED_P
 
@@ -378,14 +386,13 @@ cdef class YtStoreImpl:
                 c_data_dir,
                 options
             )
-        atexit.register(self._at_exit)
+        _stores.append(weakref.ref(self))
 
     def __dealloc__(self):
-        if self._exiting:
+        if _exiting:
             # Let OS destroy everything
             self._store_ptr = NULL
         else:
-            atexit.unregister(self._at_exit)
             # nogil is required to allow YtStore internal threads write log messages during termination
             with nogil:
                 del self._store_ptr
@@ -699,9 +706,8 @@ cdef class YtStoreImpl:
             labels,
         )
 
-    def _at_exit(self):
+    def shutdown(self):
         self._store_ptr.Shutdown();
-        self._exiting = True
 
     @staticmethod
     cdef TYtConnectOptions _get_connect_options(token: str | None, proxy_role: str | None) noexcept:
