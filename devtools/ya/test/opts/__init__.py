@@ -2174,6 +2174,12 @@ class InterimOptions(devtools.ya.core.yarg.Options):
                 'YA_TEST_FAILURE_CODE', hook=devtools.ya.core.yarg.SetValueHook('test_fail_exit_code')
             ),
             devtools.ya.core.yarg.ConfigConsumer('detect_leaks_in_pytest'),
+            devtools.ya.core.yarg.EnvConsumer(
+                'YA_ENABLE_TEST_NODES_SELF_UID',
+                hook=devtools.ya.core.yarg.SetValueHook(
+                    'enable_test_nodes_self_uid', devtools.ya.core.yarg.return_true_if_enabled
+                ),
+            ),
             devtools.ya.core.yarg.ConfigConsumer('enable_test_nodes_self_uid'),
             # See DEVTOOLS-9388
             devtools.ya.core.yarg.EnvConsumer(
