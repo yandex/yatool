@@ -2472,6 +2472,7 @@ namespace NYa {
                     });
 
                     batch.clear();
+                    TYtTimestamp curTimestamp = ToYtTimestamp(TInstant::Now());
                     for (auto& row : actualRows) {
                         if (row.ChildAs<TYtTimestamp>("access_time") < thresholdTimestamp) {
                             batch.push_back(std::move(row("access_time", curTimestamp)));
