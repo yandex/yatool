@@ -3,6 +3,10 @@ import os
 import sys
 import logging
 import typing
+import requests
+import urllib.parse
+import typing as tp
+from http import HTTPStatus
 
 from collections import defaultdict
 
@@ -55,6 +59,7 @@ TOOL_TIER_HEADERS = {
     tools.ToolTier.DEPRECATED: "DEPRECATED - are subject to remove. Don't use",
     tools.ToolTier.UNSPECIFIED: "UNSPECIFIED - no information about tier",
 }
+NDA_YA_RU = "https://nda.ya.ru/"
 
 
 def get_legacy_options():
@@ -623,6 +628,8 @@ def _get_tool_card(tool: tools._XTool, params: Params) -> str:
         tool_card["toolchain_root"] = tool.toolchain_root()
         tool_card["resource_url"] = tool.resource_url()
 
+    tool_card = _extract_nda_ya_ru(tool_card)
+
     if params.json:
         return json.dumps(tool_card, indent=4)
 
@@ -668,6 +675,42 @@ def _add_if_not_empty(dict: dict[str, typing.Any], key: str, value: typing.Any) 
         dict[key] = value
         return True
     return False
+
+
+_extract_nda_ya_ru_disabled = False
+
+
+def _extract_nda_ya_ru(v: tp.Any):
+    global _extract_nda_ya_ru_disabled
+
+    if _extract_nda_ya_ru_disabled:
+        return v
+
+    if isinstance(v, list):
+        return [_extract_nda_ya_ru(x) for x in v]
+    elif isinstance(v, dict):
+        return {k: _extract_nda_ya_ru(x) for k, x in v.items()}
+    elif isinstance(v, str) and v.startswith(NDA_YA_RU):
+        try:
+            r = requests.get(v, allow_redirects=False, timeout=3)
+            if r.status_code == HTTPStatus.FOUND:
+                location = r.headers["location"]
+                url = urllib.parse.urlsplit(location)
+                url = urllib.parse.SplitResult(
+                    url.scheme,
+                    url.netloc,
+                    url.path,
+                    # Remove nda.ya.ru query mixin
+                    "&".join([x for x in url.query.split("&") if not x.startswith("clckid=")]),
+                    url.fragment,
+                )
+                return urllib.parse.urlunsplit(url)
+        except requests.Timeout:
+            _extract_nda_ya_ru_disabled = True
+            logger.debug("Timeout occurred while retrieving '%s'. Disable nda.ya.ru url extracting", v)
+        except requests.RequestException:
+            pass
+    return v
 
 
 def _get_text_card_value(key: str, value: str | list[str] | None) -> list[str]:
