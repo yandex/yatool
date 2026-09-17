@@ -607,6 +607,33 @@ namespace NYa {
 
         };
         using TYtErrorRetrierPtr = std::shared_ptr<TYtErrorRetrier>;
+
+        class TTransactionConflictSleeper {
+        public:
+            TTransactionConflictSleeper(NThreading::TCancellationToken&& token)
+                : Token_{std::move(token)}
+            {
+            }
+
+            void Sleep() {
+                TDuration sleep = Current_ * (1 + 2 * VARIANCE * RandomNumber<double>() - VARIANCE);
+                Current_ = Min(MULTIPLIER * Current_, MAX_DURATION);
+                Token_.Wait(sleep);
+                Token_.ThrowIfCancellationRequested();
+            }
+
+        private:
+                static constexpr TDuration INIT_DURATION = TDuration::MilliSeconds(100);
+                static constexpr TDuration MAX_DURATION = TDuration::MilliSeconds(15000);
+                static constexpr double VARIANCE = 0.5;
+                static constexpr double MULTIPLIER = 1.5;
+                NThreading::TCancellationToken Token_;
+                TDuration Current_ = INIT_DURATION;
+
+                static_assert(VARIANCE < 1);
+                static_assert(MULTIPLIER > 1);
+                static_assert(MAX_DURATION > INIT_DURATION);
+        };
     }
 
     class TYtStore::TImpl {
@@ -2443,6 +2470,7 @@ namespace NYa {
                 batch.insert(batch.end(), std::make_move_iterator(batch_start), std::make_move_iterator(batch_end));
                 batch_start = batch_end;
 
+                TTransactionConflictSleeper sleeper{CancellationSource_.Token()};
                 while (!batch.empty()) {
                     bool transactionConflict = RetrierPtr_->Do([&] {
                         try {
@@ -2462,7 +2490,7 @@ namespace NYa {
                     }
 
                     ++conflictCount;
-                    SleepAfterTransactionConflict();
+                    sleeper.Sleep();
 
                     for (auto& row : batch) {
                         row.AsMap().erase("access_time");
@@ -2598,10 +2626,6 @@ namespace NYa {
             }
         }
 
-        void SleepAfterTransactionConflict() {
-            Sleep(TDuration::Seconds(RandomNumber<double>() * 0.1 + 0.05));
-        }
-
         bool ProbeMeta(TConfigureResultPtr config, TPrepareResultPtr prepareResultPtr, const TString& selfUid, const TString& uid) {
             auto startTime = TInstant::Now();
             Y_DEFER {
@@ -2683,6 +2707,7 @@ namespace NYa {
 
             const auto insertOpts = MakeTransactionOpts<NYT::TInsertRowsOptions>(config);
             const auto lookupOpts = NYT::TLookupRowsOptions().Columns(keyColumns).KeepMissingRows(true);
+            TTransactionConflictSleeper sleeper{CancellationSource_.Token()};
             while (!rows.empty()) {
                 bool transactionConflict = RetrierPtr_->Do([&] {
                     try {
@@ -2700,7 +2725,7 @@ namespace NYa {
                     return;
                 }
 
-                SleepAfterTransactionConflict();
+                sleeper.Sleep();
 
                 NYT::TNode::TListType keys{};
                 for (auto& row : rows) {
