@@ -17,8 +17,11 @@ class Mode(Enum):
 
 
 class ModulesFilesStatistic:
-    def __init__(self, stream, is_rewritable):
+    def __init__(self, stream, is_rewritable, structured_sink=None):
         self._stream = stream
+        # A structured display takes a progress event instead of the text;
+        # the modes below only decide when it is time to report.
+        self._structured_sink = structured_sink
         self._lock = threading.Lock()
         self._mode = Mode.NOT_STARTED
         self._modules_done = 0
@@ -45,6 +48,17 @@ class ModulesFilesStatistic:
 
     def _print_message(self):
         if self._mode == Mode.NOT_STARTED or self._mode == Mode.NO_PRINTING:
+            return
+        if self._structured_sink is not None:
+            self._structured_sink(
+                {
+                    'type': 'progress',
+                    'stage': 'configure',
+                    'active': self._current_ymake_processing,
+                    'done': self._modules_done,
+                    'total': self._modules_total,
+                }
+            )
             return
         if self._mode == Mode.MODULES_ONLY:
             self._stream(
@@ -222,7 +236,9 @@ class PrintProgressSubscriber(
     def __init__(self, params, display, logger):
         print_status = get_print_status_func(params, display, logger)
         self.modules_files_stats = ModulesFilesStatistic(
-            stream=print_status, is_rewritable=getattr(params, "output_style", "") == "ninja"
+            stream=print_status,
+            is_rewritable=getattr(params, "output_style", "") == "ninja",
+            structured_sink=display.emit_event if getattr(display, 'structured', False) else None,
         )
         self.ymake_states = collections.defaultdict(PrintProgressSubscriber.YmakeLastState)
         self._subscribers_count = 0
@@ -267,7 +283,9 @@ class PrintProgressSubscriber(
 def get_print_status_func(opts, display, logger):
     output_style = getattr(opts, "output_style", "")
     if display:
-        _fprint = display.emit_status if output_style == "ninja" else display.emit_message
+        # A structured display drops status lines: the configure stage is covered by its progress events.
+        rewritable = output_style == "ninja" or getattr(display, 'structured', False)
+        _fprint = display.emit_status if rewritable else display.emit_message
     else:
         _fprint = logger.debug
 

@@ -86,6 +86,10 @@ class Status(object):
     def progress(self):
         return self._progress
 
+    def done(self):
+        with self._lock:
+            return len(self._finished)
+
     @property
     def count(self):
         return self._qty

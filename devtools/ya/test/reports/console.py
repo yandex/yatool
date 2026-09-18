@@ -2,8 +2,8 @@
 import json
 import logging
 import os
-import re
 
+from . import selection
 from . import trace_comment
 from library.python import func
 from devtools.ya.test import common
@@ -108,12 +108,9 @@ class ConsoleReporter(object):
         ):
             return ""
         lines = []
-        for name in sorted(entry.logs):
-            # Don't print logs for specific runs.
-            # All data is stored on local host and easily accessible.
-            if re.search(r"_run\d+$", name):
-                continue
-            log_path = entry.logs[name]
+        logs = selection.significant_logs(entry.logs)
+        for name in sorted(logs):
+            log_path = logs[name]
             if os.sep != "/":
                 if log_path.startswith("http"):
                     log_path = log_path.replace(os.sep, "/")  # if it is a link - change all seps to /
@@ -228,16 +225,12 @@ class ConsoleReporter(object):
             dump_container_info(test_suite)
 
         if test_suite.chunks:
-            significant_tests = [[] for _ in range(len(test_suite.chunks))]
-            for chunk_idx, chunk in enumerate(test_suite.chunks):
-                for test_case in chunk.tests:
-                    if test_case.status in self._omitted_test_statuses and not self._show_passed:
-                        continue
-                    if test_case.status == const.Status.DESELECTED and not self._show_deselected:
-                        continue
-                    if test_case.status == const.Status.SKIPPED and not self._show_skipped:
-                        continue
-                    significant_tests[chunk_idx].append(test_case)
+            significant_tests = [
+                selection.select_test_cases(
+                    chunk, self._omitted_test_statuses, self._show_passed, self._show_deselected, self._show_skipped
+                )
+                for chunk in test_suite.chunks
+            ]
 
             for chunk_idx, tests in enumerate(significant_tests):
                 chunk = test_suite.chunks[chunk_idx]

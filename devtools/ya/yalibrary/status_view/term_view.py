@@ -123,16 +123,7 @@ class TermView(object):
 
     def _fmt_body(self, body):
         # type: (str) -> str
-        if self._patterns and body:
-            body = self._patterns.fix(body)
-
-        if not self._output_replacements or not body:
-            return body
-
-        for key, value in self._output_replacements:
-            body = body.replace(key, value)
-
-        return body
+        return helpers.format_body(body, self._patterns, self._output_replacements)
 
     def _emit_status(self, pre, task_status, post):
         if (pre, task_status, post) == self._last_status:
@@ -277,3 +268,6 @@ class TermView(object):
 
         if self._ninja:
             self._emit_status(*self._default_status_configuration())
+
+    def finish(self):
+        self.tick()

@@ -55,7 +55,9 @@ class YaMakeLock:
         wait_task = _YaMakeLockWaitTask(self._owner_pid)
         listener.add(wait_task)
         listener.started(wait_task)
-        term_view = status_view.TermView(wait_status, self._display, ninja=False, show_active_progress=False)
+        term_view = status_view.create_view(
+            wait_status, self._display, stage='lock', ninja=False, show_active_progress=False
+        )
         ticker = status_view.TickThrottle(term_view.tick, YA_MAKE_LOCK_POLL_INTERVAL)
         try:
             if self._agent_console is None:

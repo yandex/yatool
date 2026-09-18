@@ -19,6 +19,7 @@ PY_SRCS(
     NAMESPACE yalibrary.status_view
     __init__.py
     helpers.py
+    jsonl.py
     status.py
     pack.py
     plain.py

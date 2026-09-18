@@ -5,8 +5,10 @@ PY_SRCS(
     allure_support.py
     console.py
     dry.py
+    jsonl.py
     junit.py
     report_prototype.py
+    selection.py
     stderr_reporter.py
     trace_comment.py
     transformer.py

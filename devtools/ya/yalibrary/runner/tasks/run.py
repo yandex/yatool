@@ -745,6 +745,10 @@ class RunNodeTask(object):
         """Presentation hints of the node (`p`, `pc`, `show_out`, `path`, ...)."""
         return self._node.kv
 
+    def hide_me(self):
+        # Set on nodes whose output has a structured form elsewhere (see build/ya_make.py).
+        return bool(self._node.kv.get('hide_out'))
+
     def _supports_build_time_cache(self, other=None):
         node = other or self._node
         return (

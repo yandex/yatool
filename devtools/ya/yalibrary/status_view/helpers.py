@@ -4,6 +4,8 @@ import string
 
 import devtools.ya.test.const
 
+import typing as tp  # noqa
+
 import yalibrary.roman as roman
 import library.python.func as func
 
@@ -18,6 +20,10 @@ class NodeView(object):
         self.secondary = []
         self.type = None
         self.tags = []
+        # Plain fields for structured consumers: the node kind (kv['p'])
+        # and the primary path without markup.
+        self.kind = None
+        self.path = None
 
     def __iter__(self):
         t = '{' + ', '.join(('[[imp]]' + str(x) + '[[rst]]' for x in self.tags)) + '}' if self.tags else None
@@ -173,9 +179,24 @@ def format_paths(inputs, outputs, kv):
         return '<build node>'
 
 
+def format_body(body, patterns=None, output_replacements=None):
+    # type: (str | None, tp.Any, list | None) -> str | None
+    """Apply the path patterns and output replacements to the stderr of a finished task."""
+    if patterns and body:
+        body = patterns.fix(body)
+    if not output_replacements or not body:
+        return body
+    for key, value in output_replacements:
+        body = body.replace(key, value)
+    return body
+
+
 def fmt_node(inputs, outputs, kv, tags=None, status=None):
     view = NodeView()
-    view.primary.append(color_path(patch_path(format_paths(inputs, outputs, kv))))
+    path = patch_path(format_paths(inputs, outputs, kv))
+    view.primary.append(color_path(path))
+    view.kind = kv.get('p')
+    view.path = path
     if status:
         view.secondary.append(status)
     if 'p' in kv:

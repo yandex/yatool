@@ -680,7 +680,7 @@ class TaskContext(object):
 
     def _init_runq_and_caches(self, output_replacements: OutputReplacements | None):
         queue_status = status_view.Status()
-        term_view = status_view.TermView(
+        view = status_view.create_view(
             queue_status,
             self._app_ctx.display,
             extra_progress=self.opts.ext_progress,
@@ -688,9 +688,9 @@ class TaskContext(object):
             use_roman_numerals=self.opts.use_roman_numerals,
             style=self.opts.output_style,
         )
-        self._ticker = status_view.TickThrottle(term_view.tick, 0.1)
+        self._ticker = status_view.TickThrottle(view.tick, 0.1)
         self._exit_stack.callback(lambda: self._ticker.tick(force=True))
-        self._exit_stack.callback(term_view.tick)
+        self._exit_stack.callback(view.finish)
 
         # AgentConsole (devtools/ya/yalibrary/agent_ui) comes through
         # app_ctx: yalibrary must not import app.modules. The console

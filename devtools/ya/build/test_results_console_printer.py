@@ -1,4 +1,5 @@
 import devtools.ya.test.const
+import devtools.ya.test.reports
 from devtools.ya.test.util.shared import build_filter_message
 
 
@@ -42,10 +43,16 @@ def get_suites_to_show(suites, fail_fast=False, report_skipped_suites=False):
     return suites_to_show
 
 
-def print_tests_results_to_console(builder, suites):
-    filter_description = ", ".join(get_skipped_tests_annotations(suites))
-    suites_to_show = get_suites_to_show(suites, builder.opts.fail_fast, builder.opts.report_skipped_suites)
-    reporter = devtools.ya.test.reports.ConsoleReporter(
+def _make_reporter(builder, display):
+    if getattr(display, 'structured', False):
+        return devtools.ya.test.reports.JsonlReporter(
+            display,
+            omitted_test_statuses=builder.opts.omitted_test_statuses,
+            show_deselected=builder.opts.show_deselected_tests,
+            show_skipped=builder.opts.show_skipped_tests,
+            truncate=not builder.opts.inline_diff,
+        )
+    return devtools.ya.test.reports.ConsoleReporter(
         show_passed=builder.opts.show_passed_tests,
         show_deselected=builder.opts.show_deselected_tests,
         show_skipped=builder.opts.show_skipped_tests,
@@ -56,17 +63,21 @@ def print_tests_results_to_console(builder, suites):
         show_suite_logs_for_tags=(
             [devtools.ya.test.const.YaTestTags.ForceSandbox] if builder.opts.run_tagged_tests_on_sandbox else []
         ),
+        display=display,
     )
+
+
+def print_tests_results_to_console(builder, suites):
+    filter_description = ", ".join(get_skipped_tests_annotations(suites))
+    suites_to_show = get_suites_to_show(suites, builder.opts.fail_fast, builder.opts.report_skipped_suites)
+    reporter = _make_reporter(builder, builder.app_ctx.display)
 
     filter_message = build_filter_message(
         filter_description, builder.opts.tests_filters, get_number_of_empty_suites(suites_to_show)
     )
 
     if filter_message:
-        # noinspection PyUnresolvedReferences
-        import app_ctx
-
-        app_ctx.display.emit_message(filter_message)
+        reporter.on_warning(filter_message)
 
     for suite in suites_to_show:
         reporter.on_test_suite_finish(suite)

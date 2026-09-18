@@ -56,6 +56,8 @@ logger = logging.getLogger(__name__)
 
 # Don't use sys.maxint - it can't be serialized to yson (ya:yt mode)
 MAX_TIMEOUT = 2**32
+# The kind (kv['p']) of the node that prints the test list of `ya test -L`.
+LIST_NODE_KIND = 'TL'
 
 FETCH_DOCKER_IMAGE_SCRIPT = '$(SOURCE_ROOT)/build/scripts/fetch_from_docker_repo.py'
 FETCH_FROM_MDS_SCRIPT = '$(SOURCE_ROOT)/build/scripts/fetch_from_mds.py'
@@ -2910,7 +2912,7 @@ def inject_list_result_node(graph, tests, opts, tests_filter_descr):
             os.path.join("$(BUILD_ROOT)", devtools.ya.test.const.LIST_RESULT_NODE_LOG_FILE),
         ],
         'kv': {
-            "p": "TL",
+            "p": LIST_NODE_KIND,
             "pc": 'white',
             "show_out": True,
         },

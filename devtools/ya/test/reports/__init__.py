@@ -2,6 +2,7 @@ __all__ = [
     'JUnitReportGenerator',
     'JUnitReportGeneratorV2',
     'ConsoleReporter',
+    'JsonlReporter',
     'DryReporter',
     'StdErrReporter',
     'TextTransformer',
@@ -11,6 +12,7 @@ __all__ = [
 
 from .junit import JUnitReportGenerator
 from .console import ConsoleReporter
+from .jsonl import JsonlReporter
 from .dry import DryReporter
 from .stderr_reporter import StdErrReporter
 from .transformer import TextTransformer

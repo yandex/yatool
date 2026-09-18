@@ -146,6 +146,7 @@ class OutputStyle(enum.StrEnum):
     NINJA = 'ninja'
     MAKE = 'make'
     PLAIN = 'plain'
+    JSONL = 'jsonl'
 
 
 class OutputStyleOptions(Options):
@@ -173,7 +174,8 @@ class OutputStyleOptions(Options):
                 help=(
                     'Output style: ninja (status line rewritten in place), make (one line per finished node, same as -T), '
                     'plain (log for non-interactive consumers: no colors, no status line, INFO/WARNING/ERROR prefixes, '
-                    'progress as [done / total] lines on change and "Still waiting" reports)'
+                    'progress as [done / total] lines on change and "Still waiting" reports), '
+                    'jsonl (one JSON object per event, for programs and coding agents)'
                 ),
                 hook=SetValueHook('output_style', values=list(OutputStyle)),
                 group=PRINT_CONTROL_GROUP,

@@ -35,6 +35,7 @@ import exts.hashing as hashing
 import exts.path2
 import exts.timer
 import exts.yjson as json
+import devtools.ya.test.common.ytest_common_tools as yct
 import devtools.ya.test.const
 import devtools.ya.test.util.tools as test_tools
 from devtools.ya.build import build_facade
@@ -68,6 +69,7 @@ from yalibrary.toolscache import (
     post_local_cache_report,
     tc_force_gc,
 )
+import yalibrary.display
 import yalibrary.platform_matcher as pm
 import yalibrary.status_view as status_view
 from devtools.ya.build.cache_kind import CacheKind
@@ -137,6 +139,41 @@ def normalize_by_dir(dirs, dir_):
     return res
 
 
+def test_list_event(record):
+    # type: (dict) -> dict
+    """Project one suite record of the list node output into a `tests` event."""
+    event = {'type': 'tests', 'path': record['project-path'], 'suite': record['test-type']}
+    if record.get('test-size'):
+        event['size'] = record['test-size']
+    if record.get('test-tags'):
+        event['tags'] = sorted(record['test-tags'])
+    if record.get('target-platform-descriptor'):
+        event['platform'] = record['target-platform-descriptor']
+    tests = []
+    for item in record.get('tests', []):
+        info = yct.SubtestInfo.from_json(item)
+        test = {'name': devtools.ya.test.const.TEST_SUBTEST_SEPARATOR.join([info.test, info.subtest])}
+        if info.skipped:
+            test['skipped'] = True
+        if info.tags:
+            test['tags'] = sorted(info.tags)
+        tests.append(test)
+    event['tests'] = tests
+    if record.get('error'):
+        event['error'] = record['error']
+    return event
+
+
+def fix_dir(s):
+    # type: (str) -> str
+    """Turn a ymake Where reference into a project directory: $S/dir/ya.make and $B/dir/out both give dir."""
+    if s.startswith('$S/'):
+        s = s.replace('$S/', '').replace('/ya.make', '')
+    elif s.startswith('$B/'):
+        s = os.path.dirname(s).replace('$B/', '')
+    return s
+
+
 class DisplayMessageSubscriber(event_handling.SubscriberSpecifiedTopics):
     topics = {"NEvent.TDisplayMessage"}
 
@@ -155,6 +192,7 @@ class DisplayMessageSubscriber(event_handling.SubscriberSpecifiedTopics):
         # type: (tp.Any, tp.Any, tp.Any | None) -> None
         self._opts = opts
         self._display = display
+        self._structured = getattr(display, 'structured', False)
         self._printed = printed or set()
         self._plain = getattr(opts, 'output_style', None) == status_view.plain.STYLE
 
@@ -191,7 +229,33 @@ class DisplayMessageSubscriber(event_handling.SubscriberSpecifiedTopics):
             self._printed.add(msg)
 
             if self._should_print(msg):
-                self._display.emit_message(msg)
+                if self._structured:
+                    self._display.emit_event(self._to_event(event))
+                else:
+                    self._display.emit_message(msg)
+
+    @staticmethod
+    def _to_event(event):
+        # type: (dict) -> dict
+        """Project a TDisplayMessage into a configure fail (errors) or message (the rest)."""
+        if event['Type'] == 'Error':
+            result = {'type': 'fail', 'stage': 'configure'}
+        else:
+            severity = {'Warn': 'warning'}.get(event['Type'], 'info')
+            result = {'type': 'message', 'severity': severity}
+        if 'Where' in event:
+            result['path'] = fix_dir(event['Where'])
+        result['text'] = yalibrary.display.strip_markup(six.ensure_str(event['Message'])).strip()
+        details = {}
+        if 'Row' in event and 'Column' in event:
+            details['row'] = event['Row']
+            details['column'] = event['Column']
+        if event.get('Sub'):
+            details['sub'] = event['Sub']
+        if 'Platform' in event:
+            details['platform'] = pm.get_platform_id_from_string(event['Platform']) or event['Platform']
+        result['details'] = details
+        return result
 
 
 class YmakeEvlogSubscriber(event_handling.SubscriberLoggable):
@@ -325,13 +389,6 @@ def _build_graph_and_tests(opts, app_ctx, ymake_stats):
 
     with app_ctx.event_queue.subscription_scope(*configure_time_subscribers):
         graph, tests, stripped_tests, _, make_files = lg.build_graph_and_tests(opts, check=True, display=display)
-
-    def fix_dir(s):
-        if s.startswith('$S/'):
-            s = s.replace('$S/', '').replace('/ya.make', '')
-        elif s.startswith('$B/'):
-            s = os.path.dirname(s).replace('$B/', '')
-        return s
 
     errors = {fix_dir(k): sorted(list(v)) for k, v in errors_collector.errors.items()}
     return graph, tests, stripped_tests, errors, make_files
@@ -1451,6 +1508,11 @@ class YaMake:
         self._owners = None
         self._make_files = None
         self.raw_build_result = None
+        self._structured = getattr(app_ctx.display, 'structured', False)
+        self._structured_test_list = self._structured and getattr(opts, 'list_tests', False)
+        if self._structured_test_list and not opts.list_tests_output_file:
+            # The list node writes the structured list there; _go turns it into `tests` events.
+            opts.list_tests_output_file = os.path.join(tempfile.mkdtemp(prefix='yatestlist'), 'test_list.jsonl')
         self.build_root = None
         self.misc_build_info_dir = None
         self.arc_root = None
@@ -1465,6 +1527,8 @@ class YaMake:
             configure_errors=configure_errors,
             make_files=make_files,
         )
+        if self._structured_test_list and self.ctx.graph:
+            self._hide_test_list_output()
         self._post_clean_setup(opts)
         self.build_result = br.BuildResult({}, {}, {})
         self.exit_code = 0
@@ -1646,6 +1710,8 @@ class YaMake:
         test_node_listener = pr.TestNodeListener(self.ctx.tests, test_results_path, None)
         if getattr(self.app_ctx, 'evlog', None) is not None:
             self._build_results_listener.add(pr.FailedNodeListener(self.app_ctx.evlog))
+        if self._structured:
+            self._build_results_listener.add(pr.NodeFailureListener(self.ctx.graph, self.app_ctx.display, self.opts))
 
         if (
             self.opts.json_line_report_file is None
@@ -1732,6 +1798,28 @@ class YaMake:
 
         return self.exit_code
 
+    def _hide_test_list_output(self):
+        # type: () -> None
+        """Mark the list node so that no view echoes its human list: the stream gets `tests` events instead."""
+        from devtools.ya.test import test_node
+
+        for node in self.ctx.graph['graph']:
+            kv = node.get('kv', {})
+            if kv.get('p') == test_node.LIST_NODE_KIND:
+                kv['hide_out'] = True
+
+    def _emit_test_list(self):
+        # type: () -> None
+        """Publish the structured test list written by the list node as one `tests` event per suite."""
+        path = self.opts.list_tests_output_file
+        if not path or not os.path.exists(path):
+            logger.debug("Test list file %s is missing, nothing to publish", path)
+            return
+        with open(path) as afile:
+            for line in afile:
+                if line.strip():
+                    self.app_ctx.display.emit_event(test_list_event(json.loads(line)))
+
     def _test_console_report(self):
         suites = self.ctx.tests + self.ctx.stripped_tests
 
@@ -1742,7 +1830,7 @@ class YaMake:
 
         test_results_console_printer.print_tests_results_to_console(self, suites)
         # Information about the error in the suite may be too high and not visible - dump explicit message after the report
-        if broken_deps:
+        if broken_deps and not self._structured:
             self.app_ctx.display.emit_message("[[alt3]]SOME TESTS DIDN'T RUN DUE TO BUILD ERRORS[[rst]]")
 
     def _get_results_root(self):
@@ -1922,6 +2010,8 @@ class YaMake:
 
             if self.opts.print_test_console_report:
                 self._test_console_report()
+            if self._structured_test_list:
+                self._emit_test_list()
             if result_analyzer is not None:
                 result_analyzer()
 
@@ -1931,8 +2021,9 @@ class YaMake:
 
             self.exit_code = self._calc_exit_code()
 
-            msg = self._calc_msg(self.exit_code)
-            self.app_ctx.display.emit_message(msg)
+            if not self._structured:
+                # The structured stream reports the outcome in its `finished` event.
+                self.app_ctx.display.emit_message(self._calc_msg(self.exit_code))
 
             if self.ctx.create_symlinks:
                 self._setup_repo_state()

@@ -1,3 +1,4 @@
+import dataclasses
 import enum
 import copy
 import logging
@@ -44,6 +45,13 @@ stager = stage_tracer.get_tracer(stage_tracer.StagerGroups.OVERALL_EXECUTION)
 modules_stager = stage_tracer.get_tracer(stage_tracer.StagerGroups.MODULE_LIFECYCLE)
 # mlockall is called too early, w/ no logging
 MLOCK_STATUS_MESSAGE = ""
+
+
+@dataclasses.dataclass
+class Outcome:
+    """The return code of the handler: set by execute, read by configure_display on the success path."""
+
+    exit_code: int | None = None
 
 
 class RespawnType(enum.Enum):
@@ -157,6 +165,9 @@ def execute(action, respawn=RespawnType.MANDATORY):
             ('params', params.configure(parameters, with_respawn)),
             ('hide_token', token_suppressions.configure(ctx)),
             ('state', configure_active_state(ctx)),
+            # Must be configured before 'display': the jsonl display reports
+            # the outcome in its final event.
+            ('outcome', configure_outcome()),
             # Must be configured before 'display': configure_display consults
             # app_ctx.agent_ui to replace human rendering in agent mode.
             ('agent_ui', agent_ui.configure(ctx)),
@@ -204,9 +215,23 @@ def execute(action, respawn=RespawnType.MANDATORY):
                 ctx.host_health.start_watcher(prefix, ctx.params)
 
             with stager.scope("invoke-{}".format(action_name)):
-                return action(ctx.params)
+                rc = action(ctx.params)
+                ctx.outcome.exit_code = rc if isinstance(rc, int) else 0
+                return rc
 
     return helper
+
+
+def _exception_exit_code(exc: BaseException) -> int | None:
+    if isinstance(exc, SystemExit):
+        return exc.code if isinstance(exc.code, int) else None
+    if isinstance(exc, Exception):
+        return derive_exit_code(exc)
+    return None
+
+
+def configure_outcome():
+    yield Outcome()
 
 
 def configure_self_info():
@@ -624,6 +649,20 @@ def configure_display(app_ctx):
     # tokens and interleaves streams.
     if getattr(app_ctx, 'agent_ui', None) is not None:
         yield yadisplay.DevNullDisplay()
+        return
+
+    if getattr(app_ctx.params, 'output_style', None) == common_opts.OutputStyle.JSONL:
+        prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix() or []
+        display = yadisplay.JsonlDisplay(sys.stderr, ' '.join(prefix[1:]))
+        try:
+            yield display
+        except BaseException as e:
+            display.close(_exception_exit_code(e), e)
+            # The exit interceptor reads it: the text is already in `finished`.
+            e.reported = True
+            raise
+        else:
+            display.close(app_ctx.outcome.exit_code)
         return
 
     # The plain style is a log for non-interactive consumers: no colors and no
@@ -1122,7 +1161,8 @@ def configure_exit_interceptor(error_file):
         mute_error = getattr(e, 'mute', False)
 
         if mute_error:
-            print_message(e)
+            if not getattr(e, 'reported', False):
+                print_message(e)
         else:
             import traceback
 
@@ -1169,30 +1209,34 @@ def configure_exit_interceptor(error_file):
         sys.exit(e.ya_exit_code)
 
 
+def derive_exit_code(exc: Exception) -> int:
+    """Map an exception escaping the handler to the process exit code."""
+    temp_error = core_error.is_temporary_error(exc)
+    mute_error = getattr(exc, 'mute', False)
+    retriable_error = getattr(exc, 'retriable', True)
+
+    if mute_error:
+        if getattr(exc, 'exit_code', None) is not None:
+            error_code = getattr(exc, 'exit_code')
+        else:
+            error_code = core_error.ExitCodes.GENERIC_ERROR
+    else:
+        error_code = core_error.ExitCodes.UNHANDLED_EXCEPTION
+
+    if not retriable_error:
+        error_code = core_error.ExitCodes.NOT_RETRIABLE_ERROR
+    elif temp_error:
+        error_code = core_error.ExitCodes.INFRASTRUCTURE_ERROR
+
+    logger.debug("Derived exit code is %s", error_code)
+    return error_code
+
+
 def configure_exit_code_definition():
     try:
         yield
     except Exception as e:
-        temp_error = core_error.is_temporary_error(e)
-        mute_error = getattr(e, 'mute', False)
-        retriable_error = getattr(e, 'retriable', True)
-
-        if mute_error:
-            if getattr(e, 'exit_code', None) is not None:
-                error_code = getattr(e, 'exit_code')
-            else:
-                error_code = core_error.ExitCodes.GENERIC_ERROR
-        else:
-            error_code = core_error.ExitCodes.UNHANDLED_EXCEPTION
-
-        if not retriable_error:
-            error_code = core_error.ExitCodes.NOT_RETRIABLE_ERROR
-        elif temp_error:
-            error_code = core_error.ExitCodes.INFRASTRUCTURE_ERROR
-
-        logger.debug("Derived exit code is %s", error_code)
-
-        e.ya_exit_code = error_code
+        e.ya_exit_code = derive_exit_code(e)
         raise
 
 

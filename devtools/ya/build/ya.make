@@ -60,6 +60,7 @@ PEERDIR(
     devtools/ya/test/test_node/cmdline
     devtools/ya/yalibrary/agent_ui
     devtools/ya/yalibrary/debug_store
+    devtools/ya/yalibrary/display
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/graph
     devtools/ya/yalibrary/last_failed

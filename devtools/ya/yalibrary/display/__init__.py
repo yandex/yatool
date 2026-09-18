@@ -5,14 +5,17 @@ import codecs
 import threading
 
 from library.python import strings, windows
+from yalibrary.display.jsonl import JsonlDisplay
 import yalibrary.formatter
 
 import six
 
-__all__ = ['CompositeDisplay', 'Display']
+__all__ = ['CompositeDisplay', 'Display', 'JsonlDisplay']
 
 
 class CompositeDisplay(object):
+    structured = False
+
     def __init__(self, *displays):
         self._displays = list(displays)
 
@@ -30,6 +33,8 @@ class CompositeDisplay(object):
 
 
 class Display(object):
+    structured = False
+
     def __init__(self, stream, formatter, text_encoding=None):
         if windows.on_win():
             import colorama
@@ -92,6 +97,8 @@ class Display(object):
 
 
 class DevNullDisplay(object):
+    structured = False
+
     def emit_status(self, *args, **kwargs):
         pass
 

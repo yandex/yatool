@@ -30,9 +30,24 @@ class DisplayStreamHandler(logging.StreamHandler):
             return plain.line(plain.SEVERITY_BY_NAME[name], message)
         return fg + name + '[[rst]]: ' + message
 
+    def _structured_event(self, record):
+        # type: (logging.LogRecord) -> dict
+        """Project the record into a message event: no markup prefix, severity as a field."""
+        if record.levelno >= logging.ERROR:
+            severity = 'error'
+        elif record.levelno >= logging.WARNING:
+            severity = 'warning'
+        else:
+            severity = 'info'
+        text = self._filter(logging.StreamHandler.format(self, record))
+        return {'type': 'message', 'severity': severity, 'text': text}
+
     def emit(self, record):
         try:
-            self._display.emit_message(self._filter(self.format(record)))
+            if getattr(self._display, 'structured', False):
+                self._display.emit_event(self._structured_event(record))
+            else:
+                self._display.emit_message(self._filter(self.format(record)))
         except (KeyboardInterrupt, SystemExit):
             raise
         except Exception:

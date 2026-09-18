@@ -17,11 +17,102 @@ import devtools.ya.test.const as test_const
 import devtools.ya.test.common as test_common
 import devtools.ya.test.result as test_result
 import devtools.ya.test.reports as test_reports
+import yalibrary.display
 
 import typing as tp
 
 if tp.TYPE_CHECKING:
     import devtools.ya.test.test_types.common as tt_common  # noqa
+
+
+def extract_node_stderr(res, opts) -> tuple[str, list]:
+    """Return the stderr of a failed node and the links to its logs (in-house only)."""
+    import app_config
+
+    if app_config.in_house:
+        from devtools.ya.yalibrary.yandex.distbuild import distbs
+
+        return distbs.extract_stderr(res, opts.mds_read_account, download_stderr=opts.download_failed_nodes_stderr)
+    stderrs = copy.copy(res.get('stderrs', []))
+    if opts.arc_root:
+        stderrs = [i.replace(opts.arc_root, '$(SOURCE_ROOT)') for i in stderrs]
+    build_root = res.get('build_root')
+    if build_root:
+        stderrs = [i.replace(build_root, '$(BUILD_ROOT)') for i in stderrs]
+    return '\n'.join(stderrs), []
+
+
+class NodeFailureListener:
+    """Publish a ``fail`` event of a structured display for every failed build node.
+
+    Test and merge nodes are left to the test reporter; a uid is published once.
+    A node broken by a failed dependency is skipped: the root cause is already
+    in the stream and the node itself adds nothing but the dependency uid. The
+    dependents of a root cause are marked when it fails; a broken intermediate
+    node never runs and reports nothing, so the marking is transitive.
+    """
+
+    def __init__(self, graph, display, opts):
+        self._display = display
+        self._opts = opts
+        self._graph = graph['graph']
+        # Built on the first failure only: a green build pays nothing.
+        self._nodes = None
+        self._reversed_deps = None
+        self._seen = set()
+        self._broken = set()
+        self._lock = threading.Lock()
+
+    def __call__(self, res=None, build_stage=None):
+        if not res or res.get('status', 0) == 0:
+            return
+        uid = res['uid']
+        with self._lock:
+            if self._nodes is None:
+                self._index_graph()
+            node = self._nodes.get(uid)
+            if node is None or 'node-type' in node or uid in self._seen:
+                return
+            self._seen.add(uid)
+            if uid in self._broken:
+                return
+            self._mark_dependents_broken(uid)
+        stderr, links = extract_node_stderr(res, self._opts)
+        details = {
+            'kind': node.get('kv', {}).get('p'),
+            'outputs': node.get('outputs', []),
+            'platform': bp.BuildPlan.node_platform(node),
+            'exit_code': res.get('status'),
+        }
+        if links:
+            details['logs'] = links
+        self._display.emit_event(
+            {
+                'type': 'fail',
+                'stage': 'build',
+                'path': bp.BuildPlan.node_name(node),
+                'text': yalibrary.display.strip_markup(stderr),
+                'details': details,
+            }
+        )
+
+    def _index_graph(self):
+        self._nodes = {}
+        self._reversed_deps = defaultdict(list)
+        for node in self._graph:
+            self._nodes[node['uid']] = node
+            for dep in set(node['deps']):
+                self._reversed_deps[dep].append(node['uid'])
+
+    def _mark_dependents_broken(self, uid):
+        # type: (str) -> None
+        stack = list(self._reversed_deps.get(uid, ()))
+        while stack:
+            dependent = stack.pop()
+            if dependent in self._broken:
+                continue
+            self._broken.add(dependent)
+            stack.extend(self._reversed_deps.get(dependent, ()))
 
 
 class BuildResultsListener:
@@ -50,28 +141,10 @@ class BuildResultsListener:
             if res.get('status', 0) == 0:
                 self._on_completed(res['uid'], res)
             else:
-                stderr, error_links = self._extract_stderr(res)
+                stderr, error_links = extract_node_stderr(res, self._opts)
                 self._on_failed(res['uid'], stderr, error_links, res.get('exit_code', -99))
         if build_stage:
             self._on_trace_stage(build_stage)
-
-    def _extract_stderr(self, res):
-        import app_config
-
-        if app_config.in_house:
-            from devtools.ya.yalibrary.yandex.distbuild import distbs
-
-            return distbs.extract_stderr(
-                res, self._opts.mds_read_account, download_stderr=self._opts.download_failed_nodes_stderr
-            )
-        else:
-            stderrs = copy.copy(res.get('stderrs', []))
-            if self._opts.arc_root:
-                stderrs = [i.replace(self._opts.arc_root, '$(SOURCE_ROOT)') for i in stderrs]
-            build_root = res.get('build_root')
-            if build_root:
-                stderrs = [i.replace(build_root, '$(BUILD_ROOT)') for i in stderrs]
-            return '\n'.join(stderrs), []
 
     def _on_completed(self, uid, res):
         if 'node-type' not in self._nodes[uid]:
