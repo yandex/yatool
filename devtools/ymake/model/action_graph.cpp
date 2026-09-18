@@ -74,51 +74,14 @@ TActionGraphEncoder::TActionGraphEncoder(
 {
 }
 
-TActionGraphEncoder::TActionGraphEncoder(TCommandInfo& commandInfo)
+TActionGraphEncoder::TActionGraphEncoder(const TActionModelContext& context)
     : TActionGraphEncoder(
-        *commandInfo.Conf,
-        *commandInfo.Graph,
-        *commandInfo.UpdIter,
-        commandInfo.Module
+        *context.Conf,
+        *context.Graph,
+        *context.UpdIter,
+        context.Module
     )
 {
-}
-
-TActionGraphEncoder::TPreparedSubmission::TPreparedSubmission(
-    const TActionGraphEncoder& encoder,
-    TAddDepAdaptor& storage
-)
-    : Encoder_(&encoder)
-    , Storage_(&storage)
-{
-}
-
-void TActionGraphEncoder::TPreparedSubmission::AcceptResolvedInput(const TResolvedActionInput& input) {
-    Encoder_->RecordResolvedInput(*Storage_, input);
-}
-
-TFileElemId TActionGraphEncoder::TPreparedSubmission::InternLogicalPath(TStringBuf path) {
-    return Encoder_->InternLogicalPath(path);
-}
-
-TActionGraphEncoder::TPreparedSubmission TActionGraphEncoder::PrepareActionSubmission(TAddDepAdaptor& storage) const {
-    return TPreparedSubmission(*this, storage);
-}
-
-TActionGraphEncoder::TPreparedSubmission TActionGraphEncoder::PrepareVariableSubmission(
-    TAddDepAdaptor& storage,
-    TCmdElemId variable
-) const {
-    storage.AddUniqueDep(EDT_Property, EMNT_BuildCommand, variable);
-    auto& [id, entryStats] = *UpdIter_.Nodes.Insert(
-        MakeDepsCacheId(EMNT_BuildCommand, variable),
-        &UpdIter_.YMake,
-        Module_
-    );
-    entryStats.SetOnceEntered(false);
-    entryStats.SetReassemble(true);
-    auto& variableNode = entryStats.GetAddCtx(Module_, UpdIter_.YMake);
-    return TPreparedSubmission(*this, variableNode);
 }
 
 TActionGlobEvaluationContext TActionGraphEncoder::MakeGlobEvaluationContext() const {
@@ -136,7 +99,8 @@ void TActionGraphEncoder::RecordResolvedInput(TAddDepAdaptor& storage, const TRe
             ? EMNT_Directory
             : (input.IsOutput ? EMNT_NonParsedFile : FileTypeByRoot(input.LogicalName));
 
-    TAddDepAdaptor& node = storage.AddOutput(input.File, inputType, false);
+    const TFileElemId file = AssumeFile(Graph_.Names().AddName(inputType, input.LogicalName));
+    TAddDepAdaptor& node = storage.AddOutput(file, inputType, false);
     if (input.MarkUsedAsInput) {
         auto& moduleData = node.GetModuleData();
         moduleData.UsedAsInput = true;
@@ -158,9 +122,11 @@ TFileElemId TActionGraphEncoder::InternLogicalPath(TStringBuf path) const {
 void TActionGraphEncoder::RecordInputResolution(const TInputResolutionRecord& resolution) const {
     Y_ENSURE(Module_ != nullptr);
     Module_->ResolveResults.insert({
-        resolution.OriginalPath,
-        resolution.ResolveDirectory ? resolution.ResolveDirectory : TResolveResult::EmptyPath,
-        resolution.ResultPath,
+        InternLogicalPath(resolution.OriginalPath),
+        resolution.ResolveDirectory
+            ? Graph_.Names().FileConf.Add(resolution.ResolveDirectory)
+            : TResolveResult::EmptyPath,
+        Graph_.Names().FileConf.Add(resolution.ResultPath),
     });
 }
 
@@ -313,29 +279,34 @@ void TActionGraphEncoder::AttachMissingBinding(const TYVar& owner, TStringBuf na
     BindingOwner(owner).AddDepIface(EDT_Include, EMNT_UnknownCommand, name);
 }
 
-TActionGraphEncoder::EActionEncodingResult TActionGraphEncoder::EncodeActionSubmission(
-    TAutoPtr<TCommandInfo>& commandInfoOwner,
+std::optional<TActionCommitResult> TActionGraphEncoder::SubmitAction(
     TModuleBuilder& modBuilder,
-    TPreparedSubmission& submission,
-    IActionGlobEvaluator& globEvaluator,
+    TAddDepAdaptor& storage,
+    TActionSubmission&& submission,
     bool finalTargetCmd
 ) const {
-    TAddDepAdaptor& inputNode = *submission.Storage_;
-    auto& commandInfo = *commandInfoOwner;
-    auto& Cmd = commandInfo.Cmd;
-    auto& GlobalVars = commandInfo.GlobalVars;
-    auto& LocalVars = commandInfo.LocalVars;
-    auto& MainOutput = commandInfo.MainOutput;
-    auto& HasGlobalInput = commandInfo.HasGlobalInput;
-    auto GetInput = [&]() { return commandInfo.GetInput(); };
-    auto GetOutput = [&]() { return commandInfo.GetOutput(); };
+    TAddDepAdaptor& inputNode = storage;
+    auto& Cmd = submission.Command;
+    auto& GlobalVars = submission.GlobalCommandBindings;
+    auto& LocalVars = submission.LocalCommandBindings;
+    TVarStrEx* MainOutput = nullptr;
+    const bool HasGlobalInput = submission.HasGlobalInput;
+    auto GetInput = [&]() -> std::span<TVarStrEx> { return submission.ActionInputs; };
+    auto GetOutput = [&]() -> std::span<TVarStrEx> { return submission.Outputs; };
     auto ApplyToOutputIncludes = [&](auto&& action) {
-        commandInfo.ApplyToOutputIncludes(std::forward<decltype(action)>(action));
+        action(TStringBuf{}, submission.OutputIncludes);
+        for (auto& [type, values] : submission.OutputIncludesForType) {
+            action(type, values);
+        }
     };
     const auto* Conf = &Conf_;
     auto* Graph = &Graph_;
     auto* UpdIter = &UpdIter_;
     auto* Module = Module_;
+
+    for (const auto& input : submission.ResolvedInputs) {
+        RecordResolvedInput(inputNode, input);
+    }
 
     TModule& mod = modBuilder.GetModule();
     Y_ENSURE(UpdIter != nullptr);
@@ -359,7 +330,7 @@ TActionGraphEncoder::EActionEncodingResult TActionGraphEncoder::EncodeActionSubm
             if (ownEntries.has(fid)) {
                 YConfErr(DupSrc) << output.Name << " was already added in this project. Skip command: "
                                  << SkipId(curCmdName) << Endl;
-                return EActionEncodingResult::Failed;
+                return std::nullopt;
             }
 
             // We do not consider outputs of module command that macth main module output as a DupSrc issue
@@ -373,7 +344,7 @@ TActionGraphEncoder::EActionEncodingResult TActionGraphEncoder::EncodeActionSubm
             if (id == TNodeId::Invalid && !finalTargetCmd && inputNodeName == output.Name) {
                 YConfErr(BadOutput) << "The name of intermediate output " << output.Name
                                     << " matches the module name. Skip command: " << SkipId(curCmdName) << Endl;
-                return EActionEncodingResult::Failed;
+                return std::nullopt;
             }
 
             if (id != TNodeId::Invalid && Graph->GetFileNodeData(fid).NodeModStamp == fileConf.TimeStamps.CurStamp()) {
@@ -425,15 +396,16 @@ TActionGraphEncoder::EActionEncodingResult TActionGraphEncoder::EncodeActionSubm
     }
 
     if (!Cmd) {
-        if (!finalTargetCmd) {
-            modBuilder.QueueCommandOutputs(commandInfo);
-        }
-        return EActionEncodingResult::Complete;
+        return TActionCommitResult{
+            .HasCommand = false,
+            .Inputs = std::move(submission.ActionInputs),
+            .Outputs = std::move(submission.Outputs),
+        };
     }
 
     if (!numRealOut) {
         YConfErr(NoOutput) << "macro " << SkipId(curCmdName) << " resulted in no outputs, can't add to graph" << Endl;
-        return EActionEncodingResult::Failed;
+        return std::nullopt;
     }
 
     // Determining the main output.
@@ -529,6 +501,7 @@ TActionGraphEncoder::EActionEncodingResult TActionGraphEncoder::EncodeActionSubm
 
     // 1. Inputs
     const TCmdElemId groupId = AssumeCmd(Graph->Names().AddName(EMNT_Property, NStaticConf::INPUTS_MARKER));
+    size_t globIndex = 0;
     for (auto& input : GetInput()) {
         YDIAG(DG) << "Input dep: " << input.Name << Endl;
 
@@ -537,10 +510,9 @@ TActionGraphEncoder::EActionEncodingResult TActionGraphEncoder::EncodeActionSubm
                 inputNode.AddDepIface(EDT_Group, EMNT_Property, groupId);
                 modBuilder.CurrentInputGroup = groupId;
             }
-            try {
-                EncodeGlobInput(actionNode, globEvaluator.Evaluate(input.Name));
-            } catch (const yexception& error) {
-                globEvaluator.ReportInvalidPattern(input.Name, error.what());
+            Y_ENSURE(globIndex < submission.Globs.size());
+            if (auto& glob = submission.Globs[globIndex++]) {
+                EncodeGlobInput(actionNode, std::move(*glob));
             }
             continue;
         }
@@ -707,45 +679,49 @@ TActionGraphEncoder::EActionEncodingResult TActionGraphEncoder::EncodeActionSubm
         }
     }
 
-    return EActionEncodingResult::NeedsCompletion;
-}
-
-void TActionGraphEncoder::CompleteActionSubmission(
-    TAutoPtr<TCommandInfo>& commandInfoOwner,
-    TModuleBuilder& modBuilder,
-    TPreparedSubmission& submission,
-    bool finalTargetCmd
-) const {
-    TAddDepAdaptor& inputNode = *submission.Storage_;
-    auto& commandInfo = *commandInfoOwner;
+    Y_ENSURE(globIndex == submission.Globs.size());
+    for (auto& globalBinding : submission.GlobalBindings) {
+        RecordGlobalBindingUse(globalBinding.Name);
+        if (globalBinding.Binding) {
+            AttachGlobalBinding(std::move(*globalBinding.Binding), inputNode);
+        }
+    }
 
     if (finalTargetCmd) {
         inputNode.AddOutput(AssumeFile(inputNode.ElemId), EMNT_NonParsedFile, false)
             .GetAction()
             .GetModuleData()
-            .CmdInfo = commandInfoOwner;
-    } else if (const auto* mainOutput = commandInfo.GetMainOutput()) {
-        inputNode.AddOutput(AssumeFile(mainOutput->ElemId), EMNT_NonParsedFile, false)
+            .ActionData = new TActionContinuation(std::move(submission.Continuation));
+    } else {
+        inputNode.AddOutput(mainOutId, EMNT_NonParsedFile, false)
             .GetAction()
             .GetModuleData()
-            .CmdInfo = commandInfoOwner;
+            .ActionData = new TActionContinuation(std::move(submission.Continuation));
     }
 
-    if (!finalTargetCmd) {
-        modBuilder.QueueCommandOutputs(commandInfo);
-    }
+    return TActionCommitResult{
+        .HasCommand = true,
+        .Inputs = std::move(submission.ActionInputs),
+        .Outputs = std::move(submission.Outputs),
+    };
 }
 
 void TActionGraphEncoder::EncodeGlobInput(TAddDepAdaptor& node, TEvaluatedActionGlob&& glob) const {
     TVector<TFileElemId> matchedFiles;
     matchedFiles.reserve(glob.MatchedPaths.size());
-    for (const auto path : glob.MatchedPaths) {
+    for (const auto& path : glob.MatchedPaths) {
         matchedFiles.push_back(
             Graph_.Names().FileConf.ConstructLink(
                 ELinkType::ELT_Text,
-                Graph_.Names().FileConf.GetName(path)
+                Graph_.Names().FileConf.GetStoredName(path)
             ).GetElemId()
         );
+    }
+
+    TVector<TFileElemId> watchedDirectories;
+    watchedDirectories.reserve(glob.WatchedDirectories.size());
+    for (const auto& directory : glob.WatchedDirectories) {
+        watchedDirectories.push_back(Graph_.Names().FileConf.Add(directory));
     }
 
     const TString globCommand = FormatCmd(
@@ -759,7 +735,7 @@ void TActionGraphEncoder::EncodeGlobInput(TAddDepAdaptor& node, TEvaluatedAction
             EMNT_Property,
             FormatProperty(NProps::GLOB_HASH, glob.MatchesHash)
         )),
-        .WatchedDirs = std::move(glob.WatchedDirectories),
+        .WatchedDirs = std::move(watchedDirectories),
         .MatchedFiles = std::move(matchedFiles),
         .Excludes = {},
         .ReferencedByVar = TCmdElemId(),
@@ -781,18 +757,29 @@ void TActionGraphEncoder::EncodeGlobInput(TAddDepAdaptor& node, TEvaluatedAction
     PopulateGlobNode(globNode, globInfo);
 }
 
-bool TActionGraphEncoder::CompleteVariableSubmission(
-    TCommandInfo& commandInfo,
-    TPreparedSubmission& submission
+void TActionGraphEncoder::SubmitVariable(
+    TAddDepAdaptor& storage,
+    TVariableSubmission&& submission
 ) const {
-    TAddDepAdaptor& inputNode = *submission.Storage_;
-    auto& Cmd = commandInfo.Cmd;
-    auto GetInput = [&]() { return commandInfo.GetInput(); };
+    storage.AddUniqueDep(EDT_Property, EMNT_BuildCommand, submission.Variable);
+    auto& [id, entryStats] = *UpdIter_.Nodes.Insert(
+        MakeDepsCacheId(EMNT_BuildCommand, submission.Variable),
+        &UpdIter_.YMake,
+        Module_
+    );
+    entryStats.SetOnceEntered(false);
+    entryStats.SetReassemble(true);
+    TAddDepAdaptor& inputNode = entryStats.GetAddCtx(Module_, UpdIter_.YMake);
+    for (const auto& input : submission.ResolvedInputs) {
+        RecordResolvedInput(inputNode, input);
+    }
+    auto& Cmd = submission.Command;
+    auto GetInput = [&]() -> std::span<TVarStrEx> { return submission.Inputs; };
 
     YDIAG(SUBST) << "Process command: " << Get1(&Cmd) << Endl;
 
     if (!Cmd) {
-        return true;
+        return;
     }
 
     // 1. Inputs
@@ -803,8 +790,6 @@ bool TActionGraphEncoder::CompleteVariableSubmission(
             UpdIter_.DelayedSearchDirDeps.GetDepsByType(EDT_Include)[MakeDepsCacheId(EMNT_NonParsedFile, input.ElemId)].Push(TFileConf::GetTargetId(AssumeFile(input.ElemId)));
         }
     }
-
-    return true;
 }
 
 TVector<TStringBuf> TActionGraphEncoder::ConfigurationBindingVariables(
@@ -896,7 +881,7 @@ void TActionGraphEncoder::RecordGlobalBindingUse(TStringBuf varName) const {
 
 void TActionGraphEncoder::AttachGlobalBinding(
     TCompiledGlobalBinding&& binding,
-    TPreparedSubmission& submission
+    TAddDepAdaptor& node
 ) const {
     // TODO: there's no point in allocating cmdElemId for expressions
     // that do _not_ have directly corresponding nodes
@@ -909,18 +894,24 @@ void TActionGraphEncoder::AttachGlobalBinding(
     );
     const auto compiledVarElemId = AssumeCmd(Graph_.Names().AddName(EMNT_BuildCommand, compiledVarText));
 
-    TCommandInfo cmdInfo(Conf_, &Graph_, &UpdIter_, Module_);
-    cmdInfo.GetCommandInfoFromStructVar(
+    TYVar storedBinding;
+    storedBinding.SetSingleVal(Graph_.Names().CmdNameById(compiledVarElemId).GetStr(), true);
+    storedBinding[0].StructCmdForVars = true;
+    RegisterCommand(
+        storedBinding,
         compiledVarElemId,
-        importedExpression.Id,
-        UpdIter_.YMake.Commands,
-        Conf_.CommandConf
+        EStorageFormat::Structured,
+        EExpressionRole::Binding
     );
+    for (const auto expressionVariable : UpdIter_.YMake.Commands.GetCommandVars(importedExpression.Id)) {
+        if (TCommandInfo::IsGlobalReservedVar(expressionVariable, Conf_.CommandConf)) {
+            RecordReservedVariable(storedBinding, expressionVariable);
+        }
+    }
 
-    TAddDepAdaptor& node = *submission.Storage_;
     if (TBuildConfiguration::Workaround_AddGlobalVarsToFileNodes) {
         // duplication comes from adding locally referenced vars
-        // via TCommandInfo::GlobalVars, then the whole list through here
+        // via TActionSubmission::GlobalCommandBindings, then the whole list through here
         node.AddUniqueDep(EDT_Include, EMNT_BuildCommand, compiledVarElemId);
     } else {
         node.AddDepIface(EDT_Include, EMNT_BuildCommand, compiledVarElemId);

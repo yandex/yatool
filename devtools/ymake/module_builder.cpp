@@ -69,6 +69,19 @@ namespace {
     }
 
     constexpr TStringBuf STRIP_PREFIX = "STRIP_PREFIX"sv;
+
+    TVector<std::optional<TEvaluatedActionGlob>> EvaluateActionGlobs(
+        const TCommandInfo& commandInfo,
+        const TActionGlobEvaluator& evaluator
+    ) {
+        TVector<std::optional<TEvaluatedActionGlob>> result;
+        for (const auto& input : commandInfo.GetInput()) {
+            if (input.IsGlob) {
+                result.push_back(evaluator.Evaluate(input.Name));
+            }
+        }
+        return result;
+    }
 }
 
 void TModuleBuilder::SetProperty(TStringBuf propName, TStringBuf value) {
@@ -100,8 +113,8 @@ void TModuleBuilder::RecursiveAddInputs() {
             lastTryMode = true;
         }
 
-        auto submission = actionGraph.PrepareActionSubmission(Node);
-        EActionInputResolution state = inputResolver.Resolve(*cmdInfo, *this, submission, lastTryMode);
+        auto resolution = inputResolver.Resolve(*cmdInfo, *this, lastTryMode);
+        EActionInputResolution state = resolution.State;
         if (state == EActionInputResolution::Skipped) {
             TStringBuf cmd, cmdName;
             auto tryParse = [&](const TYVar& var, TStringBuf& cmdName, TStringBuf* cmdArgs) {
@@ -133,13 +146,15 @@ void TModuleBuilder::RecursiveAddInputs() {
         if (!outputResolver.Resolve(*cmdInfo, *this)) {
             continue;
         }
-        const auto encoding = actionGraph.EncodeActionSubmission(cmdInfo, *this, submission, globEvaluator, false);
-        if (encoding == TActionGraphEncoder::EActionEncodingResult::Failed) {
+        auto submission = cmdInfo->TakeActionSubmission(TActionSubmission{
+            .ResolvedInputs = std::move(resolution.Inputs),
+            .Globs = EvaluateActionGlobs(*cmdInfo, globEvaluator),
+        });
+        auto result = actionGraph.SubmitAction(*this, Node, std::move(submission), false);
+        if (!result) {
             continue;
         }
-        if (encoding == TActionGraphEncoder::EActionEncodingResult::NeedsCompletion) {
-            actionGraph.CompleteActionSubmission(cmdInfo, *this, submission, false);
-        }
+        QueueCommandOutputs(*result);
     }
 
     if (Module.IsInputsComplete()) {
@@ -352,23 +367,16 @@ void TModuleBuilder::AddLinkDep(TFileView name, const TString& command, TAddDepA
     TActionInputResolver inputResolver;
     TActionOutputResolver outputResolver;
     TActionGlobEvaluator globEvaluator(actionGraph.MakeGlobEvaluationContext());
-    auto submission = actionGraph.PrepareActionSubmission(node);
     bool actionAdded = false;
-    if (inputResolver.Resolve(*cmdInfo, *this, submission, /* lastTry */ true) == EActionInputResolution::Ready &&
+    auto resolution = inputResolver.Resolve(*cmdInfo, *this, /* lastTry */ true);
+    if (resolution.State == EActionInputResolution::Ready &&
         outputResolver.Resolve(*cmdInfo, *this)) {
-        const auto encoding = actionGraph.EncodeActionSubmission(cmdInfo, *this, submission, globEvaluator, true);
-        if (encoding == TActionGraphEncoder::EActionEncodingResult::Complete) {
-            actionAdded = true;
-        } else if (encoding == TActionGraphEncoder::EActionEncodingResult::NeedsCompletion) {
-            for (const auto& variableName : CollectGlobalBindingNames(*this)) {
-                actionGraph.RecordGlobalBindingUse(variableName);
-                if (auto binding = CompileGlobalBinding(*this, variableName)) {
-                    actionGraph.AttachGlobalBinding(std::move(*binding), submission);
-                }
-            }
-            actionGraph.CompleteActionSubmission(cmdInfo, *this, submission, true);
-            actionAdded = true;
-        }
+        auto submission = cmdInfo->TakeActionSubmission(TActionSubmission{
+            .ResolvedInputs = std::move(resolution.Inputs),
+            .Globs = EvaluateActionGlobs(*cmdInfo, globEvaluator),
+            .GlobalBindings = CompileGlobalBindings(*this),
+        });
+        actionAdded = actionGraph.SubmitAction(*this, node, std::move(submission), true).has_value();
     }
     if (!actionAdded) {
         YDIAG(Dev) << "Failed to add LinkDep for:" << name << node.NodeType << Endl;
@@ -405,11 +413,15 @@ void TModuleBuilder::AddFileGroupVars() {
     for (auto& [varId, cmdInfo] : FileGroupCmds) {
         TActionGraphEncoder actionGraph(Conf, Graph, UpdIter, &Module);
         TActionInputResolver inputResolver;
-        auto submission = actionGraph.PrepareVariableSubmission(Node, AssumeCmd(varId));
-        if (inputResolver.Resolve(*cmdInfo, *this, submission, /* lastTry */ true) != EActionInputResolution::Ready) {
+        auto resolution = inputResolver.Resolve(*cmdInfo, *this, /* lastTry */ true);
+        if (resolution.State != EActionInputResolution::Ready) {
             continue;
         }
-        actionGraph.CompleteVariableSubmission(*cmdInfo, submission);
+        auto submission = cmdInfo->TakeVariableSubmission(TVariableSubmission{
+            .Variable = AssumeCmd(varId),
+            .ResolvedInputs = std::move(resolution.Inputs),
+        });
+        actionGraph.SubmitVariable(Node, std::move(submission));
     }
 }
 
@@ -1122,10 +1134,10 @@ bool TModuleBuilder::SkipStatement(const TStringBuf& name, const TVector<TString
     return false;
 }
 
-bool TModuleBuilder::QueueCommandOutputs(TCommandInfo& cmdInfo) {
-    if (!cmdInfo.Cmd) {
-        Y_ASSERT(cmdInfo.GetOutput().empty());
-        for (auto& input : cmdInfo.GetInput()) {
+bool TModuleBuilder::QueueCommandOutputs(TActionCommitResult& result) {
+    if (!result.HasCommand) {
+        Y_ASSERT(result.Outputs.empty());
+        for (auto& input : result.Inputs) {
             AddDep(input, Node, false);
             TModAddData& data = AddOutput(AssumeFile(input.ElemId), NodeTypeForVar(input)).GetModuleData();
             data.CheckIfUsed = true;
@@ -1135,11 +1147,11 @@ bool TModuleBuilder::QueueCommandOutputs(TCommandInfo& cmdInfo) {
                 data.BadCmdInput = true;
             }
         }
-        return !cmdInfo.GetInput().empty();
+        return !result.Inputs.empty();
     }
 
     bool hasInput = false;
-    for (auto& output : cmdInfo.GetOutput()) {
+    for (auto& output : result.Outputs) {
         if (!output.IsTmp) {
             output.IsOutputFile = true;
             hasInput |= AddSource(/*OutSecName*/ TStringBuf("SRCS"), output, nullptr);

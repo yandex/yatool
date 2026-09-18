@@ -1,9 +1,8 @@
 #include "module_add_data.h"
-#include "macro_processor.h"
 
 
 TModAddData::TModAddData(const TModAddData& o)
-    : CmdInfo(o.CmdInfo)
+    : ActionData(o.ActionData)
     , AllFlags(o.AllFlags)
 {
     if (o.ParsedPeerdirs) {

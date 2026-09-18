@@ -993,10 +993,11 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
 
                 if (const auto* propValues = props.FindValues(TPropertyType{symbols, EVI_CommandProps, "CfgVars"})) {
                     auto& modData = Add->GetModuleData();
-                    if (modData.CmdInfo) {
-                        TActionGraphEncoder encoder(*modData.CmdInfo);
+                    if (modData.ActionData) {
+                        const auto& context = modData.ActionData->Model;
+                        TActionGraphEncoder encoder(context);
                         auto variableNames = encoder.ConfigurationBindingVariables(propValues->Data());
-                        auto binding = CompileConfigurationBinding(*modData.CmdInfo, variableNames);
+                        auto binding = CompileConfigurationBinding(context, variableNames);
                         encoder.AddConfigurationBinding(std::move(binding), *Add);
                     }
                 }

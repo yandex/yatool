@@ -20,7 +20,9 @@
 
 class TCommands;
 class TActionGraphEncoder;
+struct TActionCommitResult;
 struct TCompiledGlobalBinding;
+struct TPreparedGlobalBinding;
 
 struct TInducedDeps {
     TString Type;
@@ -40,10 +42,7 @@ bool IsForbiddenStatement(const TStringBuf& name);
 class TModuleBuilder : public TModuleDirBuilder, public TModuleWrapper
 {
     friend class TActionGraphEncoder;
-    friend TMaybe<TCompiledGlobalBinding> CompileGlobalBinding(
-        TModuleBuilder& moduleBuilder,
-        TStringBuf variableName
-    );
+    friend TVector<TPreparedGlobalBinding> CompileGlobalBindings(TModuleBuilder& moduleBuilder);
 public:
     struct TPeerQuery {
         enum class EAction {Store, Invoke, InvokeForEach};
@@ -213,7 +212,7 @@ private:
     bool LateGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
     bool PeerFlowStatement(const TStringBuf& name, const TVector<TStringBuf>& args);
 
-    bool QueueCommandOutputs(TCommandInfo& cmdInfo);
+    bool QueueCommandOutputs(TActionCommitResult& result);
 
     THashSet<ui64, TIdentity> VarMacroApplied;
     TAddDepAdaptor* GlobalNode = nullptr;

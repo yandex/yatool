@@ -14,22 +14,28 @@ TActionGlobEvaluator::TActionGlobEvaluator(TActionGlobEvaluationContext context)
 {
 }
 
-TEvaluatedActionGlob TActionGlobEvaluator::Evaluate(TStringBuf pattern) {
-    auto& fileConf = *Context_.FileConf_;
-    TExcludeMatcher excludeMatcher;
-    TUniqVector<TFileElemId> matches;
-    TGlobPattern glob(fileConf, pattern, fileConf.GetName(Context_.RootDirectory_));
-    for (const auto& result : glob.Apply(excludeMatcher)) {
-        matches.Push(result.GetTargetId());
+std::optional<TEvaluatedActionGlob> TActionGlobEvaluator::Evaluate(TStringBuf pattern) const {
+    try {
+        auto& fileConf = *Context_.FileConf_;
+        TExcludeMatcher excludeMatcher;
+        TUniqVector<TString> matches;
+        TGlobPattern glob(fileConf, pattern, fileConf.GetName(Context_.RootDirectory_));
+        for (const auto& result : glob.Apply(excludeMatcher)) {
+            matches.Push(TString{result.GetTargetStr()});
+        }
+        TVector<TString> watchedDirectories;
+        watchedDirectories.reserve(glob.GetWatchDirs().size());
+        for (const auto directory : glob.GetWatchDirs()) {
+            watchedDirectories.push_back(TString{fileConf.GetName(directory).GetTargetStr()});
+        }
+        return TEvaluatedActionGlob{
+            .Pattern = TString{pattern},
+            .MatchesHash = glob.GetMatchesHash(),
+            .WatchedDirectories = std::move(watchedDirectories),
+            .MatchedPaths = matches.Take(),
+        };
+    } catch (const yexception& error) {
+        YConfErr(Syntax) << "Invalid pattern in [[alt1]]" << pattern << "[[rst]]: " << error.what() << Endl;
+        return std::nullopt;
     }
-    return TEvaluatedActionGlob{
-        .Pattern = TString{pattern},
-        .MatchesHash = glob.GetMatchesHash(),
-        .WatchedDirectories = glob.GetWatchDirs().Data(),
-        .MatchedPaths = matches.Take(),
-    };
-}
-
-void TActionGlobEvaluator::ReportInvalidPattern(TStringBuf pattern, TStringBuf error) {
-    YConfErr(Syntax) << "Invalid pattern in [[alt1]]" << pattern << "[[rst]]: " << error << Endl;
 }

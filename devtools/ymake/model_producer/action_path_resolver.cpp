@@ -14,8 +14,7 @@ namespace {
         const TVarStrEx& input,
         TStringBuf originalInput,
         TFileView currentDirectory,
-        TModuleBuilder& moduleBuilder,
-        IActionInputModelSink& modelSink
+        TModuleBuilder& moduleBuilder
     ) {
         if (originalInput == input.Name) {
             return std::nullopt;
@@ -41,13 +40,13 @@ namespace {
         }
 
         return TInputResolutionRecord{
-            .OriginalPath = modelSink.InternLogicalPath(
+            .OriginalPath = TString{
                 NPath::IsTypedPathEx(originalInput)
                     ? originalInput
                     : NPath::ConstructPath(originalInput, NPath::Unset)
-            ),
-            .ResolveDirectory = currentDirectory.IsValid() ? currentDirectory.GetElemId() : TFileElemId(),
-            .ResultPath = AssumeFile(input.ElemId),
+            },
+            .ResolveDirectory = currentDirectory.IsValid() ? TString{currentDirectory.GetTargetStr()} : TString{},
+            .ResultPath = input.Name,
         };
     }
 
@@ -101,12 +100,12 @@ namespace {
     }
 }
 
-EActionInputResolution TActionInputResolver::Resolve(
+TActionInputResolutionResult TActionInputResolver::Resolve(
     TCommandInfo& commandInfo,
     TModuleBuilder& moduleBuilder,
-    IActionInputModelSink& modelSink,
     bool lastTry
 ) const {
+    TResolvedActionInputs resolvedInputs;
     commandInfo.Finalize();
 
     auto inputs = commandInfo.GetInput();
@@ -114,7 +113,7 @@ EActionInputResolution TActionInputResolver::Resolve(
     if (commandInfo.MainInput && !commandInfo.InitDirs(*commandInfo.MainInput, moduleBuilder, lastTry)) {
         YDIAG(VV) << "Main input in " << Get1(&commandInfo.Cmd)
                   << " is not ready, delay processing" << Endl;
-        return EActionInputResolution::Pending;
+        return {EActionInputResolution::Pending, {}};
     }
 
     for (auto& input : inputs) {
@@ -130,17 +129,16 @@ EActionInputResolution TActionInputResolver::Resolve(
             ) && !lastTry) {
             YDIAG(VV) << "Input '" << input.Name << "' in " << Get1(&commandInfo.Cmd)
                       << " is not ready, delay processing" << Endl;
-            return EActionInputResolution::Pending;
+            return {EActionInputResolution::Pending, {}};
         }
 
         if (!input.DirAllowed && !CheckForDirectory(input, commandInfo.Cmd, "input dependency"sv)) {
-            return EActionInputResolution::Skipped;
+            return {EActionInputResolution::Skipped, {}};
         }
 
         Y_ASSERT(input.ElemId); // must exists if ResolveSourcePath is true
-        modelSink.AcceptResolvedInput({
-            .File = AssumeFile(input.ElemId),
-            .LogicalName = input.Name,
+        resolvedInputs.push_back({
+            .LogicalName = TString{input.Name},
             .IsMacro = input.IsMacro,
             .IsDirectory = input.IsDir,
             .IsOutput = input.IsOutputFile,
@@ -149,8 +147,7 @@ EActionInputResolution TActionInputResolver::Resolve(
                 input,
                 originalInput,
                 commandInfo.InputDir,
-                moduleBuilder,
-                modelSink
+                moduleBuilder
             ),
         });
     }
@@ -179,7 +176,7 @@ EActionInputResolution TActionInputResolver::Resolve(
         }
     });
 
-    return state;
+    return {state, state == EActionInputResolution::Ready ? std::move(resolvedInputs) : TResolvedActionInputs{}};
 }
 
 bool TActionOutputResolver::Resolve(

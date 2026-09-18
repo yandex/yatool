@@ -553,30 +553,6 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
     return true;
 }
 
-bool TCommandInfo::GetCommandInfoFromStructVar(
-    TCmdElemId varElemId,
-    TCmdElemId cmdElemId,
-    TCommands& commands,
-    const TVars& vars
-) {
-    Cmd.SetSingleVal(Graph->Names().CmdNameById(varElemId).GetStr(), true);
-    Cmd[0].StructCmdForVars = true;
-    Y_ENSURE(UpdIter != nullptr);
-    TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RegisterCommand(
-        Cmd,
-        varElemId,
-        TActionGraphEncoder::EStorageFormat::Structured,
-        TActionGraphEncoder::EExpressionRole::Binding
-    );
-
-    auto exprVars = commands.GetCommandVars(cmdElemId);
-    for (auto&& exprVar : exprVars)
-        if (IsGlobalReservedVar(exprVar, vars))
-            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordReservedVariable(Cmd, exprVar);
-
-    return true;
-}
-
 bool TCommandInfo::GetCommandInfoFromMacro(const TStringBuf& realMacroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, TElemId id) {
     // Take appropriate macro specialization
     const TStringBuf& macroName = Conf->GetSpecMacroName(realMacroName, args);
@@ -788,6 +764,53 @@ void TCommandInfo::Finalize() {
         }
         SpecFiles = std::move(arrs);
     }
+}
+
+TActionSubmission TCommandInfo::TakeActionSubmission(TActionSubmission&& submission) {
+    Finalize();
+    auto& files = std::get<1>(SpecFiles);
+
+    submission.Command = std::move(Cmd);
+    submission.ActionInputs = std::move(files.Input);
+    submission.Outputs = std::move(files.Output);
+    submission.OutputIncludes = std::move(files.OutputInclude);
+    submission.OutputIncludesForType = std::move(files.OutputIncludeForType);
+    submission.LocalCommandBindings = std::move(LocalVars);
+    submission.GlobalCommandBindings = std::move(GlobalVars);
+    submission.HasGlobalInput = HasGlobalInput;
+    submission.Continuation.Model = {
+        .Conf = Conf,
+        .Graph = Graph,
+        .UpdIter = UpdIter,
+        .Module = Module,
+    };
+
+    const auto fromLocalVariable = [](const auto& resource) { return resource.FromLocalVar; };
+    const auto deferredResourceCount = CountIf(files.Tools.begin(), files.Tools.end(), fromLocalVariable) +
+        CountIf(files.Results.begin(), files.Results.end(), fromLocalVariable);
+    submission.Continuation.LocalResources.reserve(deferredResourceCount);
+    auto collectDeferredResources = [&](TSpecFileArr& resources) {
+        for (auto& resource : resources) {
+            if (resource.FromLocalVar) {
+                submission.Continuation.LocalResources.push_back({
+                    .Name = std::move(resource.Name),
+                    .IsResult = static_cast<bool>(resource.Result),
+                });
+            }
+        }
+    };
+    collectDeferredResources(files.Tools);
+    collectDeferredResources(files.Results);
+
+    return std::move(submission);
+}
+
+TVariableSubmission TCommandInfo::TakeVariableSubmission(TVariableSubmission&& submission) {
+    Finalize();
+    auto& files = std::get<1>(SpecFiles);
+    submission.Command = std::move(Cmd);
+    submission.Inputs = std::move(files.Input);
+    return std::move(submission);
 }
 
 

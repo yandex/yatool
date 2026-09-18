@@ -27,23 +27,12 @@ private:
     TFileElemId RootDirectory_;
 };
 
-// Producer result of evaluating one glob input. File-table handles are the
-// restricted name interface shared with the producer; the model still chooses
-// their persisted link encoding and all graph/cache topology.
+// Producer result of evaluating one glob input. Logical paths cross the
+// boundary by value; the model assigns file-table handles and chooses their
+// persisted link encoding and all graph/cache topology.
 struct TEvaluatedActionGlob {
     TString Pattern;
     TString MatchesHash;
-    TVector<TFileElemId> WatchedDirectories;
-    TVector<TFileElemId> MatchedPaths;
-};
-
-// Compatibility seam which keeps evaluation at its historical point in
-// action encoding. A future atomic submission can carry the evaluated values
-// directly instead of exposing a lazy producer callback.
-class IActionGlobEvaluator {
-public:
-    virtual ~IActionGlobEvaluator() = default;
-
-    virtual TEvaluatedActionGlob Evaluate(TStringBuf pattern) = 0;
-    virtual void ReportInvalidPattern(TStringBuf pattern, TStringBuf error) = 0;
+    TVector<TString> WatchedDirectories;
+    TVector<TString> MatchedPaths;
 };

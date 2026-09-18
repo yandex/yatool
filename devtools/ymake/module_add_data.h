@@ -1,11 +1,11 @@
 #pragma once
 
+#include "model/action_context.h"
+
 #include <devtools/ymake/compact_graph/dep_graph.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
 
 #include <util/generic/ptr.h>
-
-struct TCommandInfo;
 
 /// @brief Structure capturing properties of Added nodes w.r.t to their modules
 ///        For module nodes also contains output file nodes loaded from cached graph
@@ -17,7 +17,7 @@ enum class EInputsStatus {
 };
 
 struct TModAddData {
-    TAutoPtr<TCommandInfo> CmdInfo;
+    TAutoPtr<TActionContinuation> ActionData;
     THolder<THashSet<TFileElemId>> ParsedPeerdirs;
 
     union {

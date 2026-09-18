@@ -5,6 +5,7 @@
 #include "makefile_loader.h"
 #include "macro_string.h"
 #include "macro_processor.h"
+#include "model/action_context.h"
 #include "module_loader.h"
 #include "module_resolver.h"
 #include "prop_names.h"
@@ -565,7 +566,7 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
 
     YDIAG(DG) << "PBC name = " << name << ", " << tokens.size() << " tokens\n";
 
-    const TCommandInfo* cmdInfo = nullptr;
+    const TActionContinuation* actionData = nullptr;
 
     if (stack.size() >= 2) {
         const auto& prntState = stack[stack.size() - 2];
@@ -573,31 +574,25 @@ void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAd
         if (IsOutputType(prntState.Node.NodeType) && prntState.Dep.DepType == EDT_BuildCommand) {
             TNodeAddCtx* addCtx = prntState.Add.Get();
             if (addCtx) {
-                cmdInfo = addCtx->GetModuleData().CmdInfo.Get();
+                actionData = addCtx->GetModuleData().ActionData.Get();
             }
 
-            if (!cmdInfo) {
-                ythrow TNotImplemented() << "Output file has no cmd info. Graph seems corrupted. Reconstruct.";
+            if (!actionData) {
+                ythrow TNotImplemented() << "Output file has no action data. Graph seems corrupted. Reconstruct.";
             }
         }
     }
 
     // All nested macro export "tool" variables resolved from own vars go to the top level
-    if (cmdInfo) {
-        for (std::span<const TVarStrEx> collection : {cmdInfo->GetTools(), cmdInfo->GetResults()}) {
-            for (const auto& cmd : collection) {
-                if (!cmd.FromLocalVar) {
-                    continue;
-                }
+    if (actionData) {
+        for (const auto& resource : actionData->LocalResources) {
+            TStringBuf resourceValue = GetCmdValue(resource.Name);
+            TString dir = NPath::IsExternalPath(resourceValue) ? TString{resourceValue} : NPath::ConstructYDir(resourceValue, TStringBuf(), ConstrYDirDiag);
 
-                TStringBuf cmdValue = GetCmdValue(cmd.Name);
-                TString dir = NPath::IsExternalPath(cmdValue) ? TString{cmdValue} : NPath::ConstructYDir(cmdValue, TStringBuf(), ConstrYDirDiag);
-
-                YDIAG(DG) << (cmd.Result ? "Result" : "Tool") << " dep: " << dir << Endl;
-                node.AddUniqueDep(EDT_Include, EMNT_Directory, dir);
-                if (cmd.Result) {
-                    Graph.Names().CommandConf.GetById(RawElemId(node.ElemId)).KeepTargetPlatform = true;
-                }
+            YDIAG(DG) << (resource.IsResult ? "Result" : "Tool") << " dep: " << dir << Endl;
+            node.AddUniqueDep(EDT_Include, EMNT_Directory, dir);
+            if (resource.IsResult) {
+                Graph.Names().CommandConf.GetById(RawElemId(node.ElemId)).KeepTargetPlatform = true;
             }
         }
     }

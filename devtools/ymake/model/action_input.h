@@ -3,25 +3,26 @@
 #include "../symbols/elem_id.h"
 
 #include <util/generic/strbuf.h>
+#include <util/generic/string.h>
+#include <util/generic/vector.h>
 
 #include <optional>
 
 // Producer observation needed to detect whether a previously resolved input
 // resolves differently on a later configure. An empty ResolveDirectory
-// represents resolution without an original directory; the model chooses its
-// persisted encoding.
+// represents resolution without an original directory; the model interns the
+// logical paths and chooses their persisted encoding at commit time.
 struct TInputResolutionRecord {
-    TFileElemId OriginalPath;
-    TFileElemId ResolveDirectory;
-    TFileElemId ResultPath;
+    TString OriginalPath;
+    TString ResolveDirectory;
+    TString ResultPath;
 };
 
 // Compatibility representation of an input after producer-side path
-// resolution.  File is an opaque handle issued by the shared file table; the
-// remaining fields describe the resolved artifact without graph vocabulary.
+// resolution. LogicalName is normalized but deliberately not interned in this
+// value, so producer/model ordering does not leak through element IDs.
 struct TResolvedActionInput {
-    TFileElemId File;
-    TStringBuf LogicalName;
+    TString LogicalName;
     bool IsMacro;
     bool IsDirectory;
     bool IsOutput;
@@ -29,14 +30,4 @@ struct TResolvedActionInput {
     std::optional<TInputResolutionRecord> ResolutionRecord;
 };
 
-// Producer-facing semantic sink. Implementations may update model state, but
-// path resolution does not receive or manipulate graph construction objects.
-// InternLogicalPath is the restricted name-table operation needed to preserve
-// the current allocation point for original input spellings.
-class IActionInputModelSink {
-public:
-    virtual ~IActionInputModelSink() = default;
-
-    virtual TFileElemId InternLogicalPath(TStringBuf path) = 0;
-    virtual void AcceptResolvedInput(const TResolvedActionInput& input) = 0;
-};
+using TResolvedActionInputs = TVector<TResolvedActionInput>;

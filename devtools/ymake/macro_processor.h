@@ -24,10 +24,10 @@ class TBuildConfiguration;
 class TDepGraph;
 class TUpdIter;
 class TCommands;
-class TActionGraphEncoder;
 class TActionInputResolver;
 class TActionOutputResolver;
-struct TCompiledBindingExpression;
+struct TActionSubmission;
+struct TVariableSubmission;
 
 bool IsInternalReservedVar(const TStringBuf& cur);
 
@@ -61,13 +61,8 @@ public:
 
 private:
     friend class TCmdProperty;
-    friend class TActionGraphEncoder;
     friend class TActionInputResolver;
     friend class TActionOutputResolver;
-    friend TCompiledBindingExpression CompileConfigurationBinding(
-        TCommandInfo& commandInfo,
-        const TVector<TStringBuf>& variableNames
-    );
     explicit TCommandInfo();
     struct TSpecFileLists {
         TSpecFileList Input;         // deps for the main output
@@ -105,7 +100,6 @@ private:
 
     TModule* Module;
     TVarStrEx* MainInput = nullptr;
-    TVarStrEx* MainOutput = nullptr;
     ui32 MainInputCandidateIdx = Max<ui32>();
 
     mutable ui8 MsgDepth = 0; // for debug messages
@@ -136,9 +130,6 @@ public:
     std::span<const TVarStrEx> GetAutoInput() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).AutoInput : std::get<0>(SpecFiles).AutoInput.Data(); }
     std::span<const TVarStrEx> GetOutput() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).Output : std::get<0>(SpecFiles).Output.Data(); }
     std::span<const TVarStrEx> GetOutputInclude() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).OutputInclude : std::get<0>(SpecFiles).OutputInclude.Data(); }
-    std::span<const TVarStrEx> GetTools() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).Tools : std::get<0>(SpecFiles).Tools.Data(); }
-    std::span<const TVarStrEx> GetResults() const { return SpecFiles.index() == 1 ? std::get<1>(SpecFiles).Results : std::get<0>(SpecFiles).Results.Data(); }
-
     std::span<TVarStrEx> GetInput() { return std::get<1>(SpecFiles).Input; }
     std::span<TVarStrEx> GetOutput() { return std::get<1>(SpecFiles).Output; }
 
@@ -146,21 +137,14 @@ public:
 
     void InitFromModule(const TModule& mod);
 
-    const TVarStrEx* GetMainOutput() const {
-        return MainOutput;
-    }
+    TActionSubmission TakeActionSubmission(TActionSubmission&& submission);
+    TVariableSubmission TakeVariableSubmission(TVariableSubmission&& submission);
 
     bool GetCommandInfoFromStructCmd(
         TCommands& commands,
         TCmdElemId cmdElemId,
         NCommands::TCompiledCommand& compiled,
         bool skipMainOutput,
-        const TVars& vars
-    );
-    bool GetCommandInfoFromStructVar(
-        TCmdElemId varElemId,
-        TCmdElemId cmdElemId,
-        TCommands& commands,
         const TVars& vars
     );
     bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, TElemId id);
@@ -218,9 +202,6 @@ private:
     // Only input and output are changed outside of this class
     TSpecFileArr& GetAutoInput() { return std::get<1>(SpecFiles).AutoInput; }
     TSpecFileArr& GetOutputInclude() { return std::get<1>(SpecFiles).OutputInclude; }
-    TSpecFileArr& GetTools() { return std::get<1>(SpecFiles).Tools; }
-    TSpecFileArr& GetResults() { return std::get<1>(SpecFiles).Results; }
-
     template<typename T>
     void ApplyToOutputIncludes(T&& action) {
         action(TStringBuf{}, GetOutputInclude());

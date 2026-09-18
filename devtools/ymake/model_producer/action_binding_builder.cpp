@@ -2,7 +2,6 @@
 
 #include "../add_iter.h"
 #include "../command_store.h"
-#include "../macro_processor.h"
 #include "../macro_string.h"
 #include "../module_builder.h"
 #include "../ymake.h"
@@ -12,7 +11,7 @@
 #include <util/stream/str.h>
 
 TCompiledBindingExpression CompileConfigurationBinding(
-    TCommandInfo& commandInfo,
+    const TActionModelContext& context,
     const TVector<TStringBuf>& variableNames
 ) {
     TStringStream cfgVars;
@@ -20,17 +19,18 @@ TCompiledBindingExpression CompileConfigurationBinding(
         cfgVars << " " << variableName << "=$" << variableName;
     }
 
-    YDIAG(VV) << "CFG_VARS [" << commandInfo.Module->Vars.Id << "] -> " << cfgVars.Str() << Endl;
-    auto compiled = commandInfo.UpdIter->YMake.Commands.Compile(
+    YDIAG(VV) << "CFG_VARS [" << context.Module->Vars.Id << "] -> " << cfgVars.Str() << Endl;
+    auto compiled = context.UpdIter->YMake.Commands.Compile(
         cfgVars.Str(),
-        *commandInfo.Conf,
-        commandInfo.Module->Vars,
+        *context.Conf,
+        context.Module->Vars,
         false,
         {}
     );
     return {.Expression = std::move(compiled.Expression)};
 }
 
+namespace {
 TVector<TString> CollectGlobalBindingNames(const TModuleBuilder& moduleBuilder) {
     TVector<TString> names;
     names.reserve(
@@ -47,10 +47,12 @@ TVector<TString> CollectGlobalBindingNames(const TModuleBuilder& moduleBuilder) 
 }
 
 TMaybe<TCompiledGlobalBinding> CompileGlobalBinding(
-    TModuleBuilder& moduleBuilder,
+    TCommands& commands,
+    TVars& variables,
+    const TBuildConfiguration& conf,
     TStringBuf variableName
 ) {
-    const TYVar* variable = moduleBuilder.Vars.Lookup(variableName);
+    const TYVar* variable = variables.Lookup(variableName);
     if (!variable) {
         return Nothing();
     }
@@ -65,10 +67,10 @@ TMaybe<TCompiledGlobalBinding> CompileGlobalBinding(
     TStringBuf commandValue;
     ParseCommandLikeVariable(variableText, commandId, commandName, commandValue);
 
-    auto compiled = moduleBuilder.Commands.Compile(
+    auto compiled = commands.Compile(
         commandValue,
-        moduleBuilder.GetConf(),
-        moduleBuilder.Vars,
+        conf,
+        variables,
         false,
         {}
     );
@@ -77,4 +79,22 @@ TMaybe<TCompiledGlobalBinding> CompileGlobalBinding(
         .CommandName = TString{commandName},
         .Value = {.Expression = std::move(compiled.Expression)},
     };
+}
+}
+
+TVector<TPreparedGlobalBinding> CompileGlobalBindings(TModuleBuilder& moduleBuilder) {
+    TVector<TPreparedGlobalBinding> result;
+    for (auto&& name : CollectGlobalBindingNames(moduleBuilder)) {
+        auto binding = CompileGlobalBinding(
+            moduleBuilder.Commands,
+            moduleBuilder.Vars,
+            moduleBuilder.GetConf(),
+            name
+        );
+        result.push_back({
+            .Name = std::move(name),
+            .Binding = std::move(binding),
+        });
+    }
+    return result;
 }

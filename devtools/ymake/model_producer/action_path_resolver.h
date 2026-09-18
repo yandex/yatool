@@ -11,13 +11,17 @@ enum class EActionInputResolution {
     Skipped,
 };
 
-// Producer-side input resolution for a prepared action.
+struct TActionInputResolutionResult {
+    EActionInputResolution State;
+    TResolvedActionInputs Inputs;
+};
+
+// Producer-side input resolution for an action draft.
 class TActionInputResolver {
 public:
-    EActionInputResolution Resolve(
+    TActionInputResolutionResult Resolve(
         TCommandInfo& commandInfo,
         TModuleBuilder& moduleBuilder,
-        IActionInputModelSink& modelSink,
         bool lastTry
     ) const;
 };
