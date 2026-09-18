@@ -14,6 +14,7 @@ PEERDIR(
     devtools/ya/app/modules/caller_info
     devtools/ya/app_config
     devtools/ya/build/targets
+    devtools/ya/core/common_opts
     devtools/ya/core/config
     devtools/ya/core/error
     devtools/ya/core/event_handling
@@ -39,6 +40,7 @@ PEERDIR(
     devtools/ya/yalibrary/evlog
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/find_root
+    devtools/ya/yalibrary/status_view
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/host_health
     devtools/ya/yalibrary/loggers

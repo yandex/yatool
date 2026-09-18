@@ -5,4 +5,12 @@ PY_SRCS(
     __init__.py
 )
 
+PEERDIR(
+    devtools/ya/yalibrary/status_view
+)
+
 END()
+
+RECURSE_FOR_TESTS(
+    tests
+)

@@ -1,6 +1,7 @@
 PY23_LIBRARY()
 
 PEERDIR(
+    devtools/ya/core/error
     devtools/ya/test/const
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/roman
@@ -20,6 +21,7 @@ PY_SRCS(
     helpers.py
     status.py
     pack.py
+    plain.py
     term_view.py
 )
 

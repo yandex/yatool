@@ -10,6 +10,7 @@ import time
 import typing  # noqa: F401
 
 import app_config
+import devtools.ya.core.common_opts as common_opts
 import devtools.ya.core.error as core_error
 import devtools.ya.core.config
 import devtools.ya.core.gsid
@@ -27,6 +28,7 @@ import library.python.strings as strings
 import library.python.windows as windows
 import devtools.ya.yalibrary.app_ctx
 import yalibrary.find_root
+import yalibrary.status_view
 import yalibrary.vcs as vcs
 from exts.strtobool import strtobool
 from yalibrary.display import build_term_display
@@ -503,6 +505,10 @@ def configure_custom_file_log(app_ctx):
     yield
 
 
+def _plain_style(params) -> bool:
+    return getattr(params, 'output_style', None) == common_opts.OutputStyle.PLAIN
+
+
 def configure_display_log(app_ctx):
     from yalibrary.loggers import display_log
     from devtools.ya.core import logger  # XXX
@@ -514,7 +520,7 @@ def configure_display_log(app_ctx):
         # Must go first: with_display_log replays and closes the early
         # warning buffer, and the display is DevNull in agent mode.
         log_handler.with_agent_log(app_ctx, agent_console)
-    display_log.with_display_log(app_ctx, logger.level(), app_ctx.hide_token)
+    display_log.with_display_log(app_ctx, logger.level(), app_ctx.hide_token, plain=_plain_style(app_ctx.params))
     yield
 
 
@@ -620,8 +626,11 @@ def configure_display(app_ctx):
         yield yadisplay.DevNullDisplay()
         return
 
+    # The plain style is a log for non-interactive consumers: no colors and no
+    # status line even when stderr happens to be a terminal (an agent's pty).
+    plain_style = _plain_style(app_ctx.params)
     fmt = formatter.new_formatter(
-        exts.os2.is_tty(),
+        exts.os2.is_tty() and not plain_style,
         profile=getattr(app_ctx.params, 'terminal_profile', None),
         teamcity=getattr(app_ctx.params, 'teamcity', False),
         show_status=getattr(app_ctx.params, 'do_emit_status', True),
@@ -643,6 +652,11 @@ def configure_display(app_ctx):
                     html_display.close()
         else:
             yield term_display
+    except Exception as e:
+        # The exit interceptor prints the error after this context is gone;
+        # it learns the style the same way it learns the exit code.
+        e.ya_plain_style = plain_style
+        raise
     finally:
         term_display.close()
 
@@ -1074,11 +1088,26 @@ def configure_diag_interceptor():
 
 
 def configure_exit_interceptor(error_file):
+    def is_plain(exc):
+        # Stamped by configure_display, whose context is gone by now.
+        return getattr(exc, 'ya_plain_style', False)
+
     def print_message(exc):
         error_message = exc.message if hasattr(exc, "message") else str(exc)
         logger.debug(error_message)
+        if is_plain(exc):
+            display = build_term_display(sys.stderr, False)
+            display.emit_message(yalibrary.status_view.plain.line(yalibrary.status_view.plain.ERROR, error_message))
+            return
         display = build_term_display(sys.stderr, exts.os2.is_tty())  # XXX
         display.emit_message('[[bad]]' + error_message + '[[rst]]')
+
+    def print_plain_verdict(exc):
+        # The last line of a plain run is its verdict, even when the run
+        # died of an exception instead of a build or test result.
+        if is_plain(exc):
+            display = build_term_display(sys.stderr, False)
+            display.emit_message(yalibrary.status_view.plain.final_message(exc.ya_exit_code))
 
     try:
         yield
@@ -1136,6 +1165,7 @@ def configure_exit_interceptor(error_file):
             else:
                 sys.stderr.write("Can't write error into file")
 
+        print_plain_verdict(e)
         sys.exit(e.ya_exit_code)
 
 

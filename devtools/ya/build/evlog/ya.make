@@ -7,6 +7,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/exts
+    devtools/ya/yalibrary/status_view
 )
 
 END()

@@ -739,6 +739,12 @@ class RunNodeTask(object):
     def short_name(self):
         return self._node.kv.get('p', '??')
 
+    @property
+    def kv(self):
+        # type: () -> dict
+        """Presentation hints of the node (`p`, `pc`, `show_out`, `path`, ...)."""
+        return self._node.kv
+
     def _supports_build_time_cache(self, other=None):
         node = other or self._node
         return (

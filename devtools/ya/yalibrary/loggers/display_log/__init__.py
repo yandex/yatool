@@ -1,5 +1,7 @@
 import logging
 
+from yalibrary.status_view import plain
+
 
 class DisplayStreamHandler(logging.StreamHandler):
     level_map = {
@@ -10,24 +12,23 @@ class DisplayStreamHandler(logging.StreamHandler):
         logging.CRITICAL: ('Fatal', '[[bad]]'),
     }
 
-    def __init__(self, display, replacements):
+    def __init__(self, display, replacements, plain=False):
         super(DisplayStreamHandler, self).__init__()
         self._display = display
         self._replacements = replacements
+        self._plain = plain
 
     def _filter(self, s):
         for r in self._replacements:
             s = s.replace(r, "[SECRET]")
         return s
 
-    def gen_prefix(self, level_name):
-        prefix, fg = self.level_map[level_name]
-        return fg + prefix + '[[rst]]: '
-
     def format(self, record):
         message = logging.StreamHandler.format(self, record)
-        prefix = self.gen_prefix(record.levelno)
-        return prefix + message
+        name, fg = self.level_map[record.levelno]
+        if self._plain:
+            return plain.line(plain.SEVERITY_BY_NAME[name], message)
+        return fg + name + '[[rst]]: ' + message
 
     def emit(self, record):
         try:
@@ -38,11 +39,11 @@ class DisplayStreamHandler(logging.StreamHandler):
             self.handleError(record)
 
 
-def with_display_log(app_ctx, level, replacements):
+def with_display_log(app_ctx, level, replacements, plain=False):
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
 
-    display_handler = DisplayStreamHandler(app_ctx.display, replacements)
+    display_handler = DisplayStreamHandler(app_ctx.display, replacements, plain=plain)
     display_handler.setLevel(level)
 
     if hasattr(app_ctx, 'display_in_memory_log'):

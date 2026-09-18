@@ -69,6 +69,7 @@ from yalibrary.toolscache import (
     tc_force_gc,
 )
 import yalibrary.platform_matcher as pm
+import yalibrary.status_view as status_view
 from devtools.ya.build.cache_kind import CacheKind
 from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 
@@ -155,6 +156,15 @@ class DisplayMessageSubscriber(event_handling.SubscriberSpecifiedTopics):
         self._opts = opts
         self._display = display
         self._printed = printed or set()
+        self._plain = getattr(opts, 'output_style', None) == status_view.plain.STYLE
+
+    @staticmethod
+    def _plain_message(severity, sub, platform, where, data):
+        # type: (str, str, str, str, str) -> str
+        """One line, grep-able by its prefix: `ERROR: {platform} [sub] path:row:col: text`."""
+        prefix = status_view.plain.SEVERITY_BY_NAME.get(severity, severity.upper())
+        parts = [platform.strip(), sub, where + ':' if where else '', data]
+        return status_view.plain.line(prefix, ' '.join(part for part in parts if part))
 
     def _action(self, event):
         # type: (dict) -> None
@@ -164,16 +174,19 @@ class DisplayMessageSubscriber(event_handling.SubscriberSpecifiedTopics):
 
         data = six.ensure_str(data)
 
-        where = 'in [[imp]]{}[[rst]]'.format(event['Where']) if 'Where' in event else ''
-        if len(where):
-            where += ':{}:{}: '.format(event['Row'], event['Column']) if 'Row' in event and 'Column' in event else ': '
+        row_col = ':{}:{}'.format(event['Row'], event['Column']) if 'Row' in event and 'Column' in event else ''
         platform = (
             '{{{}}} '.format(pm.get_platform_id_from_string(event['Platform']) or event['Platform'])
             if 'Platform' in event
             else ''
         )
 
-        msg = '{}[[{}]]{}{}[[rst]]: {}{}'.format(platform, event['Mod'], severity, sub, where, data)
+        if self._plain:
+            where = event['Where'] + row_col if 'Where' in event else ''
+            msg = self._plain_message(severity, sub, platform, where, data)
+        else:
+            where = 'in [[imp]]{}[[rst]]{}: '.format(event['Where'], row_col) if 'Where' in event else ''
+            msg = '{}[[{}]]{}{}[[rst]]: {}{}'.format(platform, event['Mod'], severity, sub, where, data)
         if msg not in self._printed and (self._opts.be_verbose or severity != 'Debug'):
             self._printed.add(msg)
 
@@ -1948,6 +1961,10 @@ class YaMake:
             self.ctx.unlock()
 
     def _calc_msg(self, exit_code):
+        if self.opts.output_style == status_view.plain.STYLE:
+            if exit_code or self.opts.show_final_ok:
+                return status_view.plain.final_message(exit_code)
+            return ''
         if exit_code == devtools.ya.core.error.ExitCodes.NO_TESTS_COLLECTED:
             return "[[bad]]Failed - No tests collected[[rst]]"
         elif exit_code:

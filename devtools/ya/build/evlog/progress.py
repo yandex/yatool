@@ -4,6 +4,7 @@ import collections
 import six
 
 import devtools.ya.core.event_handling as event_handling
+import yalibrary.status_view as status_view
 
 
 class Mode(Enum):
@@ -264,13 +265,17 @@ class PrintProgressSubscriber(
 
 
 def get_print_status_func(opts, display, logger):
+    output_style = getattr(opts, "output_style", "")
     if display:
-        _fprint = display.emit_status if getattr(opts, "output_style", "") == "ninja" else display.emit_message
+        _fprint = display.emit_status if output_style == "ninja" else display.emit_message
     else:
         _fprint = logger.debug
 
     def _print_status(msg):
-        _fprint("[[imp]]{}[[rst]]".format(msg))
+        if output_style == status_view.plain.STYLE:
+            _fprint(status_view.plain.line(status_view.plain.INFO, msg))
+        else:
+            _fprint("[[imp]]{}[[rst]]".format(msg))
 
     return _print_status
 

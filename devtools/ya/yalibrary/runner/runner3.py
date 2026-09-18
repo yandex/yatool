@@ -683,11 +683,10 @@ class TaskContext(object):
         term_view = status_view.TermView(
             queue_status,
             self._app_ctx.display,
-            self.opts.output_style == 'ninja',
-            self.opts.ext_progress,
-            False,
+            extra_progress=self.opts.ext_progress,
             output_replacements=output_replacements,
             use_roman_numerals=self.opts.use_roman_numerals,
+            style=self.opts.output_style,
         )
         self._ticker = status_view.TickThrottle(term_view.tick, 0.1)
         self._exit_stack.callback(lambda: self._ticker.tick(force=True))

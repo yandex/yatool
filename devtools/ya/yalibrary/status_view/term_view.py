@@ -2,6 +2,7 @@ import sys
 import time
 
 from yalibrary.status_view import helpers
+from yalibrary.status_view import plain
 from yalibrary import display
 from yalibrary.term import size as term_size
 import yalibrary.formatter
@@ -40,6 +41,11 @@ class TickThrottle(object):
             self._stamp = time.time()
 
 
+STYLE_NINJA = 'ninja'
+STYLE_MAKE = 'make'
+STYLE_PLAIN = plain.STYLE
+
+
 class TermView(object):
     def __init__(
         self,
@@ -52,16 +58,26 @@ class TermView(object):
         patterns=None,
         use_roman_numerals=False,
         show_active_progress=True,
+        style=None,
     ):
+        # type: (...) -> None
         self._status = status
         self._display = display
         self._last_id = 0
         self._last_time = 0
-        self._ninja = ninja
+        # `style` names the output style of the run; `ninja` is kept for the
+        # callers that only choose between the rewritable status line and one
+        # line per finished task.
+        if style is None:
+            style = STYLE_NINJA if ninja else STYLE_MAKE
+        self._ninja = style == STYLE_NINJA
+        self._start_time = time.time()
+        # The plain style prints progress as messages; the strategy owns the
+        # timing state and decides what, if anything, to print on a tick.
+        self._progress = plain.PlainProgress(self._start_time) if style == STYLE_PLAIN else None
         self._extra_progress = extra_progress
         # save 2 chars for ^C
         self._max_len = term_size.termsize_or_default(sys.stderr, default=(25, 120))[1] - 2
-        self._start_time = time.time()
         self._last_updated = 0
         self._default_status = (
             '[[c:yellow]]NO ACTIVE DISTBUILD TASKS[[rst]]' if distbuild else '[[c:yellow]]NO ACTIVE LOCAL TASKS[[rst]]'
@@ -137,7 +153,60 @@ class TermView(object):
             post or [],
         )
 
+    @staticmethod
+    def _hidden(task):
+        # type: (object) -> bool
+        return hasattr(task, 'hide_me') and task.hide_me()
+
+    def _body(self, task):
+        # type: (object) -> str | None
+        return self._fmt_body(task.body()) if hasattr(task, 'body') else None
+
+    def _plain_finished(self, task):
+        # type: (object) -> None
+        """Report one finished task in the plain style: only its stderr, under a severity prefix."""
+        task_status = self._fmt(task)
+        if not task_status or self._hidden(task):
+            return
+        body = self._body(task)
+        if not body:
+            return
+        # The stderr of a passed test is not a diagnosis of anything; the
+        # test reporter prints the results.
+        if not plain.is_failed(task) and plain.is_test(task):
+            return
+        self._display.emit_message(plain.line(plain.severity_of(task), plain.header(task_status)))
+        self._display.emit_message(yalibrary.formatter.ansi_codes_to_markup(body))
+
+    def _running(self, active):
+        # type: (list) -> list
+        """`(header, elapsed)` of the active tasks that have a status, longest running first."""
+        # Status.active() is ordered by start time, the oldest task first.
+        running = []
+        for task, elapsed in reversed(active):
+            task_status = self._fmt(task)
+            if task_status:
+                running.append((plain.header(task_status), elapsed))
+        return running
+
+    def _tick_plain(self):
+        # type: () -> None
+        """The tick of the plain style: finished tasks as messages, progress as the strategy decides."""
+        for task in self._status.finished(self._last_id):
+            self._last_id += 1
+            self._plain_finished(task)
+        active = self._status.active()
+        line = self._progress.tick(
+            time.time(), self._last_id, self._status.count, len(active), lambda: self._running(active)
+        )
+        if line:
+            self._display.emit_message(line)
+
     def tick(self, *extra):
+        if self._progress is not None:
+            self._tick_plain()
+            return
+
         if time.time() - self._last_updated > 1:
             self._max_len = term_size.termsize_or_default(sys.stderr, default=(25, 120))[1] - 2
             self._last_updated = time.time()
@@ -149,9 +218,8 @@ class TermView(object):
             self._last_id += 1
             if not task_status:
                 continue
-            body = self._fmt_body(task.body()) if hasattr(task, 'body') else None
-            hide_me = task.hide_me() if hasattr(task, 'hide_me') else False
-            if not hide_me and (body or not self._ninja):
+            body = self._body(task)
+            if not self._hidden(task) and (body or not self._ninja):
                 pre = []
                 if body:
                     pre.append('[[unimp]]-------[[rst]]')

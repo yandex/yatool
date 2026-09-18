@@ -1,3 +1,4 @@
+import enum
 import logging
 import os
 import re
@@ -141,6 +142,12 @@ class DetailedArgsOptions(Options):
         )
 
 
+class OutputStyle(enum.StrEnum):
+    NINJA = 'ninja'
+    MAKE = 'make'
+    PLAIN = 'plain'
+
+
 class OutputStyleOptions(Options):
     def __init__(self):
         self.do_not_output_stderrs = False
@@ -158,6 +165,17 @@ class OutputStyleOptions(Options):
                 ['-T'],
                 help='Do not rewrite output information (ninja/make)',
                 hook=SetConstValueHook('output_style', 'make'),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.BASIC,
+            ),
+            ArgConsumer(
+                ['--output-style'],
+                help=(
+                    'Output style: ninja (status line rewritten in place), make (one line per finished node, same as -T), '
+                    'plain (log for non-interactive consumers: no colors, no status line, INFO/WARNING/ERROR prefixes, '
+                    'progress as [done / total] lines on change and "Still waiting" reports)'
+                ),
+                hook=SetValueHook('output_style', values=list(OutputStyle)),
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.BASIC,
             ),
@@ -212,6 +230,11 @@ class OutputStyleOptions(Options):
         return cls.additional_style_opts() + cls.common_style_opts()
 
     def postprocess2(self, params):
+        # The value may come from ya.conf, which bypasses the option's validation.
+        if params.output_style not in list(OutputStyle):
+            raise ArgsValidatingException(
+                "Invalid output_style: {} (choose from '{}')".format(params.output_style, "', '".join(OutputStyle))
+            )
         if params.mask_roots is not None:
             return
         params.mask_roots = getattr(params, "use_distbuild", False)
