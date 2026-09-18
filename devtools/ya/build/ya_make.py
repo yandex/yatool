@@ -1751,7 +1751,7 @@ class YaMake:
         suites = []
         if self.opts.report_skipped_suites_only or self.opts.report_skipped_suites:
             suites = self.ctx.stripped_tests
-        if not self.opts.report_skipped_suites_only:
+        if not self.opts.report_skipped_suites_only and not self.opts.list_tests:
             suites += build_report.fill_suites_results(self, self.ctx.tests, self._output_root)
 
         report_prototype = collections.defaultdict(list)
