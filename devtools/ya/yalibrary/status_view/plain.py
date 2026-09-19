@@ -40,9 +40,8 @@ SEVERITY_BY_NAME = {
     'Fatal': FATAL,
 }
 
-# One sentence per exit code: what the consumer should do next. The long
-# advice of the agent event stream lives in yalibrary/agent_ui/classify.py;
-# this table is its terse, terminal-sized counterpart.
+# One sentence per exit code: what the consumer should do next, terse
+# enough for a terminal.
 _HINT_BY_EXIT_CODE = {
     core_error.ExitCodes.GENERIC_ERROR: 'see the ERROR lines above',
     core_error.ExitCodes.UNHANDLED_EXCEPTION: 'ya itself crashed, the traceback is in the ya log',

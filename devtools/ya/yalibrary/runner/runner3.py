@@ -692,14 +692,6 @@ class TaskContext(object):
         self._exit_stack.callback(lambda: self._ticker.tick(force=True))
         self._exit_stack.callback(view.finish)
 
-        # AgentConsole (devtools/ya/yalibrary/agent_ui) comes through
-        # app_ctx: yalibrary must not import app.modules. The console
-        # projects this snapshot into the ``running`` heartbeat field.
-        agent_console = getattr(self._app_ctx, 'agent_ui', None)
-        if agent_console is not None:
-            agent_console.set_activity(queue_status.active)
-            self._exit_stack.callback(agent_console.set_activity, None)
-
         self.runq = runqueue.RunQueue(self._workers.add, queue_status.listener())
         self.task_cache = task_cache.TaskCache(self.runq)
         self.pattern_cache = task_cache.TaskCache(self.runq, self.prepare_pattern)

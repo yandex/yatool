@@ -40,12 +40,10 @@ class YaMakeLock:
         self,
         path: str,
         display: typing.Any,
-        agent_console: typing.Any = None,
         poll_interval: float = YA_MAKE_LOCK_POLL_INTERVAL,
     ) -> None:
         self._lock = filelock.PidFileLock(path)
         self._display = display
-        self._agent_console = agent_console
         self._poll_interval = poll_interval
         self._acquired = False
 
@@ -60,11 +58,7 @@ class YaMakeLock:
         )
         ticker = status_view.TickThrottle(term_view.tick, YA_MAKE_LOCK_POLL_INTERVAL)
         try:
-            if self._agent_console is None:
-                waiting = self._acquire(wait_status, ticker)
-            else:
-                with self._agent_console.temporary_activity(wait_status.active):
-                    waiting = self._acquire(wait_status, ticker)
+            waiting = self._acquire(wait_status, ticker)
         finally:
             listener.finished(wait_task)
 
@@ -76,9 +70,6 @@ class YaMakeLock:
     def _acquire(self, wait_status: status_view.Status, ticker: status_view.TickThrottle) -> bool:
         waiting = False
         while not self._lock.acquire(blocking=False):
-            if not waiting and self._agent_console is not None:
-                task, elapsed = wait_status.active()[-1]
-                logger.warning("%s, waiting for %.1fs...", task.owner_status(), elapsed)
             ticker.tick()
             waiting = True
             time.sleep(self._poll_interval)
@@ -160,7 +151,7 @@ def do_ya_make(params):
 
     if getattr(params, 'locked', False):
         lock_path = os.path.join(core_config.misc_root(), YA_MAKE_LOCK_FILE)
-        with YaMakeLock(lock_path, app_ctx.display, agent_console=getattr(app_ctx, 'agent_ui', None)):
+        with YaMakeLock(lock_path, app_ctx.display):
             return _do_ya_make(params, app_ctx)
     return _do_ya_make(params, app_ctx)
 

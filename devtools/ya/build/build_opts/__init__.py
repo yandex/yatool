@@ -43,7 +43,6 @@ from devtools.ya.core.common_opts import (
     CustomMiscBuildInfoDirOptions,
     KeepTempsOptions,
     HtmlDisplayOptions,
-    AgentOutputOptions,
     TeamcityOptions,
     ProfilerOptions,
     LogFileOptions,
@@ -3536,7 +3535,6 @@ def ya_make_options(  # compat
             InstallDirOptions(),  # temp legacy option
             KeepTempsOptions(),
             HtmlDisplayOptions(),
-            AgentOutputOptions(),
             TeamcityOptions(),
             ProfilerOptions(),
             LogFileOptions(),

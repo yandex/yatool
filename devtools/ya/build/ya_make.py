@@ -56,7 +56,6 @@ import library.python.func as func
 from exts.decompress import udopen
 from exts.compress import zcopen
 from yalibrary import tools
-from devtools.ya.yalibrary.agent_ui import subscriber as agent_ui_subscriber
 from yalibrary.last_failed import last_failed
 from yalibrary.runner import patterns as ptrn
 from yalibrary.runner import result_store
@@ -375,12 +374,6 @@ def _build_graph_and_tests(opts, app_ctx, ymake_stats):
         ymake_stats,
         errors_collector,
     ]
-
-    # AgentConsole (devtools/ya/yalibrary/agent_ui) is taken from app_ctx;
-    # it is absent or None when the agent output is disabled.
-    agent_console = getattr(app_ctx, 'agent_ui', None)
-    if agent_console is not None:
-        configure_time_subscribers.append(agent_ui_subscriber.ConfigureSubscriber(agent_console))
 
     if getattr(app_ctx, 'evlog', None):
         configure_time_subscribers.append(
@@ -1511,7 +1504,7 @@ class YaMake:
         self._structured = getattr(app_ctx.display, 'structured', False)
         self._structured_test_list = self._structured and getattr(opts, 'list_tests', False)
         if self._structured_test_list and not opts.list_tests_output_file:
-            # The list node writes the structured list there; _go turns it into `tests` events.
+            # The list node writes the structured list there; go turns it into `tests` events.
             opts.list_tests_output_file = os.path.join(tempfile.mkdtemp(prefix='yatestlist'), 'test_list.jsonl')
         self.build_root = None
         self.misc_build_info_dir = None
@@ -1537,7 +1530,6 @@ class YaMake:
         self._report = None
         self._reports_generator = None
         self._slot_time_listener = None
-        self._agent_sink = None
 
     def _setup(self, opts):
         self.opts = opts
@@ -1713,11 +1705,7 @@ class YaMake:
         if self._structured:
             self._build_results_listener.add(pr.NodeFailureListener(self.ctx.graph, self.app_ctx.display, self.opts))
 
-        if (
-            self.opts.json_line_report_file is None
-            and self.opts.build_results_report_file is None
-            and self._agent_sink is None
-        ):
+        if self.opts.json_line_report_file is None and self.opts.build_results_report_file is None:
             if self.opts.print_test_console_report:
                 self._build_results_listener.add(test_node_listener)
             return
@@ -1733,9 +1721,6 @@ class YaMake:
 
         if self.opts.json_line_report_file:
             report_list.append(results_report.JsonLineReport(self.opts.json_line_report_file))
-
-        if self._agent_sink is not None:
-            report_list.append(self._agent_sink)
 
         self._reports_generator = ar.ReportGenerator(
             self.opts,
@@ -1870,70 +1855,6 @@ class YaMake:
         return self._report.make_report() if self._report is not None else None
 
     def go(self):
-        agent_console = getattr(self.app_ctx, 'agent_ui', None)
-        if agent_console is None:
-            return self._go()
-        with agent_console.build(self.opts.rel_targets, self._target_platform_names()) as sink:
-            # The sink must be registered before _go() runs _setup_reports().
-            self._agent_sink = sink
-            sink.exit_code = self._go()
-            # Artifacts are collected after _go() so that symlinks are committed.
-            try:
-                sink.artifacts = self._collect_artifacts()
-            except Exception:
-                logger.exception("Unable to collect artifacts for the agent console")
-            return sink.exit_code
-
-    def _target_platform_names(self):
-        platforms = getattr(self.opts, 'target_platforms', None) or []
-        return [name for name in (platform.get('platform_name') for platform in platforms) if name]
-
-    def _collect_artifacts(self):
-        if self.build_result is None:
-            return []
-        test_uids = self._test_module_uids()
-        targets = self.targets  # a property resolving the graph; hoist out of the loop
-        artifacts = []
-        for uid, results in self.build_result.ok_nodes.items():
-            if uid in test_uids:
-                continue
-            target = targets.get(uid)
-            if not target:
-                continue
-            target_name, target_platform = target[0], target[1]
-            files = []
-            for res in results:
-                path = res.get('symlink') or res.get('artifact')
-                if path:
-                    files.append(path)
-            if files:
-                artifacts.append({'path': target_name, 'platform': target_platform, 'files': sorted(files)})
-        return sorted(artifacts, key=lambda artifact: (artifact['path'], str(artifact['platform'])))
-
-    def _test_module_uids(self):
-        """Uids of the modules owned by injected test nodes (the tested binaries).
-
-        A test node depends both on its own module and on DEPENDS() programs;
-        only the deps living in the test's own directory are its modules.
-        Test nodes are injected only when tests were requested; on a plain
-        build the set is empty and test binaries are reported as ordinary
-        artifacts of the requested targets.
-        """
-        uids = set()
-        targets = self.targets  # a property resolving the graph; hoist out of the loop
-        for node in self.ctx.graph['graph']:
-            if node.get('node-type') != devtools.ya.test.const.NodeType.TEST:
-                continue
-            test_dir = os.path.dirname(node.get('kv', {}).get('path', ''))
-            if not test_dir:
-                continue
-            for dep in node.get('deps') or ():
-                target = targets.get(dep)
-                if target and target[0] == test_dir:
-                    uids.add(dep)
-        return uids
-
-    def _go(self):
         self._setup_build_root(self.opts.bld_root)
         self._setup_reports()
         self._setup_compact_for_gc()

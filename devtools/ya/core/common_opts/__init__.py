@@ -414,40 +414,6 @@ class HtmlDisplayOptions(Options):
         ]
 
 
-class AgentOutputOptions(Options):
-    STDERR = '-'
-    DISABLED = 'none'
-
-    def __init__(self):
-        self.agent_output = None
-        self.auto_detect_agent = True
-
-    @staticmethod
-    def consumer():
-        hook = SetValueHook('agent_output')
-        return [
-            ArgConsumer(
-                ['--agent-output'],
-                help='Write a compact machine-readable event stream for coding agents '
-                '("-" for stderr, "none" to disable; auto-enabled on stderr when ya is launched by a coding agent)',
-                hook=hook,
-                group=PRINT_CONTROL_GROUP,
-                visible=HelpLevel.ADVANCED,
-            ),
-            EnvConsumer(
-                name='YA_AGENT_OUTPUT',
-                hook=hook,
-            ),
-            EnvConsumer(
-                name='YA_AUTO_DETECT_AGENT',
-                hook=SetValueHook('auto_detect_agent', return_true_if_enabled),
-            ),
-            ConfigConsumer(
-                'auto_detect_agent',
-            ),
-        ]
-
-
 class TeamcityOptions(Options):
     def __init__(self):
         self.teamcity = False

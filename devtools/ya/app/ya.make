@@ -7,7 +7,6 @@ PY_SRCS(
 PEERDIR(
     devtools/recipe_manager/client
     devtools/recipe_manager/manager
-    devtools/ya/app/modules/agent_ui
     devtools/ya/app/modules/evlog
     devtools/ya/app/modules/params
     devtools/ya/app/modules/token_suppressions
@@ -31,7 +30,6 @@ PEERDIR(
     devtools/ya/core/user
     devtools/ya/exts
     devtools/ya/yalibrary/active_state
-    devtools/ya/yalibrary/agent_ui
     devtools/ya/yalibrary/app_ctx
     devtools/ya/yalibrary/build_graph_cache/changelist_storage
     devtools/ya/yalibrary/debug_store
