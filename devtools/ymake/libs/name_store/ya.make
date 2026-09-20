@@ -9,6 +9,7 @@ PEERDIR(
     devtools/ymake/common
     library/cpp/containers/absl
     library/cpp/on_disk/multi_blob
+    library/cpp/threading/light_rw_lock
 )
 
 END()

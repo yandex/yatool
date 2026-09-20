@@ -47,6 +47,7 @@ PEERDIR(
     library/cpp/sighandler
     library/cpp/string_utils/base64
     library/cpp/svnversion
+    library/cpp/threading/light_rw_lock
     library/cpp/ucompress
     library/cpp/zipatch
 )
@@ -106,6 +107,7 @@ SRCS(
     export_json.cpp
     flat_json_graph.cpp
     foreign_platforms/pipeline.cpp
+    frozen_module_store.cpp
     general_parser.cpp
     glob_helper.cpp
     global_vars_collector.cpp

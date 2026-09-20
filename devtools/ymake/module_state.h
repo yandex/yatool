@@ -25,6 +25,7 @@
 
 class TSymbols;
 class TModule;
+class TFrozenModuleStore;
 class TAppliedPeersRules;
 class TBuildConfiguration;
 
@@ -138,6 +139,8 @@ using TRawIncludes = THashMap<TFileElemId, TRawIncludesInfo>;
 class TModuleSavedState {
 private:
     friend class TModule;
+    friend class TModules;
+    friend class TFrozenModuleStore;
 
     TFileElemId Id = TFileElemId();
     TFileElemId DirId = TFileElemId();
@@ -490,6 +493,7 @@ public:
 
 private:
     friend class TModules;
+    friend class TFrozenModuleStore;
     static constexpr const TFileElemId BAD_MODULE = TFileElemId(0xfffffffe);
 
     EMakeNodeType NodeType = EMNT_Deleted;

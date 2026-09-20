@@ -6,9 +6,11 @@
 #include <devtools/ymake/diag/stats.h>
 
 #include <library/cpp/containers/concurrent_hash/concurrent_hash.h>
+#include <library/cpp/threading/light_rw_lock/lightrwlock.h>
 #include <util/generic/hash.h>
 
 class TFileConf;
+class TFrozenModuleStore;
 struct TDependencyManagementModuleInfo;
 
 /// @brief Collection that owns all TModules and provides navigation among them.
@@ -18,6 +20,8 @@ struct TDependencyManagementModuleInfo;
 /// - Destroy() deletes module (both committed and non-committed)
 class TModules {
 private:
+    friend class TFrozenModuleStore;
+
     using TResultOutputsMap = THashMap<TStringBuf, TString>;
 
     TSymbols& Symbols;
@@ -40,12 +44,9 @@ private:
 
     bool Loaded = false;
     THashSet<TFileElemId> ReparsedMakefiles;
-
-    class TModulesSaver {
-    public:
-        TVector<TModuleSavedState> Data;
-        Y_SAVELOAD_DEFINE(Data);
-    };
+    THolder<TFrozenModuleStore> FrozenModules;
+    size_t LogicalModulesCount = 0;
+    mutable TLightRWLock MaterializationLock;
 
 public:
     /// Contructs the collection with just RootModule in it
@@ -79,6 +80,9 @@ public:
 
     /// Try to locate module by FileElemId
     TModule* Get(TFileElemId id);
+
+    /// Check logical membership without materializing a frozen module.
+    bool Contains(TFileElemId id) const;
 
     /// Try to locate module by FileElemId
     const TModule* Get(TFileElemId id) const {
@@ -144,14 +148,6 @@ public:
 
     void ResetTransitiveInfo();
 
-    decltype(ModulesById)::const_iterator begin() const {
-        return ModulesById.begin();
-    }
-
-    decltype(ModulesById)::const_iterator end() const {
-        return ModulesById.end();
-    }
-
     void ReportStats() const;
 
     void Clear();
@@ -163,5 +159,8 @@ public:
     ~TModules();
 
 private:
-    void SaveFilteredModules(TModulesSaver& saver);
+    // MaterializationLock must already be write-locked.
+    void CommitUnlocked(TModule& module);
+    void ClearRawIncludesUnlocked();
+    bool ContainsUnlocked(TFileElemId id) const;
 };

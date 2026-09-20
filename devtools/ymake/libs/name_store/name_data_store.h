@@ -13,16 +13,22 @@ public:
     using TValue = V;
 
     void PutById(ui32 id, const V& data) {
+        TLightWriteGuard guard(NameStore_.Lock_);
         Y_ASSERT(id < Meta_.size());
         Meta_[id] = data;
     }
 
+    // The guard protects lookup against container growth. It does not lock
+    // subsequent accesses through the returned reference; callers coordinate
+    // mutations of existing metadata and its lifetime across Clear/Load.
     const V& GetById(ui32 id) const {
+        TLightReadGuard guard(NameStore_.Lock_);
         Y_ASSERT(id < Meta_.size());
         return Meta_[id];
     }
 
     V& GetById(ui32 id) {
+        TLightReadGuard guard(NameStore_.Lock_);
         Y_ASSERT(id < Meta_.size());
         return Meta_[id];
     }
@@ -40,7 +46,8 @@ public:
     }
 
     ui32 Add(TStringBuf name) {
-        ui32 newId = NameStore_.Add(name);
+        TLightWriteGuard guard(NameStore_.Lock_);
+        ui32 newId = NameStore_.AddUnlocked(name);
         if (Meta_.size() <= newId)
             Meta_.resize(newId + 1);
         return newId;
@@ -63,8 +70,10 @@ public:
     }
 
     void Save(TMultiBlobBuilder& builder) {
+        // One snapshot: no insertion between names and their metadata.
+        TLightReadGuard guard(NameStore_.Lock_);
         TMultiBlobBuilder* multi = new TMultiBlobBuilder();
-        NameStore_.Save(*multi);
+        NameStore_.SaveUnlocked(*multi);
         builder.AddBlob(multi);
 
         if (Meta_.size() > 0) {
@@ -76,10 +85,12 @@ public:
     }
 
     void Load(TBlob& multi) {
-        Clear();
+        TLightWriteGuard guard(NameStore_.Lock_);
+        NameStore_.ClearUnlocked();
+        Meta_.clear();
         TSubBlobs blob(multi);
 
-        NameStore_.Load(blob[0]);
+        NameStore_.LoadUnlocked(blob[0]);
 
         if (blob.size() == 2) {
             TMemoryInput input(blob[1].Data(), blob[1].Length());
@@ -88,7 +99,8 @@ public:
     }
 
     void Clear() {
-        NameStore_.Clear();
+        TLightWriteGuard guard(NameStore_.Lock_);
+        NameStore_.ClearUnlocked();
         Meta_.clear();
     }
 

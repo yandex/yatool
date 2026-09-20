@@ -12,6 +12,11 @@ static inline ui64 GoodHash(const TStringBuf& s) noexcept {
 }
 
 ui32 TNameStore::Add(TStringBuf name) {
+    TLightWriteGuard guard(Lock_);
+    return AddUnlocked(name);
+}
+
+ui32 TNameStore::AddUnlocked(TStringBuf name) {
     auto key = GoodHash(name);
 
     {
@@ -42,6 +47,7 @@ ui32 TNameStore::GetId(TStringBuf name) const {
 }
 
 ui32 TNameStore::GetIdNx(TStringBuf name) const {
+    TLightReadGuard guard(Lock_);
     TNameToId::const_iterator it = Name2Id_.find(GoodHash(name));
 
     if (it != Name2Id_.end()) {
@@ -52,10 +58,16 @@ ui32 TNameStore::GetIdNx(TStringBuf name) const {
 }
 
 bool TNameStore::Has(TStringBuf name) const {
+    TLightReadGuard guard(Lock_);
     return Name2Id_.find(GoodHash(name)) != Name2Id_.end();
 }
 
 bool TNameStore::CheckId(ui32 id) const {
+    TLightReadGuard guard(Lock_);
+    return CheckIdUnlocked(id);
+}
+
+bool TNameStore::CheckIdUnlocked(ui32 id) const {
     if (Y_UNLIKELY(!id)) {
         throw yexception() << "GetName: internal error: trying to get name for id = 0\n";
     }
@@ -74,6 +86,11 @@ TNameStore::TNameStore() {
 TNameStore::~TNameStore() = default;
 
 void TNameStore::Clear() {
+    TLightWriteGuard guard(Lock_);
+    ClearUnlocked();
+}
+
+void TNameStore::ClearUnlocked() {
     IMemoryPool::Construct().Swap(Pool_);
     Name2Id_.clear();
     Names_.clear();
@@ -111,32 +128,48 @@ public:
 };
 
 void TNameStore::Save(TMultiBlobBuilder& builder) const {
+    TLightReadGuard guard(Lock_);
+    SaveUnlocked(builder);
+}
+
+void TNameStore::SaveUnlocked(TMultiBlobBuilder& builder) const {
     TBuffer buffer;
 
     {
         TBufferOutput bo(buffer);
 
-        Save(&bo);
+        ::Save(&bo, Names_);
     }
 
     builder.AddBlob(new TBlobSaverMemory(TBlob::FromBuffer(buffer)));
 }
 
 void TNameStore::Save(IOutputStream* out) const {
+    TLightReadGuard guard(Lock_);
     ::Save(out, Names_);
 }
 
 void TNameStore::Load(TBlob& multi) {
+    TLightWriteGuard guard(Lock_);
+    LoadUnlocked(multi);
+}
+
+void TNameStore::LoadUnlocked(TBlob& multi) {
     TSubBlobs blobs(multi);
 
-    LoadSingleBlob(blobs[0]);
+    LoadSingleBlobUnlocked(blobs[0]);
 }
 
 void TNameStore::LoadSingleBlob(TBlob& blob) {
+    TLightWriteGuard guard(Lock_);
+    LoadSingleBlobUnlocked(blob);
+}
+
+void TNameStore::LoadSingleBlobUnlocked(TBlob& blob) {
     // to test error condition while cache loading
     // throw yexception() << "bambaleylo!";
 
-    Clear();
+    ClearUnlocked();
 
     Blob_ = blob;
 
@@ -152,7 +185,8 @@ void TNameStore::LoadSingleBlob(TBlob& blob) {
 }
 
 TStringBuf TNameStore::GetStringBufName(ui32 id) const {
-    if (CheckId(id)) {
+    TLightReadGuard guard(Lock_);
+    if (CheckIdUnlocked(id)) {
         return Names_[id];
     }
 

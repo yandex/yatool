@@ -26,7 +26,7 @@
 #include <cstdlib>
 
 namespace {
-    const ui64 ImageVersion = 60;
+    const ui64 ImageVersion = 62;
     const ui64 DMCacheVersion = 1;
 
     template <size_t HashSize>
@@ -648,7 +648,10 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     auto forceLoad = useYmakeCache || Conf.ReadFsCache && !Conf.ReadDepsCache;
     TCacheFileReader cacheReader(Conf, forceLoad, true);
 
-    auto readResult = cacheReader.Read(file);
+    const auto readMode = Conf.WriteFsCache || Conf.WriteDepsCache
+        ? TCacheFileReader::EFileReadMode::Copy
+        : TCacheFileReader::EFileReadMode::Mmap;
+    auto readResult = cacheReader.Read(file, readMode);
 
     auto loadFsCacheFromBlobs = [&]() {
         if (cacheReader.HasNextBlob()) {
@@ -997,6 +1000,7 @@ TCacheFileReader::EReadResult TYMake::LoadDependencyManagementCache(const TFsPat
             TBlob blob = cacheReader.GetNextBlob();
             TMemoryInput input(blob.Data(), blob.Length());
             Modules.LoadDMCache(&input, Graph);
+            Y_ENSURE(input.Exhausted(), "Trailing data in dependency management module cache");
             DMCacheLoaded_ = true;
         } else {
             return TCacheFileReader::EReadResult::IncompatibleFormat;

@@ -1,24 +1,12 @@
 #include "module_store.h"
 #include "module_state.h"
 #include "dependency_management.h"
-#include "json_saveload.h"
+#include "frozen_module_store.h"
 
 #include <devtools/ymake/diag/progress_manager.h>
 
+#include <util/generic/yexception.h>
 #include <util/stream/format.h>
-
-namespace {
-    const TStringBuf DM_VAR_NAMES[] = {
-        NVariableDefs::VAR_NON_NAMAGEABLE_PEERS,
-        NVariableDefs::VAR_DART_CLASSPATH_DEPS,
-        NVariableDefs::VAR_MANAGED_PEERS,
-        NVariableDefs::VAR_MANAGED_PEERS_CLOSURE,
-        NVariableDefs::VAR_DART_CLASSPATH,
-        NVariableDefs::VAR_UNITTEST_MOD,
-        NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_TAGS_EXCLUDE,
-        NVariableDefs::VAR_DEPENDENCY_MANAGEMENT_TRANSPARENT,
-    };
-}
 
 TModule& TModules::Create(const TStringBuf& dir, const TStringBuf& makefile, const TStringBuf& tag) {
     TModule* module = new TModule(Symbols.FileConf.GetStoredName(dir), makefile, tag, CreationContext);
@@ -28,8 +16,32 @@ TModule& TModules::Create(const TStringBuf& dir, const TStringBuf& makefile, con
 }
 
 TModule* TModules::Get(TFileElemId id) {
-    const auto iter = ModulesById.find(id);
-    return iter != ModulesById.end() ? iter->second : nullptr;
+    {
+        TLightReadGuard guard(MaterializationLock);
+        const auto& modules = ModulesById;
+        if (const auto iter = modules.find(id); iter != modules.end()) {
+            return iter->second;
+        }
+    }
+
+    // Another thread may have materialized the group after our read miss.
+    TLightWriteGuard guard(MaterializationLock);
+    if (const auto iter = ModulesById.find(id); iter != ModulesById.end()) {
+        return iter->second;
+    }
+
+    FrozenModules->MaterializeModule(id);
+    const auto materialized = ModulesById.find(id);
+    return materialized != ModulesById.end() ? materialized->second : nullptr;
+}
+
+bool TModules::Contains(TFileElemId id) const {
+    TLightReadGuard guard(MaterializationLock);
+    return ContainsUnlocked(id);
+}
+
+bool TModules::ContainsUnlocked(TFileElemId id) const {
+    return ModulesById.contains(id) || FrozenModules->Contains(id);
 }
 
 TStringBuf TModules::ResultKey(const TModule& module) const {
@@ -51,15 +63,22 @@ TModules::TModules(TSymbols& symbols, const TPeersRules& rules, TBuildConfigurat
     , PeersRules(rules)
     , CreationContext({SharedEntriesByMakefileId, Symbols, conf.CommandConf, PeersRules})
     , RootModule(Create("$B", TStringBuf("$U/root"), {}))
+    , FrozenModules(MakeHolder<TFrozenModuleStore>(*this))
 {
     // Bypass validity checks
     RootModule.Id = TFileElemId();
 }
 
 void TModules::Commit(TModule& module) {
+    TLightWriteGuard guard(MaterializationLock);
+    CommitUnlocked(module);
+}
+
+void TModules::CommitUnlocked(TModule& module) {
     AssertEx(module.HasId(), "Attempt to commit module without Id");
 
     auto id = module.GetId();
+    const bool wasLogical = ContainsUnlocked(id);
     if (ModulesById.contains(id)) {
         TModule* oldMod = ModulesById[id];
         if (oldMod == &module) {
@@ -77,128 +96,71 @@ void TModules::Commit(TModule& module) {
             AssertEx(false, "Attempt to commit module with duplicate id " + ToString(id));
         }
     }
+    if (!module.IsLoaded() && FrozenModules->HasDescriptor(id)) {
+        FrozenModules->Suppress(id);
+    }
     ModulesById[id] = &module;
     module.ComputeConfigVars();
     module.Committed = true;
+    if (!wasLogical) {
+        ++LogicalModulesCount;
+    }
     YDIAG(V) << "Committed module: " << module.GetMakefile() << " as " << module.GetFileName() << " (" << id << ")" << Endl;
 
-    TProgressManager::Instance()->UpdateConfModulesTotal(ModulesById.size());
+    TProgressManager::Instance()->UpdateConfModulesTotal(LogicalModulesCount);
 }
 
 void TModules::Destroy(TModule& module) {
+    TLightWriteGuard guard(MaterializationLock);
     if (module.HasId() && module.Committed) {
+        if (module.IsLoaded() && FrozenModules->HasDescriptor(module.GetId())) {
+            FrozenModules->Suppress(module.GetId());
+        }
         ModulesById.erase(module.GetId());
         ModuleIncludesById.erase(module.GetId());
+        Y_ASSERT(LogicalModulesCount != 0);
+        --LogicalModulesCount;
     }
     ModulesStore.erase(&module);
     delete &module;
 }
 
 void TModules::Load(IInputStream* input) {
-    TModulesSaver saver;
-    saver.Load(input);
-    for (auto&& item : saver.Data) {
-        auto module = new TModule(std::move(item), CreationContext);
-        YDIAG(V) << "Loaded module: " << module->GetName() << Endl;
-        ModulesStore.emplace(module);
-        Commit(*module);
-    }
-    Loaded = true;
+    Load(TBlob::FromStringSingleThreaded(input->ReadAll()));
 }
 
 void TModules::Load(const TBlob& blob) {
-    TMemoryInput input(blob.Data(), blob.Length());
-    Load(&input);
+    TLightWriteGuard guard(MaterializationLock);
+    Y_ENSURE(!Loaded && ModulesById.empty(), "Modules cache is already loaded");
+    FrozenModules->Load(blob);
+    LogicalModulesCount = FrozenModules->ModuleCount();
+    Loaded = true;
 }
 
 void TModules::LoadDMCache(IInputStream* input, const TDepGraph& graph) {
+    TLightWriteGuard guard(MaterializationLock);
     ResetTransitiveInfo();
-
-    ui32 modulesCount = LoadFromStream<ui32>(input);
-    for (ui32 i = 0; i < modulesCount; ++i) {
-        TFileElemId modId = TFileElemId(LoadFromStream<ui32>(input));
-        auto module = Get(modId);
-        Y_ASSERT(module);
-
-        TVector<TFileElemId> uniqPeersIds, directPeersIds;
-        THashMap<TString, TString> dmVars;
-        bool isPeersComplete;
-        ::Load(input, uniqPeersIds);
-        ::Load(input, directPeersIds);
-        ::Load(input, dmVars);
-        ::Load(input, isPeersComplete);
-        auto& moduleLists = GetModuleNodeIds(modId);
-        for (auto peer : uniqPeersIds) {
-            TFileView peerFileView = Symbols.FileConf.GetName(peer);
-            TNodeId nodeId = graph.GetFileNode(peerFileView).Id();
-            GetNodeListStore().AddToList(moduleLists.UniqPeers, nodeId);
-        }
-        for (auto peer : directPeersIds) {
-            TFileView peerFileView = Symbols.FileConf.GetName(peer);
-            TNodeId nodeId = graph.GetFileNode(peerFileView).Id();
-            GetNodeListStore().AddToList(moduleLists.ManagedDirectPeers, nodeId);
-        }
-        for (const auto& varName : DM_VAR_NAMES) {
-            if (dmVars.contains(varName)) {
-                module->Set(varName, dmVars[varName]);
-            } else {
-                module->Set(varName, TString());
-            }
-        }
-        if (isPeersComplete) {
-            module->SetPeersComplete();
-        }
-    }
+    FrozenModules->LoadDMCache(input, graph);
 }
 
 void TModules::Save(IOutputStream* output) {
-    TModulesSaver saver;
-    saver.Data.reserve(ModulesById.size());
-    SaveFilteredModules(saver);
-    saver.Save(output);
-    ClearRawIncludes();
+    TLightWriteGuard guard(MaterializationLock);
+    FrozenModules->Save(output);
+    ClearRawIncludesUnlocked();
 }
 
 void TModules::SaveDMCache(IOutputStream* output, const TDepGraph& graph) {
-    ui32 modCount = ModulesById.size();
-    ::Save(output, modCount);
-
-    for (const auto& [modId, module] : ModulesById) {
-        ::Save(output, modId);
-
-        const auto moduleLists = GetModuleNodeLists(modId);
-        TVector<TElemId> uniqPeersIds, managedDirectPeersIds;
-        for (auto peer : moduleLists.UniqPeers()) {
-            uniqPeersIds.push_back(graph.Get(peer)->ElemId);
-        }
-        for (auto peer : moduleLists.ManagedDirectPeers()) {
-            managedDirectPeersIds.push_back(graph.Get(peer)->ElemId);
-        }
-        THashMap<TString, TString> dmVars;
-        for (auto varName : DM_VAR_NAMES) {
-            TStringBuf value = module->Get(varName);
-            if (!value.empty()) {
-                dmVars.emplace(varName, value);
-            }
-        }
-        ::Save(output, uniqPeersIds);
-        ::Save(output, managedDirectPeersIds);
-        ::Save(output, dmVars);
-        ::Save(output, bool(module->IsPeersComplete()));
-    }
-}
-
-void TModules::SaveFilteredModules(TModulesSaver& saver) {
-    for (const auto [id, module]: ModulesById) {
-        if (Loaded && module->IsLoaded() && ReparsedMakefiles.contains(module->GetMakefileId())) {
-            YDIAG(VV) << "Ignore outdated module: " << module->GetName() << Endl;
-            continue;
-        }
-        saver.Data.emplace_back(*module);
-    }
+    TLightWriteGuard guard(MaterializationLock);
+    FrozenModules->SaveDMCache(output, graph);
 }
 
 void TModules::ClearRawIncludes() {
+    TLightWriteGuard guard(MaterializationLock);
+    ClearRawIncludesUnlocked();
+}
+
+void TModules::ClearRawIncludesUnlocked() {
+    FrozenModules->ClearRawIncludes();
     for (auto [id, module] : ModulesById) {
         module->RawIncludes.clear();
     }
@@ -220,11 +182,13 @@ void TModules::Compact() {
 }
 
 void TModules::ReportStats() const {
+    TLightWriteGuard guard(MaterializationLock);
     ui64 countTotal = 0;
     ui64 countLoaded = 0;
     ui64 countParsed = 0;
     ui64 countOutdated = 0;
     ui64 countAccessed = 0;
+    FrozenModules->AccumulateStats(countTotal, countLoaded, countOutdated);
     for (const auto [id, module]: ModulesById) {
         if (Loaded && module->IsLoaded()) {
             ++countLoaded;
@@ -252,11 +216,14 @@ void TModules::ReportStats() const {
 }
 
 void TModules::Clear() {
+    TLightWriteGuard guard(MaterializationLock);
     ModulesById.clear();
     for (auto modPtr: ModulesStore) {
          delete modPtr;
     }
     ModulesStore.clear();
+    FrozenModules->Clear();
+    LogicalModulesCount = 0;
 }
 
 TModules::~TModules() {
@@ -272,6 +239,8 @@ const TDependencyManagementModuleInfo* TModules::FindExtraDependencyManagementIn
 }
 
 THolder<TOwnEntries> TModules::ExtractSharedEntries(TFileElemId makefileId) {
+    TLightWriteGuard guard(MaterializationLock);
+    FrozenModules->MaterializeMakefile(makefileId);
     auto it = SharedEntriesByMakefileId.find(makefileId);
     if (it == SharedEntriesByMakefileId.end()) {
         return {};
