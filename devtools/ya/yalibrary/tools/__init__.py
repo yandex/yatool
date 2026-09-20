@@ -4,6 +4,7 @@ import enum
 import json
 import logging
 import os
+import threading
 import typing
 from collections import defaultdict
 
@@ -625,7 +626,8 @@ class _ToolConfigReader:
     def __init__(self) -> None:
         self._tool_cache = {}
         self._toolchain_aliases = {}
-        self._tool_toolchains = defaultdict(dict)
+        self._tool_toolchains: dict[tuple[str, ...], dict[str, typing.Any]] | None = None
+        self._toolchains_lock = threading.Lock()
         self._tiers = None
 
     def tool(self, name_parts: tuple[str, ...]) -> _ToolConfig:
@@ -662,10 +664,12 @@ class _ToolConfigReader:
 
         if not tool_cfg or tool_cfg.type == ToolType.TOOLCHAIN:
             self._load_toolchains()
+            assert self._tool_toolchains is not None
             if not tool_cfg:
                 tool_cfg = self._build_legacy_tool(name_parts)
-            tool_cfg.toolchains = self._tool_toolchains[name_parts].get("toolchains", {})
-            tool_cfg.bottles = self._tool_toolchains[name_parts].get("bottles", {})
+            tool_data = self._tool_toolchains.get(name_parts, {})
+            tool_cfg.toolchains = tool_data.get("toolchains", {})
+            tool_cfg.bottles = tool_data.get("bottles", {})
             host_platforms = []
             for toolchain in tool_cfg.toolchains.values():
                 for platform in toolchain["platforms"]:
@@ -709,39 +713,59 @@ class _ToolConfigReader:
             final_parts.extend([part] if isinstance(part, str) else part)
         return self._CFG_PATH_SEP.join(final_parts) + ext
 
-    def _update_tool_toolchains(self, config: dict[str, typing.Any], toolchains_key: str) -> None:
+    def _update_tool_toolchains(
+        self,
+        tool_toolchains: dict[tuple[str, ...], dict[str, typing.Any]],
+        config: dict[str, typing.Any],
+        toolchains_key: str,
+    ) -> None:
         for tc_name, tc_def in config[toolchains_key].items():
             for tool_name, tool_def in tc_def["tools"].items():
                 name_parts = _split_tool_name(tool_name)
-                self._tool_toolchains[name_parts].setdefault("toolchains", {})
-                self._tool_toolchains[name_parts].setdefault("bottles", {})
-                self._tool_toolchains[name_parts]["toolchains"].setdefault(tc_name, tc_def)
+                tool_toolchains[name_parts].setdefault("toolchains", {})
+                tool_toolchains[name_parts].setdefault("bottles", {})
+                tool_toolchains[name_parts]["toolchains"].setdefault(tc_name, tc_def)
                 if "bottle" in tool_def:
                     bottle_name = tool_def["bottle"]
-                    self._tool_toolchains[name_parts]["bottles"].setdefault(
+                    tool_toolchains[name_parts]["bottles"].setdefault(
                         bottle_name, config[self._BOTTLES_KEY][bottle_name]
                     )
 
-    def _load_legacy_toolchains(self) -> None:
+    def _load_legacy_toolchains(
+        self,
+        tool_toolchains: dict[tuple[str, ...], dict[str, typing.Any]],
+        toolchain_aliases: dict[str, str],
+    ) -> None:
         legacy_config = devtools.ya.core.config.config()
         for name, alias in legacy_config.get(self._TOOLCHAIN_ALIASES_KEY, {}).items():
-            self._toolchain_aliases.setdefault(name, alias)
-        self._update_tool_toolchains(legacy_config, self._LEGACY_TOOLCHAINS_KEY)
+            toolchain_aliases.setdefault(name, alias)
+        self._update_tool_toolchains(tool_toolchains, legacy_config, self._LEGACY_TOOLCHAINS_KEY)
 
     def _load_toolchains(self) -> None:
-        if self._tool_toolchains:
+        if self._tool_toolchains is not None:
             return
-        toolchain_files = devtools.ya.core.config.list_tool_configs(self._TOOLCHAIN_CFG_DIR)
-        for file in toolchain_files:
-            if not file.endswith(self._TOOLCHAIN_SFX):
-                continue
-            path = self._make_cfg_path(self._TOOLCHAIN_CFG_DIR, file)
-            logger.debug("Load toolchains from {}".format(path))
-            cfg = devtools.ya.core.config.get_tool_config(path)
-            self._update_tool_toolchains(cfg, self._TOOLCHAINS_KEY)
-            self._toolchain_aliases.update(cfg.get(self._TOOLCHAIN_ALIASES_KEY, {}))
 
-        self._load_legacy_toolchains()
+        with self._toolchains_lock:
+            if self._tool_toolchains is not None:
+                return
+
+            toolchain_aliases: dict[str, str] = {}
+            tool_toolchains: dict[tuple[str, ...], dict[str, typing.Any]] = defaultdict(dict)
+
+            toolchain_files = devtools.ya.core.config.list_tool_configs(self._TOOLCHAIN_CFG_DIR)
+            for file in toolchain_files:
+                if not file.endswith(self._TOOLCHAIN_SFX):
+                    continue
+                path = self._make_cfg_path(self._TOOLCHAIN_CFG_DIR, file)
+                logger.debug("Load toolchains from {}".format(path))
+                cfg = devtools.ya.core.config.get_tool_config(path)
+                self._update_tool_toolchains(tool_toolchains, cfg, self._TOOLCHAINS_KEY)
+                toolchain_aliases.update(cfg.get(self._TOOLCHAIN_ALIASES_KEY, {}))
+
+            self._load_legacy_toolchains(tool_toolchains, toolchain_aliases)
+
+            self._toolchain_aliases = toolchain_aliases
+            self._tool_toolchains = tool_toolchains
 
     def _get_tool_tier(
         self, name_parts: tuple[str, ...], raw_tool_cfg: dict[str, typing.Any] | None = None
@@ -855,7 +879,7 @@ class _ToolConfigReader:
         if legacy_tool := self._legacy_tools.get(name):
             description = legacy_tool["description"]
             availability = ToolAvailability.FULL if legacy_tool.get("visible", True) else ToolAvailability.HIDDEN
-        elif self._tool_toolchains.get(name_parts):
+        elif self._tool_toolchains is not None and self._tool_toolchains.get(name_parts):
             # Not all tools are presented in tools section
             description = name
             availability = ToolAvailability.HIDDEN
