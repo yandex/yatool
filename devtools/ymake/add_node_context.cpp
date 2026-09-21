@@ -605,7 +605,7 @@ TNodeId TNodeAddCtx::Flush(TAddIterStack& stack, TAutoPtr<TNodeAddCtx>& me, bool
 
     FlushState->FinishFlush(Graph, nodeRef);
     TNodeId nodeId = FlushState->NodeId;
-    FlushState.Destroy();
+    FlushState.reset();
     FlushDone = true;
     return nodeId;
 }

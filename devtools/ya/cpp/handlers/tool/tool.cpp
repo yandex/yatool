@@ -85,7 +85,7 @@ namespace NYa::NTool {
             return;
         }
 
-        toolsCache.Destroy();
+        toolsCache.reset();
 
         if (!NSnowden::ReportingDisabled(expandedArgs)) {
             NSnowden::EnsureDaemon(config);
