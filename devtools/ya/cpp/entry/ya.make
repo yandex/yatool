@@ -6,6 +6,7 @@ SRCS(
 )
 
 PEERDIR(
+    devtools/libs/response_file
     devtools/ya/cpp/lib
     devtools/ya/cpp/lib/snowden
     # Add handlers here

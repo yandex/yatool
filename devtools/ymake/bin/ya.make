@@ -9,9 +9,10 @@ ENDIF()
 USE_PYTHON3()
 
 PEERDIR(
+    devtools/libs/response_file
     library/cpp/getopt
     devtools/ymake
-    ${STUB_PEERDIRS}  # For ymake/stub
+    ${STUB_PEERDIRS} # For ymake/stub
 )
 
 SRCS(

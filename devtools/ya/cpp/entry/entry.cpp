@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <devtools/libs/response_file/response_file.h>
 #include <devtools/ya/cpp/lib/class_registry.h>
 #include <devtools/ya/cpp/lib/config.h>
 #include <devtools/ya/cpp/lib/snowden/snowden.h>
@@ -11,13 +12,14 @@
 #include "util/generic/fwd.h"
 #include <util/generic/hash.h>
 #include <util/generic/vector.h>
-#include <util/stream/file.h>
+#include <util/generic/yexception.h>
+#include <util/stream/output.h>
 #include <util/system/env.h>
 #include <utility>
 
 #ifdef _win_
-#include <util/charset/wide.h>  // WideToUTF8, UTF8ToWide
-#include <cwchar>               // wcslen
+    #include <util/charset/wide.h> // WideToUTF8, UTF8ToWide
+    #include <cwchar>              // wcslen
 #endif
 
 namespace NYa {
@@ -38,20 +40,17 @@ namespace NYa {
         extern "C" TMain mainptr;
         TMain prevMainPtr;
 
-        bool CanBeResponseFile(const TString& s) {
+        bool CanBeResponseFile(TStringBuf s) {
             return s.length() > 1 && s[0] == '@' && s[1] != '@';
         }
 
-        bool IsEscaped(const TString& s) {
-            return s.length() > 1 && s[0] == '@' && s[1] == '@';
-        }
-
-        bool CanBeHandler(const TString& s) {
+        bool CanBeHandler(TStringBuf s) {
             return !s.empty() && s[0] != '-' && !CanBeResponseFile(s);
         }
 
-        TString GetHandlerName(const TVector<TString>& args) {
-            for (auto& arg : args) {
+        TString GetHandlerName(TConstArrayRef<const char*> args) {
+            for (size_t i = 1; i < args.size(); ++i) {
+                const char* arg = args[i];
                 // Also check against response files but that's ok.
                 // We'll unlikely ever have a handler that starts with @
                 if (CanBeHandler(arg)) {
@@ -61,85 +60,33 @@ namespace NYa {
             return "";
         }
 
-        constexpr size_t MaxExpandedArgs = 100000;
-
-        bool ExpandResponseFiles(TVector<TString>& result, const TVector<TString>& args, TString& handler) {
-            bool halt{false};
-            for (size_t i = 0; i < args.size(); ++i) {
-                if (result.size() > MaxExpandedArgs) {
-                    Cerr << "Too many arguments after expanding response files (limit: " << MaxExpandedArgs << ").\n";
-                    exit(1);
-                }
-                auto arg{args[i]};
-                if (!handler && CanBeHandler(arg)) {
-                    // first arg that can be handler is a handler
-                    handler = arg;
-                    // stop expansion if any of the following handlers is met
-                    halt = handler == "tool" || handler == "run" || handler == "curl";
-                }
-                if (halt) {
-                    for (size_t j = i; j < args.size(); ++j) {
-                        result.emplace_back(args[j]);
-                    }
-                    return halt;
-                } else if (CanBeResponseFile(arg)) {
-                    TString filePath(arg.substr(1));
-                    TFsPath path(filePath);
-
-                    if (path.Exists()) {
-                        TFileInput input(filePath);
-                        TString line;
-                        TVector<TString> content;
-                        while (input.ReadLine(line)) {
-                            if (!line.empty()) {
-                                content.push_back(std::move(line));
-                            }
-                        }
-                        halt = ExpandResponseFiles(result, content, handler);
-                    } else {
-                        Cerr << "Response file '" << filePath << "' doesn't exist.\nDocumentation on response files in ya: https://docs.yandex-team.ru/yatool/usage/options\n";
-                        exit(1);
-                    }
-                } else if (IsEscaped(arg)) {
-                    // Escaping: @@username -> @username
-                    result.emplace_back(arg.substr(1));
-                } else {
-                    result.emplace_back(arg);
-                }
-            }
-            return halt;
-        }
-
         struct TExpandResult {
-            TVector<TString> Args;      // argv[0] + expanded argv[1..]
+            TVector<const char*> Args; // argv[0] + expanded argv[1..]
             TString HandlerName;
         };
 
-        // Platform-independent: works entirely with UTF-8 TString.
-        // argv0 and rawArgs must already be decoded to UTF-8.
-        // Inserts argv0 at the front of result Args.
-        TExpandResult ExpandArgs(TString argv0, TVector<TString> rawArgs) {
+        // argv includes argv[0] and must already be decoded to UTF-8.
+        // The caller owns argv and storage for the lifetime of the returned pointers.
+        TExpandResult ExpandArgs(TConstArrayRef<const char*> argv, TVector<TString>& storage) {
             TExpandResult result;
             if (GetEnv("DISABLE_YA_RESPONSE_FILES")) {
-                result.HandlerName = GetHandlerName(rawArgs);
-                result.Args = std::move(rawArgs);
+                result.HandlerName = GetHandlerName(argv);
+                result.Args.assign(argv.begin(), argv.end());
             } else {
-                ExpandResponseFiles(result.Args, rawArgs, result.HandlerName);
-                result.Args.reserve(rawArgs.size() + 1);
+                try {
+                    result.Args = NResponseFile::ExpandResponseFiles(argv, storage, [&](TStringBuf arg) {
+                        if (!result.HandlerName && CanBeHandler(arg)) {
+                            result.HandlerName = arg;
+                            return arg == "tool" || arg == "run" || arg == "curl";
+                        }
+                        return false;
+                    });
+                } catch (const yexception& error) {
+                    Cerr << error.what() << "\nDocumentation on response files in ya: https://docs.yandex-team.ru/yatool/usage/options\n";
+                    exit(1);
+                }
             }
-            result.Args.insert(result.Args.begin(), std::move(argv0));
             return result;
-        }
-
-        // Build a char** view into expandedArgs.
-        // The returned vector's pointers are valid as long as expandedArgs is alive.
-        TVector<char*> BuildCharArgv(TVector<TString>& expandedArgs) {
-            TVector<char*> argv;
-            argv.reserve(expandedArgs.size());
-            for (auto& arg : expandedArgs) {
-                argv.push_back(const_cast<char*>(arg.data()));
-            }
-            return argv;
         }
 
         bool allowLogging(const IYaHandler* handlerPtr, const TVector<TStringBuf> args) {
@@ -180,9 +127,9 @@ namespace NYa {
         }
 
         // Platform-independent: finds and runs the C++ handler if registered.
-        // expandedArgs must be UTF-8 TStrings; TStringBuf in args points into them.
+        // expandedArgs borrows UTF-8 strings kept alive by Entry.
         void RunCppHandler(
-            const TVector<TString>& expandedArgs,
+            const TVector<const char*>& expandedArgs,
             const TString& handlerName,
             int newPgid,
             bool verbose)
@@ -198,7 +145,6 @@ namespace NYa {
             TVector<TStringBuf> args;
             args.reserve(expandedArgs.size());
             for (const auto& arg : expandedArgs) {
-                // TStringBuf points into TString, not into char** — safe on both platforms
                 args.push_back(arg);
             }
             const IConfig& config = GetConfig();
@@ -212,13 +158,13 @@ namespace NYa {
             DEBUG_LOG << "Fallback to python\n";
         }
 
-        bool DetectVerbose(const TVector<TString>& expandedArgs) {
+        bool DetectVerbose(const TVector<const char*>& expandedArgs) {
             for (size_t i = 1; i < expandedArgs.size(); ++i) {
                 if (CanBeHandler(expandedArgs[i])) {
                     // detect ya-bin's verbose mode, not handler's one
                     return false;
                 }
-                if (expandedArgs[i] == "-v" || expandedArgs[i] == "--verbose") {
+                if (TStringBuf(expandedArgs[i]) == "-v" || TStringBuf(expandedArgs[i]) == "--verbose") {
                     return true;
                 }
             }
@@ -229,25 +175,28 @@ namespace NYa {
         int Entry(int argc, wchar_t** argv) {
             // On Windows argv is genuinely wchar_t** (UTF-16 LE).
             // Decode to UTF-8 TString before any processing.
-            TVector<TString> rawArgs;
-            rawArgs.reserve(argc > 1 ? argc - 1 : 0);
-            for (int i = 1; i < argc; ++i) {
-                rawArgs.emplace_back(WideToUTF8(argv[i], wcslen(argv[i])));
+            TVector<TString> decodedArgs;
+            decodedArgs.reserve(argc);
+            for (int i = 0; i < argc; ++i) {
+                decodedArgs.emplace_back(WideToUTF8(argv[i], wcslen(argv[i])));
             }
-            TString argv0 = argc > 0 ? WideToUTF8(argv[0], wcslen(argv[0])) : TString{};
+            TVector<const char*> rawArgs;
+            rawArgs.reserve(decodedArgs.size());
+            for (const auto& arg : decodedArgs) {
+                rawArgs.push_back(arg.c_str());
+            }
 #else
         int Entry(int argc, char** argv) {
-            TVector<TString> rawArgs(argv + 1, argv + argc);
-            TString argv0 = argc > 0 ? TString{argv[0]} : TString{};
+            const TConstArrayRef<const char*> rawArgs{argv, static_cast<size_t>(argc)};
 #endif
 
-            auto [expandedArgs, handlerName] = ExpandArgs(std::move(argv0), std::move(rawArgs));
+            TVector<TString> argumentStorage;
+            auto [expandedArgs, handlerName] = ExpandArgs(rawArgs, argumentStorage);
 
-            auto charArgv = BuildCharArgv(expandedArgs);
-            int expandedArgc = static_cast<int>(charArgv.size());
+            const int expandedArgc = static_cast<int>(expandedArgs.size());
 
             ::NYa::InitYt();
-            int newPgid = SetOwnProcessGroupId(expandedArgc, charArgv.data());
+            int newPgid = SetOwnProcessGroupId(expandedArgc, const_cast<char**>(expandedArgs.data()));
             InitWatchdogFromEnv();
 
             bool verbose = DetectVerbose(expandedArgs);
@@ -266,13 +215,16 @@ namespace NYa {
                 wExpandedArgs.emplace_back(UTF8ToWide(arg));
             }
             TVector<wchar_t*> expandedWArgv;
-            expandedWArgv.reserve(wExpandedArgs.size());
+            expandedWArgv.reserve(wExpandedArgs.size() + 1);
             for (auto& warg : wExpandedArgs) {
                 expandedWArgv.push_back(reinterpret_cast<wchar_t*>(warg.begin()));
             }
-            return prevMainPtr(static_cast<int>(expandedWArgv.size()), expandedWArgv.data());
+            expandedWArgv.push_back(nullptr);
+            return prevMainPtr(expandedArgc, expandedWArgv.data());
 #else
-            return prevMainPtr(expandedArgc, charArgv.data());
+            expandedArgs.push_back(nullptr);
+            // The legacy Python entry takes char**, but does not modify the strings.
+            return prevMainPtr(expandedArgc, const_cast<char**>(expandedArgs.data()));
 #endif
         }
 
