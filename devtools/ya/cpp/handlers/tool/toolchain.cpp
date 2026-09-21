@@ -50,11 +50,12 @@ namespace NYa::NTool {
     }
 
     void ExecTool(const IConfig& config, const TTool& tool, TVector<TString> toolOptions, TExecve execve) {
-        // Remove environment variables set by 'ya' wrapper.
+        // Preserve YA_SOURCE_ROOT so tools can invoke the ya script from the same source root.
+        // Remove other environment variables set by 'ya' wrapper.
         // They are actually one-time ya-bin parameters rather than inheritable environment
         // for all descendant processes.
         auto filter = [](const TString& key, const TString&) {
-            return !(key == "RESPAWNS_PARAM" or key == "YA_SOURCE_ROOT" or key == "YA_PYVER_SET_FORCED" or key == "YA_PYVER_REQUIRE");
+            return !(key == "RESPAWNS_PARAM" or key == "YA_PYVER_SET_FORCED" or key == "YA_PYVER_REQUIRE");
         };
         THashMap<TString, TString> env = Environ(filter);
 

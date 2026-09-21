@@ -450,11 +450,7 @@ def do_tool(params: Params) -> None:
     elif os.path.isfile(tool_path):
         env = devtools.ya.core.respawn.filter_env(os.environ.copy())
 
-        # Remove environment variables set by 'ya' wrapper.
-        # They are actually one-time ya-bin parameters rather than inheritable environment
-        # for all descendant processes.
-        for key in ('YA_SOURCE_ROOT',):
-            env.pop(key, None)
+        # Preserve YA_SOURCE_ROOT so tools can invoke the ya script from the same source root.
 
         env.update(_useful_env_vars())
         for key, value in tool.environ().items():
