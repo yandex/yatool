@@ -3,7 +3,7 @@
 #include "table_defs.h"
 #include "tar.h"
 
-#define XX_CLIENT_INT_H_
+#define XX_CLIENT_INT_H_ // NOLINT(readability-identifier-naming)
 #include "xx_client_int.h"
 #undef XX_CLIENT_INT_H_
 
