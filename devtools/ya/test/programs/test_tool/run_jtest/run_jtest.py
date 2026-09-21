@@ -3,7 +3,6 @@ from concurrent import futures
 import json
 import logging
 import os
-import shutil
 import sys
 import tempfile
 import time
@@ -87,16 +86,21 @@ def report_subchunk_error(tracefile, message):
     tracefile.flush()
 
 
-def merge_subchunk_traces(target, source_file):
-    success = False
+def merge_subchunk_traces(target, source_file, position=0, finished=True):
     if source_file and os.path.exists(source_file):
-        initial_position = target.tell()
-        with open(source_file, "r") as source:
-            shutil.copyfileobj(source, target)
-        target.flush()
-        success = (target.tell() - initial_position) > 0
-    if not success:
+        # Workers may still be writing. Copy only complete JSON lines and keep byte offsets,
+        # so a partial UTF-8 character or event is retried on the next poll.
+        with open(source_file, "rb") as source:
+            source.seek(position)
+            content = source.read()
+        end = content.rfind(b"\n") + 1
+        if end:
+            target.write(content[:end].decode("utf-8"))
+            target.flush()
+            position += end
+    if finished and not position:
         report_subchunk_error(target, "subchunk finished with empty trace file '{}'".format(source_file))
+    return position
 
 
 def execute_subchunk(cmd, tests, subchunk_number, temp_tracefile_dir):
@@ -159,22 +163,33 @@ def main():
 
     exit_code = 0
     with futures.ThreadPoolExecutor(max_workers=worker_count) as pool:
-        pendings = [
-            pool.submit(execute_subchunk, java_test_cmd, chunk_tests, i, options.temp_tracefile_dir)
+        pendings = {
+            pool.submit(execute_subchunk, java_test_cmd, chunk_tests, i, options.temp_tracefile_dir): i
             for i, chunk_tests in enumerate(subchunks)
             if chunk_tests
-        ]
+        }
+        positions = {i: 0 for i in pendings.values()}
         with open(main_output, 'a') as ya_trace:
-            for future in futures.as_completed(pendings):
-                try:
-                    code, trace_filepath = future.result()
-                    merge_subchunk_traces(ya_trace, trace_filepath)
-                    if code and not exit_code:
-                        exit_code = code
-                except Exception as e:
-                    logger.exception("Error while running subchunk: %s", e)
-                    report_subchunk_error(ya_trace, str(e))
-                    exit_code = 1
+            while pendings:
+                done, _ = futures.wait(pendings, timeout=0.1, return_when=futures.FIRST_COMPLETED)
+                for future, i in list(pendings.items()):
+                    try:
+                        positions[i] = merge_subchunk_traces(
+                            ya_trace,
+                            get_tracefile_path(options.temp_tracefile_dir, i),
+                            positions[i],
+                            finished=future in done,
+                        )
+                        if future in done:
+                            code, _ = future.result()
+                            if code and not exit_code:
+                                exit_code = code
+                    except Exception as e:
+                        logger.exception("Error while running subchunk: %s", e)
+                        report_subchunk_error(ya_trace, str(e))
+                        exit_code = 1
+                    if future in done:
+                        del pendings[future]
 
     return exit_code
 
