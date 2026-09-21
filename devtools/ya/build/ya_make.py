@@ -404,6 +404,18 @@ def make_lock(opts, garbage_dir, write_lock=False, non_blocking=False):
     return filelock.FileLock(lock_file)
 
 
+def get_yt_token(opts):
+    token = opts.yt_token or opts.oauth_token
+    if not token:
+        try:
+            from yalibrary import oauth
+
+            token = oauth.get_token(core_config.get_user())
+        except Exception as e:
+            logger.warning("Failed to get YT token: %s", e)
+    return token
+
+
 class CacheFactory:
     def __init__(self, opts):
         self._opts = opts
@@ -468,7 +480,7 @@ class CacheFactory:
     def _init_yt_dist_cache(self):
         from yalibrary.store.yt_store import yt_store
 
-        token = self._get_yt_token()
+        token = get_yt_token(self._opts)
         if self._opts.yt_replace_result_yt_upload_only:
             yt_store_class = yt_store.YndexerYtStore
         else:
@@ -527,17 +539,6 @@ class CacheFactory:
             except Exception as e:
                 logger.warning("Failed to read bazel remote password file: %s", e)
         return password
-
-    def _get_yt_token(self):
-        token = self._opts.yt_token or self._opts.oauth_token
-        if not token:
-            try:
-                from yalibrary import oauth
-
-                token = oauth.get_token(core_config.get_user())
-            except Exception as e:
-                logger.warning("Failed to get YT token: %s", e)
-        return token
 
     def _get_fits_filter(self):
         def fits_filter(node):
@@ -2019,6 +2020,7 @@ class YaMake:
                     display=self.app_ctx.display,
                     output_replacements=self.ctx.output_replacements,
                     sandbox_token=sandbox_token,
+                    yt_token=get_yt_token(self.opts) if self.opts.larry_addr.startswith('sync:') else '',
                     result_context=self.ctx,
                 ).build(self.opts.larry_addr)
             else:
