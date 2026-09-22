@@ -1529,14 +1529,18 @@ TGetPeerNodeResult TUpdIter::GetPeerNodeIfNeeded(const TDGIterAddable& st){
     }
 
     TStringBuf dir = Graph.GetFileName(dirNode).GetTargetStr();
-    auto isUserSpecifiedPeerdir = st.Add->ModuleDef && st.Add->ModuleDef->IsMakelistPeer(dir);
-    isUserSpecifiedPeerdir |= st.Add->GetModuleData().IsParsedPeer(AssumeFile(dirNode->ElemId));
+    // Explicit PEERDIR statements and peers registered by source parsers both use
+    // the regular validation path. Other peers, including those added by config
+    // macros, are implicit here; "implicit" does not mean every inferred dependency.
+    const bool isExplicitOrParsedPeerdir =
+        (node->ModuleDef && node->ModuleDef->IsMakelistPeer(dir)) ||
+        node->GetModuleData().IsParsedPeer(AssumeFile(dirNode->ElemId));
 
     const auto nodeModule = node->Module;
 
     if (nodeModule != nullptr) {
         TMatchPeerRequest request;
-        if (!isUserSpecifiedPeerdir) {
+        if (!isExplicitOrParsedPeerdir) {
             request = TMatchPeerRequest{false, false, {EPeerSearchStatus::DeprecatedByFilter}};
         } else if (!nodeModule->GetTag().empty()) {
             request = TMatchPeerRequest::CheckAll();
@@ -1545,16 +1549,31 @@ TGetPeerNodeResult TUpdIter::GetPeerNodeIfNeeded(const TDGIterAddable& st){
         }
         auto peerNode = NPeers::GetPeerNode(YMake.Modules, dirNode, nodeModule, std::move(request));
 
-        if (!isUserSpecifiedPeerdir && peerNode.Status != EPeerSearchStatus::Match) {
+        if (!isExplicitOrParsedPeerdir && peerNode.Status != EPeerSearchStatus::Match) {
+            // YMAKE-2298 uses peer tags to diagnose direct-headers -> legacy proto
+            // dependencies during migration. Config macros such as USE_COMMON_GOOGLE_APIS
+            // also add peers: silently dropping a tag-incompatible peer would hide the
+            // migration error and remove a required dependency from the graph.
+            // Opt in per consumer so unrelated modules keep the existing implicit-peer
+            // behavior. Only preserve the tag error; peer selection and other failures
+            // are unchanged. An explicitly allowed legacy provider must still be selected.
+            // TODO(YMAKE-1263): remove the proto opt-in with the migration tags once
+            // legacy mode and its exceptions are retired. If no other consumers use
+            // CHECK_IMPLICIT_PEERDIR_TAGS, remove this branch and the variable as well;
+            // do not make validation unconditional for all implicit peers as cleanup.
+            if (peerNode.Status == EPeerSearchStatus::DeprecatedByTags &&
+                nodeModule->Get(NVariableDefs::VAR_CHECK_IMPLICIT_PEERDIR_TAGS) == "yes") {
+                return peerNode;
+            }
             peerNode.Status = EPeerSearchStatus::Match;
-            YDIAG(IPRP) << "Ignore bad PEERDIR to " << dir << " because it is not user-specified" << Endl;
+            YDIAG(IPRP) << "Ignore bad PEERDIR to " << dir << " because it is neither explicit nor registered by a source parser" << Endl;
         }
         return peerNode;
     }
 
-    if (!isUserSpecifiedPeerdir) {
+    if (!isExplicitOrParsedPeerdir) {
         // FIXME: stop to silently ignore this case
-        YDIAG(IPRP) << "Ignore PEERDIR from bad module to " << dir << " because it is not user-specified" << Endl;
+        YDIAG(IPRP) << "Ignore PEERDIR from bad module to " << dir << " because it is neither explicit nor registered by a source parser" << Endl;
         return {Graph.Get(TNodeId::Invalid), EPeerSearchStatus::Match};
     }
 

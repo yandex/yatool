@@ -33,6 +33,7 @@ namespace {
     const TStringBuf PROP_PROVIDES = TStringBuf("PROVIDES");
     const TStringBuf CONFIG_VAR_NAMES[] = {
         NVariableDefs::VAR_PEERDIR_TAGS,
+        NVariableDefs::VAR_CHECK_IMPLICIT_PEERDIR_TAGS,
         NVariableDefs::VAR_MANGLED_MODULE_TYPE,
         NVariableDefs::VAR_MODULE_LANG,
         NVariableDefs::VAR_MODULE_TYPE,

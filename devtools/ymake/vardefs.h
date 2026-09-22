@@ -77,6 +77,7 @@ VARIABLE(PASS_PEERS, "@usage: PASS_PEERS=yes/no\n\n"
 ""
 "If set, module peers are passed to it's dependendants.")
 VARIABLE(PEERDIR_TAGS, "")
+VARIABLE(CHECK_IMPLICIT_PEERDIR_TAGS, "Report incompatible multimodule tags for implicit peers instead of silently skipping them")
 VARIABLE(PEERS_LATE_OUTS, "")
 VARIABLE(PEERS, "a list of module dependencies for the module")
 VARIABLE(PROTO_HEADER_EXTS, "")
@@ -161,6 +162,7 @@ constexpr TVariableDefiniton ALL_VARIABLES[]{
     VAR_OUTPUT,
     VAR_PASS_PEERS,
     VAR_PEERDIR_TAGS,
+    VAR_CHECK_IMPLICIT_PEERDIR_TAGS,
     VAR_PEERS_LATE_OUTS,
     VAR_PEERS,
     VAR_PROTO_HEADER_EXTS,
