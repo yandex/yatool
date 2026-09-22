@@ -75,6 +75,12 @@ class _Builder:
             opts.arc_root = str(self.config.arcadia_root)
             opts.bld_root = self.config.params.bld_root
             opts.ignore_recurses = True
+            if self.config.output_root != self.config.arcadia_root:
+                # Exported project awaits build results in output root, not in arcadia
+                # Symlinks, not hardlinks: SymlinkResultStore recreates them every run,
+                # hardlinks of ResultStore are never refreshed once the file is there
+                opts.symlink_root = str(self.config.output_root)
+                opts.create_symlinks = True
 
             opts.rel_targets = []
             opts.abs_targets = []
