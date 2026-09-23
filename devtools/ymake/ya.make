@@ -20,6 +20,7 @@ PEERDIR(
     devtools/ymake/include_parsers
     devtools/ymake/lang
     devtools/ymake/lang/makelists
+    devtools/ymake/libs/async
     devtools/ymake/libs/clocks
     devtools/ymake/libs/str_helpers
     devtools/ymake/libs/spdx

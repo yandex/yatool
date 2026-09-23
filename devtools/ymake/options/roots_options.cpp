@@ -49,12 +49,12 @@ TString TRootsOptions::RealPathByStr(TStringBuf p) const {
 
     TString path;
     if (NeedNormalizeRealPath()) {
-        path = TUnixPath(TPathSplit(root.PathSplit()).ParsePart(loc)).Reconstruct();
+        path = TUnixPath(TPathSplit(root.GetPath()).ParsePart(loc)).Reconstruct();
     } else {
         if (!NPath::NeedFix(loc)) {
             return NPath::Join(root.c_str(), loc);
         }
-        path = TPathSplit(root.PathSplit()).ParsePart(loc).Reconstruct();
+        path = TPathSplit(root.GetPath()).ParsePart(loc).Reconstruct();
     }
     if (path.StartsWith("..")) {
         TRACE(U, NEvent::TFileOutsideRoots(path));
@@ -74,18 +74,18 @@ TString TRootsOptions::RealPathByStr(TStringBuf p) const {
 // Note: returns path either in host or in Unix format depending on NeedNormalizeRealPath()
 TString TRootsOptions::RealPath(const TStringBuf& p1, const TStringBuf& p2) const {
     if (NeedNormalizeRealPath()) {
-        return TUnixPath(TPathSplit(RealPathRoot(p1).PathSplit()).ParsePart(NPath::CutType(p1)).ParsePart(p2)).Reconstruct();
+        return TUnixPath(TPathSplit(RealPathRoot(p1).GetPath()).ParsePart(NPath::CutType(p1)).ParsePart(p2)).Reconstruct();
     } else {
-        return TPathSplit(RealPathRoot(p1).PathSplit()).ParsePart(NPath::CutType(p1)).ParsePart(p2).Reconstruct();
+        return TPathSplit(RealPathRoot(p1).GetPath()).ParsePart(NPath::CutType(p1)).ParsePart(p2).Reconstruct();
     }
 }
 
 // Note: returns path either in host or in Unix format depending on NeedNormalizeRealPath()
 TString TRootsOptions::RealPath(const TStringBuf& p1, const TStringBuf& p2, const TStringBuf& p3) const {
     if (NeedNormalizeRealPath()) {
-        return TUnixPath(TPathSplit(RealPathRoot(p1).PathSplit()).ParsePart(NPath::CutType(p1)).ParsePart(p2).ParsePart(p3)).Reconstruct();
+        return TUnixPath(TPathSplit(RealPathRoot(p1).GetPath()).ParsePart(NPath::CutType(p1)).ParsePart(p2).ParsePart(p3)).Reconstruct();
     } else {
-        return TPathSplit(RealPathRoot(p1).PathSplit()).ParsePart(NPath::CutType(p1)).ParsePart(p2).ParsePart(p3).Reconstruct();
+        return TPathSplit(RealPathRoot(p1).GetPath()).ParsePart(NPath::CutType(p1)).ParsePart(p2).ParsePart(p3).Reconstruct();
     }
 }
 
@@ -143,12 +143,16 @@ void TRootsOptions::EnableRealPathCache(TFileConf* refNames) {
 
 bool TRootsOptions::CanonPath(const TStringBuf& abspath, TString& result) const {
     TFsPath abs(abspath);
-    if (abs.IsSubpathOf(BuildRoot)) {
-        result = NPath::NormalizeSlashes(NPath::ConstructPath(abs.RelativeTo(BuildRoot).c_str(), NPath::Build));
+    // TFsPath lazily mutates its split cache even in const methods. Construct
+    // local paths from strings: copying TFsPath would also read that cache.
+    const TFsPath buildRoot(BuildRoot.GetPath());
+    if (abs.IsSubpathOf(buildRoot)) {
+        result = NPath::NormalizeSlashes(NPath::ConstructPath(abs.RelativeTo(buildRoot).c_str(), NPath::Build));
         return true;
     }
-    if (abs.IsSubpathOf(SourceRoot)) {
-        result = NPath::NormalizeSlashes(NPath::ConstructPath(abs.RelativePath(SourceRoot).c_str(), NPath::Source));
+    const TFsPath sourceRoot(SourceRoot.GetPath());
+    if (abs.IsSubpathOf(sourceRoot)) {
+        result = NPath::NormalizeSlashes(NPath::ConstructPath(abs.RelativePath(sourceRoot).c_str(), NPath::Source));
         return true;
     }
     return false;

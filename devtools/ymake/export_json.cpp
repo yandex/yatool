@@ -12,8 +12,6 @@
 #include "vars.h"
 #include "ymake.h"
 
-#include <asio/detached.hpp>
-#include <asio/experimental/concurrent_channel.hpp>
 #include <devtools/ymake/action.h>
 #include <devtools/ymake/common/md5sig.h>
 #include <devtools/ymake/common/npath.h>
@@ -24,6 +22,7 @@
 #include <devtools/ymake/diag/progress_manager.h>
 #include <devtools/ymake/diag/trace.ev.pb.h>
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/libs/async/parallel.h>
 #include <devtools/ymake/make_plan/make_plan.h>
 #include <devtools/ymake/mkcmd_inputs_outputs.h>
 #include <devtools/ymake/symbols/symbols.h>
@@ -35,6 +34,7 @@
 #include <util/generic/algorithm.h>
 #include <util/generic/hash_set.h>
 #include <util/generic/ptr.h>
+#include <util/generic/scope.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/stream/buffered.h>
@@ -43,7 +43,8 @@
 #include <util/system/types.h>
 
 #include <asio/co_spawn.hpp>
-#include <asio/use_future.hpp>
+#include <asio/strand.hpp>
+#include <asio/use_awaitable.hpp>
 
 using EDebugUidType = NDebugEvents::NExportJson::EUidType;
 
@@ -522,8 +523,6 @@ namespace {
                     }
                     TMakeModuleParallelStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
                     auto strand = asio::make_strand(exec);
-                    using TChannel = asio::experimental::concurrent_channel<void(asio::error_code)>;
-                    TDeque<TChannel> writeChannels;
                     for (const auto& [_, nodes]: cmdbuilder.GetTopoGenerations()) {
                         size_t chunkSize = 10;
                         // group nodes by module preserving order
@@ -532,17 +531,13 @@ namespace {
                             nodesByModuleId[cmdbuilder.GetModuleByNode(nodeId)].push_back(nodeId);
                         }
 
-                        TDeque<TChannel> renderChannels;
+                        std::vector<std::function<asio::awaitable<void>()>> tasks;
                         auto moduleIt = nodesByModuleId.begin();
                         while (moduleIt != nodesByModuleId.end()) {
                             auto chunkEnd = std::next(moduleIt, std::min(chunkSize, size_t(std::distance(moduleIt, nodesByModuleId.end()))));
                             const auto chunk = std::ranges::subrange(moduleIt, chunkEnd);
 
-                            renderChannels.push_back({exec, 1u});
-                            auto& renderChannel = renderChannels.back();
-                            writeChannels.push_back({exec, 1u});
-                            auto& writeChannel = writeChannels.back();
-                            asio::co_spawn(exec, [&cmdbuilder, &cache, &modulesStatesCache, &graph, &yMake, chunk, &renderChannel, &plan, strand, &writeChannel]() -> asio::awaitable<void> {
+                            tasks.emplace_back([&cmdbuilder, &cache, &modulesStatesCache, &graph, &yMake, chunk, &plan, strand]() -> asio::awaitable<void> {
                                 auto jsonString = TString{};
                                 TStringOutput ss(jsonString);
                                 NYMake::TJsonWriter writer{ss};
@@ -558,27 +553,17 @@ namespace {
                                         }
                                     }
                                 }
-                                co_await renderChannel.async_send(std::error_code{});
                                 writer.Flush();
-                                asio::co_spawn(strand, [&plan, jsonString = std::move(jsonString), &writeChannel]() -> asio::awaitable<void> {
+                                // Join the write as part of the render task, including write errors.
+                                co_await asio::co_spawn(strand, [&plan, jsonString = std::move(jsonString)]() -> asio::awaitable<void> {
                                     plan.Writer.WriteArrayJsonValue(plan.NodesArr, std::move(jsonString));
-                                    co_await writeChannel.async_send(std::error_code{});
-                                }, asio::detached);
-                            }, [&renderChannel, &writeChannel](std::exception_ptr ptr) {
-                                if (ptr) {
-                                    renderChannel.cancel();
-                                    writeChannel.cancel();
-                                    std::rethrow_exception(ptr);
-                                }
+                                    co_return;
+                                }, asio::use_awaitable);
                             });
                             moduleIt = chunkEnd;
                         }
-                        for (auto& renderChannel : renderChannels) {
-                            co_await renderChannel.async_receive();
-                        }
-                    }
-                    for (auto& writeChannel : writeChannels) {
-                        co_await writeChannel.async_receive();
+                        // No borrowed iterator or shared render state may outlive this scope.
+                        co_await NYMake::RunAll(exec, std::move(tasks));
                     }
                 } else {
                     TMakeModuleSequentialStates modulesStatesCache{yMake.Conf, yMake.Graph, yMake.Modules};
@@ -651,28 +636,31 @@ namespace {
 asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
     FORCE_TRACE(U, NEvent::TStageStarted("Export JSON"));
 
-    auto& conf = yMake.Conf;
-    TFsPath sysSourceRoot = conf.SourceRoot;
-    conf.SourceRoot = "$(SOURCE_ROOT)";
-    TFsPath sysBuildRoot = conf.BuildRoot;
-    conf.BuildRoot = "$(BUILD_ROOT)";
-    const bool sysNormalize = conf.NormalizeRealPath;
-    conf.NormalizeRealPath = true;
-    conf.EnableRealPathCache(&yMake.Names.FileConf);
-
     {
-        NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
+        auto& conf = yMake.Conf;
+        TFsPath sysSourceRoot = conf.SourceRoot;
+        TFsPath sysBuildRoot = conf.BuildRoot;
+        const bool sysNormalize = conf.NormalizeRealPath;
+        Y_DEFER {
+            conf.EnableRealPathCache(nullptr);
+            conf.SourceRoot = std::move(sysSourceRoot);
+            conf.BuildRoot = std::move(sysBuildRoot);
+            conf.NormalizeRealPath = sysNormalize;
+        };
+        conf.SourceRoot = "$(SOURCE_ROOT)";
+        conf.BuildRoot = "$(BUILD_ROOT)";
+        conf.NormalizeRealPath = true;
+        conf.EnableRealPathCache(&yMake.Names.FileConf);
 
-        TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, yMake.Conf.OutputStream.Get()};
-        NYMake::TJsonWriter jsonWriter(*output.Get());
-        TMakePlan plan(jsonWriter);
-        co_await RenderJSONGraph(yMake, plan, exec);
+        {
+            NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
+
+            TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, yMake.Conf.OutputStream.Get()};
+            NYMake::TJsonWriter jsonWriter(*output.Get());
+            TMakePlan plan(jsonWriter);
+            co_await RenderJSONGraph(yMake, plan, exec);
+        }
     }
-
-    conf.EnableRealPathCache(nullptr);
-    conf.SourceRoot = sysSourceRoot;
-    conf.BuildRoot = sysBuildRoot;
-    conf.NormalizeRealPath = sysNormalize;
 
     FORCE_TRACE(U, NEvent::TStageFinished("Export JSON"));
 
