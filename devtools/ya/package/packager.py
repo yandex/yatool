@@ -1,6 +1,7 @@
 import collections
 import concurrent.futures
 import copy
+import gc
 import itertools
 import logging
 import os
@@ -1535,6 +1536,8 @@ def do_package(params):
                                         package_context.parsed_package,
                                         package_context.formatters,
                                     )
+                                # Automatic cyclic GC is disabled in ya-bin; collect completed runner contexts.
+                                gc.collect()
 
                     if not params.build_only:
                         with stager.scope("create_package"):
