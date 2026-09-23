@@ -23,6 +23,7 @@ import devtools.ya.core.monitoring as monitoring
 import devtools.ya.core.sec as sec
 import devtools.ya.core.user as user
 import devtools.ya.core.yarg
+from library.python.user_class import UserClass
 import exts.asyncthread
 import exts.os2
 import library.python.strings as strings
@@ -846,7 +847,7 @@ def _get_snowden_wait_sec(ctx, user_class):
             return max(0, int(env_val))
         except (ValueError, TypeError):
             pass
-    if user_class == user.UserClass.SANDBOX:
+    if user_class == UserClass.SANDBOX:
         return 30
     return 0
 

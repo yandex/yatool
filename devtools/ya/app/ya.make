@@ -28,6 +28,7 @@ PEERDIR(
     devtools/ya/core/sec
     devtools/ya/core/sig_handler
     devtools/ya/core/user
+    library/python/user_class
     devtools/ya/exts
     devtools/ya/yalibrary/active_state
     devtools/ya/yalibrary/app_ctx

@@ -1,36 +1,25 @@
 import os
-import enum
 import getpass
 import logging
 
-from devtools.ya.core.user.consts import UserClass as _UserClassConsts
+from library.python import user_class
 
 logger = logging.getLogger(__name__)
 
 
-class UserClass(enum.StrEnum):
-    DISTBUILD = _UserClassConsts.DISTBUILD
-    ROBOT = _UserClassConsts.ROBOT
-    ROOT_USER = _UserClassConsts.ROOT_USER
-    SANDBOX = _UserClassConsts.SANDBOX
-    USER = _UserClassConsts.USER
-    ZOMB = _UserClassConsts.ZOMB
-    AGENT = _UserClassConsts.AGENT
-
-
 USER_CLASS_BY_NAME = {
-    '': UserClass.ROBOT,
-    'loadbase': UserClass.ROBOT,
-    'sandbox': UserClass.SANDBOX,
-    'isandbox': UserClass.SANDBOX,
-    'root': UserClass.ROOT_USER,
+    '': user_class.UserClass.ROBOT,
+    'loadbase': user_class.UserClass.ROBOT,
+    'sandbox': user_class.UserClass.SANDBOX,
+    'isandbox': user_class.UserClass.SANDBOX,
+    'root': user_class.UserClass.ROOT_USER,
 }
 
 USER_CLASS_BY_PREFIX = {
-    'teamcity': UserClass.ROBOT,
-    'robot-': UserClass.ROBOT,
-    'db-runner': UserClass.DISTBUILD,
-    'zomb-': UserClass.ZOMB,
+    'teamcity': user_class.UserClass.ROBOT,
+    'robot-': user_class.UserClass.ROBOT,
+    'db-runner': user_class.UserClass.DISTBUILD,
+    'zomb-': user_class.UserClass.ZOMB,
 }
 
 
@@ -50,20 +39,20 @@ def get_user() -> str:
     return user
 
 
-def classify_user(username: str) -> UserClass:
+def classify_user(username: str) -> user_class.UserClass:
     if username in USER_CLASS_BY_NAME:
         return USER_CLASS_BY_NAME[username]
-    for prefix, user_class in USER_CLASS_BY_PREFIX.items():
+    for prefix, classified_user in USER_CLASS_BY_PREFIX.items():
         if username.startswith(prefix):
-            return user_class
+            return classified_user
     if username.isdigit():
-        return UserClass.ROBOT
+        return user_class.UserClass.ROBOT
 
-    return UserClass.USER
+    return user_class.UserClass.USER
 
 
-def classify_invocation_user(username: str, caller_info: dict | None = None) -> UserClass:
+def classify_invocation_user(username: str, caller_info: dict | None = None) -> user_class.UserClass:
     if caller_info and caller_info.get('agent') not in (None, '', 'unknown'):
-        return UserClass.AGENT
+        return user_class.UserClass.AGENT
 
     return classify_user(username)
