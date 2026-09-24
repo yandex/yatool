@@ -4,8 +4,8 @@
 Replaces the human display for --output-style=jsonl. Every event line starts
 with the keys ``type`` and ``ts`` (wall-clock seconds), the rest of the event
 follows flat. The display counts failures and warnings on the fly and reports them in the
-final ``finished`` event together with the exit code, its category and the advice on what
-to do about the outcome.
+final ``finished`` event together with the exit code, its category, the advice on what
+to do about the outcome and the next-step tips collected during the run.
 """
 
 from __future__ import print_function
@@ -38,6 +38,7 @@ class JsonlDisplay(object):
         self._fails_by_stage = collections.Counter()
         self._warnings = 0
         self._test_counts = None
+        self._tips = collections.OrderedDict()
         self._seen_messages = set()
         self.emit_event({'type': 'started', 'handler': handler})
 
@@ -70,6 +71,16 @@ class JsonlDisplay(object):
         # type: (dict[str, int]) -> None
         """Remember test status counters for the ``finished`` event."""
         self._test_counts = dict(counts)
+
+    def add_tip(self, tip_id, text, **extra):
+        # type: (str, str, **tp.Any) -> None
+        """Remember a next-step tip for the ``finished`` event; the first tip with a given id wins."""
+        with self._lock:
+            if tip_id in self._tips:
+                return
+            tip = collections.OrderedDict([('id', tip_id), ('text', text)])
+            tip.update(extra)
+            self._tips[tip_id] = tip
 
     def close(self, exit_code=None, exception=None):
         # type: (int | None, BaseException | None) -> None
@@ -117,6 +128,8 @@ class JsonlDisplay(object):
         event['category'] = _exit_code_name(exit_code)
         event['duration'] = round(self._clock() - self._started_at, 3)
         event['counters'] = counters
+        if self._tips:
+            event['tips'] = list(self._tips.values())
         if exception is not None:
             event['text'] = yalibrary.display.strip_markup(str(exception)).strip()
         advice = _advice(event['category'], configure_failed=bool(self._fails_by_stage['configure']))

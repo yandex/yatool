@@ -52,6 +52,8 @@ def _make_reporter(builder, display):
             show_skipped=builder.opts.show_skipped_tests,
             truncate=not builder.opts.inline_diff,
             arc_root=builder.opts.arc_root,
+            fail_fast=builder.opts.fail_fast,
+            last_failed_tests=builder.opts.last_failed_tests,
         )
     return devtools.ya.test.reports.ConsoleReporter(
         show_passed=builder.opts.show_passed_tests,
