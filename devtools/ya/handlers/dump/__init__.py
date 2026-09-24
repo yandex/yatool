@@ -133,7 +133,7 @@ class DumpYaHandler(CompositeHandler):
         CompositeHandler.__init__(
             self,
             description=(
-                'Inspect build and repository metadata, generate reports such as compilation databases, '
+                'Inspect build, test, and repository metadata, generate reports such as compilation databases, '
                 'or collect diagnostic bundles from saved ya runs'
             ),
         )
