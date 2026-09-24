@@ -171,13 +171,14 @@ class TermView(object):
 
     def _running(self, active):
         # type: (list) -> list
-        """`(header, elapsed)` of the active tasks that have a status, longest running first."""
+        """`(header, elapsed)` of all active tasks, longest running first."""
         # Status.active() is ordered by start time, the oldest task first.
         running = []
         for task, elapsed in reversed(active):
             task_status = self._fmt(task)
-            if task_status:
-                running.append((plain.header(task_status), elapsed))
+            # Auxiliary tasks (cache puts, node preparation) have no status: name them
+            # as the terminal status line does, so the list is never shorter than `active`.
+            running.append((plain.header(task_status) if task_status else str(task), elapsed))
         return running
 
     def _tick_plain(self):
