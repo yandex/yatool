@@ -48,6 +48,7 @@ class ReportTypes(object):
     BUILD_ERRORS_COUNT = 'build_errors_count'
     RECIPES_USAGE = 'recipes_usage'
     FINISH = 'finish'
+    CONTROL_TRANSFER = 'control_transfer'
     HOST_HEALTH = 'host_health'
     PACKAGE_STATS = 'package_stats'
     CALLER_INFO = 'caller_info'

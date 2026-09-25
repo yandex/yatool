@@ -7,6 +7,7 @@ import devtools.ya.handlers.analyze_make.graph_diff as graph_diff
 import devtools.ya.handlers.analyze_make.timeline as timeline
 import devtools.ya.handlers.analyze_make.timebloat as timebloat
 import os
+import exts.process
 import devtools.ya.yalibrary.app_ctx
 import yalibrary.tools
 import app_config
@@ -149,6 +150,7 @@ def run_analyze_make_task_contention(params):
         print(exe)
     else:
         cmd = [exe, 'task-contention'] + params.args
+        exts.process.notify_pre_exec(exe, cmd, method='execv')
         os.execv(exe, cmd)
 
 

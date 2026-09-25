@@ -35,20 +35,23 @@ def _get_new_respawns(reasons):
     return [r for r in reasons if r and r not in _get_current_respawns()]
 
 
-def _src_root_respawn(arc_dir):
+def _src_root_respawn(from_arcadia_root, to_arcadia_root):
     if os.environ.get('YA_NO_RESPAWN'):
         logger.debug('Skipping respawn by YA_NO_RESPAWN variable')
         return
 
     py_path = sys.executable
     target = None
-    for t in [os.path.join(arc_dir, 'ya'), os.path.join(arc_dir, 'devtools', 'ya', 'ya')]:
+    for t in [
+        os.path.join(to_arcadia_root, 'ya'),
+        os.path.join(to_arcadia_root, 'devtools', 'ya', 'ya'),
+    ]:
         if os.path.exists(t):
             target = t
             break
 
     if target is None:
-        raise Exception('Cannot find ya in ' + arc_dir)
+        raise Exception('Cannot find ya in ' + to_arcadia_root)
 
     reasons = [target]
 
@@ -64,7 +67,7 @@ def _src_root_respawn(arc_dir):
     cmd = [target] + ya_script_prefix + sys.argv[1:]
 
     env = _create_respawn_env(os.environ.copy(), _get_current_respawns() + new_respawns)
-    env['YA_SOURCE_ROOT'] = arc_dir
+    env['YA_SOURCE_ROOT'] = to_arcadia_root
     env['Y_PYTHON_ENTRY_POINT'] = ':main'
 
     # -E     : ignore PYTHON* environment variables (such as PYTHONPATH)
@@ -73,7 +76,19 @@ def _src_root_respawn(arc_dir):
     full_cmd = ["-E", "-s", "-S"] + cmd
     logger.debug('Respawn %s %s (triggered by: %s)', py_path, ' '.join(full_cmd), new_respawns)
 
-    exts.process.execve(py_path, full_cmd, env)
+    exts.process.execve(
+        py_path,
+        full_cmd,
+        env,
+        transfer_type=exts.process.ControlTransferType.RESPAWN,
+        transfer_details={
+            'from_arcadia_root': from_arcadia_root,
+            'from_ya_path': devtools.ya.core.config.entry_point_path(),
+            'to_arcadia_root': to_arcadia_root,
+            'to_ya_path': target,
+            'reasons': new_respawns,
+        },
+    )
 
 
 class EmptyValue:
@@ -99,7 +114,7 @@ def check_for_respawn(new_root):
         entry_root_change = entry_root != new_root
 
         if entry_root_change:
-            _src_root_respawn(arc_dir=new_root)
+            _src_root_respawn(from_arcadia_root=entry_root, to_arcadia_root=new_root)
 
     finally:
         # It's needed only when a respawn happens.

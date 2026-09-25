@@ -39,6 +39,7 @@ ENDIF()
 
 IF (PYTHON2)
     PEERDIR(
+        contrib/deprecated/python/enum34
         contrib/deprecated/python/scandir
         contrib/deprecated/python/typing
     )

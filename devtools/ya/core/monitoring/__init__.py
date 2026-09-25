@@ -10,6 +10,7 @@ LabelValue = Any | Callable[[], Any]
 class MetricNames(enum.StrEnum):
     YA_STARTED = enum.auto()
     YA_FINISHED = enum.auto()
+    YA_CONTROL_TRANSFERRED = enum.auto()
     YT_CACHE_ERROR = enum.auto()
 
 

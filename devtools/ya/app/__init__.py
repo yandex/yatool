@@ -852,6 +852,43 @@ def _get_snowden_wait_sec(ctx, user_class):
     return 0
 
 
+def _get_handler_and_prefix():
+    prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix() or []
+    if not prefix:
+        return 'undefined', prefix
+
+    handler = prefix[1] if len(prefix) > 1 and prefix[1] != '-' else prefix[0]
+    return handler, prefix
+
+
+def _report_control_transfer(ctx, telemetry, start, transfer):
+    handler, prefix = _get_handler_and_prefix()
+    value = dict(transfer)
+    value.update(
+        {
+            'duration': time.time() - start,
+            'start_time': start,
+            'prefix': prefix,
+            'handler': handler,
+            'version': ctx.revision,
+        }
+    )
+
+    from devtools.ya.core.report import ReportTypes
+
+    telemetry.report(ReportTypes.CONTROL_TRANSFER, value)
+    ctx.metrics_reporter.report_metric(
+        monitoring.MetricNames.YA_CONTROL_TRANSFERRED,
+        labels={
+            'handler': handler,
+            'prefix': ' '.join(prefix or []),
+            'transfer_type': transfer['transfer_type'],
+            'method': transfer['method'],
+        },
+        urgent=True,
+    )
+
+
 def configure_report_interceptor(ctx, report_events, intent=None):
     # we can only do that after respawn with valid python
     from devtools.ya.core.report import telemetry, ReportTypes, mine_env_vars, mine_cmd_args, parse_events_filter
@@ -880,13 +917,6 @@ def configure_report_interceptor(ctx, report_events, intent=None):
                     snowden.cleanup_old_versions()
                 except Exception:
                     logger.debug('Failed to cleanup old snowden versions', exc_info=True)
-
-                from exts.process import register_pre_execve_hook
-
-                def _pre_execve_cleanup():
-                    telemetry.stop_reporter()
-
-                register_pre_execve_hook(_pre_execve_cleanup)
 
     init_reporter_kwargs = {
         'suppressions': sec.mine_suppression_filter(params_dict),
@@ -919,6 +949,19 @@ def configure_report_interceptor(ctx, report_events, intent=None):
         for intvl in stat.intervals:
             start = min(intvl[0], start)
 
+    pre_exec_observer = None
+    if parsed_report_events:
+        from exts.process import register_pre_exec_observer
+
+        def _pre_exec_report(transfer):
+            try:
+                _report_control_transfer(ctx, telemetry, start, transfer)
+            finally:
+                telemetry.stop_reporter()
+
+        pre_exec_observer = _pre_exec_report
+        register_pre_exec_observer(pre_exec_observer)
+
     success = False
     exit_code = 0
     exception_name = ""
@@ -944,7 +987,7 @@ def configure_report_interceptor(ctx, report_events, intent=None):
 
         e.ya_exit_code = exit_code
 
-        prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix()
+        _, prefix = _get_handler_and_prefix()
         exception_name = e.__class__.__name__
         exception_muted = getattr(e, 'mute', False)
         telemetry.report(
@@ -969,7 +1012,7 @@ def configure_report_interceptor(ctx, report_events, intent=None):
         additional_fields = _resources_report()
         additional_fields.update(_ya_downloads_report())
 
-        prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix()
+        handler, prefix = _get_handler_and_prefix()
         telemetry.report(
             ReportTypes.TIMEIT,
             dict(
@@ -1001,7 +1044,7 @@ def configure_report_interceptor(ctx, report_events, intent=None):
         ctx.metrics_reporter.report_metric(
             monitoring.MetricNames.YA_FINISHED,
             labels={
-                "handler": prefix[1] if prefix and len(prefix) > 1 else "undefined",
+                "handler": handler,
                 "prefix": " ".join(prefix),
                 "exit_code": exit_code,
                 "exc_info": exception_name,
@@ -1009,7 +1052,13 @@ def configure_report_interceptor(ctx, report_events, intent=None):
             },
             urgent=True,
         )
-        telemetry.stop_reporter()  # flush urgent reports
+        try:
+            telemetry.stop_reporter()  # flush urgent reports
+        finally:
+            if pre_exec_observer is not None:
+                from exts.process import unregister_pre_exec_observer
+
+                unregister_pre_exec_observer(pre_exec_observer)
 
         if app_config.in_house and _ya_pid_path is not None:
             from yalibrary import snowden
