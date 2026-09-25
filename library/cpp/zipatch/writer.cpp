@@ -47,7 +47,7 @@ public:
                 WriteEntry("actions.json", WriteJson(Actions_.Get(), true, false));
             }
 
-            Actions_.Destroy();
+            Actions_.reset();
         }
 
         if (Meta_) {
@@ -55,7 +55,7 @@ public:
                 WriteEntry("meta.json", WriteJson(Meta_.Get(), true));
             }
 
-            Meta_.Destroy();
+            Meta_.reset();
         }
 
         if (Revprops_) {
@@ -63,7 +63,7 @@ public:
                 WriteEntry("revprops.json", WriteJson(Revprops_.Get(), true));
             }
 
-            Revprops_.Destroy();
+            Revprops_.reset();
         }
 
         if (Archive_) {
