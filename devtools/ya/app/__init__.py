@@ -531,6 +531,52 @@ def _plain_style(params) -> bool:
     return getattr(params, 'output_style', None) == common_opts.OutputStyle.PLAIN
 
 
+# How long configure_display waits for the background caller detection before
+# settling on the default style. Detection usually finishes within milliseconds
+# (env-based); the wait only happens when no output style was chosen.
+CALLER_DETECTION_TIMEOUT = 1.0
+
+
+def resolve_output_style(style, auto_detect_agent: bool, caller_info_data: caller_info.CallerInfo | None) -> str:
+    """Pick the effective output style for the handler.
+
+    Args:
+        style: The value of --output-style/-T/ya.conf, None when the user chose nothing.
+        auto_detect_agent: The `auto_detect_agent` toggle (ya.conf, YA_AUTO_DETECT_AGENT).
+        caller_info_data: Detected caller info, None when nothing was detected.
+
+    Returns:
+        An explicit style always wins. With none given, jsonl when auto-detection
+        is on and a coding agent launched ya (only the `agent` field counts),
+        otherwise ninja.
+    """
+    if style is not None:
+        return style
+    if auto_detect_agent and caller_info_data and caller_info_data.get('agent'):
+        return common_opts.OutputStyle.JSONL
+    return common_opts.OutputStyle.NINJA
+
+
+def _apply_output_style(app_ctx) -> None:
+    # Handlers without OutputStyleOptions have no output_style at all and keep
+    # the human display; do not invent the attribute for them.
+    params = app_ctx.params
+    if not hasattr(params, 'output_style'):
+        return
+    style = params.output_style
+    auto_detect_agent = getattr(params, 'auto_detect_agent', False)
+    detected = None
+    if style is None and auto_detect_agent:
+        # Auto-enabling is on the table: block (briefly) for the background
+        # detection. A miss or a timeout reads as "not an agent". For sensitive
+        # commands the caller_info module is not configured at all, so this
+        # returns None and auto-enabling never fires there.
+        detected = caller_info.get_caller_info_from_context(app_ctx, timeout=CALLER_DETECTION_TIMEOUT)
+    params.output_style = resolve_output_style(style, auto_detect_agent, detected)
+    if style is None and params.output_style == common_opts.OutputStyle.JSONL:
+        logger.debug("output style jsonl auto-enabled: launched by %s", detected.get('agent'))
+
+
 def configure_display_log(app_ctx):
     from yalibrary.loggers import display_log
     from devtools.ya.core import logger  # XXX
@@ -634,6 +680,7 @@ def configure_display(app_ctx):
     import yalibrary.display as yadisplay
     from yalibrary import formatter
 
+    _apply_output_style(app_ctx)
     if getattr(app_ctx.params, 'output_style', None) == common_opts.OutputStyle.JSONL:
         prefix = devtools.ya.core.yarg.OptsHandler.latest_handled_prefix() or []
         display = yadisplay.JsonlDisplay(sys.stderr, ' '.join(prefix[1:]))

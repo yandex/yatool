@@ -152,7 +152,11 @@ class OutputStyle(enum.StrEnum):
 class OutputStyleOptions(Options):
     def __init__(self):
         self.do_not_output_stderrs = False
-        self.output_style = 'ninja'
+        # None means the user chose nothing (no --output-style/-T, no ya.conf key):
+        # app.configure_display then picks jsonl when a coding agent launched ya
+        # and auto_detect_agent is on, otherwise ninja. Handlers see the resolved value.
+        self.output_style = None
+        self.auto_detect_agent = False
         self.mask_roots = None
         self.status_refresh_interval = 0.1
         self.do_emit_status = True
@@ -222,7 +226,14 @@ class OutputStyleOptions(Options):
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
+            EnvConsumer(
+                name='YA_AUTO_DETECT_AGENT',
+                hook=SetValueHook('auto_detect_agent', return_true_if_enabled),
+            ),
             ConfigConsumer('output_style'),
+            # Switches the jsonl style on automatically when a coding agent launched ya
+            # (see app.configure_display); an explicit output_style still wins.
+            ConfigConsumer('auto_detect_agent'),
             ConfigConsumer('mask_roots'),
             ConfigConsumer('use_roman_numerals'),
         ]
@@ -233,7 +244,7 @@ class OutputStyleOptions(Options):
 
     def postprocess2(self, params):
         # The value may come from ya.conf, which bypasses the option's validation.
-        if params.output_style not in list(OutputStyle):
+        if params.output_style is not None and params.output_style not in list(OutputStyle):
             raise ArgsValidatingException(
                 "Invalid output_style: {} (choose from '{}')".format(params.output_style, "', '".join(OutputStyle))
             )
