@@ -490,6 +490,7 @@ class ConsoleReportOptions(devtools.ya.core.yarg.Options):
         self.show_metrics = False
         self.show_passed_tests = False
         self.show_skipped_tests = False
+        self.show_slowest_tests = 0
         self.test_console_report = test_console_report
         self.show_final_ok = True  # for internal usage by `ya run`
 
@@ -518,6 +519,14 @@ class ConsoleReportOptions(devtools.ya.core.yarg.Options):
                 visible=help_level.HelpLevel.INTERNAL,
             ),
             devtools.ya.core.yarg.ConfigConsumer('show_passed_tests'),
+            TestArgConsumer(
+                ['--show-slowest-tests'],
+                help='Show N slowest test cases of the whole run after the test report (0 disables)',
+                hook=devtools.ya.core.yarg.SetValueHook('show_slowest_tests', transform=int),
+                subgroup=CONSOLE_REPORT_SUBGROUP,
+                visible=help_level.HelpLevel.BASIC,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('show_slowest_tests'),
             TestArgConsumer(
                 ['--inline-diff'],
                 help="Disable truncation of the comments and print diff to the terminal",
@@ -561,6 +570,10 @@ class ConsoleReportOptions(devtools.ya.core.yarg.Options):
                 raise devtools.ya.core.yarg.ArgsValidatingException(
                     "Unknown test status found (option omitted_test_statuses): {}".format(status)
                 )
+        if self.show_slowest_tests < 0:
+            raise devtools.ya.core.yarg.ArgsValidatingException(
+                "Option show_slowest_tests must be a non-negative number, got {}".format(self.show_slowest_tests)
+            )
 
     def postprocess2(self, params):
         params.print_test_console_report = (

@@ -23,6 +23,21 @@ def select_test_cases(chunk, omitted_statuses, show_passed, show_deselected, sho
     return selected
 
 
+def slowest_test_cases(test_suites, limit):
+    # type: (list, int) -> list
+    """The ``limit`` longest test cases of the suites as (suite, test case) pairs, slowest first.
+
+    Only test cases that actually ran (``elapsed > 0``) take part, whatever their status:
+    a timed out test is the slowest one in the most literal sense. Ties keep a stable order
+    by project path and test name, so the same run always prints the same list.
+    """
+    if limit <= 0:
+        return []
+    ran = [(suite, test_case) for suite in test_suites for test_case in suite.tests if test_case.elapsed > 0]
+    ran.sort(key=lambda pair: (-pair[1].elapsed, pair[0].project_path, pair[1].name))
+    return ran[:limit]
+
+
 def significant_logs(logs):
     # type: (dict) -> dict
     """Logs without the per-run copies: those are local and reachable from the main ones."""

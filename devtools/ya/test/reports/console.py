@@ -41,8 +41,10 @@ class ConsoleReporter(object):
         out_path=None,
         show_skipped=None,
         display=None,
+        show_slowest=0,
     ):
         self._show_passed = show_passed
+        self._show_slowest = show_slowest
         self._show_test_cwd = show_test_cwd
         self._truncate = truncate
         self._show_metrics = show_metrics
@@ -65,7 +67,7 @@ class ConsoleReporter(object):
         pass
 
     def on_tests_finish(self, test_suites):
-        lines = []
+        lines = self._slowest_tests_lines(test_suites)
         status_pattern = "[[{marker}]]\t{count} - {status}[[rst]]"
         if test_suites:
             count = len(test_suites)
@@ -83,6 +85,28 @@ class ConsoleReporter(object):
         else:
             lines.append('Total 0 tests')
         self._display.emit_message('\n'.join(lines))
+
+    def _slowest_tests_lines(self, test_suites):
+        # type: (list) -> list[str]
+        """The ``Slowest N tests`` block for --show-slowest-tests, empty when it is off or nothing ran."""
+        slowest = selection.slowest_test_cases(test_suites, self._show_slowest)
+        if not slowest:
+            return []
+        count = len(slowest)
+        lines = ['\nSlowest {} test{}:'.format(count, '' if count == 1 else 's')]
+        width = max(len('{:0.2f}'.format(test_case.elapsed)) for _, test_case in slowest)
+        for test_suite, test_case in slowest:
+            status = const.Status.TO_STR[test_case.status]
+            msg = '{:>{width}.2f}s [{}{}[[rst]]]'.format(
+                test_case.elapsed, self.get_status_marker(status), status, width=width
+            )
+            msg += ' [[imp]]{}[[rst]] <[[unimp]]{}[[rst]]> {}'.format(
+                test_suite.project_path, test_suite.get_type(), test_case.name
+            )
+            if test_suite.multi_target_platform_run:
+                msg += ' [[[alt1]]{}[[rst]]]'.format(test_suite.target_platform_descriptor)
+            lines.append(msg)
+        return lines
 
     def get_formatted_metrics(self, entry):
         return json.dumps(entry.metrics, sort_keys=True, indent=4)

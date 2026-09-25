@@ -9,6 +9,9 @@ go into the display for its ``finished`` event.
 A failed test case or chunk of a regular test suite also gets ``rerun_filter``:
 the ``-F`` argument to append to the original command to rerun only it. The ``finished`` event gets
 next-step tips derived from the results (see _add_tips).
+
+With --show-slowest-tests N the report also gets one ``slowest_tests`` event: the N
+longest test cases of the run (see selection.slowest_test_cases), slowest first.
 """
 
 import collections
@@ -54,9 +57,11 @@ class JsonlReporter(object):
         arc_root=None,
         fail_fast=False,
         last_failed_tests=False,
+        show_slowest=0,
     ):
-        # type: (tp.Any, list[str] | None, bool, bool, bool, str | None, bool, bool) -> None
+        # type: (tp.Any, list[str] | None, bool, bool, bool, str | None, bool, bool, int) -> None
         self._display = display
+        self._show_slowest = show_slowest
         # Makes the paths in tips independent of the cwd
         self._arc_root = arc_root
         self._omitted_test_statuses = {const.Status.BY_NAME[x] for x in omitted_test_statuses or []}
@@ -118,6 +123,11 @@ class JsonlReporter(object):
             for test_case in suite.tests:
                 counts[const.Status.TO_STR[test_case.status]] += 1
         self._display.record_test_counts(dict(counts))
+        slowest = selection.slowest_test_cases(test_suites, self._show_slowest)
+        if slowest:
+            self._display.emit_event(
+                {'type': 'slowest_tests', 'tests': [self._slowest_entry(*pair) for pair in slowest]}
+            )
         self._add_tips(test_suites)
 
     def on_tests_interrupt(self):
@@ -174,6 +184,19 @@ class JsonlReporter(object):
                 'add -X to rerun only the tests that failed; finish with a full run to catch regressions',
                 flag='-X',
             )
+
+    @staticmethod
+    def _slowest_entry(test_suite, test_case):
+        # type: (tp.Any, tp.Any) -> dict
+        entry = {
+            'path': test_suite.project_path,
+            'name': test_case.name,
+            'status': const.Status.TO_STR[test_case.status],
+            'duration': test_case.elapsed,
+        }
+        if test_suite.multi_target_platform_run:
+            entry['platform'] = test_suite.target_platform_descriptor
+        return entry
 
     def _absolute_path(self, project_path):
         # type: (str) -> str

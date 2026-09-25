@@ -54,6 +54,7 @@ def _make_reporter(builder, display):
             arc_root=builder.opts.arc_root,
             fail_fast=builder.opts.fail_fast,
             last_failed_tests=builder.opts.last_failed_tests,
+            show_slowest=builder.opts.show_slowest_tests,
         )
     return devtools.ya.test.reports.ConsoleReporter(
         show_passed=builder.opts.show_passed_tests,
@@ -67,6 +68,7 @@ def _make_reporter(builder, display):
             [devtools.ya.test.const.YaTestTags.ForceSandbox] if builder.opts.run_tagged_tests_on_sandbox else []
         ),
         display=display,
+        show_slowest=builder.opts.show_slowest_tests,
     )
 
 
