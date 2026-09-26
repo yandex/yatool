@@ -3,9 +3,11 @@
 
 The counterpart of TermView for a consumer that reads an event stream instead
 of a terminal: no per-task lines, only throttled snapshots of the counters and
-of the longest running node. A snapshot goes out when the counters or the
-node change (at most once per change_interval), or as a keepalive while tasks
-are running and the stream has been quiet for keepalive_interval.
+of the longest running node. The timing is the schedule of the plain style: a
+snapshot goes out when the counters or the node change, at most once per
+PROGRESS_RATE_LIMIT_SECONDS, or as a keepalive while tasks are running and
+nothing has changed for STILL_WAITING_SCHEDULE seconds (10, then 30, then 60
+after each report; the schedule restarts on a change).
 
 What the terminal shows as the body of a finished task (its stderr, e.g. the
 compiler warnings) is forwarded as a ``message`` with the node ``path`` and
@@ -18,6 +20,7 @@ import time
 
 from yalibrary import display as display_lib
 from yalibrary.status_view import helpers
+from yalibrary.status_view import pacer
 import yalibrary.formatter
 
 import typing as tp
@@ -33,12 +36,10 @@ class JsonlProgressView(object):
         display,
         stage='build',
         clock=time.time,
-        change_interval=5.0,
-        keepalive_interval=30.0,
         output_replacements=None,
         patterns=None,
     ):
-        # type: (Status, tp.Any, str, tp.Callable[[], float], float, float, list | None, tp.Any) -> None
+        # type: (Status, tp.Any, str, tp.Callable[[], float], list | None, tp.Any) -> None
         self._status = status
         self._output_replacements = output_replacements
         self._patterns = patterns
@@ -46,11 +47,8 @@ class JsonlProgressView(object):
         self._display = display
         self._stage = stage
         self._clock = clock
-        self._change_interval = change_interval
-        self._keepalive_interval = keepalive_interval
-        self._last_written = None  # type: dict | None
         self._last_key = None  # type: tuple | None
-        self._last_written_at = None  # type: float | None
+        self._pacer = pacer.ProgressPacer(clock())
 
     def snapshot(self):
         # type: () -> dict
@@ -72,16 +70,14 @@ class JsonlProgressView(object):
         """Forward new task bodies and write the snapshot if it is due; the signature matches TermView.tick."""
         self._flush_bodies()
         now = self._clock()
-        if self._last_written is None:
-            self._write(self.snapshot(), now)
-            return
-        quiet_for = now - self._last_written_at
-        if quiet_for < self._change_interval:
+        if self._pacer.throttled(now):
             # Nothing can be due yet: skip building the snapshot on this tick.
             return
         snapshot = self.snapshot()
-        if self._changed(snapshot) or (snapshot['active'] and quiet_for >= self._keepalive_interval):
-            self._write(snapshot, now)
+        if self._changed(snapshot):
+            self._pacer.note_change(now)
+        if self._pacer.due(now, bool(snapshot['active'])):
+            self._write(snapshot)
 
     def finish(self):
         # type: () -> None
@@ -89,7 +85,7 @@ class JsonlProgressView(object):
         self._flush_bodies()
         snapshot = self.snapshot()
         if self._changed(snapshot):
-            self._write(snapshot, self._clock())
+            self._write(snapshot)
 
     def _flush_bodies(self):
         # type: () -> None
@@ -125,11 +121,9 @@ class JsonlProgressView(object):
         # not a change, the keepalive is what refreshes it.
         return _comparable(snapshot) != self._last_key
 
-    def _write(self, snapshot, now):
-        # type: (dict, float) -> None
-        self._last_written = snapshot
+    def _write(self, snapshot):
+        # type: (dict) -> None
         self._last_key = _comparable(snapshot)
-        self._last_written_at = now
         self._display.emit_event(snapshot)
 
     @staticmethod

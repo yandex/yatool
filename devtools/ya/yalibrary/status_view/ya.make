@@ -20,6 +20,7 @@ PY_SRCS(
     __init__.py
     helpers.py
     jsonl.py
+    pacer.py
     status.py
     pack.py
     plain.py

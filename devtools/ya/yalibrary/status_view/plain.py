@@ -19,6 +19,7 @@ import devtools.ya.core.error as core_error
 import devtools.ya.test.const
 
 from yalibrary import display as display_lib
+from yalibrary.status_view import pacer
 
 # The value of --output-style that selects this style.
 STYLE = 'plain'
@@ -102,25 +103,11 @@ def severity_of(task):
     return WARNING
 
 
-# Bazel prints at most once a second (NO_CURSES_MINIMAL_PROGRESS_RATE_LIMIT of
-# UiEventHandler); a consumer that reads the whole log does not need that
-# many lines, one every ten seconds keeps a long build legible.
-PROGRESS_RATE_LIMIT_SECONDS = 10.0
 # SHOW_TIME_THRESHOLD_SECONDS of UiStateTracker: the elapsed time of a task
 # is shown only once it is worth noticing.
 PROGRESS_SHOW_TIME_THRESHOLD_SECONDS = 3
-# Schedule of ActionExecutionStatusReporter when --progress_report_interval
-# is left at 0: the first report after 10 seconds, the next after 30, then
-# once a minute. Indexed by the number of reports already made, capped.
-STILL_WAITING_SCHEDULE = (10, 30, 60)
 # MAX_LINES of ActionExecutionStatusReporter.
 STILL_WAITING_MAX_LINES = 10
-
-
-def wait_seconds(reports_made):
-    # type: (int) -> int
-    """Seconds of silence before the next "Still waiting" report."""
-    return STILL_WAITING_SCHEDULE[min(reports_made, len(STILL_WAITING_SCHEDULE) - 1)]
 
 
 def progress(done, total, text, elapsed=0.0, running=1):
@@ -149,18 +136,14 @@ def still_waiting(jobs):
 class PlainProgress(object):
     """What to print about the running tasks on a tick, if anything.
 
-    Keeps the count of finished tasks last seen (resets the silence clock)
-    and last reported (rate limited), and the number of "Still waiting"
-    reports made since the last change.
+    Tracks the count of finished tasks last seen; the pacer decides when a
+    change or a "Still waiting" report is due.
     """
 
     def __init__(self, now):
         # type: (float) -> None
         self._seen_done = 0
-        self._reported_done = 0
-        self._last_line_time = 0
-        self._last_change_time = now
-        self._reports_made = 0
+        self._pacer = pacer.ProgressPacer(now)
 
     def tick(self, now, done, total, active, running):
         # type: (float, int, int, int, tp.Callable[[], list]) -> str | None
@@ -172,18 +155,14 @@ class PlainProgress(object):
         """
         if done != self._seen_done:
             self._seen_done = done
-            self._last_change_time = now
-            self._reports_made = 0
+            self._pacer.note_change(now)
         if not active:
             return None
-        if done != self._reported_done and now - self._last_line_time >= PROGRESS_RATE_LIMIT_SECONDS:
-            self._reported_done = done
-            self._last_line_time = now
+        report = self._pacer.due(now, bool(active))
+        if report == pacer.ProgressPacer.CHANGE:
             header, elapsed = running()[0]
             return progress(done, total, header, elapsed, active)
-        if now - self._last_change_time >= wait_seconds(self._reports_made):
-            self._last_change_time = now
-            self._reports_made += 1
+        if report == pacer.ProgressPacer.KEEPALIVE:
             return still_waiting(running())
         return None
 
