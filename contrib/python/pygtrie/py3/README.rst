@@ -9,12 +9,7 @@ pygtrie
    :target: http://pygtrie.readthedocs.io/en/stable/
    :alt: Documentation build status (stable)
 
-.. image:: https://api.travis-ci.com/mina86/pygtrie.svg
-   :target: https://travis-ci.com/mina86/pygtrie
-   :alt: Continuous integration status
-
-pygtrie is a pure Python implementation of a trie data structure
-compatible with Python 2.x and Python 3.x.
+pygtrie is a pure Python implementation of a trie data structure.
 
 `Trie data structure <http://en.wikipedia.org/wiki/Trie>`_, also known
 as radix or prefix tree, is a tree associating keys to values where
@@ -27,9 +22,9 @@ interface.  As such, in most circumstances, ``Trie`` could be used as
 a drop-in replacement for a ``dict``, but the prefix nature of the
 data structure is trie’s real strength.
 
-The module also contains ``PrefixSet`` class which uses a trie to
-store a set of prefixes such that a key is contained in the set if it
-or its prefix is stored in the set.
+The module also contains :`PrefixSet` class which uses a trie to store
+a set of prefixes such that a key is contained in the set if it, or any
+of its prefixes, is stored in the set.
 
 Features
 --------
@@ -46,6 +41,8 @@ Features
 - A PrefixSet supports “all keys starting with given prefix” logic.
 
 - Can store any value including None.
+
+For example usage, see scripts in ``examples`` directory.
 
 Installation
 ------------
