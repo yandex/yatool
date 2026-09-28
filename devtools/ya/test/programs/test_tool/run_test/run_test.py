@@ -23,6 +23,7 @@ import traceback
 import psutil
 
 from . import test_context
+from . import wine_env
 from .stages import Stages
 
 import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
@@ -1664,14 +1665,22 @@ def main():
 
         command_cwd = test_run_cwd or work_dir
 
+        wineprefix = None
         if options.with_wine:
             wineprefix = os.path.join(work_dir, ".wine")
             os.mkdir(wineprefix)
             env["WINEPREFIX"] = wineprefix
+            wine_links_env, wine_links_reason = wine_env.fakedll_hardlink_decision(
+                options.global_resources.get(const.WINE_TOOL), wineprefix
+            )
+            env.update(wine_links_env)
 
         user_env = {}
         set_user_env_vars(user_env, options.test_env, options.global_resources)
         env.update(user_env)
+        if wineprefix:
+            wine_mode = wine_env.describe(env, user_env)
+            logger.info("wine env: mode=%s prefix=%s reason=%s", wine_mode, wineprefix, wine_links_reason or "-")
 
         context.update_env(user_env)
 
@@ -1921,6 +1930,10 @@ def main():
                     break
                 finally:
                     stages.flush()
+
+                    if wineprefix:
+                        # also after a timeout: shows whether the prefix was populated by links
+                        logger.info("wine env: mode=%s %s", wine_mode, wine_env.report_line(wineprefix))
 
                     if not wrapper_stderr_tail:
                         wrapper_stderr_tail = read_tail(stderr_path)

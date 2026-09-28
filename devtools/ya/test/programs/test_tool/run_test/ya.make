@@ -7,6 +7,7 @@ PY_SRCS(
     run_test.py
     stages.py
     test_context.py
+    wine_env.py
 )
 
 PEERDIR(
