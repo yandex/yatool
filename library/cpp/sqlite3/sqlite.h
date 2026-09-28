@@ -60,8 +60,11 @@ namespace NSQLite {
         TSQLiteStatement& Bind(size_t idx, double val);
         TSQLiteStatement& Bind(size_t idx, TStringBuf str);
         TSQLiteStatement& BindBlob(size_t idx, TStringBuf blob);
+        // Strings are bound with SQLITE_STATIC, i.e. by pointer: take the value by
+        // reference so that the pointer refers to the caller's string, not to a copy
+        // that dies when this function returns.
         template <typename Value>
-        TSQLiteStatement& Bind(TStringBuf name, Value val) {
+        TSQLiteStatement& Bind(TStringBuf name, const Value& val) {
             size_t idx = BoundNamePosition(name);
             Y_ASSERT(idx > 0);
             return Bind(idx, val);
