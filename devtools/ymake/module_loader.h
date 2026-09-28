@@ -28,6 +28,21 @@ struct TModuleGlobInfo {
     TCmdElemId ReferencedByVar;
 };
 
+/// Glob pattern data collected while the module name is not computed yet
+/// (a _GLOB statement met in a module declaration body): the glob command
+/// embeds the module element id, so its registration is postponed until the
+/// name is available (see TModuleDef::FlushPendingGlobs).
+struct TPendingGlob {
+    TString GlobStr;
+    TCmdElemId GlobPatternHash = TCmdElemId();
+    TVector<TFileElemId> WatchedDirs;
+    TVector<TFileElemId> MatchedFiles;
+    TVector<TCmdElemId> Excludes;
+    TCmdElemId ReferencedByVar = TCmdElemId();
+    TGlobStat GlobPatternStat;
+};
+
+
 /// @brief Encapsulate module definition in ya.make
 /// This class loads module from ya.make and performs vars evaluation during loading.
 class TModuleDef : private TNonCopyable {
@@ -56,6 +71,7 @@ private:
     TMakeFileMap MakeFileMap;
     const TModuleConf& ModuleConf;
     TVector<TModuleGlobInfo> ModuleGlobs;
+    TVector<TPendingGlob> PendingGlobs;
 
     TVars& Vars;
     TOriginalVars OrigVars;
@@ -195,6 +211,11 @@ public:
     bool ProcessGlobStatement(const TStringBuf& name, const TVector<TStringBuf>& args, TVars& vars, TOriginalVars& orig, std::pair<size_t, size_t> location = {0, 0});
     bool ProcessSetAppendWithGlobal(TStringBuf macroName, const TVector<TStringBuf>& args);
     bool IsExtendGlobRestriction() const;
+
+    /// Registers glob command nodes for the patterns collected during the
+    /// module declaration body. Must be called once the module name is valid
+    /// (i.e. after TModuleDef::InitFromConf); a no-op otherwise.
+    void FlushPendingGlobs();
 
     TFileView GetName() const {
         return Module.GetName();

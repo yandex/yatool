@@ -247,6 +247,13 @@ public:
 
     TFileView GetName() const;
 
+    /// Whether the module name is already computed (see TModule::Init).
+    /// GLOB statements processed during module declaration body must not rely
+    /// on the name being available at that point.
+    bool HasName() const {
+        return Name.IsValid();
+    }
+
     TStringBuf Get(const TStringBuf& name) const;
     void Set(const TStringBuf& name, const TStringBuf& value);
     bool Enabled(const TStringBuf& path) const;

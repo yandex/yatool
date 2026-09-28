@@ -231,6 +231,7 @@ void TModuleDef::InitModule(const TStringBuf& name, TArrayRef<const TStringBuf> 
     InitModuleSpecConditions();
     ProcessModuleCall(name, args);
     InitFromConf();
+    FlushPendingGlobs();
     //TODO: set this variable only for DLL and derivatives or add common variable to store FileName
     Vars.SetValue(NVariableDefs::VAR_SONAME, Module.GetFileName());
     Vars.SetValue(NVariableDefs::VAR_MODULE_ARGS, JoinStrings(args.cbegin(), args.cend(), " "));
@@ -338,13 +339,19 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
         }
     }
 
-    const auto moduleElemId = Module.GetName().GetElemId();
+    // The module name is not available yet when a _GLOB statement is met
+    // in a module declaration body (TModuleDef::ProcessModuleCall runs before
+    // the name is computed by InitFromConf). The glob command node embeds the
+    // module element id, so such patterns are registered later, in
+    // TModuleDef::FlushPendingGlobs. Glob results and restrictions do not
+    // depend on the name and are processed right away.
+    const bool deferRegistration = !Module.HasName();
+
     TCmdElemId globVarElemId = TCmdElemId();
     TGlobStat globStat;
     TUniqVector<TFileView> values;
     for (auto globStr : globs) {
         try {
-            TUniqVector<TFileElemId> matches;
             TGlobPattern globPattern(Names.FileConf, globStr, Module.GetDir());
             TGlobStat globPatternStat;
             for (const auto& result : globPattern.Apply(excludeMatcher, &globPatternStat)) {
@@ -355,19 +362,35 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
             if (!globVarElemId) {
                 globVarElemId = AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::REFERENCED_BY, varName)));
             }
-            const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
-            const auto globPatternId = AssumeCmd(Names.AddName(EMNT_BuildCommand, globCmd));
-            TGlobHelper::SaveGlobPatternStat(GetModuleGlobsData(), globPatternId, std::move(globPatternStat));
-            ModuleGlobs.push_back(
-                TModuleGlobInfo {
-                    .GlobPatternId = globPatternId,
-                    .GlobPatternHash = AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash()))),
-                    .WatchedDirs = globPattern.GetWatchDirs().Data(),
-                    .MatchedFiles = matches.Take(),
-                    .Excludes = excludeIds.Data(),
-                    .ReferencedByVar = globVarElemId,
-                }
-            );
+            const auto globPatternHash = AssumeCmd(Names.AddName(EMNT_Property, FormatProperty(NProps::GLOB_HASH, globPattern.GetMatchesHash())));
+            if (deferRegistration) {
+                PendingGlobs.push_back(
+                    TPendingGlob {
+                        .GlobStr = TString{globStr},
+                        .GlobPatternHash = globPatternHash,
+                        .WatchedDirs = globPattern.GetWatchDirs().Data(),
+                        .MatchedFiles = {},
+                        .Excludes = excludeIds.Data(),
+                        .ReferencedByVar = globVarElemId,
+                        .GlobPatternStat = std::move(globPatternStat),
+                    }
+                );
+            } else {
+                const auto moduleElemId = Module.GetName().GetElemId();
+                const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, globStr);
+                const auto globPatternId = AssumeCmd(Names.AddName(EMNT_BuildCommand, globCmd));
+                TGlobHelper::SaveGlobPatternStat(GetModuleGlobsData(), globPatternId, std::move(globPatternStat));
+                ModuleGlobs.push_back(
+                    TModuleGlobInfo {
+                        .GlobPatternId = globPatternId,
+                        .GlobPatternHash = globPatternHash,
+                        .WatchedDirs = globPattern.GetWatchDirs().Data(),
+                        .MatchedFiles = {},
+                        .Excludes = excludeIds.Data(),
+                        .ReferencedByVar = globVarElemId,
+                    }
+                );
+            }
         } catch (const yexception& error) {
             YConfErrPrecise(Syntax, location.first, location.second) << "Invalid pattern in [[alt1]]" << name << "[[rst]]: " << error.what() << Endl;
         }
@@ -395,6 +418,30 @@ bool TModuleDef::ProcessGlobStatement(const TStringBuf& name, const TVector<TStr
 
 bool TModuleDef::IsExtendGlobRestriction() const {
     return !Conf.GlobRestrictionExtends.empty() && Conf.GlobRestrictionExtends.contains(Module.GetDir().CutType());
+}
+
+void TModuleDef::FlushPendingGlobs() {
+    if (PendingGlobs.empty()) {
+        return;
+    }
+    Y_ASSERT(Module.HasName());
+    const auto moduleElemId = Module.GetName().GetElemId();
+    for (auto& pending: PendingGlobs) {
+        const auto globCmd = FormatCmd(moduleElemId, NProps::GLOB, pending.GlobStr);
+        const auto globPatternId = AssumeCmd(Names.AddName(EMNT_BuildCommand, globCmd));
+        TGlobHelper::SaveGlobPatternStat(GetModuleGlobsData(), globPatternId, std::move(pending.GlobPatternStat));
+        ModuleGlobs.push_back(
+            TModuleGlobInfo {
+                .GlobPatternId = globPatternId,
+                .GlobPatternHash = pending.GlobPatternHash,
+                .WatchedDirs = std::move(pending.WatchedDirs),
+                .MatchedFiles = std::move(pending.MatchedFiles),
+                .Excludes = std::move(pending.Excludes),
+                .ReferencedByVar = pending.ReferencedByVar,
+            }
+        );
+    }
+    PendingGlobs.clear();
 }
 
 const TVector<TModuleGlobInfo>& TModuleDef::GetModuleGlobs() const {
