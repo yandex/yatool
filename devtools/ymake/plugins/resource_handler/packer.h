@@ -37,13 +37,16 @@ void append_impl(TVector<T>& lhs, const U& rhs) {
     }
 }
 
+// The arguments are taken by reference: when T is a view type (TStringBuf) the
+// appended views must point into the caller's strings, not into by-value copies
+// that die when append() returns.
 template <CIsString T, typename... Args>
-void append(TVector<T>& lhs, Args... args) {
+void append(TVector<T>& lhs, const Args&... args) {
     (append_impl(lhs, args), ...);
 }
 
 template <CIsString T, typename... Args>
-void append_if(bool need, TVector<T>& lhs, Args... args) {
+void append_if(bool need, TVector<T>& lhs, const Args&... args) {
     if (need) {
         (append_impl(lhs, args), ...);
     }
