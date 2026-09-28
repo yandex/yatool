@@ -7,12 +7,19 @@ of the longest running node. The timing is the schedule of the plain style: a
 snapshot goes out when the counters or the node change, at most once per
 PROGRESS_RATE_LIMIT_SECONDS, or as a keepalive while tasks are running and
 nothing has changed for STILL_WAITING_SCHEDULE seconds (10, then 30, then 60
-after each report; the schedule restarts on a change).
+after each report; the schedule restarts on a change). Once the display has a
+failure, the snapshots go out at most once a minute and without the node: the
+stream is read for the failure then, not for the progress. A node that is the
+same as in the previous snapshot is written as its elapsed time alone.
 
 What the terminal shows as the body of a finished task (its stderr, e.g. the
 compiler warnings) is forwarded as a ``message`` with the node ``path`` and
-``kind``, so the stream carries everything the human sees; tasks that ask to be
-hidden (``hide_me``) are skipped, like on the terminal.
+``kind`` and the severity the plain style gives it, so the stream carries
+everything the human sees; tasks that ask to be hidden (``hide_me``) are
+skipped, like on the terminal.
+
+PacedProgressSink applies the same schedule to progress events that are built
+elsewhere, such as those of the configure stage.
 """
 
 import collections
@@ -21,6 +28,7 @@ import time
 from yalibrary import display as display_lib
 from yalibrary.status_view import helpers
 from yalibrary.status_view import pacer
+from yalibrary.status_view import plain
 import yalibrary.formatter
 
 import typing as tp
@@ -48,6 +56,7 @@ class JsonlProgressView(object):
         self._stage = stage
         self._clock = clock
         self._last_key = None  # type: tuple | None
+        self._last_node = None  # type: tuple | None
         self._pacer = pacer.ProgressPacer(clock())
 
     def snapshot(self):
@@ -69,6 +78,8 @@ class JsonlProgressView(object):
         # type: (*object) -> None
         """Forward new task bodies and write the snapshot if it is due; the signature matches TermView.tick."""
         self._flush_bodies()
+        if self._display.has_failures():
+            self._pacer.slow_down()
         now = self._clock()
         if self._pacer.throttled(now):
             # Nothing can be due yet: skip building the snapshot on this tick.
@@ -105,7 +116,7 @@ class JsonlProgressView(object):
                 continue
             event = collections.OrderedDict()
             event['type'] = 'message'
-            event['severity'] = 'info'
+            event['severity'] = plain.severity_of(task).lower()
             view = task.status() if hasattr(task, 'status') else None
             if isinstance(view, helpers.NodeView):
                 event['path'] = view.path
@@ -124,6 +135,16 @@ class JsonlProgressView(object):
     def _write(self, snapshot):
         # type: (dict) -> None
         self._last_key = _comparable(snapshot)
+        node = snapshot.get('node')
+        if node is not None:
+            if self._display.has_failures():
+                del snapshot['node']
+            else:
+                key = (node['kind'], node['path'])
+                if key == self._last_node:
+                    # The previous snapshot names it: the elapsed time is all that is new.
+                    snapshot['node'] = {'elapsed': node['elapsed']}
+                self._last_node = key
         self._display.emit_event(snapshot)
 
     @staticmethod
@@ -142,6 +163,41 @@ class JsonlProgressView(object):
         node['path'] = view.path
         node['elapsed'] = int(elapsed)
         return node
+
+
+class PacedProgressSink(object):
+    """Write progress events built elsewhere on the schedule of JsonlProgressView.
+
+    The events carry ``active``, ``done`` and ``total``; any other field is
+    written as is and is not a change on its own.
+    """
+
+    def __init__(self, display, clock=time.time):
+        # type: (tp.Any, tp.Callable[[], float]) -> None
+        self._display = display
+        self._clock = clock
+        self._last_key = None  # type: tuple | None
+        self._pacer = pacer.ProgressPacer(clock())
+
+    def __call__(self, event):
+        # type: (dict) -> None
+        if self._display.has_failures():
+            self._pacer.slow_down()
+        now = self._clock()
+        key = (event['active'], event['done'], event['total'])
+        if key != self._last_key:
+            self._pacer.note_change(now)
+        if self._pacer.due(now, bool(event['active'])):
+            self._last_key = key
+            self._display.emit_event(event)
+
+    def finish(self, event):
+        # type: (dict) -> None
+        """Write the closing event regardless of the schedule, unless it repeats the last one."""
+        key = (event['active'], event['done'], event['total'])
+        if key != self._last_key:
+            self._last_key = key
+            self._display.emit_event(event)
 
 
 def _comparable(snapshot):

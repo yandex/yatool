@@ -9,6 +9,7 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/core/error
     devtools/ya/yalibrary/formatter
+    devtools/ya/yalibrary/term
     contrib/python/colorama
 )
 

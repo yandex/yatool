@@ -119,10 +119,14 @@ class JsonlReporter(object):
 
     def on_tests_finish(self, test_suites):
         counts = collections.Counter()
+        suite_counts = collections.Counter()
         for suite in test_suites:
+            suite_counts[const.Status.TO_STR[suite.get_status()]] += 1
             for test_case in suite.tests:
                 counts[const.Status.TO_STR[test_case.status]] += 1
         self._display.record_test_counts(dict(counts))
+        # The test counters sum over all suites: the suite ones tell how many suites they come from
+        self._display.record_suite_counts(dict(suite_counts))
         slowest = selection.slowest_test_cases(test_suites, self._show_slowest)
         if slowest:
             self._display.emit_event(
@@ -151,20 +155,22 @@ class JsonlReporter(object):
         failed_suites = [suite for suite in test_suites if suite.get_status() not in _NOT_FAILED_STATUSES]
         style_paths = sorted(
             {
-                self._absolute_path(suite.project_path)
+                self._absolute_path(path)
                 for suite in failed_suites
                 if _is_style(suite) and suite.get_type() in _STYLE_FIXABLE_LINTERS
+                for path in _style_failed_paths(suite)
             }
         )
         if style_paths:
             self._display.add_tip(
                 'ya_style',
-                'formatting errors may be fixed automatically: run `ya style` on these paths',
+                'formatting errors may be fixed automatically: run `ya style` on these files; '
+                'it does not fix lint findings (e.g. flake8 codes such as F401), fix those in the code',
                 paths=style_paths,
             )
 
-        # The reporter only runs when tests were requested, so the tip goes with every such run
-        if not self._fail_fast:
+        # Stopping early only pays off when something failed and there was more than one suite to wait for
+        if not self._fail_fast and failed_suites and len(test_suites) > 1:
             self._display.add_tip(
                 'fail_fast',
                 'add --fail-fast to stop at the first failed test suite and start fixing it sooner',
@@ -216,6 +222,8 @@ class JsonlReporter(object):
         # type: (str, tp.Any, str, dict, dict, str | None) -> None
         if self._truncate:
             comment = trace_comment.truncate_comment(comment, const.CONSOLE_SNIPPET_LIMIT)
+        # Tells apart the suites of one path, e.g. a pytest suite and its import_test
+        details['suite'] = test_suite.get_type()
         logs = selection.significant_logs(logs)
         if logs:
             details['logs'] = logs
@@ -236,3 +244,22 @@ class JsonlReporter(object):
 def _is_style(test_suite):
     # type: (tp.Any) -> bool
     return test_suite.get_ci_type_name() == 'style'
+
+
+def _style_failed_paths(test_suite):
+    # type: (tp.Any) -> set[str]
+    """Project paths of the files failed by a style suite, the module path for a failure without a file.
+
+    A style check names its test case ``<path relative to the module>::<check>``: the files are what to
+    pass to `ya style`, the module path would also restyle files the check did not complain about.
+    """
+    paths = set()
+    for test_case in test_suite.tests:
+        if test_case.status in _NOT_FAILED_STATUSES:
+            continue
+        file_name, sep, _ = test_case.name.rpartition('::')
+        if sep and file_name:
+            paths.add(os.path.normpath(os.path.join(test_suite.project_path, file_name)))
+        else:
+            paths.add(test_suite.project_path)
+    return paths or {test_suite.project_path}

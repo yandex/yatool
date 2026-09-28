@@ -43,9 +43,12 @@ def extract_node_stderr(res, opts) -> tuple[str, list]:
 
 
 class NodeFailureListener:
-    """Publish a ``fail`` event of a structured display for every failed build node.
+    """Publish a ``fail`` event of a structured display for every failed build or test node.
 
-    Test and merge nodes are left to the test reporter; a uid is published once.
+    A test node exits non-zero only when the test tool itself fails (e.g. it
+    cannot start): failed tests are the test reporter's, and the reporter sees
+    nothing of such a crash, so the node output is published here with the
+    ``test`` stage. Merge nodes are left to the test reporter; a uid is published once.
     A node broken by a failed dependency is skipped: the root cause is already
     in the stream and the node itself adds nothing but the dependency uid. The
     dependents of a root cause are marked when it fails; a broken intermediate
@@ -71,7 +74,7 @@ class NodeFailureListener:
             if self._nodes is None:
                 self._index_graph()
             node = self._nodes.get(uid)
-            if node is None or 'node-type' in node or uid in self._seen:
+            if node is None or node.get('node-type') not in (None, 'test') or uid in self._seen:
                 return
             self._seen.add(uid)
             if uid in self._broken:
@@ -86,11 +89,15 @@ class NodeFailureListener:
         }
         if links:
             details['logs'] = links
+        stage = 'test' if 'node-type' in node else 'build'
+        suite_path = node.get('kv', {}).get('path')
+        # A test node kv path is `<project path>/<suite name>`: the project path matches the test reporter's events
+        path = os.path.dirname(suite_path) if stage == 'test' and suite_path else bp.BuildPlan.node_name(node)
         self._display.emit_event(
             {
                 'type': 'fail',
-                'stage': 'build',
-                'path': bp.BuildPlan.node_name(node),
+                'stage': stage,
+                'path': path,
                 'text': yalibrary.display.strip_markup(stderr),
                 'details': details,
             }

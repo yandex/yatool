@@ -7,6 +7,11 @@ a consumer that reads the whole log does not need that many lines, one every
 ten seconds keeps a long build legible. Silence is broken by keepalives on the
 schedule of ActionExecutionStatusReporter with --progress_report_interval left
 at 0: the first report after 10 seconds, the next after 30, then once a minute.
+
+Once something has failed the progress is no longer what the consumer reads the
+log for: the pacer can be slowed down to one report a minute, which still keeps
+the silence well below the kill timeouts of agent harnesses (300 s for Gemini
+CLI) while the failure stays closer to the end of the log.
 """
 
 import typing as tp  # noqa
@@ -14,6 +19,7 @@ import typing as tp  # noqa
 PROGRESS_RATE_LIMIT_SECONDS = 10.0
 # Indexed by the number of reports already made, capped.
 STILL_WAITING_SCHEDULE = (10, 30, 60)
+SLOW_PROGRESS_RATE_LIMIT_SECONDS = 60.0
 
 
 def wait_seconds(reports_made):
@@ -40,6 +46,12 @@ class ProgressPacer(object):
         self._silence_since = now
         self._reports_made = 0
         self._pending = False
+        self._rate_limit = PROGRESS_RATE_LIMIT_SECONDS
+
+    def slow_down(self):
+        # type: () -> None
+        """Report at most once per SLOW_PROGRESS_RATE_LIMIT_SECONDS from now on, changes and keepalives alike."""
+        self._rate_limit = SLOW_PROGRESS_RATE_LIMIT_SECONDS
 
     def note_change(self, now):
         # type: (float) -> None
@@ -51,7 +63,7 @@ class ProgressPacer(object):
     def throttled(self, now):
         # type: (float) -> bool
         """Nothing can be due on this tick: a caller with a costly state can skip building it."""
-        return self._last_report_time is not None and now - self._last_report_time < PROGRESS_RATE_LIMIT_SECONDS
+        return self._last_report_time is not None and now - self._last_report_time < self._rate_limit
 
     def due(self, now, active):
         # type: (float, bool) -> str | None

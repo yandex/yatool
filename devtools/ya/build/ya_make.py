@@ -41,6 +41,7 @@ import devtools.ya.test.util.tools as test_tools
 from devtools.ya.build import build_facade
 from devtools.ya.build import frepkage, test_results_console_printer
 from devtools.ya.build.evlog.progress import (
+    finish_configure_progress,
     get_print_status_func,
     YmakeTimeStatistic,
 )
@@ -1053,13 +1054,17 @@ class Context:
             self.stripped_tests = []
             self.make_files = []
         else:
-            (
-                self.graph,
-                self.tests,
-                self.stripped_tests,
-                self.configure_errors,
-                self.make_files,
-            ) = _build_graph_and_tests(self.opts, app_ctx, self.ymake_stats)
+            try:
+                (
+                    self.graph,
+                    self.tests,
+                    self.stripped_tests,
+                    self.configure_errors,
+                    self.make_files,
+                ) = _build_graph_and_tests(self.opts, app_ctx, self.ymake_stats)
+            finally:
+                # The configure stage is over whatever its outcome: close it before the build progress starts.
+                finish_configure_progress(display)
             timer.show_step("graph_and_tests finished")
 
             if self.configure_errors and not opts.continue_on_fail:

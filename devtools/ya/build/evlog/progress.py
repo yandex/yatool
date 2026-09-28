@@ -5,6 +5,7 @@ import six
 
 import devtools.ya.core.event_handling as event_handling
 import yalibrary.status_view as status_view
+import yalibrary.status_view.jsonl as status_view_jsonl
 
 
 class Mode(Enum):
@@ -19,8 +20,9 @@ class Mode(Enum):
 class ModulesFilesStatistic:
     def __init__(self, stream, is_rewritable, structured_sink=None):
         self._stream = stream
-        # A structured display takes a progress event instead of the text;
-        # the modes below only decide when it is time to report.
+        # A structured display takes a progress event on every update instead
+        # of the text and paces the events itself; the modes below only decide
+        # when it is time to report the text.
         self._structured_sink = structured_sink
         self._lock = threading.Lock()
         self._mode = Mode.NOT_STARTED
@@ -48,17 +50,6 @@ class ModulesFilesStatistic:
 
     def _print_message(self):
         if self._mode == Mode.NOT_STARTED or self._mode == Mode.NO_PRINTING:
-            return
-        if self._structured_sink is not None:
-            self._structured_sink(
-                {
-                    'type': 'progress',
-                    'stage': 'configure',
-                    'active': self._current_ymake_processing,
-                    'done': self._modules_done,
-                    'total': self._modules_total,
-                }
-            )
             return
         if self._mode == Mode.MODULES_ONLY:
             self._stream(
@@ -160,6 +151,10 @@ class ModulesFilesStatistic:
         with self._lock:
             self._update_stats(event, delta_done, delta_total, delta_files, delta_rendered, delta_rendered_total)
 
+            if self._structured_sink is not None:
+                self._report_structured(typename, event)
+                return
+
             if typename == "NEvent.TStageStarted" and event["StageName"] == "ymake run":
                 self._current_ymake_processing += 1
 
@@ -215,6 +210,35 @@ class ModulesFilesStatistic:
                 self._current_ymake_processing -= 1
                 self._try_print_message(timestamp)
 
+    def _report_structured(self, typename, event):
+        if typename == "NEvent.TStageStarted" and event["StageName"] == "ymake run":
+            self._current_ymake_processing += 1
+        elif typename == "NEvent.TStageFinished" and event["StageName"] == "ymake run":
+            self._current_ymake_processing -= 1
+        self._structured_sink(self._structured_event(self._current_ymake_processing))
+
+    def is_structured(self):
+        # type: () -> bool
+        return self._structured_sink is not None
+
+    def finish(self):
+        # type: () -> None
+        """Close the configure stage on the structured sink with a final event that bypasses its schedule."""
+        if self._structured_sink is None:
+            return
+        with self._lock:
+            self._structured_sink.finish(self._structured_event(active=0))
+
+    def _structured_event(self, active):
+        # type: (int) -> dict
+        return {
+            'type': 'progress',
+            'stage': 'configure',
+            'active': active,
+            'done': self._modules_done,
+            'total': self._modules_total,
+        }
+
 
 class MixedProgressMeta(type(event_handling.SubscriberExcludedTopics), type(event_handling.SingletonSubscriber)):
     pass
@@ -224,6 +248,8 @@ class PrintProgressSubscriber(
     six.with_metaclass(MixedProgressMeta, event_handling.SubscriberExcludedTopics, event_handling.SingletonSubscriber)
 ):
     topics = {"NEvent.TNeedDirHint"}
+    # Statistic of the singleton instance, closed by finish_configure_progress().
+    current_stats = None  # type: ModulesFilesStatistic | None
 
     class YmakeLastState:
         def __init__(self):
@@ -238,8 +264,11 @@ class PrintProgressSubscriber(
         self.modules_files_stats = ModulesFilesStatistic(
             stream=print_status,
             is_rewritable=getattr(params, "output_style", "") == "ninja",
-            structured_sink=display.emit_event if getattr(display, 'structured', False) else None,
+            structured_sink=(
+                status_view_jsonl.PacedProgressSink(display) if getattr(display, 'structured', False) else None
+            ),
         )
+        PrintProgressSubscriber.current_stats = self.modules_files_stats
         self.ymake_states = collections.defaultdict(PrintProgressSubscriber.YmakeLastState)
         self._subscribers_count = 0
         self._lock = threading.Lock()
@@ -278,6 +307,23 @@ class PrintProgressSubscriber(
             prev_ymake_state.rendered_total = event["Total"]
         else:
             self.modules_files_stats.handler(event)
+
+
+def finish_configure_progress(display):
+    # type: (object) -> None
+    """Close the configure stage on a structured display with one final progress event.
+
+    The counters come from the ymake progress subscriber; if it was never created
+    in this process (no ymake reported), the stage still ends, with zero modules.
+    """
+    if not getattr(display, 'structured', False):
+        return
+    stats = PrintProgressSubscriber.current_stats
+    if stats is None or not stats.is_structured():
+        stats = ModulesFilesStatistic(
+            stream=None, is_rewritable=False, structured_sink=status_view_jsonl.PacedProgressSink(display)
+        )
+    stats.finish()
 
 
 def get_print_status_func(opts, display, logger):

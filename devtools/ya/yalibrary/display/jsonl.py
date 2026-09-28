@@ -2,8 +2,9 @@
 """Machine-readable display: one JSON object per line on the given stream.
 
 Replaces the human display for --output-style=jsonl. Every event line starts
-with the keys ``type`` and ``ts`` (wall-clock seconds), the rest of the event
-follows flat. The display counts failures and warnings on the fly and reports them in the
+with the keys ``type`` and ``ts`` (seconds since the start of the run, rounded to
+0.1 s; the ``started`` event carries the wall-clock start as integer ``epoch``),
+the rest of the event follows flat. The display counts failures and warnings on the fly and reports them in the
 final ``finished`` event together with the exit code, its category, the advice on what
 to do about the outcome and the next-step tips collected during the run.
 """
@@ -21,6 +22,11 @@ import six
 
 import devtools.ya.core.error as core_error
 import yalibrary.display
+import yalibrary.term.console
+
+# The ``finished`` event names at most this many failures per stage; the tail
+# of a long log always carries it, so it must stay short.
+MAX_FAILED_PER_STAGE = 10
 
 
 class JsonlDisplay(object):
@@ -36,11 +42,16 @@ class JsonlDisplay(object):
         # list of tuples (stream, data)
         self._dump_after_close = []
         self._fails_by_stage = collections.Counter()
+        # stage -> the first MAX_FAILED_PER_STAGE distinct failures, in order of arrival
+        self._failed = collections.OrderedDict()  # type: collections.OrderedDict[str, list[str]]
+        self._failed_seen = set()
+        self._failed_more = collections.Counter()
         self._warnings = 0
         self._test_counts = None
+        self._suite_counts = None
         self._tips = collections.OrderedDict()
         self._seen_messages = set()
-        self.emit_event({'type': 'started', 'handler': handler})
+        self.emit_event({'type': 'started', 'epoch': int(self._started_at), 'handler': handler})
 
     def emit_event(self, event):
         # type: (dict) -> None
@@ -72,6 +83,11 @@ class JsonlDisplay(object):
         """Remember test status counters for the ``finished`` event."""
         self._test_counts = dict(counts)
 
+    def record_suite_counts(self, counts):
+        # type: (dict[str, int]) -> None
+        """Remember test suite status counters for the ``finished`` event."""
+        self._suite_counts = dict(counts)
+
     def add_tip(self, tip_id, text, **extra):
         # type: (str, str, **tp.Any) -> None
         """Remember a next-step tip for the ``finished`` event; the first tip with a given id wins."""
@@ -81,6 +97,11 @@ class JsonlDisplay(object):
             tip = collections.OrderedDict([('id', tip_id), ('text', text)])
             tip.update(extra)
             self._tips[tip_id] = tip
+
+    def has_failures(self):
+        # type: () -> bool
+        """Whether a ``fail`` event has been written."""
+        return bool(self._fails_by_stage)
 
     def close(self, exit_code=None, exception=None):
         # type: (int | None, BaseException | None) -> None
@@ -107,12 +128,32 @@ class JsonlDisplay(object):
             if event.get('severity') == 'warning':
                 self._warnings += 1
         elif event_type == 'fail':
-            self._fails_by_stage[event.get('stage')] += 1
+            stage = event.get('stage')
+            self._fails_by_stage[stage] += 1
+            self._remember_failure(stage, event)
         return True
+
+    def _remember_failure(self, stage, event):
+        # type: (str, dict) -> None
+        """Keep where the failure is, so that the summary points at it even if the event itself is cut off."""
+        where = event.get('path') or ''
+        name = (event.get('details') or {}).get('name')
+        if name:
+            where = '{}::{}'.format(where, name)
+        if (stage, where) in self._failed_seen:
+            return
+        self._failed_seen.add((stage, where))
+        failed = self._failed.setdefault(stage, [])
+        if len(failed) < MAX_FAILED_PER_STAGE:
+            failed.append(where)
+        else:
+            self._failed_more[stage] += 1
 
     def _finished_event(self, exit_code, exception):
         # type: (int | None, BaseException | None) -> dict
         counters = collections.OrderedDict()
+        if self._suite_counts is not None:
+            counters['suites'] = self._suite_counts
         if self._test_counts is not None:
             counters['tests'] = self._test_counts
         for name, value in (
@@ -125,28 +166,68 @@ class JsonlDisplay(object):
         event = collections.OrderedDict()
         event['type'] = 'finished'
         event['exit_code'] = exit_code
-        event['category'] = _exit_code_name(exit_code)
+        event['category'] = self._category(exit_code)
         event['duration'] = round(self._clock() - self._started_at, 3)
         event['counters'] = counters
-        if self._tips:
-            event['tips'] = list(self._tips.values())
+        if self._failed:
+            failed = collections.OrderedDict(self._failed)
+            if self._failed_more:
+                # How many more distinct failures of the stage the list leaves out.
+                failed['more'] = dict(self._failed_more)
+            event['failed'] = failed
+        tips = [
+            tip
+            for tip_id, tip in self._tips.items()
+            # Stopping at the first failed suite does not stop a build that is already broken.
+            if not (tip_id == 'fail_fast' and self._fails_by_stage['build'])
+        ]
+        if tips:
+            event['tips'] = tips
         if exception is not None:
             event['text'] = yalibrary.display.strip_markup(str(exception)).strip()
-        advice = _advice(event['category'], configure_failed=bool(self._fails_by_stage['configure']))
+        advice = _advice(event['category'], has_text='text' in event)
         if advice is not None:
             event['advice'] = advice
         return event
+
+    def _category(self, exit_code):
+        # type: (int | None) -> str | None
+        """What went wrong, told by the failures the display saw rather than by the exit code alone."""
+        if self._fails_by_stage['configure']:
+            # ignore_configure_errors still defaults to true (see
+            # _calc_exit_code in build/ya_make.py and YA-1456), so such a run
+            # exits 1 without --keep-going and 0 with it, and CONFIGURE_ERROR
+            # never arrives. Reading the fact keeps the category the same
+            # before and after that default is flipped and closes the false
+            # green of a --keep-going run whose configuration failed.
+            return 'configure_error'
+        if exit_code and self._fails_by_stage['build']:
+            # A failed build has no exit code of its own: it exits 1 and hides TEST_FAILED.
+            return 'build_failed'
+        return _exit_code_name(exit_code)
 
     def _write(self, event):
         # type: (dict) -> None
         line = collections.OrderedDict()
         line['type'] = event['type']
-        line['ts'] = round(self._clock(), 3)
+        line['ts'] = round(self._clock() - self._started_at, 1)
         for key, value in event.items():
             if key != 'type':
                 line[key] = value
-        self._stream.write(json.dumps(line) + '\n')
+        self._stream.write(json.dumps(_strip_ansi(line), separators=(',', ':')) + '\n')
         self._stream.flush()
+
+
+def _strip_ansi(value):
+    # type: (tp.Any) -> tp.Any
+    """Drop the terminal colors a tool left in the text: in JSON every escape costs six characters."""
+    if isinstance(value, six.string_types):
+        return yalibrary.term.console.strip_ansi_codes(value)
+    if isinstance(value, dict):
+        return collections.OrderedDict((key, _strip_ansi(item)) for key, item in value.items())
+    if isinstance(value, (list, tuple)):
+        return [_strip_ansi(item) for item in value]
+    return value
 
 
 def _exit_code_name(code):
@@ -167,8 +248,14 @@ def _exit_code_name(code):
 # can hide, which events carry the diagnosis, whether a rerun is worth anything.
 _ADVICE_BY_CATEGORY = {
     'generic_error': (
-        "The run failed without an exit code of its own. The failed build and test events of this stream, "
-        "and the `text` field of this summary, carry the diagnosis: read them and fix what they name. "
+        "The run failed without an exit code of its own. The failed events of this stream carry the diagnosis, "
+        "`failed` of this summary lists where they are: read them and fix what they name. Rerunning the same "
+        "command unchanged fails the same way."
+    ),
+    'build_failed': (
+        "The build failed, so tests that depend on the broken nodes did not run. Every broken node is a `fail` "
+        "event with `stage` build carrying the `path` of the module and the compiler or tool output in `text`; "
+        "`failed` of this summary lists them. Fix the first of them: the rest often break for the same reason. "
         "Rerunning the same command unchanged fails the same way."
     ),
     'unhandled_exception': (
@@ -203,8 +290,8 @@ _ADVICE_BY_CATEGORY = {
     # the same way, so the error itself has to be looked at.
     'not_retriable_error': (
         "The run died of an error explicitly marked as not retriable: the same command fails the same way, so "
-        "a rerun buys nothing. Read the `text` field of this summary: if it names something the command or "
-        "the code can fix, fix that; otherwise report the failure together with the ya log."
+        "a rerun buys nothing. Read the error: if it names something the command or the code can fix, fix that; "
+        "otherwise report the failure together with the ya log."
     ),
     'yt_store_fetch_error': (
         "A node could not be fetched from the distributed cache; the command itself is fine. Rerun it as is; "
@@ -219,16 +306,15 @@ _ADVICE_BY_CATEGORY = {
 }
 
 
-def _advice(category, configure_failed):
+# Categories whose diagnosis may be the error that ended the run rather than an event of the stream.
+_TEXT_HINT_CATEGORIES = frozenset(['generic_error', 'not_retriable_error'])
+_TEXT_HINT = " The error that ended the run is in the `text` field of this summary."
+
+
+def _advice(category, has_text):
     # type: (str | None, bool) -> str | None
     """Return what to do about the outcome, None when there is nothing to act on."""
-    if configure_failed:
-        # A broken configuration is diagnosed by the configure failures the
-        # display counted, not by the exit code: ignore_configure_errors still
-        # defaults to true (see _calc_exit_code in build/ya_make.py and
-        # YA-1456), so such a run exits 1 without --keep-going and 0 with it,
-        # and CONFIGURE_ERROR never arrives. Reading the fact keeps the advice
-        # the same before and after that default is flipped and closes the
-        # false green of a --keep-going run whose configuration failed.
-        category = 'configure_error'
-    return _ADVICE_BY_CATEGORY.get(category)
+    advice = _ADVICE_BY_CATEGORY.get(category)
+    if advice is not None and has_text and category in _TEXT_HINT_CATEGORIES:
+        advice += _TEXT_HINT
+    return advice
