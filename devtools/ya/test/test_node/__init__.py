@@ -993,7 +993,7 @@ def create_test_node(
     if node_timeout:
         node["timeout"] = node_timeout
 
-    if opts.enable_test_nodes_self_uid and node["cache"] and self_uid is not None:
+    if node["cache"] and self_uid is not None:
         node["self_uid"] = self_uid
 
     if node_tag:
@@ -1757,7 +1757,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
         "cmds": cmds,
     }
 
-    if opts.enable_test_nodes_self_uid and node["cache"] and self_uid is not None:
+    if node["cache"] and self_uid is not None:
         node["self_uid"] = self_uid
 
     intermediate_test_nodes(test_nodes)
@@ -1866,7 +1866,7 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_t
         "cmds": [{"cmd_args": cmd, "cwd": "$(BUILD_ROOT)"}],
     }
 
-    if opts.enable_test_nodes_self_uid and node["cache"] and self_uid is not None:
+    if node["cache"] and self_uid is not None:
         node["self_uid"] = self_uid
 
     intermediate_test_nodes(test_nodes)
