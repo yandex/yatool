@@ -944,26 +944,17 @@ def configure_report_interceptor(ctx, report_events, intent=None):
     parsed_report_events = parse_events_filter.parse_events_filter(report_events)
 
     snowden_mode = None
-    _ya_pid_path = None
+    _snowden_lifecycle = None
     _snowden_store_dir = None
     _snowden_user_class = None
     if parsed_report_events:
         if app_config.in_house:
             from yalibrary import snowden
-            from yalibrary.snowden import SnowdenMode
 
             _snowden_user_class = user.classify_user(ctx.username)
-            snowden_mode = snowden.resolve_snowden_mode(_snowden_user_class)
-
-            if snowden_mode == SnowdenMode.STANDALONE:
-                _snowden_store_dir = snowden.snowden_dir()
-                snowden.touch_version_dir(_snowden_store_dir)
-                snowden.ensure_daemon(_snowden_store_dir, shard='report')
-                _ya_pid_path = snowden.register_ya_pid(_snowden_store_dir)
-                try:
-                    snowden.cleanup_old_versions()
-                except Exception:
-                    logger.debug('Failed to cleanup old snowden versions', exc_info=True)
+            _snowden_lifecycle = snowden.SnowdenLifecycle(_snowden_user_class, shard='report').start()
+            snowden_mode = _snowden_lifecycle.mode
+            _snowden_store_dir = _snowden_lifecycle.store_dir
 
     init_reporter_kwargs = {
         'suppressions': sec.mine_suppression_filter(params_dict),
@@ -971,30 +962,38 @@ def configure_report_interceptor(ctx, report_events, intent=None):
     }
     if snowden_mode:
         init_reporter_kwargs['snowden_mode'] = snowden_mode
-    telemetry.init_reporter(**init_reporter_kwargs)
+    try:
+        telemetry.init_reporter(**init_reporter_kwargs)
 
-    telemetry.report(
-        ReportTypes.EXECUTION,
-        {
-            'cmd_args': mine_cmd_args(),
-            # Caller-supplied label for the invocation, reported next to the command.
-            'intent': intent,
-            'env_vars': mine_env_vars(),
-            'cwd': os.getcwd(),
-            '__file__': __file__,
-            'version': ctx.revision,
-            'vcs_type': ctx.vcs_type,
-        },
-    )
-    ctx.metrics_reporter.report_metric(
-        monitoring.MetricNames.YA_STARTED,
-        urgent=True,
-    )
+        telemetry.report(
+            ReportTypes.EXECUTION,
+            {
+                'cmd_args': mine_cmd_args(),
+                # Caller-supplied label for the invocation, reported next to the command.
+                'intent': intent,
+                'env_vars': mine_env_vars(),
+                'cwd': os.getcwd(),
+                '__file__': __file__,
+                'version': ctx.revision,
+                'vcs_type': ctx.vcs_type,
+            },
+        )
+        ctx.metrics_reporter.report_metric(
+            monitoring.MetricNames.YA_STARTED,
+            urgent=True,
+        )
 
-    start = time.time()
-    for stat in stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION).values():
-        for intvl in stat.intervals:
-            start = min(intvl[0], start)
+        start = time.time()
+        for stat in stage_tracer.get_stat(stage_tracer.StagerGroups.OVERALL_EXECUTION).values():
+            for intvl in stat.intervals:
+                start = min(intvl[0], start)
+    except BaseException:
+        try:
+            telemetry.stop_reporter()
+        finally:
+            if _snowden_lifecycle is not None:
+                _snowden_lifecycle.stop()
+        raise
 
     pre_exec_observer = None
     if parsed_report_events:
@@ -1106,14 +1105,10 @@ def configure_report_interceptor(ctx, report_events, intent=None):
                 from exts.process import unregister_pre_exec_observer
 
                 unregister_pre_exec_observer(pre_exec_observer)
+            if _snowden_lifecycle is not None:
+                _snowden_lifecycle.stop()
 
-        if app_config.in_house and _ya_pid_path is not None:
-            from yalibrary import snowden
-
-            try:
-                snowden.unregister_ya_pid(_ya_pid_path)
-            except Exception:
-                logger.debug('Snowden unregister_ya_pid failed', exc_info=True)
+        if _snowden_lifecycle is not None:
             try:
                 _wait_sec = _get_snowden_wait_sec(ctx, _snowden_user_class)
                 if _wait_sec > 0 and _snowden_store_dir is not None:
