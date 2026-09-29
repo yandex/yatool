@@ -802,6 +802,7 @@ class _ToolConfigReader:
         env = definition.get("env")
         platforms = definition.get("platforms")
         executable = definition.get("executable")
+        untar = definition.get("untar", True)
         if formula is None:
             formula = self._DEFAULT_FORMULA_PATH.format("/".join(name_parts))
         if platforms is None:
@@ -809,9 +810,11 @@ class _ToolConfigReader:
         if not platforms:
             raise ToolResolveException("Allowed platforms are not specified or empty for tool '{}'".format(name))
         if executable is None:
-            executable = [name_parts[-1]]
-        elif isinstance(executable, str):
+            executable = [name_parts[-1]] if untar else name_parts[-1]
+        elif untar and isinstance(executable, str):
             executable = [executable]
+        elif not untar and not isinstance(executable, str):
+            raise ToolResolveException("Executable must be a string for unpacked tool '{}'".format(name))
         if env is None:
             env = {}
 
@@ -842,9 +845,7 @@ class _ToolConfigReader:
         bottles = {
             bottle_name: {
                 "formula": formula,
-                "executable": {
-                    name: executable,
-                },
+                "executable": {name: executable} if untar else executable,
             },
         }
         return toolchains, bottles, platforms
