@@ -555,7 +555,10 @@ class TaskContext(object):
 
             # Don't cache_stderr to avoid belated reading of special tags
             _, address, wait_fn = start_executor(
-                cache_stderr=False, debug=devtools.ya.core.config.is_test_mode(), wait_init=False
+                cache_stderr=False,
+                debug=devtools.ya.core.config.is_test_mode(),
+                wait_init=False,
+                private_net_ns=self.opts.private_net_ns,
             )
             self.executor_address = address
             return wait_fn

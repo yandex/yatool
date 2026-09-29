@@ -267,16 +267,20 @@ private:
 #endif
 };
 
-void RunServer(const TString address, bool cacheStderr, bool debug) {
+void RunServer(const TString address, bool cacheStderr, bool debug, bool privateNetNs) {
+    // Install the subreaper before a timed-out probe can start a background reaper thread.
+    NProcUtil::TSubreaperApplicant applicant = NProcUtil::TSubreaperApplicant();
 #if defined(_linux_)
-    const auto networkIsolation = NProcUtil::DetectNetworkIsolationStrategy();
-    if (networkIsolation == NProcUtil::ENetworkIsolationStrategy::Unsupported) {
+    const auto networkIsolation = privateNetNs
+        ? NProcUtil::DetectNetworkIsolationStrategy()
+        : NProcUtil::ENetworkIsolationStrategy::Unsupported;
+    if (privateNetNs && networkIsolation == NProcUtil::ENetworkIsolationStrategy::Unsupported) {
         Cerr << "Warning: network isolation is unavailable; restricted commands will run with full network access" << Endl;
     }
 #else
+    Y_UNUSED(privateNetNs);
     const auto networkIsolation = NProcUtil::ENetworkIsolationStrategy::Unsupported;
 #endif
-    NProcUtil::TSubreaperApplicant applicant = NProcUtil::TSubreaperApplicant();
 
     SetAsyncSignalHandler(SIGINT, RequestShutdown);
     SetAsyncSignalHandler(SIGTERM, RequestShutdown);

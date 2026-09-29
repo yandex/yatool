@@ -7,7 +7,10 @@
     #include <sched.h>
     #include <unistd.h>
 
+    #include <util/datetime/base.h>
     #include <util/string/builder.h>
+    #include <chrono>
+    #include <util/thread/factory.h>
     #include <util/system/file.h>
     #include <util/system/yassert.h>
 
@@ -167,10 +170,16 @@ namespace NProcUtil {
             WriteProcFile(filename, mapping);
         }
 
-        bool ProbeNetworkIsolation(ENetworkIsolationStrategy strategy) {
+        enum class EProbeResult {
+            Supported,
+            Unsupported,
+            TimedOut,
+        };
+
+        EProbeResult ProbeNetworkIsolation(ENetworkIsolationStrategy strategy, std::chrono::steady_clock::time_point deadline) {
             const pid_t pid = fork();
             if (pid < 0) {
-                return false;
+                return EProbeResult::Unsupported;
             }
 
             if (pid == 0) {
@@ -183,22 +192,46 @@ namespace NProcUtil {
             }
 
             int status = 0;
-            pid_t waitResult;
-            do {
-                waitResult = waitpid(pid, &status, 0);
-            } while (waitResult < 0 && errno == EINTR);
-
-            return waitResult == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+            for (;;) {
+                const pid_t waitResult = waitpid(pid, &status, WNOHANG);
+                if (waitResult == pid) {
+                    return WIFEXITED(status) && WEXITSTATUS(status) == 0
+                               ? EProbeResult::Supported
+                               : EProbeResult::Unsupported;
+                }
+                if (waitResult < 0 && errno != EINTR) {
+                    return EProbeResult::Unsupported;
+                }
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    Cerr << "Warning: network isolation probe timed out (pid " << pid
+                         << ", strategy " << (strategy == ENetworkIsolationStrategy::Direct ? "direct" : "apparmor-rootlesskit")
+                         << "); disabling network isolation" << Endl;
+                    kill(pid, SIGKILL);
+                    // SIGKILL does not immediately finish an uninterruptible syscall.
+                    // Reap in the background so cleanup cannot block server startup.
+                    SystemThreadFactory()->Run([pid]() {
+                        int status = 0;
+                        while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+                        }
+                    });
+                    return EProbeResult::TimedOut;
+                }
+                Sleep(TDuration::MilliSeconds(1));
+            }
         }
     } // namespace
 
     ENetworkIsolationStrategy DetectNetworkIsolationStrategy() {
-        if (ProbeNetworkIsolation(ENetworkIsolationStrategy::Direct)) {
-            return ENetworkIsolationStrategy::Direct;
-        }
-
-        if (ProbeNetworkIsolation(ENetworkIsolationStrategy::AppArmorRootlesskit)) {
-            return ENetworkIsolationStrategy::AppArmorRootlesskit;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+        for (const auto strategy : {ENetworkIsolationStrategy::Direct, ENetworkIsolationStrategy::AppArmorRootlesskit}) {
+            const auto result = ProbeNetworkIsolation(strategy, deadline);
+            if (result == EProbeResult::Supported) {
+                return strategy;
+            }
+            if (result == EProbeResult::TimedOut) {
+                // A timed-out probe starts a reaper thread; do not fork another probe afterwards.
+                break;
+            }
         }
 
         return ENetworkIsolationStrategy::Unsupported;

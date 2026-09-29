@@ -15,3 +15,7 @@ END()
 RECURSE(
     python
 )
+
+RECURSE_FOR_TESTS(
+    ut
+)

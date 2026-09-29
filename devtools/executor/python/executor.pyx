@@ -21,7 +21,7 @@ from library.python import func, unique_id, windows
 
 
 cdef extern from "devtools/executor/lib/server.h":
-    int RunServer(char* mount_point, bint cache_stderr, bint debug) nogil
+    int RunServer(char* mount_point, bint cache_stderr, bint debug, bint private_net_ns) nogil
 
 
 class ShutdownException(Exception):
@@ -76,7 +76,7 @@ def _get_address():
         return "unix:{}".format(_get_mount_point())
 
 
-def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_init=True):
+def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_init=True, private_net_ns=False):
     address = _get_address()
 
     env = dict(os.environ)
@@ -85,7 +85,7 @@ def start_executor(terminate_at_exit=True, cache_stderr=True, debug=False, wait_
         'Y_PYTHON_ENTRY_POINT': 'devtools.executor.python.executor:_run_server_entry_point',
     })
 
-    cmd = [sys.executable, address, str(int(cache_stderr))]
+    cmd = [sys.executable, address, str(int(cache_stderr)), str(int(private_net_ns))]
     logging.debug("Starting local executor with cmd: %s", cmd)
 
     if debug:
@@ -155,6 +155,7 @@ def _run_server_entry_point():
 
     address = sys.argv[1]
     cache_stderr = bool(int(sys.argv[2]))
+    private_net_ns = bool(int(sys.argv[3]))
     debug = bool(int(os.environ.get('DEBUG_LOCAL_EXECUTOR')))
     if debug:
         sys.stderr.write("Staring server at {}\n".format(address))
@@ -163,15 +164,15 @@ def _run_server_entry_point():
     cdef char* cstr = rawstr
 
     try:
-        RunServer(cstr, cache_stderr, debug)
+        RunServer(cstr, cache_stderr, debug, private_net_ns)
         sys.exit(0)
     except Exception:
         sys.exit(1)
 
 
 @contextlib.contextmanager
-def with_executor():
-    pid, address, _ = start_executor(terminate_at_exit=False)
+def with_executor(private_net_ns=False):
+    pid, address, _ = start_executor(terminate_at_exit=False, private_net_ns=private_net_ns)
     yield address
     terminate_process(pid)
 
