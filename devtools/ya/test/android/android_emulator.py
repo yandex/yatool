@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import threading
+import shlex
 import socket
 import six.moves.queue as Queue
 import time
@@ -189,7 +190,12 @@ class AndroidEmulator(object):
         self.run_cmd(device_id, ['push', wrap_script, device_path])
         # the app process (its own uid) execs the wrapper on launch, hence world-exec
         self.chmod(device_id, device_path, '755')
-        self.run_cmd(device_id, ['shell', 'setprop', 'wrap.' + app_name, '/system/bin/sh ' + device_path])
+
+        property_name = 'wrap.' + app_name
+        property_value = '/system/bin/sh ' + device_path
+        self.run_cmd(
+            device_id, ['shell', 'setprop {} {}'.format(shlex.quote(property_name), shlex.quote(property_value))]
+        )
 
     def push_check_marker_script(self, device_id, app_name, end_marker):
         with open(self.check_marker_script, 'w') as check_script:
