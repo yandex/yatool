@@ -24,6 +24,10 @@ TEST_TYPE = 'jstyle'
 logger = logging.getLogger(__name__)
 
 
+class JstyleServerStartupTimeout(Exception):
+    pass
+
+
 def setup_logging(verbose):
     level = logging.DEBUG if verbose else logging.ERROR
     logging.basicConfig(level=level, stream=sys.stdout, format="%(asctime)s: %(levelname)s: %(message)s")
@@ -82,7 +86,7 @@ def wait_for_server_startup(proc, log, timeout):
                         "jstyle server failed with {} exit code, see logs for more info".format(proc.returncode)
                     )
 
-        raise Exception("Failed to start jstyle server in {} seconds".format(timeout))
+        raise JstyleServerStartupTimeout("Failed to start jstyle server in {} seconds".format(timeout))
 
     except Exception:
         stream.close()
@@ -225,6 +229,13 @@ def main():
         sys.stdout.write(os.linesep.join(sorted(test_cases.keys())))
         return 0
     setup_logging(args.verbose)
+    lock_dir = get_lock_dir() if test_cases else None
+    return run(args, test_cases, config_migrations, lock_dir)
+
+
+def run(
+    args: argparse.Namespace, test_cases: dict[str, str], config_migrations: MigrationsConfig, lock_dir: str | None
+) -> int:
     logger.debug('Total cases:\n' + '\n'.join(test_cases.values()))
 
     suite = devtools.ya.test.test_types.common.PerformedTestSuite(None, None, None)
@@ -233,6 +244,7 @@ def main():
 
     tests = []
     skipped_files = set()
+    use_jstyle_server = args.use_jstyle_server and bool(lock_dir)
     while test_cases:
         logs_dir = args.out_path
         checkstyle_input = os.path.join(logs_dir, 'checkstyle.files.list')
@@ -250,12 +262,15 @@ def main():
             else:
                 cp = os.path.join(args.runner_lib_path, '*')
 
-        lock_dir = get_lock_dir()
-        if args.use_jstyle_server and lock_dir:
+        if use_jstyle_server:
             lock_file = os.path.join(lock_dir, get_lock_file(args.runner_lib_path))
             java_cmd = [args.java, '-cp', cp, 'ru.yandex.devtools.JStyleRunnerServer', '-f', lock_file]
-            res = execute(java_cmd, args.config_xml, checkstyle_input, lock_file, logs_dir)
-        else:
+            try:
+                res = execute(java_cmd, args.config_xml, checkstyle_input, lock_file, logs_dir)
+            except JstyleServerStartupTimeout as e:
+                logger.warning("%s; falling back to standalone jstyle", e)
+                use_jstyle_server = False
+        if not use_jstyle_server:
             java_cmd = [args.java, '-cp', cp, 'ru.yandex.devtools.JStyleRunner', '-c', args.config_xml]
             if args.verbose:
                 java_cmd.append('-d')
