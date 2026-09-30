@@ -10,8 +10,17 @@
 #include <util/stream/null.h>
 #include <util/string/type.h>
 #include <util/system/env.h>
+#include <util/system/error.h>
 #include <util/system/execpath.h>
 #include <util/system/shellcommand.h>
+
+#if defined(_unix_)
+    #include <cerrno>
+    #include <csignal>
+    #include <fcntl.h>
+    #include <sys/wait.h>
+    #include <unistd.h>
+#endif
 
 namespace NYa::NSnowden {
     bool ReportingDisabled(const TVector<TString>& expandedArgs) {
@@ -30,6 +39,91 @@ namespace NYa::NSnowden {
         }
         return false;
     }
+
+    namespace {
+#if defined(_unix_)
+        void SpawnDetached(const TString& executable, const TList<TString>& args, const THashMap<TString, TString>& env) {
+            TVector<TString> argvStorage;
+            argvStorage.reserve(args.size() + 1);
+            argvStorage.push_back(executable);
+            argvStorage.insert(argvStorage.end(), args.begin(), args.end());
+            TVector<char*> argv;
+            argv.reserve(argvStorage.size() + 1);
+            for (auto& arg : argvStorage) {
+                argv.push_back(arg.begin());
+            }
+            argv.push_back(nullptr);
+
+            TVector<TString> envStorage;
+            envStorage.reserve(env.size());
+            for (const auto& [key, value] : env) {
+                envStorage.push_back(key + "=" + value);
+            }
+            TVector<char*> envp;
+            envp.reserve(envStorage.size() + 1);
+            for (auto& var : envStorage) {
+                envp.push_back(var.begin());
+            }
+            envp.push_back(nullptr);
+
+            const int devNull = open("/dev/null", O_RDWR | O_CLOEXEC);
+            if (devNull < 0) {
+                DEBUG_LOG << "[snowden] Cannot open /dev/null: " << LastSystemErrorText() << "\n";
+                return;
+            }
+
+            // Same as TShellCommand: block signals so that no parent handler runs in the forked copy.
+            sigset_t allSignals;
+            sigset_t oldMask;
+            sigfillset(&allSignals);
+            pthread_sigmask(SIG_SETMASK, &allSignals, &oldMask);
+
+            const pid_t intermediate = fork();
+            if (intermediate == 0) {
+                // The grandchild must not be a session leader, so it cannot acquire a controlling terminal.
+                setsid();
+                const pid_t grandchild = fork();
+                if (grandchild == 0) {
+                    // Same as TShellCommand: reset dispositions, SIG_IGN would survive execve().
+                    struct sigaction sa = {};
+                    sa.sa_handler = SIG_DFL;
+                    sigemptyset(&sa.sa_mask);
+                    for (int sig = 1; sig < NSIG; ++sig) {
+                        sigaction(sig, &sa, nullptr);
+                    }
+                    pthread_sigmask(SIG_SETMASK, &oldMask, nullptr);
+
+                    // dup2() clears FD_CLOEXEC on the new descriptors.
+                    dup2(devNull, STDIN_FILENO);
+                    dup2(devNull, STDOUT_FILENO);
+                    dup2(devNull, STDERR_FILENO);
+                    execve(argv[0], argv.data(), envp.data());
+                    _exit(127);
+                }
+                // The grandchild is reparented to init (or the nearest subreaper).
+                _exit(grandchild < 0 ? 1 : 0);
+            }
+            const int forkErrno = errno;
+            pthread_sigmask(SIG_SETMASK, &oldMask, nullptr);
+            close(devNull);
+            if (intermediate < 0) {
+                DEBUG_LOG << "[snowden] Cannot fork child process: " << LastSystemErrorText(forkErrno) << "\n";
+                return;
+            }
+
+            int status = 0;
+            pid_t waited = 0;
+            do {
+                waited = waitpid(intermediate, &status, 0);
+            } while (waited < 0 && errno == EINTR);
+            if (waited < 0 && errno != ECHILD) {
+                DEBUG_LOG << "[snowden] Cannot wait for child process: " << LastSystemErrorText() << "\n";
+            } else if (waited > 0 && !(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
+                DEBUG_LOG << "[snowden] Cannot fork grandchild process, child status: " << status << "\n";
+            }
+        }
+#endif
+    } // namespace
 
     namespace NPrivate {
         TShellCommandOptions BuildPythonEntryPointOptions(bool async) {
@@ -50,7 +144,13 @@ namespace NYa::NSnowden {
             const TList<TString>& args,
             bool async
         ) {
+            THashMap<TString, TString> env = NYa::Environ();
+            env["Y_PYTHON_ENTRY_POINT"] = entryPoint;
 #if defined(_unix_)
+            if (async) {
+                SpawnDetached(executable, args, env);
+                return Nothing();
+            }
             // Keep fd 0 occupied while TShellCommand creates its output pipes.
             // Otherwise an output pipe can take fd 0 and close the redirected
             // stdin in the child while rearranging descriptors after fork().
@@ -61,8 +161,7 @@ namespace NYa::NSnowden {
             TNullInput nullIn;
             opts.SetInputStream(&nullIn);
 
-            opts.Environment = NYa::Environ();
-            opts.Environment["Y_PYTHON_ENTRY_POINT"] = entryPoint;
+            opts.Environment = std::move(env);
 
             TShellCommand cmd(executable, args, opts);
             cmd.Run();
