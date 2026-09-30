@@ -65,14 +65,14 @@ class YmakeCrashedBySignalError(error_base.Error):
     so the signal number can only be recovered from the ymake backtrace header in stderr.
     """
 
-    # signal.SIGBUS and signal.SIGSEGV, same as in BROKEN_HOST_ENVIRONMENT_YA_EXIT_CODES
-    BROKEN_HOST_SIGNALS = (7, 11)
+    # signal.SIGABRT, signal.SIGBUS and signal.SIGSEGV, same as in BROKEN_HOST_ENVIRONMENT_YA_EXIT_CODES
+    BROKEN_HOST_SIGNALS = (6, 7, 11)
 
     ERROR_RE = re.compile(
         r'Signal (?:{}), backtrace is:.*?YMake crashed'.format('|'.join(str(s) for s in BROKEN_HOST_SIGNALS)),
         re.DOTALL,
     )
-    MESSAGE = 'ymake crashed with a segmentation fault or a bus error'
+    MESSAGE = 'ymake crashed with an abort, segmentation fault or bus error'
 
 
 class YmakeCrashedError(error_base.Error):
