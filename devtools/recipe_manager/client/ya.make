@@ -10,7 +10,6 @@ PEERDIR(
     devtools/recipe_manager/proto
     devtools/ya/yalibrary/loggers/file_log
     library/python/filelock
-    library/python/fs
     library/python/svn_version
 )
 

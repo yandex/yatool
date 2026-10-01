@@ -1346,7 +1346,6 @@ def _configure_recipe_manager_client(ctx):
         logs_root=core_config.logs_root(),
         timeout=10,
         force_restart=getattr(ctx.params, 'force_restart_recipe_manager', False),
-        source_root=arc_root,
     )
     ctx.display.emit_message(
         "[[good]]Persistent recipes enabled[[rst]] (Recipe Manager at [[path]]{}[[rst]])\n".format(recipes_shallow_root)
