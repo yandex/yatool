@@ -504,7 +504,7 @@ class Value(Node):
                     i += 1
 
                 if string:
-                    out.append(' '.join(['    '] + string))
+                    out.append(' '.join(string if first else ['    '] + string))
 
                 if comments:
                     out[-1] += ' ' + comments
