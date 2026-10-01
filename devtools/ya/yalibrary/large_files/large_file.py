@@ -3,12 +3,17 @@ import re
 import logging
 
 import json
-from devtools.ya.yalibrary.yandex.sandbox.misc import consts as sandbox_const
 
 from .exc import ExternalFileException
 
-RESOURCE_LINK_PATTERN = r"{}/resource/[0-9]+/view".format(re.escape(sandbox_const.DEFAULT_SANDBOX_URL))
-DOWNLOAD_LINK_PATTERN = r"{}/[0-9]+".format(re.escape(sandbox_const.DEFAULT_SANDBOX_PROXY_URL))
+
+def _get_sandbox_link_patterns():
+    from devtools.ya.yalibrary.yandex.sandbox.misc import consts as sandbox_const
+
+    return (
+        ('resource_link', r"{}/resource/[0-9]+/view".format(re.escape(sandbox_const.DEFAULT_SANDBOX_URL))),
+        ('download_link', r"{}/[0-9]+".format(re.escape(sandbox_const.DEFAULT_SANDBOX_PROXY_URL))),
+    )
 
 
 # https://st.yandex-team.ru/DEVTOOLS-7768
@@ -148,7 +153,7 @@ class ExternalFile:
             patterns = []
 
             if storage == "SANDBOX":
-                patterns.extend((('resource_link', RESOURCE_LINK_PATTERN), ('download_link', DOWNLOAD_LINK_PATTERN)))
+                patterns.extend(_get_sandbox_link_patterns())
             elif storage == "MDS":
                 download_link_pattern_mds = r"https:\/\/.*/get-{}/{}".format(data["namespace"], data["resource_id"])
                 patterns.append(('download_link', download_link_pattern_mds))

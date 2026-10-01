@@ -5,7 +5,6 @@ import os
 import fnmatch
 import logging
 import inspect
-import yaml
 from typing import Callable, Optional
 
 import devtools.ya.test.const
@@ -293,6 +292,8 @@ class SuiteFiltersManager:
             return self.filter_func(testname)
 
     def __init__(self, list_path: str):
+        import yaml
+
         with open(list_path, 'r') as fp:
             filters_yaml = yaml.load(fp, yaml.Loader)
         self._suite_filters = (

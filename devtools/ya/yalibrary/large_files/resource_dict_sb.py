@@ -1,8 +1,7 @@
-from devtools.ya.yalibrary.yandex.sandbox.misc import consts as sandbox_const
-
-
 def get_resource_dict_sb(res_info, update_external=True):
-    task_info = res_info['task']
+    from devtools.ya.yalibrary.yandex.sandbox.misc import consts as sandbox_const
+
+    task_info = res_info['task'] = res_info['task']
     if 'status' in task_info:
         del task_info['status']
     ret = {
