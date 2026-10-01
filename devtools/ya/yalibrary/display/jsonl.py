@@ -255,8 +255,9 @@ _ADVICE_BY_CATEGORY = {
     'build_failed': (
         "The build failed, so tests that depend on the broken nodes did not run. Every broken node is a `fail` "
         "event with `stage` build carrying the `path` of the module and the compiler or tool output in `text`; "
-        "`failed` of this summary lists them. Fix the first of them: the rest often break for the same reason. "
-        "Rerunning the same command unchanged fails the same way."
+        "`failed` of this summary lists them together with the failures of the other stages. Fix everything it "
+        "lists: broken nodes of one module often share a cause, but test and style failures are separate "
+        "problems. After the fix rerun the command: the tests the build blocked run then and may fail too."
     ),
     'unhandled_exception': (
         "ya itself crashed: the failure is in the build system, not in the code being built. The `text` field "
