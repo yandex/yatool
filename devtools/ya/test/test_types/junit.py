@@ -96,7 +96,16 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         return self.classpath
 
     def get_direct_deps(self, deps):
-        return [os.path.relpath(jar_file, graph_consts.BUILD_ROOT) for jar_file in deps]
+        build_root_prefix = graph_consts.BUILD_ROOT + os.sep
+        result = []
+        for jar_file in deps:
+            path = os.path.normpath(jar_file)
+            if path.startswith(build_root_prefix):
+                # Graph paths are symbolic: resolving them must not query the cwd.
+                result.append(path[len(build_root_prefix) :])
+            else:
+                result.append(os.path.relpath(jar_file, graph_consts.BUILD_ROOT))
+        return result
 
     def get_classpath_package_files(self, deps):
         return [os.path.splitext(jar_file)[0] + ".cpsf" for jar_file in deps]
@@ -320,7 +329,7 @@ class JavaTestSuite(test_types.AbstractTestSuite):
                     '-m',
                     '--ya-start-command-file',
                 ]
-                + list(map(lambda p: os.path.relpath(p, graph_consts.BUILD_ROOT), self.classpath))
+                + self.get_direct_deps(self.classpath)
                 + [
                     '--ya-end-command-file',
                 ]
