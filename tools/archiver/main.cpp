@@ -109,7 +109,6 @@ namespace {
         }
 
     private:
-        // width in source chars
         static const size_t Columns = 10;
         ui64 Count_ = 0;
         IOutputStream* Slave_ = nullptr;
@@ -196,7 +195,6 @@ namespace {
         }
 
         void DoFinish() override {
-            //*O << ";\nextern const unsigned char* " << B << " = (const unsigned char*)" << B << "Array;\n";
             *O << ";\nextern const unsigned int " << B << "Size = sizeof(" << B << ") / sizeof(" << B << "[0]) - 1;\n}\n";
         }
 
@@ -302,7 +300,11 @@ static inline bool IsDelim(char ch) noexcept {
     return ch == '/' || ch == '\\';
 }
 
+// FIX: защита от UB при пустой строке
 static inline TString GetFile(const TString& s) {
+    if (s.empty()) {
+        return {};
+    }
     const char* e = s.end();
     const char* b = s.begin();
     const char* c = e - 1;
@@ -414,12 +416,12 @@ namespace {
     };
 }
 
+// FIX: защита от UB при пустом ключе архива
 static TString CutFirstSlash(const TString& fileName) {
-    if (fileName[0] == '/') {
+    if (!fileName.empty() && fileName[0] == '/') {
         return fileName.substr(1);
-    } else {
-        return fileName;
     }
+    return fileName;
 }
 
 struct TMappingReader {
@@ -439,13 +441,30 @@ static void UnpackArchive(const TString& archive, const TFsPath& dir = TFsPath()
     TMappingReader mappingReader(archive);
     const TArchiveReader& reader = mappingReader.Reader;
     const size_t count = reader.Count();
+
+    // FIX: Path Traversal (Zip Slip).
+    // Приводим целевую директорию к абсолютному пути один раз до цикла.
+    // Это необходимо для корректной работы IsChildOf().
+    const TFsPath targetDir = (dir.IsDefined() ? dir : TFsPath::Cwd()).Absolute();
+
     for (size_t i = 0; i < count; ++i) {
         const TString key = reader.KeyByIndex(i);
         const TString fileName = CutFirstSlash(key);
         if (!Quiet) {
             Cerr << archive << " --> " << fileName << Endl;
         }
-        const TFsPath path(dir / fileName);
+
+        // Собираем итоговый путь и приводим к абсолютному виду
+        const TFsPath path = (targetDir / fileName).Absolute();
+
+        // Защита от Path Traversal: IsChildOf() делает покомпонентное сравнение
+        // путей и гарантирует что файл не запишется за пределы targetDir.
+        // Атака вида "../../etc/passwd" будет поймана здесь.
+        if (!path.IsChildOf(targetDir)) {
+            ythrow yexception()
+                << "Security: Path Traversal attempt detected in archive entry: " << key;
+        }
+
         path.Parent().MkDirs();
         TAutoPtr<IInputStream> in = reader.ObjectByKey(key);
         TFixedBufferFileOutput out(path);
@@ -617,7 +636,8 @@ int main(int argc, char** argv) {
         const auto& path = files[i];
         size_t off = 0;
 #ifdef _win_
-        if (path[0] > 0 && isalpha(path[0]) && path[1] == ':')
+        // FIX: проверка размера строки перед обращением к path[1]
+        if (path.size() >= 2 && path[0] > 0 && isalpha(path[0]) && path[1] == ':')
             off = 2; // skip drive letter ("d:")
 #endif               // _win_
         const size_t pos = path.find(':', off);
