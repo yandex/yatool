@@ -240,19 +240,29 @@ void TYMake::UpdateUnreachableExternalFileChanges() {
     auto& fileConf = Names.FileConf;
     auto externalChanges = fileConf.GetExternalChanges();
     for (auto id : externalChanges) {
+        bool hasUnreachableFile = false;
+        bool hasReachableNode = false;
         for (ui8 i = 0; i < static_cast<ui8>(ELinkType::ELT_COUNT); ++i) {
             auto linkType = static_cast<ELinkType>(i);
             auto elemId = TFileId::CreateElemId(linkType, id);
             auto node = Graph.GetFileNodeById(elemId);
-            if (node.IsValid()) {
-                if (!node->State.GetReachable() && node->NodeType == EMNT_File) {
-                    auto& fileData = fileConf.GetFileDataById(elemId);
-                    fileData.HashSum = {};
-                    fileData.Size = 0;
-                    fileData.LastCheckedStamp = TTimeStamps::Never;
-                    fileData.RealModStamp = 0;
-                }
+            if (!node.IsValid()) {
+                continue;
             }
+            if (node->State.GetReachable()) {
+                hasReachableNode = true;
+                break;
+            }
+            hasUnreachableFile |= node->NodeType == EMNT_File;
+        }
+
+        // All contexts share file metadata; a reachable context still needs its content hash.
+        if (hasUnreachableFile && !hasReachableNode) {
+            auto& fileData = fileConf.GetFileDataById(id);
+            fileData.HashSum = {};
+            fileData.Size = 0;
+            fileData.LastCheckedStamp = TTimeStamps::Never;
+            fileData.RealModStamp = 0;
         }
     }
 }
