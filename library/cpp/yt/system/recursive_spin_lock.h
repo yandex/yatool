@@ -1,16 +1,14 @@
 #pragma once
 
-#include "public.h"
 #include "spin_lock_base.h"
 #include "spin_lock_count.h"
-
-#include <library/cpp/yt/system/thread_id.h>
+#include "thread_id.h"
 
 #include <util/system/types.h>
 
 #include <atomic>
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -49,7 +47,7 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT
 
 #define RECURSIVE_SPIN_LOCK_INL_H_
 #include "recursive_spin_lock-inl.h"

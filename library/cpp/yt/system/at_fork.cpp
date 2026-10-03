@@ -1,8 +1,6 @@
 #include "at_fork.h"
 #include "writer_starving_rw_spin_lock.h"
 
-#include <library/cpp/yt/memory/leaky_singleton.h>
-
 #include <library/cpp/yt/assert/assert.h>
 
 #ifdef _unix_
@@ -11,8 +9,9 @@
 
 #include <atomic>
 #include <array>
+#include <new>
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +20,10 @@ class TAtForkManager
 public:
     static TAtForkManager* Get()
     {
-        return LeakySingleton<TAtForkManager>();
+        // Intentionally leaked.
+        alignas(TAtForkManager) static std::byte Storage[sizeof(TAtForkManager)];
+        static auto* Instance = new (Storage) TAtForkManager();
+        return Instance;
     }
 
     void RegisterAtForkHandlers(
@@ -44,8 +46,6 @@ public:
     }
 
 private:
-    DECLARE_LEAKY_SINGLETON_FRIEND()
-
     YT_DECLARE_SPIN_LOCK(TWriterStarvingRWSpinLock, ForkLock_);
 
     struct TAtForkHandlerSet
@@ -136,4 +136,4 @@ TWriterStarvingRWSpinLock* GetForkLock()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT

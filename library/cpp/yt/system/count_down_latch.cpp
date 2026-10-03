@@ -2,13 +2,11 @@
 
 #include "futex.h"
 
-#include <library/cpp/yt/threading/futex.h>
-
 #include <library/cpp/yt/assert/assert.h>
 
 #include <cerrno>
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +22,7 @@ void TCountDownLatch::CountDown()
     auto previous = Count_.fetch_sub(1, std::memory_order::release);
     if (previous == 1) {
 #ifdef _linux_
-        int rv = NThreading::FutexWake(
+        int rv = FutexWake(
             reinterpret_cast<int*>(&Count_),
             std::numeric_limits<int>::max());
         YT_VERIFY(rv >= 0);
@@ -45,7 +43,7 @@ void TCountDownLatch::Wait() const
             return;
         }
 #ifdef _linux_
-        int rv = NThreading::FutexWait(
+        int rv = FutexWait(
             const_cast<int*>(reinterpret_cast<const int*>(&Count_)),
             count);
         YT_VERIFY(rv >= 0 || errno == EWOULDBLOCK || errno == EINTR);
@@ -67,5 +65,5 @@ int TCountDownLatch::GetCount() const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT
 

@@ -4,7 +4,7 @@
 #include "copyable_atomic.h"
 #endif
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -34,4 +34,4 @@ TCopyableAtomic<T>& TCopyableAtomic<T>::operator=(TCopyableAtomic&& other) noexc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT

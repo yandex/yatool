@@ -1,6 +1,6 @@
 #include "writer_starving_rw_spin_lock.h"
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -30,4 +30,4 @@ void TWriterStarvingRWSpinLock::AcquireWriterSlow() noexcept
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT

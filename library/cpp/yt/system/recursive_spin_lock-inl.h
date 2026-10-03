@@ -8,7 +8,7 @@
 
 #include <library/cpp/yt/assert/assert.h>
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -70,5 +70,5 @@ inline bool TRecursiveSpinLock::TryAndTryAcquire() noexcept
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT
 

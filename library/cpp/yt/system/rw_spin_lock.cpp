@@ -9,7 +9,7 @@
 
 #include <thread>
 
-namespace NYT::NThreading::NDetail {
+namespace NYT::NDetail {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -98,4 +98,4 @@ void TCheckedReaderWriterSpinLock::RecordThreadRelease()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading::NDetail
+} // namespace NYT::NDetail

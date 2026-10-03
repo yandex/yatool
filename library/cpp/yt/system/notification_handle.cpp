@@ -1,8 +1,7 @@
 #include "notification_handle.h"
+#include "handle_eintr.h"
 
 #include <library/cpp/yt/exception/exception.h>
-
-#include <library/cpp/yt/system/handle_eintr.h>
 
 #include <library/cpp/yt/assert/assert.h>
 
@@ -11,7 +10,7 @@
     #include <sys/eventfd.h>
 #endif
 
-#ifdef _darwin_
+#if defined(_unix_) && !defined(_linux_)
     #include <fcntl.h>
     #include <unistd.h>
 #endif
@@ -20,7 +19,7 @@
     #include <util/network/socket.h>
 #endif
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -116,4 +115,4 @@ int TNotificationHandle::GetFD() const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT

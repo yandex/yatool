@@ -7,7 +7,7 @@
 
 #include <library/cpp/yt/misc/source_location.h>
 
-namespace NYT::NThreading {
+namespace NYT {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -28,4 +28,4 @@ TSpinLockInplace<TLock, LocationLite>::TSpinLockInplace()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-} // namespace NYT::NThreading
+} // namespace NYT
