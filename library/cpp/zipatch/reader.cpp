@@ -153,12 +153,12 @@ private:
 };
 
 TReader::TReader(const TFsPath& path)
-    : Impl_(new TImpl(path))
+    : Impl_(std::make_unique<TImpl>(path))
 {
 }
 
 TReader::TReader(const TStringBuf buf)
-    : Impl_(new TImpl(buf))
+    : Impl_(std::make_unique<TImpl>(buf))
 {
 }
 

@@ -15,9 +15,9 @@ namespace NZipatch {
 class TWriter::TImpl {
 public:
     TImpl(const TFsPath& path)
-        : Actions_(new TJsonValue(JSON_ARRAY))
-        , Meta_(new TJsonValue(JSON_MAP))
-        , Revprops_(new TJsonValue(JSON_MAP))
+        : Actions_(std::make_unique<TJsonValue>(JSON_ARRAY))
+        , Meta_(std::make_unique<TJsonValue>(JSON_MAP))
+        , Revprops_(std::make_unique<TJsonValue>(JSON_MAP))
         , Archive_(nullptr)
     {
         Archive_ = archive_write_new();
@@ -44,7 +44,7 @@ public:
     void Finish() {
         if (Actions_) {
             if (Archive_) {
-                WriteEntry("actions.json", WriteJson(Actions_.Get(), true, false));
+                WriteEntry("actions.json", WriteJson(Actions_.get(), true, false));
             }
 
             Actions_.reset();
@@ -52,7 +52,7 @@ public:
 
         if (Meta_) {
             if (Archive_) {
-                WriteEntry("meta.json", WriteJson(Meta_.Get(), true));
+                WriteEntry("meta.json", WriteJson(Meta_.get(), true));
             }
 
             Meta_.reset();
@@ -60,7 +60,7 @@ public:
 
         if (Revprops_) {
             if (Archive_) {
-                WriteEntry("revprops.json", WriteJson(Revprops_.Get(), true));
+                WriteEntry("revprops.json", WriteJson(Revprops_.get(), true));
             }
 
             Revprops_.reset();
@@ -175,14 +175,14 @@ private:
     }
 
 private:
-    THolder<NJson::TJsonValue> Actions_;
-    THolder<NJson::TJsonValue> Meta_;
-    THolder<NJson::TJsonValue> Revprops_;
+    std::unique_ptr<NJson::TJsonValue> Actions_;
+    std::unique_ptr<NJson::TJsonValue> Meta_;
+    std::unique_ptr<NJson::TJsonValue> Revprops_;
     struct archive* Archive_;
 };
 
 TWriter::TWriter(const TFsPath& path)
-    : Impl_(new TImpl(path))
+    : Impl_(std::make_unique<TImpl>(path))
 {
 }
 

@@ -1,8 +1,9 @@
 #pragma once
 
 #include <util/folder/path.h>
-#include <util/generic/ptr.h>
 #include <util/generic/maybe.h>
+
+#include <memory>
 
 namespace NZipatch {
 
@@ -44,7 +45,7 @@ public:
 
 private:
     class TImpl;
-    THolder<TImpl> Impl_;
+    std::unique_ptr<TImpl> Impl_;
 };
 
 } // namespace NZipatch
