@@ -328,7 +328,8 @@ namespace NACCache {
         if (placement == InStore) {
             if (TransactionLog_) {
                 auto savedName = TransactionLog_->GetStashedName(GetUid(), TTransactionLog::NewFile);
-                if (TFsPath(savedName).Exists()) {
+                const TFsPath savedPath(savedName);
+                if (savedPath.Exists() || savedPath.IsSymlink()) {
                     return GetStatInfo(savedName);
                 }
             }
@@ -527,4 +528,4 @@ namespace NACCache {
         PreprocessPutOrGetResults_.clear();
         GetResults_.clear();
     }
-}
+} // namespace NACCache
