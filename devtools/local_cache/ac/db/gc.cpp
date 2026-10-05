@@ -220,6 +220,10 @@ namespace NACCachePrivate {
 
         // Next method for inner loop
         bool NextInner() {
+            // Batch is full: commit it, NextOuter resumes from LastBlobInner (GCBigBlobs uses >=).
+            if (RemovedCount >= MaxRemoveCount) {
+                return false;
+            }
             while (LastAcStepResult || (LastBlobStepResult = Parent.Get(GCBigBlobs).Step())) {
                 LastBlobInner = Parent.GetColumnInt64(GCBigBlobs, 0, "BlobRef");
                 auto fsSize = Parent.GetColumnInt64(GCBigBlobs, 1, "FSSize");

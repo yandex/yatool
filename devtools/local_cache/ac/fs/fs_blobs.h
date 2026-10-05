@@ -184,6 +184,9 @@ namespace NACCache {
         /// No-op if params.Mode != OnFS
         void RemoveBlob(const TParams& params, TFsInfo& info);
 
+        /// True if blob is expected on FS but neither in store nor put in current transaction (lstat only).
+        bool IsMissingInStore(const TParams& params);
+
         /// Get file information in or out of store.
         /// Obvious requirements wrt Put/Get
         TFsInfo GetInfo(EFilePlacement placement);

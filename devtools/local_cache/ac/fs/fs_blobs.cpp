@@ -11,6 +11,7 @@
 #include <util/stream/file.h>
 #include <util/stream/format.h>
 #include <util/system/error.h>
+#include <util/system/fstat.h>
 
 #include <array>
 
@@ -289,6 +290,16 @@ namespace NACCache {
                 ythrow TIoException() << "Cannot stash blob " << fileName << " to " << TransactionLog_->StashDir_;
             }
         }
+    }
+
+    bool TFsBlobProcessor::IsMissingInStore(const TParams& params) {
+        if (GetIOMode(params) != FullIO) {
+            return false;
+        }
+        if (TransactionLog_ && TransactionLog_->PutFiles_.contains(GetUid())) {
+            return false;
+        }
+        return TFileStat(GetStoreFileName(), true /* nofollow */).IsNull();
     }
 
     std::pair<TString, bool> TFsBlobProcessor::PrepareStashDir(const TString& rootDir, const TString& tid, EOperationMode mode, bool sync) {

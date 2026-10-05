@@ -78,6 +78,14 @@ namespace NACCachePrivate {
             if (refCountAdj <= -oldRefCount && !exists) {
                 return TReturn({rowid, std::make_pair(0, 0), std::make_pair(false, false), 0, 0, copyMode});
             } else if (refCountAdj > -oldRefCount && exists) {
+                TFsBlobProcessor::TParams storeParams{CodecNone, storeMode};
+                if (refCountAdj > 0 && processor.IsMissingInStore(storeParams)) {
+                    // Row without file (e.g. lost removal rollback): put the file again, sizes are already accounted.
+                    LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_WARNING, "WARN[ACCAS]")
+                        << "PB: restore missing file, uid=" << uidStr << Endl;
+                    TFsBlobProcessor::TFsInfo meta;
+                    std::tie(content, copyMode) = processor.Put(storeParams, meta);
+                }
                 i64 sum = (i64)oldRefCount;
                 if (refCountAdj) {
                     sum += (i64)refCountAdj;
