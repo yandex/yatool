@@ -19,6 +19,7 @@
 #include <library/cpp/regex/pcre/regexp.h>
 #include <library/cpp/retry/retry.h>
 #include <library/cpp/threading/cancellation/cancellation_token.h>
+#include <library/cpp/threading/future/async.h>
 #include <library/cpp/threading/future/subscription/wait_any.h>
 #include <library/cpp/ucompress/reader.h>
 #include <library/cpp/ucompress/writer.h>
@@ -734,10 +735,10 @@ namespace NYa {
                 auto deadLine = prepareTimeout.ToDeadLine();
                 auto promise = PrepareControl_.Init();
 
-                ThreadPool_.SafeAddFunc([this, promise=std::move(promise), options, deadLine]() mutable {
+                PrepareTask_ = NThreading::Async([this, promise = std::move(promise), options, deadLine]() mutable {
                     TThread::SetCurrentThreadName("YtStore::Prepare");
                     DoPrepare(std::move(promise), options, deadLine);
-                });
+                }, ThreadPool_);
                 // To support refresh metadata only mode (--yt-store-refresh-on-read --threads=0)
                 // we must wait for DoPrepare result
                 if (options->RefreshOnRead) {
@@ -1957,6 +1958,11 @@ namespace NYa {
         // Cancels ongoing work and joins the pool threads.
         void TearDown() noexcept {
             CancellationSource_.Cancel();
+            // DoPrepare schedules metadata reads on this pool. Stop must not
+            // race with those submissions, even when no caller waited in Has.
+            if (PrepareTask_.Initialized()) {
+                PrepareTask_.Wait();
+            }
             ThreadPool_.Stop();
         }
 
@@ -2772,6 +2778,7 @@ namespace NYa {
         TAdaptiveThreadPool ThreadPool_{};
         TInitializeControl InitializeControl_{};
         TPrepareControl PrepareControl_{};
+        NThreading::TFuture<void> PrepareTask_{};
         TYtErrorRetrierPtr RetrierPtr_{};
         TMetricsManager Metrics_;
         TMemorySemaphore MemSem_{DEFAULT_MAX_MEMORY_USAGE};
