@@ -17,4 +17,6 @@ class LarryOptions(yarg.Options):
                 group=groups.LARRY_OPT_GROUP,
                 visible=False,
             ),
+            yarg.EnvConsumer('YA_LARRY_ADDR', hook=yarg.SetValueHook('larry_addr')),
+            yarg.ConfigConsumer('larry_addr'),
         ]
