@@ -194,7 +194,8 @@ class AndroidEmulator(object):
         property_name = 'wrap.' + app_name
         property_value = '/system/bin/sh ' + device_path
         self.run_cmd(
-            device_id, ['shell', 'setprop {} {}'.format(shlex.quote(property_name), shlex.quote(property_value))]
+            device_id,
+            ['shell', 'su', 'root', 'setprop {} {}'.format(shlex.quote(property_name), shlex.quote(property_value))],
         )
 
     def push_check_marker_script(self, device_id, app_name, end_marker):
