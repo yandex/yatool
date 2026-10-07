@@ -2014,6 +2014,7 @@ class YaMake:
             if self.opts.larry_addr is not None:
                 try:
                     from devtools.ya.build.larry_client import LarryClient
+                    from devtools.ya.build.larry_client.build_variables import collect_build_variables
                 except ImportError:
                     raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
 
@@ -2025,8 +2026,14 @@ class YaMake:
                     display=self.app_ctx.display,
                     output_replacements=self.ctx.output_replacements,
                     sandbox_token=sandbox_token,
-                    yt_token=get_yt_token(self.opts) if self.opts.larry_addr.startswith('sync:') else '',
+                    yt_cache_mode=None if self.opts.yt_store else 'off',
+                    yt_token=(
+                        get_yt_token(self.opts)
+                        if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
+                        else ''
+                    ),
                     result_context=self.ctx,
+                    build_variables=collect_build_variables(self.ctx, self.app_ctx),
                 ).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
