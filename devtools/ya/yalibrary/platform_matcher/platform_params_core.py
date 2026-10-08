@@ -93,7 +93,7 @@ def transform_toolchain(alias, target_platforms, toolchain_transforms):
         toolchain_transforms: Dict mapping toolchain keys to aliases
 
     Returns:
-        List of platform params or None if not found
+        Params of the first matching target platform, or None if not found
     """
     # XXX: remove after DEVTOOLS-6216
 
@@ -106,13 +106,12 @@ def transform_toolchain(alias, target_platforms, toolchain_transforms):
             logger.debug('Found platform by id for alias %s: %s', alias, target_platform)
             return make_platform_params(target_platform)
 
-    platforms_params = {}
+    # Several toolchains can share an alias. Prefer the configured platform order,
+    # not the iteration order of toolchain_transforms (unordered in Python 2).
     for target_platform in target_platforms:
-        platforms_params[target_platform] = make_platform_params(target_platform)
-
-    for toolchain, name in toolchain_transforms.items():
-        if name == alias:
-            for target_platform, platform_params in platforms_params.items():
+        platform_params = make_platform_params(target_platform)
+        for toolchain, name in toolchain_transforms.items():
+            if name == alias:
                 platform_name = target_platform.split(',')[0]
                 if toolchain.startswith(platform_name):
                     params_to_replace = {}
