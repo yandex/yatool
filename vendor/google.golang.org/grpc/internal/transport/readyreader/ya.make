@@ -4,34 +4,44 @@ LICENSE(Apache-2.0)
 
 VERSION(v1.83.2)
 
+SRCS(
+    ready_reader.go
+)
+
+GO_XTEST_SRCS(ready_reader_ext_test.go)
+
 IF (OS_LINUX)
     SRCS(
-        syscall_linux.go
+        raw_conn_linux.go
     )
 ENDIF()
 
 IF (OS_DARWIN)
     SRCS(
-        syscall_nonlinux.go
+        raw_conn_nonlinux.go
     )
 ENDIF()
 
 IF (OS_WINDOWS)
     SRCS(
-        syscall_nonlinux.go
+        raw_conn_nonlinux.go
     )
 ENDIF()
 
 IF (OS_ANDROID)
     SRCS(
-        syscall_linux.go
+        raw_conn_linux.go
     )
 ENDIF()
 
 IF (OS_EMSCRIPTEN)
     SRCS(
-        syscall_nonlinux.go
+        raw_conn_nonlinux.go
     )
 ENDIF()
 
 END()
+
+RECURSE(
+    gotest
+)

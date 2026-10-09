@@ -4,8 +4,6 @@ LICENSE(Apache-2.0)
 
 VERSION(v1.83.2)
 
-SRCS(
-    backoff.go
-)
+ALL_GO_SRCS()
 
 END()
