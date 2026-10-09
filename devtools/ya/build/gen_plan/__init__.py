@@ -440,7 +440,7 @@ def gen_dummy_graph(
         if not for_uid and stats_uid:
             node['stats_uid'] = stats_uid
 
-        if timeout:
+        if not for_uid and timeout:
             node['timeout'] = timeout
 
         if requirements:
