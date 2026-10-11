@@ -39,6 +39,12 @@ class BazelStoreException(Exception):
     pass
 
 
+class BazelStoreHTTPError(BazelStoreException):
+    def __init__(self, status_code):
+        super().__init__("Bazel cache returned HTTP {}".format(status_code))
+        self.retriable = status_code in (408, 429) or status_code >= 500
+
+
 class BazelStoreIntegrityError(BazelStoreException):
     retriable = False
 
@@ -61,6 +67,8 @@ class TimeoutHTTPAdapter(requests.adapters.HTTPAdapter):
         cert=None,
         proxies=None,
     ):
+        if timeout is None:
+            timeout = DEFAULT_TIMEOUT
         return super().send(request=request, stream=stream, timeout=timeout, verify=verify, cert=cert, proxies=proxies)
 
 
@@ -155,7 +163,7 @@ class StreamWriter:
 
 class BazelStoreClient(object):
     def __init__(self, base_uri, username=None, password=None, max_connections=48, retry_policy=None):
-        self.base_uri = base_uri
+        self.base_uri = base_uri.rstrip('/') + '/'
         self.session = requests.Session()
         adapter = TimeoutHTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections)
         self.session.mount('http://', adapter)
@@ -168,25 +176,37 @@ class BazelStoreClient(object):
         if f_kwargs is None:
             f_kwargs = {}
 
+        def call():
+            try:
+                return func(*f_args, **f_kwargs)
+            except requests.RequestException as e:
+                # A failed request must not disable the cache for the rest of the build.
+                raise BazelStoreException(str(e)) from e
+
         try:
-            return retry.retry_call(func, f_args, f_kwargs, conf)
+            return retry.retry_call(call, conf=conf)
         except BazelStoreException:
             raise
         except Exception as e:
             raise BazelStoreBrokenException(e)
 
     def _ac_url(self, uid):
-        return parse.urljoin(self.base_uri, '/ac/' + uid_to_uri(uid))
+        return parse.urljoin(self.base_uri, 'ac/' + uid_to_uri(uid))
 
     def _cas_url(self, hex_digest):
-        return parse.urljoin(self.base_uri, '/cas/' + hex_digest)
+        return parse.urljoin(self.base_uri, 'cas/' + hex_digest)
+
+    @staticmethod
+    def _check_response(response):
+        if not 200 <= response.status_code < 300:
+            raise BazelStoreHTTPError(response.status_code)
 
     def install_data(self, file_path, cas_url, codec, headers):
         with self.session.get(cas_url, headers=headers) as req:
             if req.status_code == 404:
                 raise BazelStoreIntegrityError("Requested blob is missing in CAS: {}".format(cas_url))
 
-            req.raise_for_status()
+            self._check_response(req)
 
             content_encoding = req.headers['content-encoding']
             if codec and codec != content_encoding:
@@ -225,33 +245,31 @@ class BazelStoreClient(object):
 
         cas_url = self._cas_url(hashstr)
         if size == 0:
-            response = self.session.put(cas_url, b"")
+            with self.session.put(cas_url, b"") as response:
+                self._check_response(response)
         else:
             with open(file_path, 'rb') as afile:
-                response = self.session.put(cas_url, afile)
-
-        if response.status_code != 200:
-            raise BazelStoreException(
-                'Failed to upload file %s, status_code %d',
-                file_path,
-                response.status_code,
-            )
+                with self.session.put(cas_url, afile) as response:
+                    self._check_response(response)
         return hashstr
 
     def put_meta(self, uid, meta):
         ac_url = self._ac_url(uid)
-        self.session.put(ac_url, json.dumps(meta))
+        with self.session.put(ac_url, json.dumps(meta)) as response:
+            self._check_response(response)
+
+    def _get_meta(self, uid):
+        with self.session.get(self._ac_url(uid)) as response:
+            if response.status_code == 404:
+                raise BazelStoreIntegrityError("No metadata for UID '{}'".format(uid))
+            self._check_response(response)
+            try:
+                return json.loads(response.content)
+            except json_decoder.JSONDecodeError as e:
+                raise BazelStoreIntegrityError("Broken metadata for UID '{}'".format(uid)) from e
 
     def get_meta(self, uid):
-        ac_url = self._ac_url(uid)
-        response = self._retry_func(self.session.get, f_args=(ac_url,), conf=self.retry_policy.read_conf)
-        if response.status_code != 200:
-            raise BazelStoreException('No metadata for UID `%s`', uid)
-        try:
-            result = json.loads(response.content)
-        except json_decoder.JSONDecodeError:
-            raise BazelStoreIntegrityError('Broken metadata for UID `%s`', uid)
-        return result
+        return self._retry_func(self._get_meta, f_args=(uid,), conf=self.retry_policy.read_conf)
 
     def put_data(self, files, root_dir, uid, name):
         result = {'files': {}, 'name': name}
@@ -286,12 +304,15 @@ class BazelStoreClient(object):
                 self.download_file(file_path, file_data)
         return meta
 
+    def _exists(self, uid):
+        with self.session.head(self._ac_url(uid)) as response:
+            if response.status_code == 404:
+                return False
+            self._check_response(response)
+            return response.status_code == 200
+
     def exists(self, uid):
-        ac_url = self._ac_url(uid)
-        response = self._retry_func(self.session.head, f_args=(ac_url,), conf=self.retry_policy.read_conf)
-        if response.status_code == 200:
-            return True
-        return False
+        return self._retry_func(self._exists, f_args=(uid,), conf=self.retry_policy.read_conf)
 
 
 class BazelStore(DistStore):
@@ -357,6 +378,10 @@ class BazelStore(DistStore):
             found = self._client.exists(uid)
         except BazelStoreBrokenException as e:
             self._disable_store(e)
+            found = False
+        except BazelStoreException as e:
+            logger.debug('Failed to probe %s: %s', uid, e)
+            self._count_failure('has')
             found = False
         logger.debug('Bazel-remote Probing %s => %s', uid, found)
         self._inc_cache_hit(found)
