@@ -327,6 +327,7 @@ class BazelStore(DistStore):
         )
         self._client = BazelStoreClient(*args, **kwargs)
         self._disabled = False
+        self._failed_restores = set()
         self._lock = threading.Lock()
 
     def _get_data_size(self, meta_info):
@@ -373,6 +374,9 @@ class BazelStore(DistStore):
     def _do_has(self, uid):
         if self._disabled:
             return False
+        with self._lock:
+            if uid in self._failed_restores:
+                return False
 
         try:
             found = self._client.exists(uid)
@@ -399,7 +403,9 @@ class BazelStore(DistStore):
             return True
         try:
             meta = self._client.put_data(files, root_dir, uid, name)
-            self._meta[uid] = meta
+            with self._lock:
+                self._meta[uid] = meta
+                self._failed_restores.discard(uid)
         except BazelStoreBrokenException as e:
             self._disable_store(e)
             return False
@@ -424,9 +430,15 @@ class BazelStore(DistStore):
             return False
         except BazelStoreException as e:
             logger.debug('Failed to restore %s: %s', uid, e)
+            # AC may still exist while a referenced CAS file is missing. Permit repair after rebuilding.
+            with self._lock:
+                self._failed_restores.add(uid)
+                self._meta.pop(uid, None)
             self._count_failure('get')
             return False
 
+        with self._lock:
+            self._failed_restores.discard(uid)
         data_size = self._get_data_size(meta)
         self._inc_data_size(data_size, 'get')
         return True

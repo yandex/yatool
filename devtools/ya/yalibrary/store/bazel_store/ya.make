@@ -18,4 +18,5 @@ END()
 RECURSE_FOR_TESTS(
     tests
     ut/http
+    ut/repair
 )
