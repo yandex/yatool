@@ -99,7 +99,7 @@ class DistStore(object):
                 return Status.OK
             return Status.FAILED
 
-    def _do_try_restore(self, uid, into_dir, filter_func=None):
+    def _do_try_restore(self, uid, into_dir, filter_func=None, expected_outputs=None):
         raise NotImplementedError()
 
     def try_restore(self, *args, **kwargs):

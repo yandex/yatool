@@ -130,12 +130,15 @@ class RestoreFromDistCacheTask(object):
         start_time = time.time()
         self._build_root.create()
 
-        if self._ctx.opts.dist_cache_late_fetch:
-            is_ok = self._dist_cache.has(self._node.uid) and self._dist_cache.try_restore(
-                self._node.uid, self._build_root.path, self._filter
-            )
+        if self._ctx.opts.dist_cache_late_fetch and not self._dist_cache.has(self._node.uid):
+            is_ok = False
         else:
-            is_ok = self._dist_cache.try_restore(self._node.uid, self._build_root.path, self._filter)
+            is_ok = self._dist_cache.try_restore(
+                self._node.uid,
+                self._build_root.path,
+                self._filter,
+                expected_outputs=list(self._build_root.output),
+            )
 
         if is_ok:
             if self._ctx.content_uids:

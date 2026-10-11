@@ -11,6 +11,7 @@ PEERDIR(
     devtools/ya/yalibrary/store
     contrib/python/zstandard
     contrib/python/requests
+    contrib/python/urllib3
 )
 
 END()
@@ -19,4 +20,5 @@ RECURSE_FOR_TESTS(
     tests
     ut/http
     ut/repair
+    ut/restore
 )

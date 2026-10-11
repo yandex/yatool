@@ -6,6 +6,10 @@ import logging
 import os
 import os.path as os_path
 import threading
+import stat
+import tempfile
+import re
+import shutil
 
 from exts import hashing
 from six.moves.urllib import parse
@@ -15,6 +19,7 @@ import library.python.retry as retry
 import requests
 import requests.adapters
 import requests.auth
+import urllib3.exceptions
 import zstandard as zstd
 
 DOWNLOAD_CHUNK_SIZE = 1 << 15
@@ -45,6 +50,10 @@ class BazelStoreHTTPError(BazelStoreException):
         self.retriable = status_code in (408, 429) or status_code >= 500
 
 
+class BazelStoreLocalError(BazelStoreException):
+    retriable = False
+
+
 class BazelStoreIntegrityError(BazelStoreException):
     retriable = False
 
@@ -55,6 +64,10 @@ class BazelStoreBrokenException(BazelStoreException):
     """
 
     pass
+
+
+class BazelStoreRollbackError(RuntimeError):
+    """The build directory is unsafe to reuse after a failed rollback."""
 
 
 class TimeoutHTTPAdapter(requests.adapters.HTTPAdapter):
@@ -182,6 +195,8 @@ class BazelStoreClient(object):
             except requests.RequestException as e:
                 # A failed request must not disable the cache for the rest of the build.
                 raise BazelStoreException(str(e)) from e
+            except OSError as e:
+                raise BazelStoreLocalError("Local filesystem error: {}".format(e)) from e
 
         try:
             return retry.retry_call(call, conf=conf)
@@ -202,42 +217,52 @@ class BazelStoreClient(object):
             raise BazelStoreHTTPError(response.status_code)
 
     def install_data(self, file_path, cas_url, codec, headers):
-        with self.session.get(cas_url, headers=headers) as req:
+        with self.session.get(cas_url, headers=headers, stream=True) as req:
             if req.status_code == 404:
                 raise BazelStoreIntegrityError("Requested blob is missing in CAS: {}".format(cas_url))
 
             self._check_response(req)
 
-            content_encoding = req.headers['content-encoding']
-            if codec and codec != content_encoding:
-                raise BazelStoreIntegrityError(
-                    "Got content-encoding='{}', while '{}' was excepted for {}".format(content_encoding, codec, cas_url)
-                )
+            content_encoding = req.headers.get('content-encoding', 'identity').lower()
+            if content_encoding not in ('identity', 'zstd'):
+                raise BazelStoreIntegrityError("Unsupported CAS content encoding: '{}'".format(content_encoding))
 
-            with StreamWriter(file_path, codec=codec) as writer:
-                for chunk in req.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-                    writer.write(chunk)
+            try:
+                with StreamWriter(file_path, codec='zstd' if content_encoding == 'zstd' else None) as writer:
+                    # urllib3 otherwise accepts early EOF when the server supplied Content-Length.
+                    req.raw.enforce_content_length = True
+                    # Requests may decode Content-Encoding in iter_content(). Decode zstd exactly once here.
+                    for chunk in req.raw.stream(DOWNLOAD_CHUNK_SIZE, decode_content=False):
+                        writer.write(chunk)
                 return writer.get_hexdigest()
+            except zstd.ZstdError as e:
+                raise BazelStoreIntegrityError("Invalid zstd data in CAS") from e
+            except urllib3.exceptions.HTTPError as e:
+                raise requests.ConnectionError(str(e)) from e
 
     def get_codec(self):
         return "zstd"
 
-    def get_blob(self, hash, file_path):
+    def get_blob(self, hash, file_path, expected_size=None):
         cas_url = self._cas_url(hash)
-        dirname = os_path.dirname(file_path)
-        if not os_path.exists(dirname):
-            os.makedirs(dirname)
+        dirname = os_path.dirname(os_path.abspath(file_path))
+        os.makedirs(dirname, exist_ok=True)
         codec = self.get_codec()
         headers = {'Accept-Encoding': codec}
-        digest_got = self._retry_func(
-            self.install_data, f_args=(file_path, cas_url, codec, headers), conf=self.retry_policy.read_conf
-        )
-        if digest_got != hash:
-            raise BazelStoreException(
-                'Digest mismatch got: %s expected: %s',
-                digest_got,
-                hash,
+        fd, temporary_path = tempfile.mkstemp(prefix='.bazel-', dir=dirname)
+        os.close(fd)
+        try:
+            digest_got = self._retry_func(
+                self.install_data, f_args=(temporary_path, cas_url, codec, headers), conf=self.retry_policy.read_conf
             )
+            if digest_got != hash:
+                raise BazelStoreIntegrityError("CAS digest mismatch: got {}, expected {}".format(digest_got, hash))
+            if expected_size is not None and os.stat(temporary_path).st_size != expected_size:
+                raise BazelStoreIntegrityError("CAS size does not match metadata")
+            os.replace(temporary_path, file_path)
+        finally:
+            if os_path.exists(temporary_path):
+                os.unlink(temporary_path)
 
     def put_blob(self, file_path):
         hashstr = hashing.file_hash(file_path, hashlib.sha256())
@@ -265,7 +290,7 @@ class BazelStoreClient(object):
             self._check_response(response)
             try:
                 return json.loads(response.content)
-            except json_decoder.JSONDecodeError as e:
+            except (json_decoder.JSONDecodeError, UnicodeDecodeError) as e:
                 raise BazelStoreIntegrityError("Broken metadata for UID '{}'".format(uid)) from e
 
     def get_meta(self, uid):
@@ -290,18 +315,150 @@ class BazelStoreClient(object):
         return result
 
     def download_file(self, file_path, file_data):
-        self.get_blob(file_data['hash'], file_path)
+        self.get_blob(file_data['hash'], file_path, expected_size=file_data.get('size'))
         os.chmod(file_path, file_data['mode'])
 
-    def get_data(self, root_dir, uid, filter_func=None):
+    @staticmethod
+    def _validate_meta(meta, root_dir):
+        if not isinstance(meta, dict) or not isinstance(meta.get('files'), dict):
+            raise BazelStoreIntegrityError("Metadata must contain a mapping of files")
+        root = os_path.realpath(root_dir)
+        paths = set()
+        for rel_path, data in meta['files'].items():
+            if (
+                not isinstance(rel_path, str)
+                or not rel_path
+                or os_path.isabs(rel_path)
+                or '..' in rel_path.replace(os.altsep or os.sep, os.sep).split(os.sep)
+            ):
+                raise BazelStoreIntegrityError("Metadata contains an invalid relative path")
+            path = os_path.realpath(os_path.join(root, rel_path))
+            if os_path.commonpath((root, path)) != root or path == root:
+                raise BazelStoreIntegrityError("Metadata file is outside the build directory")
+            if path in paths:
+                raise BazelStoreIntegrityError("Metadata contains duplicate file paths")
+            paths.add(path)
+            if not isinstance(data, dict) or not isinstance(data.get('hash'), str):
+                raise BazelStoreIntegrityError("Metadata contains an invalid file description")
+            if re.fullmatch(r'[0-9a-f]{64}', data['hash']) is None:
+                raise BazelStoreIntegrityError("Metadata contains an invalid CAS digest")
+            if type(data.get('mode')) is not int or not 0 <= data['mode'] <= 0o177777:
+                raise BazelStoreIntegrityError("Metadata contains an invalid file mode")
+            # Older entries may omit sizes. Verify a declared size before installing the file.
+            if 'size' in data and (type(data['size']) is not int or data['size'] < 0):
+                raise BazelStoreIntegrityError("Metadata contains an invalid file size")
+
+        for path in paths:
+            parent = os_path.dirname(path)
+            while parent != root:
+                if parent in paths:
+                    raise BazelStoreIntegrityError("Metadata uses a file as a directory")
+                parent = os_path.dirname(parent)
+
+    @staticmethod
+    def _install_staged_files(staging_dir, root_dir, backup_dir):
+        installed = []
+        created_dirs = []
+        root = os_path.realpath(root_dir)
+
+        def on_walk_error(error):
+            raise error
+
+        try:
+            for dirname, _, filenames in os.walk(staging_dir, onerror=on_walk_error):
+                for filename in filenames:
+                    source = os_path.join(dirname, filename)
+                    relative = os_path.relpath(source, staging_dir)
+                    destination = os_path.join(root_dir, relative)
+                    if os_path.commonpath((root, os_path.realpath(destination))) != root:
+                        raise BazelStoreIntegrityError("Filtered file is outside the build directory")
+                    parent = os_path.dirname(destination)
+                    missing_dirs = []
+                    while not os_path.exists(parent):
+                        missing_dirs.append(parent)
+                        parent = os_path.dirname(parent)
+                    created_dirs.extend(reversed(missing_dirs))
+                    os.makedirs(os_path.dirname(destination), exist_ok=True)
+                    if os_path.isdir(destination):
+                        raise IsADirectoryError(destination)
+                    backup = None
+                    if os_path.lexists(destination):
+                        backup = os_path.join(backup_dir, str(len(installed)))
+                        os.replace(destination, backup)
+                    installed.append((destination, backup))
+                    os.replace(source, destination)
+        except Exception:
+            # Restore the previous files if installing a later file fails.
+            rollback_error = None
+            for destination, backup in reversed(installed):
+                try:
+                    if backup is not None:
+                        os.replace(backup, destination)
+                    elif os_path.lexists(destination):
+                        os.unlink(destination)
+                except OSError as e:
+                    rollback_error = e
+            for directory in reversed(created_dirs):
+                try:
+                    if os_path.exists(directory):
+                        os.rmdir(directory)
+                except OSError as e:
+                    rollback_error = e
+            if rollback_error is not None:
+                raise BazelStoreRollbackError(
+                    "Failed to restore the build directory; backups kept in " + backup_dir
+                ) from rollback_error
+            raise
+
+    def get_data(self, root_dir, uid, filter_func=None, expected_outputs=None):
         meta = self.get_meta(uid)
+        try:
+            self._validate_meta(meta, root_dir)
+        except (ValueError, OSError) as e:
+            raise BazelStoreIntegrityError("Metadata contains an invalid file path") from e
         if filter_func is None:
             filter_func = always_false
 
-        for rel_path, file_data in meta['files'].items():
-            file_path = os_path.join(root_dir, rel_path)
-            if not filter_func(file_path, self._cas_url(file_data['hash'])):
-                self.download_file(file_path, file_data)
+        try:
+            os.makedirs(root_dir, exist_ok=True)
+            temporary_dir = tempfile.mkdtemp(prefix='.bazel-', dir=os_path.dirname(os_path.abspath(root_dir)))
+            cleanup = True
+            try:
+                staging_dir = os_path.join(temporary_dir, 'files')
+                backup_dir = os_path.join(temporary_dir, 'backups')
+                os.makedirs(staging_dir)
+                os.makedirs(backup_dir)
+                # Keep both downloaded files and links created by the filter out of the build root until ready.
+                for rel_path, file_data in meta['files'].items():
+                    file_path = os_path.join(staging_dir, rel_path)
+                    if not filter_func(file_path, self._cas_url(file_data['hash'])):
+                        self.download_file(file_path, file_data)
+                # An existing dependency file must not hide an incomplete cached result.
+                for output in expected_outputs or ():
+                    relative = os_path.relpath(output, root_dir)
+                    try:
+                        mode = os.lstat(os_path.join(staging_dir, relative)).st_mode
+                    except FileNotFoundError as e:
+                        raise BazelStoreIntegrityError(
+                            "Required output is missing from cached result: " + relative
+                        ) from e
+                    if not stat.S_ISREG(mode):
+                        raise BazelStoreIntegrityError("Required output is not a regular file: " + relative)
+                try:
+                    self._install_staged_files(staging_dir, root_dir, backup_dir)
+                except BazelStoreRollbackError:
+                    # A filesystem failure during rollback must not delete the saved original files.
+                    cleanup = False
+                    raise
+            finally:
+                if cleanup:
+                    try:
+                        shutil.rmtree(temporary_dir)
+                    except OSError:
+                        # Cleanup cannot turn an installed result into a cache miss.
+                        logger.warning("Failed to remove temporary cache directory %s", temporary_dir, exc_info=True)
+        except OSError as e:
+            raise BazelStoreException("Failed to install files from Bazel cache: {}".format(e)) from e
         return meta
 
     def _exists(self, uid):
@@ -419,12 +576,12 @@ class BazelStore(DistStore):
         self._inc_data_size(data_size, 'put')
         return True
 
-    def _do_try_restore(self, uid, into_dir, filter_func=None):
+    def _do_try_restore(self, uid, into_dir, filter_func=None, expected_outputs=None):
         if self._disabled:
             return False
 
         try:
-            meta = self._client.get_data(into_dir, uid, filter_func)
+            meta = self._client.get_data(into_dir, uid, filter_func, expected_outputs=expected_outputs)
         except BazelStoreBrokenException as e:
             self._disable_store(e)
             return False
