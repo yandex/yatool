@@ -165,7 +165,7 @@ class RestoreFromDistCacheTask(object):
         self._execution_log[str(self)] = {
             'timing': (start_time, time.time()),
             'prepare': '',
-            'type': 'get from dist cache',
+            'type': 'get from dist cache' if is_ok else 'failed to get from dist cache',
         }
 
     def __str__(self):
