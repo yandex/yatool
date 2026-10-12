@@ -313,6 +313,9 @@ def config_from_arc_rel_path(path):
 @func.lazy
 def has_mapping():
     try:
+        if 'YA_FORCE_RESOURCE_MAPPING' in os.environ:
+            return strtobool.strtobool(os.environ.get('YA_FORCE_RESOURCE_MAPPING', '0'))
+
         import app_config
 
         return app_config.has_mapping

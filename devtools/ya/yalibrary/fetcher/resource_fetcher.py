@@ -135,16 +135,18 @@ def fetch_resource_if_need(
     if parsed_uri.resource_type == "docker":
         skopeo_binary = _get_skopeo_binary()
 
-    downloader = _get_downloader(
-        fetcher,
-        parsed_uri,
-        progress_callback,
-        state,
-        keep_directory_packed,
-        use_universal_fetcher,
-        docker_config_path,
-        skopeo_binary,
-    )
+    def do_download(download_to):
+        downloader = _get_downloader(
+            fetcher,
+            parsed_uri,
+            progress_callback,
+            state,
+            keep_directory_packed,
+            use_universal_fetcher,
+            docker_config_path,
+            skopeo_binary,
+        )
+        return downloader(download_to)
 
     def do_deploy(download_to, resource_info):
         deploy_tool(download_to, result_dir, post_process, resource_info, resource_uri, binname, strip_prefix)
@@ -152,7 +154,7 @@ def fetch_resource_if_need(
     try:
         return _do_fetch_resource_if_need(
             result_dir,
-            downloader,
+            do_download,
             do_deploy,
             target_is_tool_dir,
             force_refetch,
