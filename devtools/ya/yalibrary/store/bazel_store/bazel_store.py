@@ -1,4 +1,3 @@
-import binascii
 import hashlib
 import json
 import json.decoder as json_decoder
@@ -14,6 +13,7 @@ import shutil
 from exts import hashing
 from six.moves.urllib import parse
 from yalibrary.store.dist_store import DistStore
+import yalibrary.store.bazel_store.protocol as _protocol
 from library.python import func
 import library.python.retry as retry
 import requests
@@ -22,9 +22,12 @@ import requests.auth
 import urllib3.exceptions
 import zstandard as zstd
 
+# Сохраняем публичные имена после выделения протокола в отдельный модуль.
+META_VERSION = _protocol.META_VERSION
+SHA256_LENGTH = _protocol.SHA256_LENGTH
+uid_to_uri = _protocol.uid_to_uri
+
 DOWNLOAD_CHUNK_SIZE = 1 << 15
-META_VERSION = '1'
-SHA256_LENGTH = 64
 DEFAULT_TIMEOUT = 30
 
 EXCLUDED_P = frozenset(['UN', 'PK', 'GO', 'ld', 'SB', 'CP', 'DL'])
@@ -116,20 +119,6 @@ class _RetryPolicy:
 DEFAULT_RETRY_POLICY = _RetryPolicy()
 
 
-# Byte interpretation:
-# - second last: hash type (0-no hash, 1-sha256)
-# - last: META_VERSION
-def uid_to_uri(uid):
-    pseudo_hash = binascii.hexlify(uid.encode('utf-8')).decode('utf-8')
-    padding_length = SHA256_LENGTH - len(pseudo_hash)
-    if padding_length < 2:
-        pseudo_hash = hashlib.sha256(pseudo_hash.encode('utf-8')).hexdigest()[:-2]
-        pseudo_hash += "1" + META_VERSION
-    else:
-        pseudo_hash += '0' * (padding_length - 1) + META_VERSION
-    return pseudo_hash
-
-
 class StreamWrapper:
     def __init__(self, file_name):
         self._fo = open(file_name, 'wb')
@@ -192,14 +181,19 @@ class BazelStoreClient(object):
         def call():
             try:
                 return func(*f_args, **f_kwargs)
+            except requests.ConnectTimeout:
+                # Keep the type until retries finish: a TCP black hole must not stall every cache operation.
+                raise
             except requests.RequestException as e:
-                # A failed request must not disable the cache for the rest of the build.
+                # Other request failures remain cache misses after their retries.
                 raise BazelStoreException(str(e)) from e
             except OSError as e:
                 raise BazelStoreLocalError("Local filesystem error: {}".format(e)) from e
 
         try:
             return retry.retry_call(call, conf=conf)
+        except requests.ConnectTimeout as e:
+            raise BazelStoreBrokenException("Bazel cache connection timed out after retries: {}".format(e)) from e
         except BazelStoreException:
             raise
         except Exception as e:
@@ -270,17 +264,18 @@ class BazelStoreClient(object):
 
         cas_url = self._cas_url(hashstr)
         if size == 0:
-            with self.session.put(cas_url, b"") as response:
+            with self.session.put(cas_url, b"", allow_redirects=False) as response:
                 self._check_response(response)
         else:
             with open(file_path, 'rb') as afile:
-                with self.session.put(cas_url, afile) as response:
+                with self.session.put(cas_url, afile, allow_redirects=False) as response:
                     self._check_response(response)
         return hashstr
 
     def put_meta(self, uid, meta):
         ac_url = self._ac_url(uid)
-        with self.session.put(ac_url, json.dumps(meta)) as response:
+        # A redirect can turn PUT into GET and falsely report a successful upload.
+        with self.session.put(ac_url, json.dumps(meta), allow_redirects=False) as response:
             self._check_response(response)
 
     def _get_meta(self, uid):
@@ -473,7 +468,11 @@ class BazelStoreClient(object):
 
 
 class BazelStore(DistStore):
+    # Records use graph UIDs; put() does not write content UID aliases.
+    support_content_uids = False
+
     def __init__(self, *args, **kwargs):
+        self._put_observer = kwargs.pop('put_observer', None)
         super(BazelStore, self).__init__(
             name='bazel-store',
             stats_name='bazel_store_status',
@@ -486,6 +485,13 @@ class BazelStore(DistStore):
         self._disabled = False
         self._failed_restores = set()
         self._lock = threading.Lock()
+
+    def put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
+        """Наблюдатель получает статус и живые выходы; без него обычная запись не меняется."""
+        status = super().put(self_uid, uid, root_dir, files, codec=codec, cuid=cuid)
+        if self._put_observer is not None:
+            self._put_observer(uid, status.name.lower(), root_dir, files)
+        return status
 
     def _get_data_size(self, meta_info):
         return sum(x.get('size', 0) for x in meta_info['files'].values())
@@ -539,6 +545,7 @@ class BazelStore(DistStore):
             found = self._client.exists(uid)
         except BazelStoreBrokenException as e:
             self._disable_store(e)
+            self._count_failure('has')
             found = False
         except BazelStoreException as e:
             logger.debug('Failed to probe %s: %s', uid, e)
@@ -565,6 +572,7 @@ class BazelStore(DistStore):
                 self._failed_restores.discard(uid)
         except BazelStoreBrokenException as e:
             self._disable_store(e)
+            self._count_failure('put')
             return False
         except BazelStoreException as e:
             logger.debug('Put %s(%s) to Bazel-remote failed: %s', name, uid, e)
@@ -584,6 +592,7 @@ class BazelStore(DistStore):
             meta = self._client.get_data(into_dir, uid, filter_func, expected_outputs=expected_outputs)
         except BazelStoreBrokenException as e:
             self._disable_store(e)
+            self._count_failure('get')
             return False
         except BazelStoreException as e:
             logger.debug('Failed to restore %s: %s', uid, e)

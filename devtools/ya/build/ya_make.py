@@ -420,6 +420,15 @@ def get_yt_token(opts):
 class CacheFactory:
     def __init__(self, opts):
         self._opts = opts
+        self.warming_manifest = None
+        if getattr(opts, 'bazel_remote_warming_manifest', None):
+            from yalibrary.bazel_warming.manifest import ManifestWriter
+
+            self.warming_manifest = ManifestWriter(
+                opts.bazel_remote_warming_manifest,
+                opts.bazel_remote_warming_run_id,
+                opts.dist_cache_max_file_size,
+            )
 
     def get_dist_cache_instance(self):
         cache_instance = self._try_init_bazel_remote_cache()
@@ -476,6 +485,7 @@ class CacheFactory:
             max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
             max_connections=connection_pool_size,
             fits_filter=fits_filter,
+            put_observer=self.warming_manifest.record_put if self.warming_manifest else None,
         )
 
     def _init_yt_dist_cache(self):
@@ -742,6 +752,27 @@ def need_cache_test_statuses(opts):
     return is_local_build_with_tests(opts)
 
 
+def select_bazel_warming_results(graph, opts, dist_cache, writer=None):
+    """Выбрать подходящие результаты без HEAD, при необходимости сохранив manifest."""
+    from yalibrary.bazel_warming.manifest import Node, relative_output
+
+    original_results = set(graph['result'])
+    nodes = []
+    if dist_cache is not None:
+        for node in graph['graph']:
+            if dist_cache.fits(node) and is_dist_cache_suitable(node, original_results, opts):
+                nodes.append(
+                    Node(
+                        uid=node['uid'],
+                        outputs=tuple(relative_output(output) for output in node['outputs']),
+                        cacheable=node.get('cache', True),
+                    )
+                )
+    if writer is not None:
+        writer.select(nodes)
+    return [node.uid for node in nodes]
+
+
 # XXX see YA-1354
 def replace_dist_cache_results(graph, opts, dist_cache, app_ctx):
     if not dist_cache:
@@ -982,6 +1013,7 @@ class Context:
         self.stage_times = {}
 
         self._cache_factory = CacheFactory(opts)
+        self.warming_manifest = self._cache_factory.warming_manifest
         self._full_graph = None
 
         self.opts = opts
@@ -1089,8 +1121,19 @@ class Context:
         # Save graph size before any strip operations for statistics
         self.total_nodes_before_strip = len(self.graph.get('graph', []))
 
+        warming_results = None
+        if self.warming_manifest is not None or opts.bazel_remote_warming:
+            warming_results = select_bazel_warming_results(self.graph, opts, self.dist_cache, self.warming_manifest)
+
         # XXX see YA-1354
-        if opts.bazel_remote_store and opts.dist_cache_evict_cached:
+        if opts.bazel_remote_warming:
+            # Каждый выбранный модуль должен пройти восстановление, даже если
+            # его потребитель уже есть в кеше. HEAD AC не подтверждает его CAS.
+            self.graph['result'] = warming_results
+            self.graph = lg.strip_graph(self.graph)
+            results = set(self.graph['result'])
+            self.tests = [test for test in self.tests if test.uid in results]
+        elif opts.bazel_remote_store and opts.dist_cache_evict_cached:
             self.graph['result'] = replace_dist_cache_results(self.graph, opts, self.dist_cache, app_ctx)
             logger.debug("Strip graph due bazel_remote_store mode")
             self.graph = lg.strip_graph(self.graph)

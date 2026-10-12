@@ -317,7 +317,8 @@ class BuildRoot(object):
                 with open(digests_file) as f:
                     data = json.load(f)
                 return OutputDigests.from_json(self.path, data)
-            except (KeyError, json.JSONDecodeError):
+            except (KeyError, TypeError, AttributeError, ValueError, OSError):
+                # Cached digests are optional: unreadable or incompatible metadata must not break restored outputs.
                 logger.exception("Cannot load digest file %s", digests_file)
 
         if not self._compute_hash:
@@ -325,7 +326,11 @@ class BuildRoot(object):
 
         digests = {}
         hashes = []
+        digest_path = os.path.normcase(os.path.normpath(digests_file))
         for output in self._outputs:
+            # Metadata describes the outputs and must not include itself in their hash.
+            if os.path.normcase(os.path.normpath(output)) == digest_path:
+                continue
             if os.path.exists(output):
                 d = acdigest.get_file_digest(output)
                 digests[output] = d
@@ -337,9 +342,11 @@ class BuildRoot(object):
         output_digests = OutputDigests(self.path, acdigest.digest_current_version, digests, outputs_uid)
 
         if write_if_absent:
+            # Replace an incompatible sidecar even when its cached mode is read-only.
+            if windows.on_win() and os.path.isfile(digests_file):
+                os.chmod(digests_file, os.stat(digests_file).st_mode | stat.S_IWRITE)
+            fs.write_file(digests_file, json.dumps(output_digests.to_json()))
             self.add_output("$(BUILD_ROOT)/" + OUTPUT_DIGESTS_FILE_NAME)
-            with open(digests_file, "w") as f:
-                json.dump(output_digests.to_json(), f)
 
         return output_digests
 

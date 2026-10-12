@@ -58,6 +58,7 @@ PEERDIR(
     devtools/ya/test/opts
     devtools/ya/test/test_node/coverage
     devtools/ya/test/test_node/cmdline
+    devtools/ya/yalibrary/bazel_warming/manifest
     devtools/ya/yalibrary/debug_store
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/fetcher

@@ -156,6 +156,16 @@ def do_ya_make(params):
     return _do_ya_make(params, app_ctx)
 
 
+def _run_build_with_warming_manifest(builder):
+    """Завершить manifest лишь после возврата runner; исключение оставляет его неполным."""
+    exit_code = builder.go()
+    # go() уже дождался upload workers и освобождения build roots.
+    warming_manifest = getattr(builder.ctx, 'warming_manifest', None)
+    if warming_manifest is not None:
+        warming_manifest.finish(exit_code)
+    return exit_code
+
+
 def _do_ya_make(params, app_ctx):
     from devtools.ya.build import ya_make
 
@@ -202,7 +212,7 @@ def _do_ya_make(params, app_ctx):
     exit_code = 0
     if getattr(params, 'save_context_to', None) is None:
         with stager.scope('build'):
-            exit_code = builder.go()
+            exit_code = _run_build_with_warming_manifest(builder)
         if builder.misc_build_info_dir:
             with stager.scope('dump_results'):
                 context = context or ya_make.BuildContext(builder)

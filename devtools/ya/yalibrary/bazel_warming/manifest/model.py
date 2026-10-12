@@ -1,0 +1,273 @@
+"""Строгий формат manifest: проверка схемы, идентификатора запуска и файловых путей."""
+
+from dataclasses import dataclass
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import stat
+
+# -----------------------------------------------------------------------------
+# Формат документа и проверки простых значений
+# -----------------------------------------------------------------------------
+
+SCHEMA_VERSION = 1
+MAX_MANIFEST_BYTES = 256 * 1024 * 1024
+PUT_STATUSES = frozenset(('not_attempted', 'ok', 'failed', 'skipped_size'))
+_RUN_ID = re.compile(r'[A-Za-z0-9_.-]{1,128}\Z')
+
+
+class ManifestError(ValueError):
+    """Manifest не позволяет достоверно определить результат текущего запуска."""
+
+
+def validate_run_id(value):
+    """Разрешить короткий идентификатор без пробелов, управляющих символов и путей."""
+    if not isinstance(value, str) or _RUN_ID.fullmatch(value) is None:
+        raise ManifestError('run_id должен содержать от 1 до 128 латинских букв, цифр или символов _.-.')
+
+
+def _integer(value, name, minimum=0):
+    """Отклонить bool, дробные и отрицательные значения в числовых полях."""
+    if type(value) is not int or value < minimum:
+        raise ManifestError(f'{name} должен быть целым числом не меньше {minimum}.')
+
+
+def relative_output(value):
+    """Превратить выход графа $(BUILD_ROOT)/... в безопасный относительный путь."""
+    if not isinstance(value, str):
+        raise ManifestError('Путь выхода должен быть строкой.')
+    prefix = '$(BUILD_ROOT)/'
+    if value.startswith(prefix):
+        value = value[len(prefix) :]
+    if (
+        not value
+        or '\\' in value
+        or any(
+            ord(character) < 32 or ord(character) == 127 or 0xD800 <= ord(character) <= 0xDFFF for character in value
+        )
+        or PurePosixPath(value).is_absolute()
+        or any(part in ('.', '..', '') for part in value.split('/'))
+        or any(len(part.encode('utf-8')) > 255 for part in value.split('/'))
+        or '$(' in value
+    ):
+        raise ManifestError(f'Некорректный относительный путь выхода: {value!r}.')
+    return value
+
+
+def _paths(paths):
+    """Проверить уникальность путей и конфликт файла с его собственным потомком."""
+    if not isinstance(paths, (tuple, list)):
+        raise ManifestError('outputs должен быть списком путей.')
+    seen = set()
+    for path in paths:
+        if relative_output(path) != path or path in seen:
+            raise ManifestError(f'Некорректный или повторный путь: {path!r}.')
+        seen.add(path)
+    for path in seen:
+        parts = path.split('/')
+        if any('/'.join(parts[:index]) in seen for index in range(1, len(parts))):
+            raise ManifestError(f'Путь файла конфликтует с его потомком: {path!r}.')
+
+
+def _object(data, expected, name):
+    """Не принимать пропущенные или неизвестные поля текущей версии формата."""
+    if not isinstance(data, dict) or set(data) != set(expected):
+        raise ManifestError(f'Неверный набор полей {name}; ожидаются: {", ".join(sorted(expected))}.')
+
+
+# -----------------------------------------------------------------------------
+# Независимые модели плана и выполненных записей
+# -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class WrittenFile:
+    path: str
+    size: int
+
+    def validate(self):
+        if relative_output(self.path) != self.path:
+            raise ManifestError('written_files должен содержать относительные пути.')
+        _integer(self.size, 'written_files.size')
+
+    @classmethod
+    def from_dict(cls, data):
+        _object(data, ('path', 'size'), 'written_files')
+        result = cls(**data)
+        result.validate()
+        return result
+
+
+@dataclass(frozen=True)
+class Node:
+    uid: str
+    outputs: tuple[str, ...]
+    cacheable: bool = True
+    put_status: str = 'not_attempted'
+    written_files: tuple[WrittenFile, ...] = ()
+
+    def validate(self, max_file_size):
+        """Подтвердить пропуск по размеру реальным большим выходом данного узла."""
+        if (
+            not isinstance(self.uid, str)
+            or not self.uid
+            or any(ord(character) < 32 or ord(character) == 127 for character in self.uid)
+        ):
+            raise ManifestError('uid должен быть непустой строкой без управляющих символов.')
+        _paths(self.outputs)
+        if not self.outputs:
+            raise ManifestError(f'У узла {self.uid!r} не указаны выходы.')
+        if (
+            type(self.cacheable) is not bool
+            or not isinstance(self.put_status, str)
+            or self.put_status not in PUT_STATUSES
+        ):
+            raise ManifestError('Некорректные cacheable или put_status.')
+        if not isinstance(self.written_files, (tuple, list)):
+            raise ManifestError('written_files должен быть списком.')
+        for item in self.written_files:
+            if not isinstance(item, WrittenFile):
+                raise ManifestError('written_files должен содержать WrittenFile.')
+            item.validate()
+        paths = [item.path for item in self.written_files]
+        _paths(paths)
+        if self.put_status == 'not_attempted':
+            if self.written_files:
+                raise ManifestError('Для not_attempted не должно быть written_files.')
+        elif not self.cacheable or not set(self.outputs).issubset(paths):
+            raise ManifestError('Итог PUT должен содержать все выходы cacheable-узла.')
+        if self.put_status == 'skipped_size':
+            if not max_file_size or not any(item.size > max_file_size for item in self.written_files):
+                raise ManifestError('skipped_size не подтверждён выходом больше max_file_size.')
+
+    @classmethod
+    def from_dict(cls, data, max_file_size):
+        _object(data, ('uid', 'outputs', 'cacheable', 'put_status', 'written_files'), 'nodes')
+        if not isinstance(data['outputs'], list) or not isinstance(data['written_files'], list):
+            raise ManifestError('outputs и written_files должны быть JSON-массивами.')
+        result = cls(
+            uid=data['uid'],
+            outputs=tuple(data['outputs']),
+            cacheable=data['cacheable'],
+            put_status=data['put_status'],
+            written_files=tuple(WrittenFile.from_dict(item) for item in data['written_files']),
+        )
+        result.validate(max_file_size)
+        return result
+
+    @property
+    def requires_verification(self):
+        """Даже успешный PUT требует чтения AC/CAS; исключаются только доказанные пропуски."""
+        return self.cacheable and self.put_status != 'skipped_size'
+
+
+@dataclass(frozen=True)
+class Manifest:
+    run_id: str
+    nodes: tuple[Node, ...]
+    max_file_size: int = 0
+    complete: bool = False
+    build_exit_code: int | None = None
+    schema_version: int = SCHEMA_VERSION
+
+    def validate(self):
+        """Проверить весь документ, включая связь complete с завершением сборки."""
+        validate_run_id(self.run_id)
+        if type(self.schema_version) is not int or self.schema_version != SCHEMA_VERSION:
+            raise ManifestError(f'Поддерживается только schema_version={SCHEMA_VERSION}.')
+        _integer(self.max_file_size, 'max_file_size')
+        if type(self.complete) is not bool:
+            raise ManifestError('complete должен быть true или false.')
+        if self.complete:
+            _integer(self.build_exit_code, 'build_exit_code')
+        elif self.build_exit_code is not None:
+            raise ManifestError('Незавершённый manifest не должен содержать код завершения сборки.')
+        if not isinstance(self.nodes, (tuple, list)):
+            raise ManifestError('nodes должен быть списком.')
+        seen = set()
+        for node in self.nodes:
+            if not isinstance(node, Node):
+                raise ManifestError('nodes должен содержать Node.')
+            node.validate(self.max_file_size)
+            if node.uid in seen:
+                raise ManifestError(f'Повторный UID в manifest: {node.uid!r}.')
+            seen.add(node.uid)
+
+    def to_dict(self):
+        """Вернуть JSON-объект: коллекции в нём представлены массивами, а не tuple."""
+        self.validate()
+        return {
+            'schema_version': self.schema_version,
+            'run_id': self.run_id,
+            'complete': self.complete,
+            'build_exit_code': self.build_exit_code,
+            'max_file_size': self.max_file_size,
+            'nodes': [
+                {
+                    'uid': node.uid,
+                    'outputs': list(node.outputs),
+                    'cacheable': node.cacheable,
+                    'put_status': node.put_status,
+                    'written_files': [{'path': item.path, 'size': item.size} for item in node.written_files],
+                }
+                for node in self.nodes
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        _object(data, ('schema_version', 'run_id', 'complete', 'build_exit_code', 'max_file_size', 'nodes'), 'manifest')
+        if type(data['schema_version']) is not int or data['schema_version'] != SCHEMA_VERSION:
+            raise ManifestError(f'Поддерживается только schema_version={SCHEMA_VERSION}.')
+        _integer(data['max_file_size'], 'max_file_size')
+        if not isinstance(data['nodes'], list):
+            raise ManifestError('nodes должен быть JSON-массивом.')
+        result = cls(
+            run_id=data['run_id'],
+            nodes=tuple(Node.from_dict(node, data['max_file_size']) for node in data['nodes']),
+            max_file_size=data['max_file_size'],
+            complete=data['complete'],
+            build_exit_code=data['build_exit_code'],
+            schema_version=data['schema_version'],
+        )
+        result.validate()
+        return result
+
+
+# -----------------------------------------------------------------------------
+# Чтение только окончательного manifest текущего запуска
+# -----------------------------------------------------------------------------
+
+
+def _unique_object(pairs):
+    """JSON с повторным ключом не имеет однозначной интерпретации."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ManifestError(f'Повторный JSON-ключ: {key!r}.')
+        result[key] = value
+    return result
+
+
+def read_manifest(path, expected_run_id):
+    """Прочитать обычный файл до 256 MiB и отклонить незавершённый или чужой запуск."""
+    validate_run_id(expected_run_id)
+    flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
+    descriptor = os.open(Path(path), flags)
+    with os.fdopen(descriptor, 'rb') as source:
+        if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+            raise ManifestError('Manifest должен быть обычным файлом.')
+        raw = source.read(MAX_MANIFEST_BYTES + 1)
+    if len(raw) > MAX_MANIFEST_BYTES:
+        raise ManifestError('Manifest превышает лимит 256 MiB.')
+    try:
+        data = json.loads(raw.decode('utf-8'), object_pairs_hook=_unique_object)
+    except (UnicodeDecodeError, ValueError, RecursionError) as error:
+        raise ManifestError(f'Не удалось прочитать JSON manifest: {error}.') from error
+    result = Manifest.from_dict(data)
+    if result.run_id != expected_run_id:
+        raise ManifestError('Manifest принадлежит другому запуску.')
+    if not result.complete:
+        raise ManifestError('Сборка не завершила manifest; полнота результатов неизвестна.')
+    return result

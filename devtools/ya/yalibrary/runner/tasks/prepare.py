@@ -25,7 +25,10 @@ def _get_node_resolve_status(node, local_cache, dist_cache, opts):
     if not cacheable:
         return NodeResolveStatus.EXEC
 
-    if local_cache.has(node.uid):
+    # Прогрев должен прочитать удалённые файлы выбранного результата:
+    # локальная копия не доказывает наличие CAS на сервере.
+    warming_result = getattr(opts, 'bazel_remote_warming', False) and node.is_result_node
+    if not warming_result and local_cache.has(node.uid):
         return NodeResolveStatus.LOCAL
 
     should_try_dist_cache = dist_cache and dist_cache.fits(node)

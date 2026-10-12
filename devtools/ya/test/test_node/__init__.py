@@ -1,11 +1,14 @@
 # coding: utf-8
 import collections
 import copy
+import functools
 import getpass
+import hashlib
 import json
 import logging
 import os
 import socket
+import stat
 
 import time
 
@@ -1332,6 +1335,68 @@ def _stable_dir_outputs(suite, opts):
     return not _need_random_uid(suite, opts) and opts.dir_outputs_test_mode
 
 
+def _test_tool_file_signature(file_stat: os.stat_result) -> tuple[int, ...]:
+    return (
+        file_stat.st_dev,
+        file_stat.st_ino,
+        file_stat.st_size,
+        file_stat.st_mtime_ns,
+        file_stat.st_ctime_ns,
+    )
+
+
+@functools.lru_cache(maxsize=32)
+def _local_test_tool_digest(opts, path: str, signature: tuple[int, ...]) -> str:
+    # Include opts in the cache key to reread tools for each build invocation.
+    # Tools must remain immutable while that build's graph is generated.
+    hasher = hashlib.sha256()
+    with open(path, 'rb') as tool:
+        if _test_tool_file_signature(os.fstat(tool.fileno())) != signature:
+            raise RuntimeError(f"Local test_tool changed while calculating its UID: {path}")
+        for chunk in iter(lambda: tool.read(1 << 20), b''):
+            hasher.update(chunk)
+        if _test_tool_file_signature(os.fstat(tool.fileno())) != signature:
+            raise RuntimeError(f"Local test_tool changed while calculating its UID: {path}")
+    return hasher.hexdigest()
+
+
+def _local_test_tool_uid(path: str, opts) -> str:
+    file_stat = os.stat(path)
+    signature = _test_tool_file_signature(file_stat)
+    if not stat.S_ISREG(file_stat.st_mode):
+        raise RuntimeError(f"Local test_tool is not a regular file: {path}")
+
+    try:
+        hash(opts)
+    except TypeError:
+        digest = _local_test_tool_digest.__wrapped__(opts, path, signature)
+    else:
+        digest = _local_test_tool_digest(opts, path, signature)
+    if _test_tool_file_signature(os.stat(path)) != signature:
+        raise RuntimeError(f"Local test_tool changed while calculating its UID: {path}")
+    return f"local-test-tool-sha256:{digest}"
+
+
+def _normalize_local_test_tool_cmd(command: list[str], opts) -> list[str]:
+    local_paths = {
+        path
+        for path in (
+            getattr(opts, 'test_tool_bin', None),
+            opts.flags.get('TEST_TOOL_HOST_LOCAL'),
+            opts.flags.get('TEST_TOOL_TARGET_LOCAL'),
+        )
+        if path
+    }
+    identities: dict[str, str] = {}
+    for path in local_paths:
+        inline_arg = f'--test-tool-bin={path}'
+        if path in command or inline_arg in command:
+            identity = _local_test_tool_uid(path, opts)
+            identities[path] = identity
+            identities[inline_arg] = f'--test-tool-bin={identity}'
+    return [identities.get(arg, arg) for arg in command]
+
+
 def _build_test_paths_hashes_detail(paths):
     # Introspection for `test_paths_hashes`: this hash is a combination of a per-path
     # imprint for every path, and each path imprint is in turn a combination of the
@@ -1406,6 +1471,7 @@ def get_suite_self_uid(
         prepare_cmds, _ = suite.get_prepare_test_cmds()
         prepare_cmd_args = [x for cmd in prepare_cmds for x in cmd['cmd_args']]
         prepare_cmd_cwds = [cmd.get('cwd', '') for cmd in prepare_cmds]
+        prepare_cmd_uid_args = _normalize_local_test_tool_cmd(prepare_cmd_args, opts)
 
         sbr_uid_ext_part = "sbr_uid_ext={}".format(suite.get_sandbox_uid_extension())
 
@@ -1421,7 +1487,7 @@ def get_suite_self_uid(
             + sorted(suite._original_requirements.items())
             + affecting_tags
             + [sbr_uid_ext_part]
-            + prepare_cmd_args
+            + prepare_cmd_uid_args
             + prepare_cmd_cwds
             + sandbox_resource_parts
             + ext_sbr_resource_parts
@@ -1430,7 +1496,11 @@ def get_suite_self_uid(
         if suite.recipes:
             suite_imprint_parts.append(suite.recipes)
 
-        imprint_parts = run_cmd + [imprint.combine_imprints(*suite_imprint_parts)] + active_uid_opts
+        imprint_parts = (
+            _normalize_local_test_tool_cmd(run_cmd, opts)
+            + [imprint.combine_imprints(*suite_imprint_parts)]
+            + active_uid_opts
+        )
         # XXX
         # Suite output paths may contain the name of the target platform,
         # which can lead to problems when different platforms will not affect test's uid.

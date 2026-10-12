@@ -2710,6 +2710,9 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.bazel_remote_password = None
         self.bazel_remote_password_file = None
         self.bazel_remote_readonly = True
+        self.bazel_remote_warming = False
+        self.bazel_remote_warming_manifest = None
+        self.bazel_remote_warming_run_id = None
 
     @staticmethod
     def consumer():
@@ -2822,6 +2825,30 @@ class DistCacheOptions(DistCacheSetupOptions):
                     help='Upload to Bazel-remote store',
                     hook=SetConstValueHook('bazel_remote_readonly', False),
                     group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ArgConsumer(
+                    ['--bazel-remote-warming'],
+                    help='Build or restore every selected Bazel cache result, including intermediate modules; '
+                    'requires writable Bazel cache and local execution',
+                    hook=SetConstValueHook('bazel_remote_warming', True),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ArgConsumer(
+                    ['--bazel-remote-warming-manifest'],
+                    help='Save the selected Bazel cache outputs and PUT results to a versioned JSON file; '
+                    'requires writable Bazel cache and local execution',
+                    hook=SetValueHook('bazel_remote_warming_manifest'),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ArgConsumer(
+                    ['--bazel-remote-warming-run-id'],
+                    help='Unique run identifier for the Bazel warming manifest; '
+                    'use with --bazel-remote-warming-manifest',
+                    hook=SetValueHook('bazel_remote_warming_run_id'),
+                    group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
                 ),
                 ArgConsumer(
@@ -3133,6 +3160,55 @@ class DistCacheOptions(DistCacheSetupOptions):
 
         if self.yt_readonly and self.yt_store_crit == "put":
             self.yt_store_crit = "get"
+
+    def postprocess2(self, params):
+        """Прогрев и manifest допустимы только для локальной сборки с записью в Bazel."""
+        super().postprocess2(params)
+        path = params.bazel_remote_warming_manifest
+        run_id = params.bazel_remote_warming_run_id
+        if (path is None) != (run_id is None):
+            raise ArgsValidatingException(
+                '--bazel-remote-warming-manifest and --bazel-remote-warming-run-id must be used together'
+            )
+        if params.bazel_remote_warming and getattr(params, 'clear_build', False):
+            raise ArgsValidatingException(
+                '--bazel-remote-warming cannot be combined with --ignore-build-cache or --rebuild'
+            )
+        if path is None and not params.bazel_remote_warming:
+            return
+        if path is not None and (not isinstance(path, str) or not path):
+            raise ArgsValidatingException('Bazel warming manifest requires a nonempty file path')
+        if os.name != 'posix':
+            raise ArgsValidatingException('Bazel cache warming requires POSIX (Linux or macOS)')
+        if path is not None:
+            from yalibrary.bazel_warming.manifest import ManifestError, validate_run_id
+
+            try:
+                validate_run_id(run_id)
+            except ManifestError as error:
+                raise ArgsValidatingException(str(error)) from error
+        if not params.bazel_remote_store or params.bazel_remote_readonly or not params.bazel_remote_baseuri:
+            raise ArgsValidatingException('Bazel cache warming requires --bazel-remote-store and --bazel-remote-put')
+        build_threads = getattr(params, 'build_threads', None)
+        if type(build_threads) is not int or build_threads <= 0:
+            raise ArgsValidatingException('Bazel cache warming requires a positive integer number of build threads')
+        unsupported = (
+            'use_distbuild',
+            'custom_context',
+            'custom_json',
+            'make_context_only',
+            'make_context_on_distbuild',
+            'make_context_on_distbuild_only',
+            'save_context_to',
+            'stat_only_report_file',
+            'show_command',
+            'report_skipped_suites_only',
+            'ignore_nodes_exit_code',
+            'yt_replace_result',
+            'yt_store_exclusive',
+        )
+        if getattr(params, 'larry_addr', None) is not None or any(getattr(params, name, False) for name in unsupported):
+            raise ArgsValidatingException('Bazel cache warming supports only ordinary local ya make execution')
 
 
 class JavaSpecificOptions(Options):
