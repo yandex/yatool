@@ -4,6 +4,7 @@
 #include <library/cpp/json/json_value.h>
 #include <library/cpp/json/json_writer.h>
 
+#include <util/generic/algorithm.h>
 #include <util/generic/scope.h>
 #include <util/string/builder.h>
 #include <util/folder/tempdir.h>
@@ -38,10 +39,30 @@ namespace NUniversalFetcher {
         if (json.Has("use_fixed_delay")) {
             ret.UseFixedDelay = json["use_fixed_delay"].GetBooleanSafe();
         }
+        if (json.Has("sandbox_max_server_error_retry_count")) {
+            ret.SandboxMaxServerErrorRetryCount = json["sandbox_max_server_error_retry_count"].GetIntegerSafe();
+        }
         return ret;
     }
 
     namespace {
+
+        // True when the attempt reached the sandbox data transports and each of them answered with HTTP 5xx.
+        // Only the sandbox fetcher reports transport history, so this never holds for other fetchers.
+        bool FailedWithSandboxServerErrorsOnly(const TFetchResult& result) {
+            return !result.TransportHistory.empty() && AllOf(result.TransportHistory, [](const TTransportRequest& req) {
+                return req.Attrs.Has("http_code") && req.Attrs["http_code"].GetIntegerRobust() / 100 == 5;
+            });
+        }
+
+        bool SandboxServerErrorRetriesExhausted(const TVector<TUniversalFetcher::TFetchAttempt>& attempts, const TMaybe<int>& limit) {
+            if (!limit.Defined() || std::ssize(attempts) <= *limit) {
+                return false;
+            }
+            return AllOf(attempts, [](const TUniversalFetcher::TFetchAttempt& attempt) {
+                return FailedWithSandboxServerErrorsOnly(attempt.Result);
+            });
+        }
 
         class TRetryPolicy {
         public:
@@ -130,6 +151,8 @@ namespace NUniversalFetcher {
         f.Metrics->OnRequest();
         TInstant startTime = TInstant::Now();
 
+        const TMaybe<int> sandboxMaxServerErrorRetryCount = params.SandboxMaxServerErrorRetryCount.OrElse(f.Retries.SandboxMaxServerErrorRetryCount);
+
         TVector<TFetchAttempt> attempts;
         TRetryPolicy policy(f.Retries);
         policy.Execute([&]() {
@@ -175,6 +198,11 @@ namespace NUniversalFetcher {
                         ythrow yexception() << "Failed to move from tmp dir to destination, error=" << LastSystemErrorText();
                     }
                 }
+            }
+
+            if (attempt.Result.Status == EFetchStatus::RetriableError && SandboxServerErrorRetriesExhausted(attempts, sandboxMaxServerErrorRetryCount)) {
+                Log_ << ELogPriority::TLOG_WARNING << "Giving up on " << uri << ": all " << attempts.size() << " attempts failed with HTTP 5xx";
+                attempt.Result.Status = EFetchStatus::NonRetriableError;
             }
 
             f.Metrics->OnFetchAttemptFinished(attempt.Result.Status);

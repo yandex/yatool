@@ -31,9 +31,11 @@ class RetryPolicy:
     max_delay_ms: int = 1_000
     jitter: bool = False
     use_fixed_delay: bool = True
+    # sandbox fetcher only, see TRetriesConfig::SandboxMaxServerErrorRetryCount
+    sandbox_max_server_error_retry_count: int | None = None
 
     def to_dict(self) -> dict:
-        return {
+        res = {
             "max_retry_count": self.max_retry_count,
             "initial_delay": _to_ms(self.initial_delay_ms),
             "backoff_multiplier": self.backoff_multiplier,
@@ -41,6 +43,9 @@ class RetryPolicy:
             "jitter": self.jitter,
             "use_fixed_delay": self.use_fixed_delay,
         }
+        if self.sandbox_max_server_error_retry_count is not None:
+            res["sandbox_max_server_error_retry_count"] = self.sandbox_max_server_error_retry_count
+        return res
 
 
 @dataclasses.dataclass

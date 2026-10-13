@@ -9,6 +9,7 @@
 #include <library/cpp/json/json_value.h>
 
 #include <util/generic/hash.h>
+#include <util/generic/maybe.h>
 #include <util/generic/string.h>
 #include <util/generic/ptr.h>
 #include <util/generic/vector.h>
@@ -45,6 +46,11 @@ namespace NUniversalFetcher {
             bool Jitter = true;
             // Whether to use a fixed delay between retries
             bool UseFixedDelay = false;
+            // Sandbox resources only. If set, retries stop once this many of them have been made and every
+            // attempt so far got nothing but HTTP 5xx from the sandbox data transports (mds, http proxy).
+            // The last attempt is then reported as a non-retriable error.
+            // Can be overridden per download with TFetchParams::SandboxMaxServerErrorRetryCount.
+            TMaybe<int> SandboxMaxServerErrorRetryCount = Nothing();
 
             static TRetriesConfig FromJson(const NJson::TJsonValue&);
         };

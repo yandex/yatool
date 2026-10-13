@@ -72,6 +72,8 @@ namespace NUniversalFetcher {
         };
 
         TMaybe<TProgressReporting> ProgressReporting = Nothing();
+        // Overrides TUniversalFetcher::TRetriesConfig::SandboxMaxServerErrorRetryCount for this download
+        TMaybe<int> SandboxMaxServerErrorRetryCount = Nothing();
     };
 
     class IFetcher {

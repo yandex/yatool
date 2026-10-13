@@ -29,6 +29,7 @@ cdef extern from "devtools/libs/universal_fetcher/registry/registry.h" namespace
             TDuration MinInterval
 
         TMaybe[TProgressReporting] ProgressReporting
+        TMaybe[int] SandboxMaxServerErrorRetryCount
 
     THolder[TUniversalFetcher] CreateUniversalFetcher(const TString& configJson, TUniversalFetcherLoggingFunction)
 
@@ -90,7 +91,7 @@ cdef class UniversalFetcher:
         cdef TUniversalFetcherLoggingFunction wrapped_func = WrapPythonLogFunction(lf, pyLogFuncProxy)
         self._impl = CreateUniversalFetcher(json_config, wrapped_func)
 
-    def download(self, url, dst_path, filename=None, progress_callback=None, progress_callback_call_delay_ms=1000):
+    def download(self, url, dst_path, filename=None, progress_callback=None, progress_callback_call_delay_ms=1000, sandbox_max_server_error_retry_count=None):
         assert isinstance(url, str)
         assert isinstance(dst_path, str)
         assert isinstance(filename, (str, type(None)))
@@ -119,6 +120,8 @@ cdef class UniversalFetcher:
             c_fetch_params.ProgressReporting.ConstructInPlace()
             c_fetch_params.ProgressReporting.GetRef().Callback = WrapPythonProgressFunction(pf, pyProgressFuncProxy)
             c_fetch_params.ProgressReporting.GetRef().MinInterval = TDuration.MicroSeconds(progress_callback_call_delay_ms * 1000)
+        if sandbox_max_server_error_retry_count is not None:
+            c_fetch_params.SandboxMaxServerErrorRetryCount = <int>sandbox_max_server_error_retry_count
 
         with nogil:
             if filename is not None:
