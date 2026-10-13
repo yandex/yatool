@@ -13,6 +13,9 @@ import stat
 
 SCHEMA_VERSION = 1
 MAX_MANIFEST_BYTES = 256 * 1024 * 1024
+# Ограничиваем число UID, чтобы сбой кеша не запускал массовую пересборку.
+# У одного UID может быть несколько файлов CAS; лимит относится к результатам сборки.
+MAX_CACHE_REPAIR_RESULTS = 100
 PUT_STATUSES = frozenset(('not_attempted', 'ok', 'failed', 'skipped_size'))
 _RUN_ID = re.compile(r'[A-Za-z0-9_.-]{1,128}\Z')
 
@@ -25,6 +28,15 @@ def validate_run_id(value):
     """Разрешить короткий идентификатор без пробелов, управляющих символов и путей."""
     if not isinstance(value, str) or _RUN_ID.fullmatch(value) is None:
         raise ManifestError('run_id должен содержать от 1 до 128 латинских букв, цифр или символов _.-.')
+
+
+def _validate_uid(value):
+    if (
+        not isinstance(value, str)
+        or not value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+    ):
+        raise ManifestError('uid должен быть непустой строкой без управляющих символов.')
 
 
 def _integer(value, name, minimum=0):
@@ -106,15 +118,11 @@ class Node:
     cacheable: bool = True
     put_status: str = 'not_attempted'
     written_files: tuple[WrittenFile, ...] = ()
+    build_error: str = ''
 
     def validate(self, max_file_size):
         """Подтвердить пропуск по размеру реальным большим выходом данного узла."""
-        if (
-            not isinstance(self.uid, str)
-            or not self.uid
-            or any(ord(character) < 32 or ord(character) == 127 for character in self.uid)
-        ):
-            raise ManifestError('uid должен быть непустой строкой без управляющих символов.')
+        _validate_uid(self.uid)
         _paths(self.outputs)
         if not self.outputs:
             raise ManifestError(f'У узла {self.uid!r} не указаны выходы.')
@@ -124,6 +132,10 @@ class Node:
             or self.put_status not in PUT_STATUSES
         ):
             raise ManifestError('Некорректные cacheable или put_status.')
+        if not isinstance(self.build_error, str):
+            raise ManifestError('build_error должен быть строкой.')
+        if self.build_error and self.put_status != 'not_attempted':
+            raise ManifestError('Несобранный узел не должен содержать итог PUT.')
         if not isinstance(self.written_files, (tuple, list)):
             raise ManifestError('written_files должен быть списком.')
         for item in self.written_files:
@@ -143,7 +155,10 @@ class Node:
 
     @classmethod
     def from_dict(cls, data, max_file_size):
-        _object(data, ('uid', 'outputs', 'cacheable', 'put_status', 'written_files'), 'nodes')
+        expected = ('uid', 'outputs', 'cacheable', 'put_status', 'written_files')
+        if isinstance(data, dict) and 'build_error' in data:
+            expected += ('build_error',)
+        _object(data, expected, 'nodes')
         if not isinstance(data['outputs'], list) or not isinstance(data['written_files'], list):
             raise ManifestError('outputs и written_files должны быть JSON-массивами.')
         result = cls(
@@ -152,6 +167,7 @@ class Node:
             cacheable=data['cacheable'],
             put_status=data['put_status'],
             written_files=tuple(WrittenFile.from_dict(item) for item in data['written_files']),
+            build_error=data.get('build_error', ''),
         )
         result.validate(max_file_size)
         return result
@@ -163,6 +179,29 @@ class Node:
 
 
 @dataclass(frozen=True)
+class LocalCacheDescriptor:
+    kind: str
+    path: str
+
+    def validate(self):
+        if self.kind not in ('new_store', 'ring_store'):
+            raise ManifestError('Неизвестный тип локального кеша прогрева.')
+        if not isinstance(self.path, str) or '\0' in self.path or not Path(self.path).is_absolute():
+            raise ManifestError('Путь локального кеша должен быть абсолютным.')
+
+    def to_dict(self):
+        self.validate()
+        return {'kind': self.kind, 'path': self.path}
+
+    @classmethod
+    def from_dict(cls, data):
+        _object(data, ('kind', 'path'), 'local_cache')
+        result = cls(**data)
+        result.validate()
+        return result
+
+
+@dataclass(frozen=True)
 class Manifest:
     run_id: str
     nodes: tuple[Node, ...]
@@ -170,6 +209,7 @@ class Manifest:
     complete: bool = False
     build_exit_code: int | None = None
     schema_version: int = SCHEMA_VERSION
+    local_cache: LocalCacheDescriptor | None = None
 
     def validate(self):
         """Проверить весь документ, включая связь complete с завершением сборки."""
@@ -183,6 +223,10 @@ class Manifest:
             _integer(self.build_exit_code, 'build_exit_code')
         elif self.build_exit_code is not None:
             raise ManifestError('Незавершённый manifest не должен содержать код завершения сборки.')
+        if self.local_cache is not None:
+            if not isinstance(self.local_cache, LocalCacheDescriptor):
+                raise ManifestError('Некорректное описание локального кеша.')
+            self.local_cache.validate()
         if not isinstance(self.nodes, (tuple, list)):
             raise ManifestError('nodes должен быть списком.')
         seen = set()
@@ -210,14 +254,19 @@ class Manifest:
                     'cacheable': node.cacheable,
                     'put_status': node.put_status,
                     'written_files': [{'path': item.path, 'size': item.size} for item in node.written_files],
+                    **({'build_error': node.build_error} if node.build_error else {}),
                 }
                 for node in self.nodes
             ],
+            **({'local_cache': self.local_cache.to_dict()} if self.local_cache is not None else {}),
         }
 
     @classmethod
     def from_dict(cls, data):
-        _object(data, ('schema_version', 'run_id', 'complete', 'build_exit_code', 'max_file_size', 'nodes'), 'manifest')
+        expected = ('schema_version', 'run_id', 'complete', 'build_exit_code', 'max_file_size', 'nodes')
+        if isinstance(data, dict) and 'local_cache' in data:
+            expected += ('local_cache',)
+        _object(data, expected, 'manifest')
         if type(data['schema_version']) is not int or data['schema_version'] != SCHEMA_VERSION:
             raise ManifestError(f'Поддерживается только schema_version={SCHEMA_VERSION}.')
         _integer(data['max_file_size'], 'max_file_size')
@@ -230,6 +279,7 @@ class Manifest:
             complete=data['complete'],
             build_exit_code=data['build_exit_code'],
             schema_version=data['schema_version'],
+            local_cache=LocalCacheDescriptor.from_dict(data['local_cache']) if 'local_cache' in data else None,
         )
         result.validate()
         return result
