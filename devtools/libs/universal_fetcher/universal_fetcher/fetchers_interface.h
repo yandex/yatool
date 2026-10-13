@@ -74,6 +74,8 @@ namespace NUniversalFetcher {
         TMaybe<TProgressReporting> ProgressReporting = Nothing();
         // Overrides TUniversalFetcher::TRetriesConfig::SandboxMaxServerErrorRetryCount for this download
         TMaybe<int> SandboxMaxServerErrorRetryCount = Nothing();
+        // Sandbox resources only: skip the skynet transport for this download even if it is in TransportsOrder
+        bool SandboxDisableSkynet = false;
     };
 
     class IFetcher {
