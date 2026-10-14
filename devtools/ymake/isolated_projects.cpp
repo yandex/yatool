@@ -18,19 +18,32 @@
 
 #include <util/folder/path.h>
 #include <util/generic/deque.h>
-#include <util/generic/stack.h>
 #include <util/generic/strbuf.h>
 #include <util/generic/string.h>
 #include <util/generic/queue.h>
 #include <util/stream/file.h>
 #include <util/string/split.h>
 #include <util/string/strip.h>
+#include <util/string/builder.h>
 
 #include <algorithm>
 
 using namespace NYMake;
 
 namespace {
+    TStringBuf DepStatementName(TIsolatedProjects::EDepStatement statement) {
+        switch (statement) {
+            case TIsolatedProjects::EDepStatement::Depends:
+                return NProps::DEPENDS;
+        }
+        Y_UNREACHABLE();
+    }
+
+    TString FormatIsolatedProjectsError(const TString& project, const TString& dependencyDetails) {
+        return TStringBuilder() << "The project depends on [[alt1]]isolated project[[rst]] [[imp]]" << project << "[[rst]]" << Endl
+                                << dependencyDetails << Endl;
+    }
+
     /// visitor for collecting dependency between sources
     /// also keep anothed type nodes info for deps (path between 'From' & 'To')
     class TDepsCollectorVisitor: TDirectPeerdirsConstVisitor<> {
@@ -47,9 +60,10 @@ namespace {
             TPathId PathId{EmptyPath}; // index fist path node in TDepsCollectorVisitor::Paths (nodes on path from 'From' to 'To')
         };
 
-        TDepsCollectorVisitor(const TRestoreContext& restoreContext, bool isIsolatedProjectsHashChanged)
+        TDepsCollectorVisitor(const TRestoreContext& restoreContext, bool isIsolatedProjectsHashChanged, TIsolatedProjects::TCheckResult& result)
             : RestoreContext_(restoreContext)
             , IsIsolatedProjectsHashChanged_(isIsolatedProjectsHashChanged)
+            , Result_(result)
         {
             Paths_.push_back(TNodeId::Invalid); // reserve place for EmptyPath id
         }
@@ -66,7 +80,7 @@ namespace {
                 if (IsModuleType(nodeType)) {
                     const auto* module = RestoreContext_.Modules.Get(AssumeFile(nodeRef->ElemId));
                     if (RequireModuleRecheck(module)) {
-                        YConfEraseByOwner(IslPrjs, module->GetId()); // clear all existing module isolated projects errors
+                        Result_.OwnersToErase.push_back(module->GetId());
                     }
                     if (module->DataPaths) {
                         for (const auto dirView : *module->DataPaths) {
@@ -177,50 +191,27 @@ namespace {
             return Deps_;
         }
 
-        void PrintDepWithPath(IOutputStream& os, const TSourceDep& dep) const {
+        TIsolatedProjects::TCheckResult::TDependencyPath DependencyPath(const TSourceDep& dep) const {
             const auto& graph = RestoreContext_.Graph;
             const auto& fileConf = graph.Names().FileConf;
-            TStack<TStringBuf> fullPath;  // use for print path elements in reverse order
-            fullPath.emplace(fileConf.GetName(dep.To).GetTargetStr());
-
+            TIsolatedProjects::TCheckResult::TDependencyPath path;
+            path.From = fileConf.GetName(dep.From);
+            path.To = fileConf.GetName(dep.To);
             if (dep.PathId) {
                 for (auto pathId = dep.PathId;; ++pathId) {
                     auto nodeId = Paths_[pathId];
-                    auto nodeRef = graph.Get(TNodeId{ToUnderlying(nodeId) & 0x7fffffff});
-                    TStringBuf name = graph.ToTargetStringBuf(nodeRef);
-                    if (nodeRef->NodeType == EMNT_BuildCommand) {
-                        name = SkipId(name);
-                    }
-                    fullPath.emplace(name);
+                    path.Nodes.push_back(TNodeId{ToUnderlying(nodeId) & ~LastPathNodeBit_});
                     if (ToUnderlying(nodeId) & LastPathNodeBit_) {
                         break;
                     }
                 }
             }
-
-            auto prev = fileConf.GetName(dep.From).GetTargetStr();
-            while (fullPath.size()) {
-                // emulate TDependencyPathFormatter (transitive_requirements_check.cpp) format here
-                os << Endl << "    "sv << prev << " -> "sv << fullPath.top();
-                prev = fullPath.top();
-                fullPath.pop();
-            }
+            std::reverse(path.Nodes.begin(), path.Nodes.end());
+            return path;
         }
 
-        TString StringDepWithPath(const TSourceDep& dep) const {
-            TStringStream ss;
-            PrintDepWithPath(ss, dep);
-            return ss.Str();
-        }
-
-        TString StringDebugStatistics() const {
-            TStringStream ss;
-            ss << " deps_count=" << Deps_.size() << ";";
-            ss << " paths_nodes_count=" << Paths_.size() << ";";
-            for (const auto& [pathLength, count] : PathsLengthStat_) {
-                ss << " paths_len" << pathLength << "_count=" << count << ";";
-            }
-            return ss.Str();
+        TIsolatedProjects::TCheckResult::TStatistics Statistics() const {
+            return {Deps_.size(), Paths_.size(), PathsLengthStat_};
         }
 
     private:
@@ -234,6 +225,7 @@ namespace {
         TDeque<TNodeId> Paths_;
         TMap<size_t, size_t> PathsLengthStat_;
         bool IsIsolatedProjectsHashChanged_;
+        TIsolatedProjects::TCheckResult& Result_;
 
         bool RequireModuleRecheck(const TModule* module) {
             // Recheck require if isolated projects changed OR module reconstructed
@@ -248,8 +240,9 @@ namespace {
         using TBase = TNoReentryStatsConstVisitor<TVisitorStateItem<TEntryStatsData>>;
         using TState = typename TBase::TState;
 
-        TRecurseIsolatedProjectsVisitor(const TRestoreContext& restoreContext)
+        TRecurseIsolatedProjectsVisitor(const TRestoreContext& restoreContext, TIsolatedProjects::TCheckResult& result)
             : RestoreContext_(restoreContext)
+            , Result_(result)
         {}
 
         bool AcceptDep(TState& state) {
@@ -266,16 +259,17 @@ namespace {
             const auto& parentNode = state.ParentNode();
             if (parentNode.IsValid() && state.Parent()->CurDep().Value() == EDT_BuildFrom/* DEPENDS */) {
                 auto& fileConf = RestoreContext_.Graph.Names().FileConf;
-                auto path = fileConf.GetTargetName(AssumeFile(topNode->ElemId)).GetTargetStr();
+                auto path = fileConf.GetTargetName(AssumeFile(topNode->ElemId));
                 auto dir = fileConf.GetTargetName(AssumeFile(parentNode->ElemId)).GetTargetStr();
                 auto makefile = RestoreContext_.Graph.Names().FileConf.GetStoredName(NPath::SmartJoin(dir, "ya.make"));
-                RestoreContext_.Conf.IsolatedProjects.CheckStatementPath(NProps::DEPENDS, makefile, path);
+                RestoreContext_.Conf.IsolatedProjects.CollectStatementPath(TIsolatedProjects::EDepStatement::Depends, makefile, path, Result_);
             }
             return true;
         }
 
     private:
         const TRestoreContext& RestoreContext_;
+        TIsolatedProjects::TCheckResult& Result_;
     };
 }
 
@@ -342,8 +336,98 @@ void TIsolatedProjects::Load(const TFsPath& sourceRoot, const TVector<TStringBuf
     LoadProjectsIgnoreIncluded(projectToSources);  // copy here (sorted) projectToSources to this->Projects (keep sorted order)
 }
 
-// check path not lead inside isolated project (or upper dir), or (if placed) makefile contain this path also placed in same project
+void TIsolatedProjects::TCheckResult::Apply(const TDepGraph& graph) const {
+    if (!Diag()->IslPrjs) {
+        return;
+    }
+    if (EraseAll) {
+        YConfErase(IslPrjs);
+    }
+    for (const auto owner : OwnersToErase) {
+        YConfEraseByOwner(IslPrjs, owner);
+    }
+    if (Statistics) {
+        TStringStream statistics;
+        statistics << " deps_count=" << Statistics->DepsCount << ";";
+        statistics << " paths_nodes_count=" << Statistics->PathNodesCount << ";";
+        for (const auto& [pathLength, count] : Statistics->PathLengths) {
+            statistics << " paths_len" << pathLength << "_count=" << count << ";";
+        }
+        YDebug() << "Isolated projects validator stats: " << statistics.Str() << Endl;
+    }
+    for (const auto& diagnostic : Diagnostics) {
+        diagnostic.Report(graph);
+    }
+}
+
+TIsolatedProjects::TCheckResult::TDiagnostic::TDiagnostic(TFileView owner, TString project, TDependencyPath dependency)
+    : Owner_(owner)
+    , Project_(std::move(project))
+    , Dependency_(std::move(dependency))
+{
+    const auto& path = std::get<TDependencyPath>(Dependency_);
+    Y_ENSURE(path.From.IsValid() && path.To.IsValid());
+}
+
+TIsolatedProjects::TCheckResult::TDiagnostic::TDiagnostic(TFileView owner, TString project, TStatementDependency dependency)
+    : Owner_(owner)
+    , Project_(std::move(project))
+    , Dependency_(std::move(dependency))
+{
+    Y_ENSURE(Owner_.IsValid());
+    Y_ENSURE(std::get<TStatementDependency>(Dependency_).Path.IsValid());
+}
+
+void TIsolatedProjects::TCheckResult::TDiagnostic::Report(const TDepGraph& graph) const {
+    TStringStream details;
+    if (const auto* path = std::get_if<TDependencyPath>(&Dependency_)) {
+        auto previous = path->From.GetTargetStr();
+        const auto append = [&](TStringBuf next) {
+            // Match TDependencyPathFormatter's edge-per-line format.
+            details << Endl << "    "sv << previous << " -> "sv << next;
+            previous = next;
+        };
+        for (const auto nodeId : path->Nodes) {
+            const auto node = graph.Get(nodeId);
+            auto name = graph.ToTargetStringBuf(node);
+            if (node->NodeType == EMNT_BuildCommand) {
+                name = SkipId(name);
+            }
+            append(name);
+        }
+        append(path->To.GetTargetStr());
+    } else {
+        const auto& statement = std::get<TStatementDependency>(Dependency_);
+        details << Owner_.GetTargetStr() << " [[alt1]]"sv << DepStatementName(statement.Statement) << "[[rst]] -> "sv << statement.Path.GetTargetStr();
+    }
+    const auto emit = [&] {
+        YConfErr(IslPrjs) << FormatIsolatedProjectsError(Project_, details.Str());
+    };
+    if (Owner_.IsValid()) {
+        TScopedContext context(Owner_);
+        emit();
+    } else {
+        emit();
+    }
+}
+
+// Check whether a reference enters an isolated project from outside it.
 void TIsolatedProjects::CheckStatementPath(TStringBuf statement, TFileView makefile, TStringBuf path) const {
+    CheckStatementPath(statement, makefile, path, [this](const TString& project, TFileView source, TStringBuf statement, TStringBuf path) {
+        TScopedContext context(source);
+        TStringStream details;
+        details << source.GetTargetStr() << " [[alt1]]"sv << statement << "[[rst]] -> "sv << path;
+        GenerateIsolatedProjectsError(project, source, details.Str());
+    });
+}
+
+void TIsolatedProjects::CollectStatementPath(EDepStatement statement, TFileView makefile, TFileView path, TCheckResult& result) const {
+    CheckStatementPath(DepStatementName(statement), makefile, path.GetTargetStr(), [&result, statement, path](const TString& project, TFileView source, TStringBuf, TStringBuf) {
+        result.Diagnostics.push_back({source, project, TCheckResult::TStatementDependency{statement, path}});
+    });
+}
+
+void TIsolatedProjects::CheckStatementPath(TStringBuf statement, TFileView makefile, TStringBuf path, const TErrorHandler& onError) const {
     const TFoldersTree* folder = &FoldersTree_;
     TStringBuf varPath{path};  // variable consumed with NextTok iteration
     TStringBuf shortFolderName;
@@ -352,7 +436,7 @@ void TIsolatedProjects::CheckStatementPath(TStringBuf statement, TFileView makef
         if (!subfolder) {
             if (folder->ExistsProject()) {
                 // 'path' lead inside isolated_project
-                CheckMakefilePlacedInProject(statement, makefile, *folder->GetProject(), path);
+                CheckMakefilePlacedInProject(statement, makefile, *folder->GetProject(), path, onError);
             }
             return;
         }
@@ -362,27 +446,27 @@ void TIsolatedProjects::CheckStatementPath(TStringBuf statement, TFileView makef
     constexpr TStringBuf dependsStatement = NProps::DEPENDS;
     if (statement == dependsStatement) {
         if (folder->ExistsProject()) {
-            CheckMakefilePlacedInProject(statement, makefile, *folder->GetProject(), path);
+            CheckMakefilePlacedInProject(statement, makefile, *folder->GetProject(), path, onError);
         }
         return;  // NOTE: ignore DEPENDS point to upper level (regarding isolated_projects) folder (disputable point, but now it generate too many false-positive errors)
     }
 
     // 'path' point to isolated_project(s) (or somewhere higher dir)
-    CheckMakefilePlacedInProjects(statement, makefile, *folder, path);
+    CheckMakefilePlacedInProjects(statement, makefile, *folder, path, onError);
 }
 
-void TIsolatedProjects::CheckMakefilePlacedInProjects(TStringBuf statement, TFileView makefile, const TFoldersTree& folder, TStringBuf path) const {
+void TIsolatedProjects::CheckMakefilePlacedInProjects(TStringBuf statement, TFileView makefile, const TFoldersTree& folder, TStringBuf path, const TErrorHandler& onError) const {
     if (folder.ExistsProject()) {
-        CheckMakefilePlacedInProject(statement, makefile, *folder.GetProject(), path);
+        CheckMakefilePlacedInProject(statement, makefile, *folder.GetProject(), path, onError);
         return;
     }
 
     for (auto& [_, subFolder] : folder.Data()) {
-        CheckMakefilePlacedInProjects(statement, makefile, subFolder, path);  // do not expect deep recurse here
+        CheckMakefilePlacedInProjects(statement, makefile, subFolder, path, onError);  // do not expect deep recurse here
     }
 }
 
-void TIsolatedProjects::CheckMakefilePlacedInProject(TStringBuf statement, TFileView makefile, const TString& project, TStringBuf path) const {
+void TIsolatedProjects::CheckMakefilePlacedInProject(TStringBuf statement, TFileView makefile, const TString& project, TStringBuf path, const TErrorHandler& onError) const {
     auto makefileBuf = makefile.GetTargetStr();
     auto makefileStripped = NPath::CutAllTypes(makefileBuf);
     if (makefileStripped.length() >= project.length()
@@ -391,30 +475,32 @@ void TIsolatedProjects::CheckMakefilePlacedInProject(TStringBuf statement, TFile
     ) {
         // has deps from isolated projects to itself, it's ok
     } else {
-        auto scopedContext = MakeHolder<TScopedContext>(makefile);
-        TStringStream dependencyDetails;
-        dependencyDetails << makefileBuf << " [[alt1]]"sv << statement << "[[rst]] -> "sv << path;
-        GenerateIsolatedProjectsError(project, makefile, dependencyDetails.Str());
+        onError(project, makefile, statement, path);
     }
 }
 
-void TIsolatedProjects::CheckAll(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const {
+TIsolatedProjects::TCheckResult TIsolatedProjects::CheckAll(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const {
+    TCheckResult result;
+    if (!Diag()->IslPrjs) {
+        return result;
+    }
     const auto& conf = restoreContext.Conf;
     if (Empty()) {
         if (conf.IsIsolatedProjectsHashChanged()) {
             // Was some isolated projects, but now it empty, we must clear all isolated projects errors
-            YConfErase(IslPrjs);
+            result.EraseAll = true;
         }
-        return; // no isolated projects, do nothing
+        return result; // no isolated projects, do nothing
     }
-    ReportDeps(restoreContext, startTargets);
-    ReportRecurseDeps(recurseRestoreContext, recurseStartTargets);
+    CollectDeps(restoreContext, startTargets, result);
+    CollectRecurseDeps(recurseRestoreContext, recurseStartTargets, result);
+    return result;
 }
 
-void TIsolatedProjects::ReportDeps(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets) const {
+void TIsolatedProjects::CollectDeps(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, TCheckResult& result) const {
     const auto& conf = restoreContext.Conf;
     const auto& graph = restoreContext.Graph;
-    TDepsCollectorVisitor visitor(restoreContext, conf.IsIsolatedProjectsHashChanged());
+    TDepsCollectorVisitor visitor(restoreContext, conf.IsIsolatedProjectsHashChanged(), result);
     IterateAll(
         graph,
         startTargets,
@@ -428,7 +514,7 @@ void TIsolatedProjects::ReportDeps(const TRestoreContext& restoreContext, const 
         }
     );
 
-    YDebug() << "Isolated projects validator stats: " << visitor.StringDebugStatistics() << Endl;
+    result.Statistics = visitor.Statistics();
 
     visitor.SortDepsByTo();
 
@@ -454,13 +540,11 @@ void TIsolatedProjects::ReportDeps(const TRestoreContext& restoreContext, const 
                 ) {
                     // has deps from isolated projects to itself, it's ok
                 } else {
-                    THolder<TScopedContext> scopedContext{nullptr};
-                    TFileView moduleView;
+                    TFileView owner;
                     if (itDeps->ModuleId) {
-                        moduleView = restoreContext.Graph.Names().FileConf.GetTargetName(itDeps->ModuleId);
-                        scopedContext = MakeHolder<TScopedContext>(itDeps->ModuleId, moduleView.GetTargetStr());
+                        owner = fileConf.GetTargetName(itDeps->ModuleId);
                     }
-                    GenerateIsolatedProjectsError(*itProject,  moduleView.IsValid() ? moduleView : fromNameView, visitor.StringDepWithPath(*itDeps));
+                    result.Diagnostics.push_back({owner, *itProject, visitor.DependencyPath(*itDeps)});
                 }
             }
             ++itDeps;
@@ -468,8 +552,8 @@ void TIsolatedProjects::ReportDeps(const TRestoreContext& restoreContext, const 
     }
 }
 
-void TIsolatedProjects::ReportRecurseDeps(const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const {
-    TRecurseIsolatedProjectsVisitor recurseIsolateProjectsVisitor(recurseRestoreContext);
+void TIsolatedProjects::CollectRecurseDeps(const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets, TCheckResult& result) const {
+    TRecurseIsolatedProjectsVisitor recurseIsolateProjectsVisitor(recurseRestoreContext, result);
     IterateAll(recurseRestoreContext.Graph, recurseStartTargets, recurseIsolateProjectsVisitor);
 }
 
@@ -537,8 +621,7 @@ void TIsolatedProjects::OnIncludedProjectPath(TStringBuf includedPath, const THa
 }
 
 void TIsolatedProjects::GenerateIsolatedProjectsError(const TString& project, const TFileView&, const TString& dependencyDetails) const {
-    YConfErr(IslPrjs) << "The project depends on [[alt1]]isolated project[[rst]] [[imp]]" << project << "[[rst]]" << Endl
-                      << dependencyDetails << Endl;
+    YConfErr(IslPrjs) << FormatIsolatedProjectsError(project, dependencyDetails);
 }
 
 void TIsolatedProjects::LoadProjectsIgnoreIncluded(const TProjectPathToSources& projectToSources) {

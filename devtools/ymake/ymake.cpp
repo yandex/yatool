@@ -96,7 +96,8 @@ void TYMake::CheckIsolatedProjects() {
     NYMake::TTraceStage stageTracer{"Check isolated projects"};
     TRestoreContext restoreContext(Conf, Graph, Modules);
     TRestoreContext recurseRestoreContext(Conf, RecurseGraph, Modules);
-    Conf.IsolatedProjects.CheckAll(restoreContext, StartTargets, recurseRestoreContext, RecurseStartTargets);
+    const auto result = Conf.IsolatedProjects.CheckAll(restoreContext, StartTargets, recurseRestoreContext, RecurseStartTargets);
+    result.Apply(Graph);
 }
 
 void TYMake::TransferStartDirs() {

@@ -7,9 +7,14 @@
 
 #include <util/folder/path.h>
 #include <util/generic/hash_set.h>
+#include <util/generic/map.h>
 #include <util/generic/strbuf.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
+
+#include <functional>
+#include <optional>
+#include <variant>
 
 struct TRestoreContext;
 
@@ -65,6 +70,67 @@ private:
 
 class TIsolatedProjects {
 public:
+    enum class EDepStatement {
+        Depends,
+    };
+
+    // All messages have the Error severity and the -WIslPrjs kind.
+    // Apply() requires the original graph with stable node IDs and symbol tables.
+    // Apply in the analysis phase's diagnostic context.
+    struct TCheckResult {
+        struct TDependencyPath {
+            TFileView From;
+            TFileView To; // DATA targets may have no graph node.
+            TVector<TNodeId> Nodes; // Intermediate graph nodes, in dependency order.
+        };
+
+        struct TStatementDependency {
+            EDepStatement Statement;
+            TFileView Path;
+        };
+
+        class TDiagnostic {
+        public:
+            TDiagnostic(TFileView owner, TString project, TDependencyPath dependency);
+            TDiagnostic(TFileView owner, TString project, TStatementDependency dependency);
+
+            TFileView Owner() const {
+                return Owner_;
+            }
+
+            const TString& Project() const {
+                return Project_;
+            }
+
+            const std::variant<TDependencyPath, TStatementDependency>& Dependency() const {
+                return Dependency_;
+            }
+
+            void Report(const TDepGraph& graph) const;
+
+        private:
+            // Statement diagnostics always have a valid owner. For graph paths,
+            // an invalid view keeps the phase's ambient owner (no enclosing module).
+            TFileView Owner_;
+            TString Project_;
+            std::variant<TDependencyPath, TStatementDependency> Dependency_;
+        };
+
+        struct TStatistics {
+            size_t DepsCount = 0;
+            size_t PathNodesCount = 0;
+            TMap<size_t, size_t> PathLengths;
+        };
+
+        // Graph traversal finishes collecting erasures before producing messages.
+        bool EraseAll = false;
+        TVector<TFileElemId> OwnersToErase;
+        TVector<TDiagnostic> Diagnostics;
+        std::optional<TStatistics> Statistics;
+
+        void Apply(const TDepGraph& graph) const;
+    };
+
     // load isolated projects list
     void Load(const TFsPath& sourceRoot, const TVector<TStringBuf>& lists, MD5& confHash);
 
@@ -78,11 +144,12 @@ public:
         return Projects_.empty();
     }
 
-    void CheckAll(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const;
+    // Collect without changing configuration messages or their scoped owner.
+    // Module access and cached-message queries are still sequential.
+    [[nodiscard]] TCheckResult CheckAll(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const;
 
-    // use ymake dependecy graph + own info(Makefile*Refs_) for check existing dependency to isolated projects from another projects
-    void ReportDeps(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets) const;
-    void ReportRecurseDeps(const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const;
+    // Called by graph validation after CheckAll has checked the warning flag.
+    void CollectStatementPath(EDepStatement statement, TFileView makefile, TFileView path, TCheckResult& result) const;
 
     virtual ~TIsolatedProjects() = default;
 protected:
@@ -99,9 +166,17 @@ protected:
     void LoadFromString(TProjectPathToSources&, TStringBuf content, TStringBuf filename);
     void LoadProjectsIgnoreIncluded(const TProjectPathToSources&);
 
+private:
+    using TErrorHandler = std::function<void(const TString&, TFileView, TStringBuf, TStringBuf)>;
+
+    void CollectDeps(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, TCheckResult& result) const;
+    void CollectRecurseDeps(const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets, TCheckResult& result) const;
+
+    void CheckStatementPath(TStringBuf statement, TFileView makefile, TStringBuf path, const TErrorHandler& onError) const;
+
     // walk by folders tree (projects) and call error handler if makefile not in the same project folder
-    void CheckMakefilePlacedInProjects(TStringBuf statement, TFileView makefile, const TFoldersTree& folder, TStringBuf dataFile) const;
-    void CheckMakefilePlacedInProject(TStringBuf statement, TFileView makefile, const TString& project, TStringBuf dataFile) const;
+    void CheckMakefilePlacedInProjects(TStringBuf statement, TFileView makefile, const TFoldersTree& folder, TStringBuf dataFile, const TErrorHandler& onError) const;
+    void CheckMakefilePlacedInProject(TStringBuf statement, TFileView makefile, const TString& project, TStringBuf dataFile, const TErrorHandler& onError) const;
 
 private:
     TVector<TString> Projects_;  // (sorted)
