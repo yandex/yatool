@@ -101,6 +101,8 @@ public:
     void Erase(TFileElemId owner);
     bool EraseMessagesByKind(const TStringBuf var, TFileElemId owner = TFileElemId()); // If owner == 0 erase for all owners
     bool HasMessagesByKind(const TStringBuf var, TFileElemId owner) const;
+    // Capture on the main analysis flow before concurrent diagnostic writers start.
+    THashSet<TFileElemId> GetOwnersWithMessagesByKind(TStringBuf kind) const;
 
     bool IsChkPeersCompleted() const noexcept;
     void MarkChkPeersCompleted() noexcept;

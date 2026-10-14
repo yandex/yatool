@@ -204,6 +204,18 @@ bool TConfMsgManager::HasMessagesByKind(const TStringBuf var, TFileElemId owner)
     }) != messages.end();
 }
 
+THashSet<TFileElemId> TConfMsgManager::GetOwnersWithMessagesByKind(TStringBuf kind) const {
+    THashSet<TFileElemId> owners;
+    for (const auto& [owner, messages] : Messages) {
+        if (FindIf(messages, [kind](const TConfigureMessage& message) {
+                return message.Kind == kind;
+            }) != messages.end()) {
+            owners.insert(owner);
+        }
+    }
+    return owners;
+}
+
 void TConfMsgManager::Save(TMultiBlobBuilder& builder) {
     TString confMsgsData;
     {

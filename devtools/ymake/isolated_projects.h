@@ -17,6 +17,8 @@
 #include <variant>
 
 struct TRestoreContext;
+class TModules;
+class TModule;
 
 class TFoldersTree {
 public:
@@ -144,11 +146,49 @@ public:
         return Projects_.empty();
     }
 
-    // Collect without changing configuration messages or their scoped owner.
-    // Module access and cached-message queries are still sequential.
-    [[nodiscard]] TCheckResult CheckAll(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const;
+    class TCheckInput {
+    public:
+        struct TStatement {
+            TFileView Makefile;
+            TFileView Path;
+        };
 
-    // Called by graph validation after CheckAll has checked the warning flag.
+        const TDepGraph& Graph() const {
+            return Graph_;
+        }
+
+        const TModules& Modules() const {
+            return Modules_;
+        }
+
+        bool ShouldEraseModuleErrors(const TModule& module) const;
+
+    private:
+        friend class TIsolatedProjects;
+        TCheckInput(const TDepGraph& graph, const TModules& modules)
+            : Graph_(graph)
+            , Modules_(modules)
+        {}
+
+        const TDepGraph& Graph_;
+        const TModules& Modules_;
+        bool Enabled_ = false;
+        bool EraseAll_ = false;
+        TVector<TNodeId> StartTargets_;
+        bool HashChanged_ = false;
+        THashSet<TFileElemId> OwnersWithErrors_;
+        TVector<TStatement> Statements_;
+    };
+
+    // Preparation runs on the main analysis flow. Graph topology, node IDs,
+    // symbol tables and this project's list must remain alive and stable until Apply.
+    // Modules must outlive computation; DATA paths must not change after graph construction.
+    [[nodiscard]] TCheckInput PrepareCheck(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets) const;
+    // May materialize modules under the store lock; run with the configuration executor context.
+    // Reads stable module fields and prepared error owners, never the live message cache.
+    [[nodiscard]] TCheckResult CheckAll(const TCheckInput& input) const;
+
+    // Called by graph validation after PrepareCheck has captured the warning flag.
     void CollectStatementPath(EDepStatement statement, TFileView makefile, TFileView path, TCheckResult& result) const;
 
     virtual ~TIsolatedProjects() = default;
@@ -169,8 +209,7 @@ protected:
 private:
     using TErrorHandler = std::function<void(const TString&, TFileView, TStringBuf, TStringBuf)>;
 
-    void CollectDeps(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets, TCheckResult& result) const;
-    void CollectRecurseDeps(const TRestoreContext& recurseRestoreContext, const TVector<TTarget>& recurseStartTargets, TCheckResult& result) const;
+    void CollectDeps(const TCheckInput& input, TCheckResult& result) const;
 
     void CheckStatementPath(TStringBuf statement, TFileView makefile, TStringBuf path, const TErrorHandler& onError) const;
 

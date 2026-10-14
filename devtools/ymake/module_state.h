@@ -522,10 +522,13 @@ private:
 
     TModuleAttrs Attrs;
 
+    // Set during construction, before publication through TModules::Get.
+    // Keep separate from flags modified by post-configuration analyses.
+    bool Loaded = false;
+
     union {
         ui32 AllInitializationFlags = 0;
-        struct { // 10 bits used
-            ui32 Loaded: 1;
+        struct { // 9 bits used
             ui32 Committed: 1;
             ui32 InitComplete: 1;
             ui32 InputsComplete: 1;
