@@ -45,6 +45,33 @@ class OutputsExceedLimitError(BuildRootError):
     pass
 
 
+def prepare_shared_build_root_access(path, access_root):
+    """Make a build root below access_root traversable by its owning group."""
+    if os.name != 'posix':
+        return
+
+    path = os.path.realpath(path)
+    access_root = os.path.realpath(access_root)
+    try:
+        if os.path.commonpath((path, access_root)) != access_root:
+            return
+    except ValueError:
+        return
+
+    dirs = []
+    current = path
+    while True:
+        dirs.append(current)
+        if current == access_root:
+            break
+        current = os.path.dirname(current)
+
+    for directory in reversed(dirs):
+        mode = stat.S_IMODE(os.stat(directory).st_mode)
+        if not mode & stat.S_IXGRP:
+            os.chmod(directory, mode | stat.S_IXGRP)
+
+
 class OutputDigests(object):
     def __init__(self, root_path, version, file_digests, outputs_uid):
         self._root_path = root_path
@@ -87,6 +114,7 @@ class BuildRoot(object):
         dir_outputs=None,
         validate_content=False,
         compute_hash=True,
+        shared_mode=False,
     ):
         self.path = path
         self._keep = keep
@@ -101,6 +129,7 @@ class BuildRoot(object):
         self._dir_outputs = []
         self._validate_content = validate_content
         self._compute_hash = compute_hash
+        self._shared_mode = shared_mode
         if dir_outputs:
             self._dir_outputs = [x.replace('$(BUILD_ROOT)', path) for x in dir_outputs]
 
@@ -352,7 +381,10 @@ class BuildRoot(object):
 
     def create(self):
         self._created = True
-        return fs.create_dirs(self.path)
+        path = fs.create_dirs(self.path)
+        if self._shared_mode:
+            os.chmod(path, 0o770)
+        return path
 
     def delete(self):
         fs.remove_tree_with_perm_update(self.path)
@@ -427,12 +459,13 @@ class BuildRoot(object):
 
 
 class BuildRootSet(object):
-    def __init__(self, path, keep, defer, limit_output_size, validate_content=False):
+    def __init__(self, path, keep, defer, limit_output_size, validate_content=False, shared_mode=False):
         self._store_path = path
         self._lock = threading.Lock()
         self._id = 0
         self._keep = keep
         self._defer = defer
+        self._shared_mode = shared_mode
         self._build_root = self._make_root()
         self._limit_output_size = limit_output_size
         self._validate_content = validate_content
@@ -459,6 +492,8 @@ class BuildRootSet(object):
             cur_name = os.path.join(self._store_path, uniq_id.gen4())
             try:
                 os.mkdir(cur_name)
+                if self._shared_mode:
+                    os.chmod(cur_name, 0o770)
                 return cur_name
             except OSError:
                 pass
@@ -503,6 +538,7 @@ class BuildRootSet(object):
             dir_outputs,
             validate_content=self._validate_content,
             compute_hash=compute_hash,
+            shared_mode=self._shared_mode,
         )
         self._roots.append(root)
 

@@ -16,6 +16,7 @@
 
 #include <util/folder/dirut.h>
 #include <util/system/env.h>
+#include <util/system/sysstat.h>
 
 namespace {
     struct TOptions : NToolsCache::TConfigOptions, NToolsCache::TClientOptions {
@@ -141,8 +142,14 @@ int main(int argc, const char* argv[]) {
         NToolsCachePrivate::CheckConfig(config);
         NACCachePrivate::CheckConfig(config);
 
+        if (NUserServicePrivate::IsSharedMode(config)) {
+            Umask(0077);
+        }
+
         NUserServicePrivate::PrepareDirs(config);
-        NToolsCachePrivate::PrepareDirs(config);
+        if (!NUserServicePrivate::IsSharedMode(config)) {
+            NToolsCachePrivate::PrepareDirs(config);
+        }
         NACCachePrivate::PrepareDirs(config);
 
         // Need persistent temp directory for local socket.

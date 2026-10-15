@@ -1,6 +1,17 @@
 #include "config.h"
 
+#include "devtools/local_cache/psingleton/server/config.h"
+#include "devtools/local_cache/common/fs-utils/stats.h"
+
 #include <util/folder/path.h>
+#include <util/system/file.h>
+#include <util/system/fstat.h>
+#include <util/system/fs.h>
+#include <util/string/printf.h>
+
+#if defined(_linux_)
+#include <unistd.h>
+#endif
 
 bool NACCachePrivate::TConfigOptions::HasParams() const {
     return LockFile != "" || DBPath != "" ||
@@ -154,6 +165,11 @@ void NACCachePrivate::CheckConfig(const NConfig::TConfig& config) {
         }
     }
 
+    if (NUserServicePrivate::IsSharedMode(config) &&
+        (!acSection.contains(ToString(LockFileStr)) || acSection.At(ToString(LockFileStr)).Get<TString>().empty())) {
+        ythrow TTypeMismatch() << "--ac-shared-mode requires an explicit --ac-lock_file";
+    }
+
     // TString + TFsPath
     for (auto e : {LockFileStr, DbPathStr, FsStoreStr}) {
         try {
@@ -242,6 +258,89 @@ TString NACCachePrivate::GetDBDirectory(const NConfig::TConfig& config) {
 
 void NACCachePrivate::PrepareDirs(const NConfig::TConfig& config) {
     using namespace NConfig;
+    if (NUserServicePrivate::IsSharedMode(config)) {
+#if defined(_linux_)
+        const auto lockName = GetLockName(config);
+        const TFsPath lockDir = TFsPath(lockName).Dirname();
+        const auto& acSection = config.Get<TDict>().At(ToString(LocalCacheStr)).Get<TDict>().At(ToString(BuildCacheStr)).Get<TDict>();
+        const TFsPath cacheDir(acSection.At(ToString(FsStoreStr)).Get<TString>());
+
+        auto validateOwnedDirectory = [](const TFsPath& path) {
+            TFileStat stat(path);
+            if (stat.IsNull() || !stat.IsDir()) {
+                ythrow TIoException() << "shared-mode storage directory has an unexpected type: " << path;
+            }
+            if (stat.Uid != static_cast<ui32>(geteuid())) {
+                ythrow TIoException() << "invalid shared-mode storage directory ownership for " << path
+                                      << ": expected uid=" << geteuid()
+                                      << ", got uid=" << stat.Uid
+                                      << ", gid=" << stat.Gid
+                                      << ", mode=" << Sprintf("%04o", stat.Mode & 0777);
+            }
+        };
+
+        auto validateLockFile = [](const TFsPath& path) {
+            TFileStat stat(path);
+            if (stat.IsNull() || !stat.IsFile()) {
+                ythrow TIoException() << "shared-mode lock file has an unexpected type: " << path;
+            }
+            if (stat.Uid != static_cast<ui32>(geteuid()) || stat.Gid != static_cast<ui32>(getegid()) || (stat.Mode & 0777) != 0640) {
+                ythrow TIoException() << "invalid shared-mode lock file ownership or permissions for " << path
+                                      << ": expected uid=" << geteuid() << ", gid=" << getegid()
+                                      << ", mode=0640"
+                                      << ", got uid=" << stat.Uid << ", gid=" << stat.Gid
+                                      << ", mode=" << Sprintf("%04o", stat.Mode & 0777);
+            }
+        };
+
+        auto validateLockDirectory = [](const TFsPath& path) {
+            TFileStat stat(path);
+            if (stat.IsNull() || !stat.IsDir()) {
+                ythrow TIoException() << "shared-mode lock directory has an unexpected type: " << path;
+            }
+            if (stat.Uid != static_cast<ui32>(geteuid()) || !(stat.Mode & S_IRGRP)) {
+                ythrow TIoException() << "invalid shared-mode lock directory ownership or permissions for " << path
+                                      << ": expected uid=" << geteuid() << " and group read permission"
+                                      << ", got uid=" << stat.Uid
+                                      << ", gid=" << stat.Gid
+                                      << ", mode=" << Sprintf("%04o", stat.Mode & 0777);
+            }
+        };
+
+        validateLockDirectory(lockDir.RealPath());
+
+        if (!cacheDir.Exists()) {
+            cacheDir.MkDirs(0700);
+            NFsPrivate::Chmod(cacheDir, 0700);
+        }
+        validateOwnedDirectory(cacheDir.RealPath());
+
+        TFsPath dbDir(GetDBDirectory(config));
+        if (!dbDir.Exists()) {
+            dbDir.MkDirs(0700);
+            NFsPrivate::Chmod(dbDir, 0700);
+        }
+        validateOwnedDirectory(dbDir.RealPath());
+
+        const TString ipc = lockDir.RealPath().GetPath();
+        const TString cache = cacheDir.RealPath().GetPath();
+        if (ipc == cache || ipc.StartsWith(cache + "/") || cache.StartsWith(ipc + "/")) {
+            ythrow TIoException() << "shared-mode lock directory and cache_dir must be disjoint";
+        }
+
+        TFsPath lockPath(lockName);
+        if (!lockPath.Exists()) {
+            TFile(lockName, CreateNew | RdWr | ARUser | AWUser | ARGroup);
+            // The daemon uses umask 0077 in shared mode, so make the
+            // intentionally group-readable lock file explicit.
+            NFsPrivate::Chmod(lockPath, 0640);
+        }
+        validateLockFile(lockPath.RealPath());
+        return;
+#else
+        Y_UNREACHABLE();
+#endif
+    }
     TFsPath(TFsPath(GetLockName(config)).Dirname()).MkDirs(0755);
     TFsPath(GetDBDirectory(config)).MkDirs(0755);
 }

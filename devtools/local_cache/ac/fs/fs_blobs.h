@@ -12,6 +12,9 @@
 #include <util/system/fs.h>
 
 namespace NACCache {
+    void SetSharedMode(bool enabled);
+    bool IsSharedMode();
+
     enum ECodec {
         CodecNone
     };
@@ -250,7 +253,7 @@ namespace NACCache {
         TString GetUid(EFilePlacement placement);
 
         /// Copy content with permissions
-        void CopyBlob(const TFsPath& from, const TFsPath& to, i64 fileMode) const;
+        void CopyBlob(const TFsPath& from, const TFsPath& to, i64 fileMode, bool sharedOutput) const;
 
         /// throws exception on error
         void CheckFile(TStringBuf content, const TFsPath& toFileName) const;

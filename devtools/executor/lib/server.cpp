@@ -20,6 +20,7 @@
 #include <util/system/condvar.h>
 #include <util/system/error.h>
 #include <util/system/shellcommand.h>
+#include <util/system/sysstat.h>
 #include <util/thread/factory.h>
 
 namespace {
@@ -199,11 +200,19 @@ public:
         options.SetNice(command->GetNice());
 #if defined(_linux_)
         const NExternalExecutor::TRequirements requirements = command->GetRequirements();
-        if (requirements.GetNetwork() == NExternalExecutor::TRequirements::RESTRICTED &&
-            NetworkIsolation != NProcUtil::ENetworkIsolationStrategy::Unsupported) {
+        const bool isolateNetwork = requirements.GetNetwork() == NExternalExecutor::TRequirements::RESTRICTED &&
+                                    NetworkIsolation != NProcUtil::ENetworkIsolationStrategy::Unsupported;
+        if (isolateNetwork || command->GetHasUmask()) {
             const auto strategy = NetworkIsolation;
-            options.SetFuncAfterFork([strategy]() {
-                NProcUtil::UnshareNs(strategy);
+            const auto hasUmask = command->GetHasUmask();
+            const auto childUmask = command->GetUmask();
+            options.SetFuncAfterFork([strategy, isolateNetwork, hasUmask, childUmask]() {
+                if (isolateNetwork) {
+                    NProcUtil::UnshareNs(strategy);
+                }
+                if (hasUmask) {
+                    Umask(childUmask);
+                }
             });
         }
 #endif

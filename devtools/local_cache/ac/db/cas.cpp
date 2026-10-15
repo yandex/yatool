@@ -2,6 +2,7 @@
 
 #include <library/cpp/logger/null.h>
 #include <library/cpp/logger/rotating_file.h>
+#include <library/cpp/logger/global/rty_formater.h>
 
 #include <util/generic/hash_set.h>
 
@@ -103,9 +104,23 @@ namespace NACCache {
         TransactionLog_.Reset(TFsBlobProcessor::GetTransactionLog(&Parent_->RootDir_, tid, Parent_->Mode_, sync).Release());
     }
 
-    TRollbackHandler::~TRollbackHandler() {
+    TRollbackHandler::~TRollbackHandler() noexcept {
         if (TransactionLog_.Get()) {
-            Rollback();
+            try {
+                Rollback();
+            } catch (const std::exception& e) {
+                try {
+                    LOGGER_CHECKED_GENERIC_LOG(Parent_->GetLog(), TRTYLogPreprocessor, TLOG_ERR, "ERR[ACCAS]")
+                        << "Rollback cleanup failed: " << e.what() << Endl;
+                } catch (...) {
+                }
+            } catch (...) {
+                try {
+                    LOGGER_CHECKED_GENERIC_LOG(Parent_->GetLog(), TRTYLogPreprocessor, TLOG_ERR, "ERR[ACCAS]")
+                        << "Rollback cleanup failed with an unknown exception" << Endl;
+                } catch (...) {
+                }
+            }
         }
     }
 

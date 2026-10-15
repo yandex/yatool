@@ -30,6 +30,8 @@ message TCommand {
     bytes StderrFilename = 5;
     int32 Nice = 6;
     TRequirements Requirements = 7;
+    uint32 Umask = 8;
+    bool HasUmask = 9;
 }
 
 message TEmpty {

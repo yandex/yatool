@@ -4,6 +4,7 @@ import logging
 import os
 import grpc
 import six
+import stat
 import subprocess
 import threading
 import time
@@ -25,6 +26,128 @@ from devtools.libs.acdigest.python import get_file_digest
 from yalibrary.evlog import _LOG_DIR_NAME_FMT, _LOG_FILE_NAME_FMT
 
 logger = logging.getLogger(__name__)
+
+
+class _SharedACAccessError(RuntimeError):
+    pass
+
+
+def _shared_ac_user_access(lock_file):
+    try:
+        lock_stat = os.stat(lock_file)
+    except OSError as error:
+        raise _SharedACAccessError('Cannot inspect shared AC lock file {}: {}'.format(lock_file, error))
+    if not stat.S_ISREG(lock_stat.st_mode):
+        raise _SharedACAccessError('Shared AC lock file is not a regular file: {}'.format(lock_file))
+
+    user_groups = set(os.getgroups())
+    user_groups.add(os.getegid())
+    if lock_stat.st_gid not in user_groups:
+        raise _SharedACAccessError(
+            'Shared AC access is misconfigured: user uid={} is not a member of daemon primary group gid={} '
+            'from lock file {}. Add the user to that group and restart the user session.'.format(
+                os.geteuid(), lock_stat.st_gid, lock_file
+            )
+        )
+    return lock_stat
+
+
+def _read_process_identity(pid):
+    effective_uid = None
+    gids = set()
+    with open('/proc/{}/status'.format(pid)) as status_file:
+        for line in status_file:
+            if line.startswith('Uid:'):
+                values = [int(value) for value in line.split()[1:]]
+                if len(values) >= 2:
+                    effective_uid = values[1]
+            elif line.startswith('Gid:'):
+                values = [int(value) for value in line.split()[1:]]
+                if len(values) >= 2:
+                    gids.add(values[1])
+                if len(values) >= 4:
+                    gids.add(values[3])
+            elif line.startswith('Groups:'):
+                gids.update(int(value) for value in line.split()[1:])
+
+    if effective_uid is None or not gids:
+        raise ValueError('incomplete process identity in /proc/{}/status'.format(pid))
+    return effective_uid, gids
+
+
+def _daemon_has_user_group_in_nss(daemon_uid, user_gid):
+    import grp
+    import pwd
+
+    daemon = pwd.getpwuid(daemon_uid)
+    if daemon.pw_gid == user_gid:
+        return True
+    return daemon.pw_name in grp.getgrgid(user_gid).gr_mem
+
+
+def _validate_shared_ac_daemon_access(lock_file, lock_stat, pid):
+    user_gid = os.getegid()
+    try:
+        daemon_uid, daemon_groups = _read_process_identity(pid)
+    except (IOError, OSError, ValueError) as error:
+        try:
+            configured = _daemon_has_user_group_in_nss(lock_stat.st_uid, user_gid)
+        except (KeyError, ImportError, OSError) as nss_error:
+            raise _SharedACAccessError(
+                'Cannot verify shared AC daemon groups for pid={} from {}: /proc is unavailable ({}) and NSS '
+                'lookup failed ({}).'.format(pid, lock_file, error, nss_error)
+            )
+        if not configured:
+            raise _SharedACAccessError(
+                'Shared AC access is misconfigured: daemon uid={} is not configured as a member of user primary '
+                'group gid={}. Add the daemon to that group and restart the daemon.'.format(lock_stat.st_uid, user_gid)
+            )
+        logger.warning(
+            'Cannot read /proc/%s/status; shared AC daemon group membership was verified through NSS only. '
+            'Restart the daemon after group changes. Error: %s',
+            pid,
+            error,
+        )
+        return
+
+    if daemon_uid != lock_stat.st_uid:
+        raise _SharedACAccessError(
+            'Shared AC identity mismatch for {}: lock owner uid={}, daemon pid={} effective uid={}.'.format(
+                lock_file, lock_stat.st_uid, pid, daemon_uid
+            )
+        )
+    if user_gid not in daemon_groups:
+        raise _SharedACAccessError(
+            'Shared AC access is misconfigured: daemon uid={} pid={} is not a member of user primary group gid={}. '
+            'Add the daemon to that group and restart the daemon.'.format(daemon_uid, pid, user_gid)
+        )
+
+
+def _prepare_shared_ac_put(root_path, blobs):
+    directories = set()
+    root = os.path.abspath(root_path) if root_path else None
+    root_prefix = root if root and root.endswith(os.sep) else root + os.sep if root else None
+
+    for blob, _ in blobs:
+        path = os.path.abspath(blob)
+        if root and (path == root or path.startswith(root_prefix)):
+            directory = os.path.dirname(path)
+            while directory == root or directory.startswith(root_prefix):
+                directories.add(directory)
+                if directory == root:
+                    break
+                directory = os.path.dirname(directory)
+
+    for directory in sorted(directories, key=len):
+        directory_stat = os.lstat(directory)
+        if stat.S_ISDIR(directory_stat.st_mode) and not directory_stat.st_mode & stat.S_IXGRP:
+            os.chmod(directory, stat.S_IMODE(directory_stat.st_mode) | stat.S_IXGRP)
+
+    for blob, _ in blobs:
+        path = os.path.abspath(blob)
+        blob_stat = os.lstat(path)
+        if stat.S_ISREG(blob_stat.st_mode) and not blob_stat.st_mode & stat.S_IRGRP:
+            os.chmod(path, stat.S_IMODE(blob_stat.st_mode) | stat.S_IRGRP)
 
 
 # Uses app_ctx.params to query command-line options.
@@ -139,10 +262,12 @@ class _Server(object):
     _tc_cache_size = None
 
     _ac_enable = False
+    _ac_shared = False
     _ac_master = False
     _ac_full_address = None
     _ac_lock_file = None
     _ac_cache_size = None
+    _shared_access_validated = False
 
     _dead_line = None
 
@@ -195,11 +320,11 @@ class _Server(object):
                 logger.debug("Tools cache default parameters (disabled in batch mode)")
                 return
 
-            if not getattr(params, 'tools_cache', False):
+            if not getattr(params, 'tools_cache', False) and not getattr(params, 'build_cache_shared', False):
                 cls._read_config = True
-                logger.debug("Disabled tools cache")
+                logger.debug("Disabled tools and shared build caches")
                 return
-            else:
+            elif getattr(params, 'tools_cache', False):
                 cls._tc_enable = True
 
             if params.tools_cache_master:
@@ -207,6 +332,8 @@ class _Server(object):
 
             if params.build_cache:
                 cls._ac_enable = True
+
+            cls._ac_shared = getattr(params, 'build_cache_shared', False)
 
             if params.build_cache_master:
                 cls._ac_master = params.build_cache_master
@@ -239,7 +366,11 @@ class _Server(object):
             except Exception as e:
                 logger.debug("(dump_debug) While store build cache info into: %s", e)
 
-            cls._single_instance = 'service' in cls._gl_config_options and cls._gl_config_options['service'] == 'all'
+            cls._single_instance = (
+                not cls._ac_shared
+                and 'service' in cls._gl_config_options
+                and cls._gl_config_options['service'] == 'all'
+            )
 
             if cls._single_instance:
                 cls._ac_lock_file = cls._tc_lock_file
@@ -250,6 +381,12 @@ class _Server(object):
                     cls._ac_lock_file = os.path.join(cls._bld_dir, '.cache_lock')
                 else:
                     cls._ac_lock_file = os.path.join(build_root(), 'cache', '7', '.cache_lock')
+
+            if cls._ac_shared:
+                if 'lock_file' not in cls._ac_config_options:
+                    raise ValueError('--shared-ac requires an explicit build cache lock_file')
+                if not cls._ac_lock_file or not os.path.isabs(cls._ac_lock_file):
+                    raise ValueError('--shared-ac requires an absolute build cache lock_file')
 
             cls._ac_cache_size = getattr(params, "cache_size", None)
             cls._tc_cache_size = getattr(params, "tools_cache_size", None)
@@ -479,11 +616,17 @@ class _Server(object):
         def read_address():
             from devtools.local_cache.psingleton.python import systemptr
 
+            lock_stat = None
+            if cls._ac_shared and not cls._shared_access_validated:
+                lock_stat = _shared_ac_user_access(cls._ac_lock_file)
             full_address = systemptr.get_server_info(
                 cls._ac_lock_file, log_file=_log_name(), non_blocking=False, fresh=True
             )
             pid, ctime, address = full_address
             if address:
+                if cls._ac_shared and not cls._shared_access_validated:
+                    _validate_shared_ac_daemon_access(cls._ac_lock_file, lock_stat, pid)
+                    cls._shared_access_validated = True
                 cls._ac_full_address = full_address
                 logger.debug("AC cache {} address: {}".format(diag, str(full_address)))
             return full_address if address else None
@@ -491,6 +634,9 @@ class _Server(object):
         full_address = read_address()
         if full_address is not None:
             return full_address
+
+        if cls._ac_shared:
+            raise RuntimeError('Shared AC cache service not found in {} for {}'.format(cls._ac_lock_file, diag))
 
         with cls._ac_lock:
             return cls._start_with_lock(None, read_address, diag, start_tc=False)
@@ -504,6 +650,12 @@ class _Server(object):
     def is_ac_enabled(cls, opts):
         cls._do_read_config(opts)
         return cls._ac_enable
+
+    @classmethod
+    def validate_shared_ac_access(cls, opts=None):
+        cls._do_read_config(opts)
+        if cls._ac_shared:
+            cls._ac_cache_address('(shared access preflight)', verbose=True)
 
     @classmethod
     def _report_grpc_error(cls, grpc_exc, service, pid):
@@ -638,6 +790,8 @@ class _Server(object):
     def get_uid(cls, uid, dest_path, hardlink, is_result, release):
         from devtools.local_cache.ac.python.ac import get_uid
 
+        if cls._ac_shared:
+            hardlink = False
         kwargs = {'uid': uid, 'dest_path': dest_path, 'hardlink': hardlink, 'is_result': is_result, 'release': release}
 
         return cls.unary_method(get_uid, kwargs, diag='(get uid {})'.format(uid), tc=False)
@@ -646,6 +800,9 @@ class _Server(object):
     def put_uid(cls, uid, root_path, blobs, weight, hardlink, replace, is_result, file_names):
         from devtools.local_cache.ac.python.ac import put_uid
 
+        if cls._ac_shared:
+            hardlink = False
+            _prepare_shared_ac_put(root_path, blobs)
         kwargs = {
             'uid': uid,
             'root_path': root_path,
@@ -807,6 +964,8 @@ class ACCache(object):
     support_content_uids = True
 
     def __init__(self, store_path):
+        _SERVER.validate_shared_ac_access()
+
         self._fs_size = 0
         self._size = 0
         self._blob_count = 0

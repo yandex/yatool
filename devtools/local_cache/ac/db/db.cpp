@@ -489,8 +489,12 @@ namespace NACCachePrivate {
         });
 
         for (auto& bi : files) {
-            auto optim = cas.PostprocessBlobAfterGet(bi, casGuard);
-            output.CopyMode = Meet(optim, output.CopyMode);
+            try {
+                auto optim = cas.PostprocessBlobAfterGet(bi, casGuard);
+                output.CopyMode = Meet(optim, output.CopyMode);
+            } catch (const TSystemError& e) {
+                ythrow TRestoreError() << "failed to restore cached output " << bi.GetPath() << ": " << e.what();
+            }
         }
 
         LOGGER_CHECKED_GENERIC_LOG(cas.GetLog(), TRTYLogPreprocessor, TLOG_INFO, "INFO[ACST]") << "GU: uid=" << uidStr << Endl;

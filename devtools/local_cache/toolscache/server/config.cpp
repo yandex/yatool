@@ -67,6 +67,15 @@ static TMaybe<TString> GetServiceOption(const NConfig::TConfig& config) {
 
 void NToolsCacheServerPrivate::CheckConfig(const NConfig::TConfig& config) {
     auto service = GetServiceOption(config);
+    if (NUserServicePrivate::IsSharedMode(config)) {
+#if !defined(_linux_)
+        ythrow TTypeMismatch() << "--ac-shared-mode is supported on Linux only";
+#else
+        if (service.Empty() || service != ToString(RunACStr)) {
+            ythrow TTypeMismatch() << "--ac-shared-mode requires --grpc-service=build_cache";
+        }
+#endif
+    }
     if (service.Empty()) {
         return;
     }

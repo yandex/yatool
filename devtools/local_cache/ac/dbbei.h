@@ -1,5 +1,7 @@
 #pragma once
 
+#include "errors.h"
+
 #include "devtools/local_cache/ac/proto/ac.pb.h"
 
 #include "devtools/local_cache/common/dbbe-running-procs/running_handler.h"

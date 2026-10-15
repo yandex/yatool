@@ -13,11 +13,62 @@
 #include <util/system/error.h>
 #include <util/system/fstat.h>
 
+#include <algorithm>
 #include <array>
+#include <vector>
 
 #include <errno.h>
 
 namespace NACCache {
+    namespace {
+        bool SharedMode = false;
+    }
+
+    void SetSharedMode(bool enabled) {
+        SharedMode = enabled;
+    }
+
+    bool IsSharedMode() {
+        return SharedMode;
+    }
+
+    namespace {
+        const NFs::EFilePermissions SharedDirectoryPermissions =
+            NFs::FP_OWNER_READ | NFs::FP_OWNER_WRITE | NFs::FP_OWNER_EXEC |
+            NFs::FP_GROUP_READ | NFs::FP_GROUP_WRITE | NFs::FP_GROUP_EXEC;
+
+        i64 SharedOutputMode(i64 mode) {
+            const auto permissions = mode & 0777;
+            return permissions | ((permissions & 0700) >> 3);
+        }
+
+        bool MakeOutputDirectories(const TFsPath& path) {
+            if (!IsSharedMode()) {
+                return NFs::MakeDirectoryRecursive(path, StoragePermissions);
+            }
+
+            std::vector<TFsPath> missing;
+            TFsPath current(path);
+            while (!current.Exists()) {
+                missing.push_back(current);
+                auto parent = current.Dirname();
+                if (parent == current) {
+                    return false;
+                }
+                current = parent;
+            }
+
+            std::reverse(missing.begin(), missing.end());
+            for (const auto& dir : missing) {
+                if (!NFs::MakeDirectory(dir, SharedDirectoryPermissions) && !dir.IsDirectory()) {
+                    return false;
+                }
+                NFsPrivate::Chmod(dir, 0770);
+            }
+            return true;
+        }
+    }
+
     TFsBlobProcessor::TFsBlobProcessor(const TBlobInfo* blobInfo, const TString* rootDir, EOperationMode mode)
         : BlobInfo_(*blobInfo)
         , RootDir_(*rootDir)
@@ -114,7 +165,7 @@ namespace NACCache {
     }
 
     std::tuple<TString, EOptim> TFsBlobProcessor::PutInternal(const TParams& params, TFsInfo& info) {
-        auto optim = BlobInfo_.GetOptimization();
+        auto optim = IsSharedMode() ? Copy : BlobInfo_.GetOptimization();
         Y_ABORT_UNLESS(params.Mode != DataRemoved);
 
         TFsPath source(BlobInfo_.GetPath());
@@ -165,7 +216,7 @@ namespace NACCache {
             optim = Copy;
         }
 
-        CopyBlob(source, target, info.Mode);
+        CopyBlob(source, target, info.Mode, false);
         noRemove = true;
         return std::make_tuple("", optim);
     }
@@ -184,13 +235,14 @@ namespace NACCache {
             TransactionLog_->AddPreparedPutFile(GetUid());
             TransactionLog_->CreateStashDirs();
             if (!TransactionLog_->HasPreprocesedPutOrGetResult(GetUid())) {
-                (void)GetInternal(params, Hardlink, source, TransactionLog_->GetStashedName(GetUid(), TTransactionLog::NewFile), content, outStoreMode);
+                (void)GetInternal(params, IsSharedMode() ? Copy : Hardlink, source, TransactionLog_->GetStashedName(GetUid(), TTransactionLog::NewFile), content, outStoreMode);
             }
-            TransactionLog_->AddPreprocessPutOrGetResult(GetUid(), "", Hardlink, TFsInfo());
-            return Hardlink;
+            auto optim = IsSharedMode() ? Copy : Hardlink;
+            TransactionLog_->AddPreprocessPutOrGetResult(GetUid(), "", optim, TFsInfo());
+            return optim;
         }
 
-        if (!NFs::MakeDirectoryRecursive(TFsPath(BlobInfo_.GetPath()).Dirname(), StoragePermissions)) {
+        if (!MakeOutputDirectories(TFsPath(BlobInfo_.GetPath()).Dirname())) {
             ythrow TIoException() << "failed to create target dir for " << BlobInfo_.GetPath();
         }
 
@@ -209,7 +261,7 @@ namespace NACCache {
         }
 
         if (IsProcessingSplit()) {
-            if (!NFs::MakeDirectoryRecursive(TFsPath(BlobInfo_.GetPath()).Dirname(), StoragePermissions)) {
+            if (!MakeOutputDirectories(TFsPath(BlobInfo_.GetPath()).Dirname())) {
                 ythrow TIoException() << "failed to create target dir for " << BlobInfo_.GetPath();
             }
 
@@ -223,6 +275,10 @@ namespace NACCache {
     EOptim TFsBlobProcessor::GetInternal(const TParams& params, EOptim optim, const TString& sourceFile, const TString& targetFile, TStringBuf content, i64 outStoreMode) {
         Y_ABORT_UNLESS(params.Mode != DataRemoved);
         Y_ABORT_UNLESS(optim != Rename);
+
+        if (IsSharedMode()) {
+            optim = Copy;
+        }
 
         TFsPath source(sourceFile);
         TFsPath target(targetFile);
@@ -245,7 +301,7 @@ namespace NACCache {
                 EOpenMode perm = AWUser | ARUser;
                 EOpenMode mode = OpenAlways | WrOnly;
                 TUnbufferedFileOutput(TFile(target, perm | mode)).Write(content);
-                NFsPrivate::Chmod(target, outStoreMode);
+                NFsPrivate::Chmod(target, IsSharedMode() ? SharedOutputMode(outStoreMode) : outStoreMode);
                 CheckFile(content, target);
             }
             noRemove = true;
@@ -264,7 +320,7 @@ namespace NACCache {
             optim = Copy;
         }
 
-        CopyBlob(source, target, outStoreMode);
+        CopyBlob(source, target, outStoreMode, IsSharedMode());
         noRemove = true;
         return optim;
     }
@@ -410,7 +466,7 @@ namespace NACCache {
         }
     }
 
-    void TFsBlobProcessor::CopyBlob(const TFsPath& from, const TFsPath& to, i64 fileMode) const {
+    void TFsBlobProcessor::CopyBlob(const TFsPath& from, const TFsPath& to, i64 fileMode, bool sharedOutput) const {
         if (NFsPrivate::IsLink(fileMode)) {
             if (!NFs::SymLink(from.ReadLink(), to)) {
                 ythrow TIoException() << "Cannot create symlink";
@@ -419,7 +475,7 @@ namespace NACCache {
         }
 
         NFs::Copy(from, to);
-        NFsPrivate::Chmod(to, fileMode & 0777);
+        NFsPrivate::Chmod(to, sharedOutput ? SharedOutputMode(fileMode) : fileMode & 0777);
 
         stat_struct buf;
         NFsPrivate::LStat(from, &buf);
@@ -515,6 +571,15 @@ namespace NACCache {
     }
 
     void TFsBlobProcessor::TTransactionLog::Rollback(EOperationMode mode) {
+        Y_DEFER {
+            PutFiles_.clear();
+            PreparedPutFiles_.clear();
+            RemoveFiles_.clear();
+            NewGetFiles_.clear();
+            PreprocessPutOrGetResults_.clear();
+            GetResults_.clear();
+        };
+
         if (mode == NoIO) {
             return;
         }
@@ -531,12 +596,5 @@ namespace NACCache {
                 ythrow TIoException() << "Cannot remove new file: " << fileName;
             }
         }
-
-        PutFiles_.clear();
-        PreparedPutFiles_.clear();
-        RemoveFiles_.clear();
-        NewGetFiles_.clear();
-        PreprocessPutOrGetResults_.clear();
-        GetResults_.clear();
     }
 } // namespace NACCache

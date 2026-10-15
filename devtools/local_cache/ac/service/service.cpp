@@ -1,5 +1,9 @@
 #include "service.h"
 
+#include "devtools/local_cache/ac/fs/fs_blobs.h"
+
+#include "devtools/local_cache/psingleton/server/config.h"
+
 #include <library/cpp/logger/global/common.h>
 #include <library/cpp/logger/global/rty_formater.h>
 
@@ -33,6 +37,7 @@ namespace NACCache {
         , QuiescenceTime_(0)
         , PollMode_(PollAll)
         , MasterMode_(false)
+        , SharedMode_(NUserServicePrivate::IsSharedMode(config))
         , GraphInfo_(false)
         , ForeignKeys_(false)
         , NoDb_(false)
@@ -44,6 +49,7 @@ namespace NACCache {
         , RemoveStats_("Remove")
         , PutDepsStats_("PutDeps")
     {
+        SetSharedMode(SharedMode_);
         const auto& acSection = GetSection();
         MasterMode_ = acSection.contains(ToString(MasterModeStr)) ? acSection.At(ToString(MasterModeStr)).As<bool>() : false;
         GraphInfo_ = acSection.contains(ToString(GraphInfoStr)) ? acSection.At(ToString(GraphInfoStr)).As<bool>() : false;
@@ -145,6 +151,9 @@ namespace NACCache {
     }
 
     bool TACCacheServer::IsQuiescent() const noexcept {
+        if (SharedMode_) {
+            return false;
+        }
         TReadGuard lock(DBBEMutex_);
         if (!DBBE_) {
             return false;
@@ -202,6 +211,14 @@ namespace NACCache {
         context->AddTrailingMetadata("io-exception", e.what());
     }
 
+    void TACCacheServer::ReportRestoreFailure(const THash& hash, const TRestoreError& e, grpc::ServerContext* context, TACStatus* response) {
+        LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_WARNING, "WARN[ACSERV]")
+            << "Failed to restore uid " << hash << " into the client destination: " << e.what() << Endl;
+        response->SetSuccess(false);
+        response->SetOptim(Copy);
+        context->AddTrailingMetadata("io-exception", e.what());
+    }
+
     Status TACCacheServer::Put(ServerContext* context, const TPutUid* request, TACStatus* response) {
         TReadGuard lock(DBBEMutex_);
         if (!DBBE_) {
@@ -255,6 +272,8 @@ namespace NACCache {
                     auto r = DBBE_->GetUid(*request);
                     response->SetSuccess(r.Success);
                     response->SetOptim(r.CopyMode);
+                } catch (const TRestoreError& e) {
+                    ReportRestoreFailure(request->GetACHash(), e, context, response);
                 } catch (const TSystemError& e) {
                     RemoveOnFailure(request->GetACHash(), e, context, response);
                 }

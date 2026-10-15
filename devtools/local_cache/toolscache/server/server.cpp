@@ -75,7 +75,7 @@ int NToolsCache::ServerCode(EMode mode, const NConfig::TConfig& config, TLog& lo
     int rc = 0;
     TStringStream sstr;
     try {
-        if (!NToolsCacheServerPrivate::DoRunService(config, NToolsCacheServerPrivate::RunTCStr) && mode != Halt) {
+        if (!NUserServicePrivate::IsSharedMode(config) && !NToolsCacheServerPrivate::DoRunService(config, NToolsCacheServerPrivate::RunTCStr) && mode != Halt) {
             NotifyOtherTC(config, 0, log);
         }
 

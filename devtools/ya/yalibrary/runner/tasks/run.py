@@ -201,9 +201,11 @@ class PopenExecutor(ExecutorBase):
         proc = None
 
         def set_nice():
+            if not windows.on_win() and kwargs.get('umask') is not None:
+                os.umask(kwargs['umask'])
             try:
                 if not windows.on_win():
-                    return os.nice(nice)
+                    os.nice(nice)
             except OSError:
                 pass
 
@@ -305,7 +307,14 @@ class LocalExecutor(ExecutorBase):
                 nice_arg = dict(nice=nice)
 
             with executor.run_external_process(
-                executor_address, args, stdout.name, cwd, env, requirements=requirements, **nice_arg
+                executor_address,
+                args,
+                stdout.name,
+                cwd,
+                env,
+                requirements=requirements,
+                umask=kwargs.get('umask'),
+                **nice_arg
             ) as res:
                 for line in res.iter_stderr():
                     if line.startswith(self.status_prefix):
@@ -477,6 +486,7 @@ class RunNodeTask(object):
                     nice=self._ctx.opts.set_nice_value,
                     executor_address=self._ctx.executor_address,
                     requirements=requirements,
+                    umask=0o007 if getattr(self._ctx.opts, 'build_cache_shared', False) else None,
                 )
                 self._detailed_timings.start_stage(DetailedStages.POSTPROCESSING_COMMAND, time.time())
 

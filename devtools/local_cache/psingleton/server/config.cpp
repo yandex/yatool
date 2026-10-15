@@ -3,7 +3,7 @@
 #include <util/folder/path.h>
 
 bool NUserServicePrivate::TConfigOptions::HasParams() const {
-    return !LogName.Empty() || !GrpcShutdownDeadline.Empty() || !GrpcTermWait.Empty() || !GrpcAddress.Empty();
+    return !LogName.Empty() || !GrpcShutdownDeadline.Empty() || !GrpcTermWait.Empty() || !GrpcAddress.Empty() || SharedMode;
 }
 
 void NUserServicePrivate::TConfigOptions::WriteSection(IOutputStream& out) const {
@@ -24,6 +24,9 @@ void NUserServicePrivate::TConfigOptions::WriteSection(IOutputStream& out) const
     if (auto* val = GrpcAddress.Get()) {
         out << ToString(Address) << "=" << *val << Endl;
     }
+    if (SharedMode) {
+        out << ToString(SharedModeStr) << "=true" << Endl;
+    }
 }
 
 void NUserServicePrivate::TConfigOptions::AddOptions(NLastGetopt::TOpts& parser) {
@@ -43,6 +46,10 @@ void NUserServicePrivate::TConfigOptions::AddOptions(NLastGetopt::TOpts& parser)
         .Hidden()
         .RequiredArgument()
         .StoreResultT<TString>(&LogName);
+    parser.AddLongOption("ac-shared-mode", "run build cache as a shared standalone service")
+        .NoArgument()
+        .DefaultValue(false)
+        .StoreResult(&SharedMode, true);
 }
 
 static void MalformedEntryError(NUserServicePrivate::EConfigStrings e) {
@@ -132,4 +139,10 @@ TString NUserServicePrivate::GetLogName(const NConfig::TConfig& config) {
     }
 
     return "";
+}
+
+bool NUserServicePrivate::IsSharedMode(const NConfig::TConfig& config) {
+    using namespace NConfig;
+    const auto& section = config.Get<TDict>().At(ToString(GrpcServer)).Get<TDict>();
+    return section.contains(ToString(SharedModeStr)) && section.At(ToString(SharedModeStr)).As<bool>();
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "devtools/local_cache/ac/errors.h"
 #include "devtools/local_cache/ac/proto/ac.pb.h"
 #include "devtools/local_cache/ac/fs/fs_blobs.h"
 #include "devtools/local_cache/common/db-utils/dbi.h"

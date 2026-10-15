@@ -20,7 +20,7 @@ namespace NACCache {
     public:
         friend class TCASManager;
 
-        ~TRollbackHandler();
+        ~TRollbackHandler() noexcept;
 
         void Commit();
 

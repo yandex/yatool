@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import six
+import sys
 
 from humanfriendly import parse_size, InvalidSize
 
@@ -55,6 +56,8 @@ import yalibrary.upload.consts
 from yalibrary.platform_matcher import is_darwin_rosetta
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SHARED_AC_LOCK_FILE = '/run/ya-tc/ac.lock'
 
 
 class BuildTypeConsumer(ArgConsumer):
@@ -1247,6 +1250,7 @@ class ToolsOptions(Options):
         self.tools_cache = False
         self.tools_cache_master = False
         self.build_cache = False
+        self.build_cache_shared = False
         self.build_cache_master = False
         self.tools_cache_bin = None
         self.tools_cache_ini = None
@@ -1293,6 +1297,20 @@ class ToolsOptions(Options):
                 hook=SetConstValueHook('build_cache', True),
                 group=CACHE_CONTROL_GROUP,
                 visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--shared-ac'],
+                help='use an externally managed shared build cache',
+                hook=SetConstValueHook('build_cache_shared', True),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+            ArgConsumer(
+                ['--no-shared-ac'],
+                help='do not use an externally managed shared build cache',
+                hook=SetConstValueHook('build_cache_shared', False),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.ADVANCED,
             ),
             EnvConsumer(
                 'YA_AC',
@@ -1362,6 +1380,7 @@ class ToolsOptions(Options):
             ConfigConsumer('tools_cache'),
             ConfigConsumer('tools_cache_master'),
             ConfigConsumer('build_cache'),
+            ConfigConsumer('build_cache_shared'),
             ConfigConsumer('build_cache_master'),
             ConfigConsumer('tools_cache_ini'),
             ConfigConsumer('tools_cache_conf', hook=ExtendHook('tools_cache_conf_str')),
@@ -1376,12 +1395,21 @@ class ToolsOptions(Options):
         self.build_cache_conf = []
         self.tools_cache_gl_conf = []
 
-        if not self.tools_cache:
+        if self.build_cache_shared:
+            if not sys.platform.startswith('linux'):
+                raise ArgsValidatingException('--shared-ac is supported on Linux only')
+            self.build_cache = True
+
+        if not self.tools_cache and not self.build_cache_shared:
             return
 
         self.tools_cache_conf = {k: v for k, v in (s.split('=', 1) for s in self.tools_cache_conf_str)}
         self.build_cache_conf = {k: v for k, v in (s.split('=', 1) for s in self.build_cache_conf_str)}
         self.tools_cache_gl_conf = {k: v for k, v in (s.split('=', 1) for s in self.tools_cache_gl_conf_str)}
+        if self.build_cache_shared:
+            lock_file = self.build_cache_conf.setdefault('lock_file', DEFAULT_SHARED_AC_LOCK_FILE)
+            if not os.path.isabs(lock_file):
+                raise ArgsValidatingException('--shared-ac requires an absolute build cache lock_file')
         self._set_tools_cache_size()
 
     def _set_tools_cache_size(self):

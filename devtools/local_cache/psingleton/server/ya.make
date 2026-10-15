@@ -12,6 +12,7 @@ IF (NOT OS_WINDOWS)
 ENDIF()
 
 PEERDIR(
+    devtools/local_cache/common/fs-utils
     devtools/local_cache/psingleton/service
     library/cpp/sqlite3
     library/cpp/deprecated/atomic

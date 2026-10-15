@@ -16,6 +16,7 @@ namespace NUserServicePrivate {
         ShutdownDealline /* "shutdown_call_deadline_ms" */,
         TermSignalWait /* "wait_term_s" */,
         LogNameStr /* "log" */,
+        SharedModeStr /* "shared_mode" */,
     };
 
     inline TString IniSectionName() {
@@ -32,6 +33,7 @@ namespace NUserServicePrivate {
         TMaybe<i64> GrpcTermWait;
         /// [grpc] log
         TMaybe<TString> LogName;
+        bool SharedMode = false;
         bool HasParams() const;
         void WriteSection(IOutputStream& out) const;
         void AddOptions(NLastGetopt::TOpts& parser);
@@ -42,4 +44,6 @@ namespace NUserServicePrivate {
     void PrepareDirs(const NConfig::TConfig& config);
 
     TString GetLogName(const NConfig::TConfig& config);
+
+    bool IsSharedMode(const NConfig::TConfig& config);
 }

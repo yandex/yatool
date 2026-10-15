@@ -243,7 +243,7 @@ def fs_encode(s):
 
 
 @contextlib.contextmanager
-def run_external_process(address, args, stdout=None, cwd=None, env=None, nice=10, requirements=None):
+def run_external_process(address, args, stdout=None, cwd=None, env=None, nice=10, requirements=None, umask=None):
     env = env or dict(os.environ)
     env = [runner_pb2.TEnvEntry(Name=fs_encode(k), Value=fs_encode(v)) for k, v in six.iteritems(env)]
 
@@ -279,5 +279,7 @@ def run_external_process(address, args, stdout=None, cwd=None, env=None, nice=10
         Env=env,
         Nice=nice,
         Requirements=proto_requirements,
+        Umask=0 if umask is None else umask,
+        HasUmask=umask is not None,
     )
     yield Result(address, _get_client(address).Execute(command))

@@ -72,6 +72,7 @@ namespace NACCache {
         std::string ErrorMessage(const char* method) const;
         grpc::Status SetStatus(TStringBuf method, grpc::ServerContext* context) const;
 
+        void ReportRestoreFailure(const THash& hash, const TRestoreError& e, grpc::ServerContext* context, TACStatus* response);
         void RemoveOnFailure(const THash& hash, const TSystemError& e, grpc::ServerContext* context, TACStatus* response);
 
         /// Returns config section related to this service.
@@ -91,6 +92,7 @@ namespace NACCache {
         int QuiescenceTime_;
         EPollersConf PollMode_;
         bool MasterMode_;
+        bool SharedMode_;
         bool GraphInfo_;
         bool ForeignKeys_;
         /// benchmarking mode, no DB operations at all

@@ -3,11 +3,14 @@
 
 #include "devtools/local_cache/psingleton/server/server-nix.h"
 
+#include "devtools/local_cache/common/fs-utils/stats.h"
+
 #include <library/cpp/logger/global/common.h>
 #include <library/cpp/logger/global/rty_formater.h>
 #include <library/cpp/sqlite3/sqlite.h>
 
 #include <util/generic/scope.h>
+#include <util/system/fs.h>
 #include <util/system/tempfile.h>
 
 #include <grpcpp/health_check_service_interface.h>
@@ -228,6 +231,9 @@ namespace NUserService {
         MyName_.SetPort(static_cast<TIpPort>(port));
         LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[SERV]") << "Starting server at " << MyName_.ToGrpcAddress() << ", pid=" << MyName_.GetPid() << Endl;
         Y_ENSURE_EX(port > 0 || !MyName_.GetLocalSocket().empty(), TWithBackTrace<yexception>());
+        if (NUserServicePrivate::IsSharedMode(Config_) && !MyName_.GetLocalSocket().empty()) {
+            NFsPrivate::Chmod(MyName_.GetLocalSocket(), 0660);
+        }
 
         WaitThread_ = std::thread([this]() {
             // TODO: Add CondVar?, but be cautious of locks for Server_ (sighandlers, exception
