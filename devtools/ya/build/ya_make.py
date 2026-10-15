@@ -484,6 +484,7 @@ class CacheFactory:
             readonly=getattr(self._opts, 'bazel_remote_readonly', True),
             max_file_size=getattr(self._opts, 'dist_cache_max_file_size', 0),
             max_connections=connection_pool_size,
+            timeout=getattr(self._opts, 'bazel_remote_timeout', bazel_store.DEFAULT_TIMEOUT),
             fits_filter=fits_filter,
             put_observer=self.warming_manifest.record_put if self.warming_manifest else None,
         )

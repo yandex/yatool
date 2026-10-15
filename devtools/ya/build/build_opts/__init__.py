@@ -1,6 +1,7 @@
 import os
 import six
 import logging
+import math
 import multiprocessing
 import enum
 
@@ -2706,6 +2707,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_crit = None
         self.bazel_remote_store = False
         self.bazel_remote_baseuri = 'http://[::1]:8080/'
+        self.bazel_remote_timeout = 30
         self.bazel_remote_username = None
         self.bazel_remote_password = None
         self.bazel_remote_password_file = None
@@ -2797,6 +2799,15 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.ADVANCED,
                 ),
                 ConfigConsumer('bazel_remote_baseuri'),
+                ArgConsumer(
+                    ['--bazel-remote-timeout'],
+                    help='Bazel-remote HTTP timeout in seconds for connecting and socket inactivity; '
+                    'not a total request deadline',
+                    hook=SetValueHook('bazel_remote_timeout', transform=float),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.ADVANCED,
+                ),
+                ConfigConsumer('bazel_remote_timeout'),
                 ArgConsumer(
                     ['--bazel-remote-username'],
                     help='Bazel-remote username',
@@ -3129,6 +3140,13 @@ class DistCacheOptions(DistCacheSetupOptions):
 
     def postprocess(self):
         super().postprocess()
+        if (
+            type(self.bazel_remote_timeout) not in (int, float)
+            or not math.isfinite(self.bazel_remote_timeout)
+            or self.bazel_remote_timeout <= 0
+        ):
+            raise ArgsValidatingException('Bazel HTTP timeout must be a finite positive number of seconds')
+
         if self.yt_store_exclusive:
             self.yt_store = True
 

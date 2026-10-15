@@ -2,6 +2,7 @@ import hashlib
 import json
 import json.decoder as json_decoder
 import logging
+import math
 import os
 import os.path as os_path
 import threading
@@ -74,17 +75,23 @@ class BazelStoreRollbackError(RuntimeError):
 
 
 class TimeoutHTTPAdapter(requests.adapters.HTTPAdapter):
+    def __init__(self, *args, timeout=DEFAULT_TIMEOUT, **kwargs):
+        if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("Bazel HTTP timeout must be a finite positive number of seconds")
+        self._timeout = timeout
+        super().__init__(*args, **kwargs)
+
     def send(
         self,
         request,
         stream,
-        timeout=DEFAULT_TIMEOUT,
+        timeout=None,
         verify=True,
         cert=None,
         proxies=None,
     ):
         if timeout is None:
-            timeout = DEFAULT_TIMEOUT
+            timeout = self._timeout
         return super().send(request=request, stream=stream, timeout=timeout, verify=verify, cert=cert, proxies=proxies)
 
 
@@ -164,10 +171,12 @@ class StreamWriter:
 
 
 class BazelStoreClient(object):
-    def __init__(self, base_uri, username=None, password=None, max_connections=48, retry_policy=None):
+    def __init__(
+        self, base_uri, username=None, password=None, max_connections=48, retry_policy=None, timeout=DEFAULT_TIMEOUT
+    ):
         self.base_uri = base_uri.rstrip('/') + '/'
         self.session = requests.Session()
-        adapter = TimeoutHTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections)
+        adapter = TimeoutHTTPAdapter(pool_connections=max_connections, pool_maxsize=max_connections, timeout=timeout)
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
         if username and password:
