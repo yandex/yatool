@@ -14,6 +14,7 @@
 #include "transitive_requirements_check.h"
 #include "ymake.h"
 #include "configure_tasks.h"
+#include "analyses_tasks.h"
 
 #include <devtools/ymake/build_graph_scope.h>
 #include <devtools/ymake/compact_graph/dep_types.h>
@@ -762,31 +763,64 @@ bool PostConfigureStage(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     return hasBadLoops;
 }
 
-asio::awaitable<TMaybe<EBuildResult>> AnalysesStage(TBuildConfiguration& conf, THolder<TYMake>& yMake, bool hasBadLoops) {
-    if (!yMake->CanBypassConfigure() || conf.IsBlacklistHashChanged()) {
-        yMake->CheckBlacklist();
+namespace {
+    TMaybe<EBuildResult> AnalyseDependencies(TBuildConfiguration& conf, TYMake& yMake, bool hasBadLoops) {
+        // Load Dependency Management and DependsToModulesClosure from cache if possible,
+        // otherwise compute them and save to cache.
+        if (auto result = yMake.ApplyDependencyManagement()) {
+            return result.GetRef();
+        }
+
+        MakeUnique(yMake.StartTargets);
+
+        if (!yMake.CanBypassConfigure() && conf.CheckTransitiveRequirements) {
+            CheckTransitiveRequirements(yMake.GetRestoreContext(), yMake.StartTargets);
+        }
+
+        if (!hasBadLoops && Diag()->ChkPeers && !ConfMsgManager()->IsChkPeersCompleted()) {
+            yMake.FindMissingPeerdirs();
+            ConfMsgManager()->MarkChkPeersCompleted();
+        }
+        return TMaybe<EBuildResult>();
     }
-    if (!yMake->CanBypassConfigure() || conf.IsIsolatedProjectsHashChanged()) {
-        yMake->CheckIsolatedProjects();
+}
+
+asio::awaitable<TMaybe<EBuildResult>> AnalysesStage(TBuildConfiguration& conf, TYMake& yMake, bool hasBadLoops, TExecutorWithContext<TExecContext> exec) {
+    const bool checkBlacklist = !yMake.CanBypassConfigure() || conf.IsBlacklistHashChanged();
+    const bool checkIsolatedProjects = !yMake.CanBypassConfigure() || conf.IsIsolatedProjectsHashChanged();
+    if (!conf.ParallelIsolatedProjects || !checkIsolatedProjects) {
+        if (checkBlacklist) {
+            yMake.CheckBlacklist();
+        }
+        if (checkIsolatedProjects) {
+            yMake.CheckIsolatedProjects();
+        }
+        co_return AnalyseDependencies(conf, yMake, hasBadLoops);
     }
 
-    // Load Dependency Management and DependsToModulesClosure from cache if possible,
-    // otherwise compute them and save to cache.
-    if (auto result = yMake->ApplyDependencyManagement()) {
-        co_return result.GetRef();
+    const auto input = [&] {
+        NYMake::TTraceStage stage{"Prepare isolated projects"};
+        TRestoreContext restoreContext(conf, yMake.Graph, yMake.Modules);
+        TRestoreContext recurseRestoreContext(conf, yMake.RecurseGraph, yMake.Modules);
+        return conf.IsolatedProjects.PrepareCheck(restoreContext, yMake.StartTargets, recurseRestoreContext, yMake.RecurseStartTargets);
+    }();
+    TIsolatedProjects::TCheckResult isolatedResult;
+    const auto result = co_await RunConcurrentAnalyses(exec, [&] {
+        NYMake::TTraceStage stage{"Check isolated projects"};
+        isolatedResult = conf.IsolatedProjects.CheckAll(input);
+    }, [&] {
+        if (checkBlacklist) {
+            yMake.CheckBlacklist();
+        }
+        return AnalyseDependencies(conf, yMake, hasBadLoops);
+    });
+    // Both branches have stopped borrowing the input and graph, including on an
+    // early DM result. Only this flow writes the isolated-project diagnostics.
+    {
+        NYMake::TTraceStage stage{"Apply isolated projects diagnostics"};
+        isolatedResult.Apply(yMake.Graph);
     }
-
-    MakeUnique(yMake->StartTargets);
-
-    if (!yMake->CanBypassConfigure() && conf.CheckTransitiveRequirements) {
-        CheckTransitiveRequirements(yMake->GetRestoreContext(), yMake->StartTargets);
-    }
-
-    if (!hasBadLoops && Diag()->ChkPeers && !ConfMsgManager()->IsChkPeersCompleted()) {
-        yMake->FindMissingPeerdirs();
-        ConfMsgManager()->MarkChkPeersCompleted();
-    }
-    co_return TMaybe<EBuildResult>();
+    co_return result;
 }
 
 asio::awaitable<void> ReportConfigureErrors(THolder<TYMake>& yMake) {
@@ -901,7 +935,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
     }
 
     auto mainFlow = asio::co_spawn(exec, [exec, &conf, &yMake, hasBadLoops]() -> asio::awaitable<TMaybe<EBuildResult>> {
-        auto result = co_await asio::co_spawn(exec, AnalysesStage(conf, yMake, hasBadLoops), asio::use_awaitable);
+        auto result = co_await asio::co_spawn(exec, AnalysesStage(conf, *yMake, hasBadLoops, exec), asio::use_awaitable);
         if (result.Defined()) {
             co_return result.GetRef();
         }

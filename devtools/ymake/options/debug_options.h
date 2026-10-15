@@ -17,6 +17,7 @@
 #include <optional>
 
 struct TDebugOptions {
+    bool ParallelIsolatedProjects = false;
     bool RebuildGraph = false;
     bool RebuildJsonGraph = false;
     bool UseJsonCache = false;

@@ -95,6 +95,7 @@ SRCS(
     context_executor.cpp
     conf.cpp
     config/config.cpp
+    analyses_tasks.cpp
     configure_tasks.cpp
     dump_graph_info.cpp
     debug_log.cpp
