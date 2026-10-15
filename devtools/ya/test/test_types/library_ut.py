@@ -150,6 +150,9 @@ class UnitTestSuite(common_types.AbstractTestSuite):
         if for_dist_build and not getattr(opts, 'keep_full_test_logs', False):
             cmd.append("--truncate-logs")
 
+        if getattr(opts, 'unittest_err_limit', None):
+            cmd += ["--ut-err-limit", str(opts.unittest_err_limit)]
+
         if self.get_fork_mode() == "subtests":
             cmd.append("--split-by-tests")
 

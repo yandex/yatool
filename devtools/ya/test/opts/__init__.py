@@ -5,7 +5,8 @@ import shlex
 import sys
 
 import devtools.ya.core.yarg
-from devtools.ya.core import error
+import humanfriendly
+from devtools.ya.core import common_opts, error
 from devtools.ya.core.yarg import help_level
 from exts import path2
 from devtools.ya.test import const
@@ -1129,6 +1130,10 @@ class FileReportsOptions(devtools.ya.core.yarg.Options):
             self.junit_path = os.path.expanduser(self.junit_path)
 
 
+# run_ut rejects smaller limits: they leave no room for the tail next to the truncation marker
+UNITTEST_ERR_LIMIT_MIN = 4 * 1024
+
+
 class OutputOptions(devtools.ya.core.yarg.Options):
     CompressionFilters = ['none', 'zstd', 'gzip']
 
@@ -1142,6 +1147,7 @@ class OutputOptions(devtools.ya.core.yarg.Options):
         self.test_output_compression_filter = 'zstd'
         self.test_output_compression_level = 1
         self.test_node_output_limit = None
+        self.unittest_err_limit = None
 
     def consumer(self):
         return [
@@ -1233,6 +1239,14 @@ class OutputOptions(devtools.ya.core.yarg.Options):
             ),
             devtools.ya.core.yarg.ConfigConsumer('test_node_output_limit'),
             TestArgConsumer(
+                ['--unittest-err-limit'],
+                help="Keep at most this size of unittest ut.err (bytes or e.g. 2MiB): its head and tail",
+                hook=devtools.ya.core.yarg.SetValueHook('unittest_err_limit'),
+                subgroup=OUTPUT_SUBGROUP,
+                visible=help_level.HelpLevel.EXPERT,
+            ),
+            devtools.ya.core.yarg.ConfigConsumer('unittest_err_limit'),
+            TestArgConsumer(
                 ['--test-keep-symlinks'],
                 help="Don't delete symlinks from test output",
                 hook=devtools.ya.core.yarg.SetConstValueHook('test_keep_symlinks', True),
@@ -1242,6 +1256,18 @@ class OutputOptions(devtools.ya.core.yarg.Options):
         ]
 
     def postprocess(self):
+        # Here rather than in the hook, so that ya.conf values are checked too
+        if self.unittest_err_limit is not None:
+            size = self.unittest_err_limit
+            try:
+                self.unittest_err_limit = common_opts.parse_size_arg(size)
+            except humanfriendly.InvalidSize as e:
+                raise devtools.ya.core.yarg.ArgsValidatingException("Invalid --unittest-err-limit: {}".format(e))
+            if self.unittest_err_limit < UNITTEST_ERR_LIMIT_MIN:
+                raise devtools.ya.core.yarg.ArgsValidatingException(
+                    "--unittest-err-limit must be at least {} bytes: {}".format(UNITTEST_ERR_LIMIT_MIN, size)
+                )
+
         if self.test_output_compression_filter == 'none':
             self.test_output_compression_filter = None
         else:
