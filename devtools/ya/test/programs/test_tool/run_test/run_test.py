@@ -1670,9 +1670,8 @@ def main():
             wineprefix = os.path.join(work_dir, ".wine")
             os.mkdir(wineprefix)
             env["WINEPREFIX"] = wineprefix
-            wine_links_env, wine_links_reason = wine_env.fakedll_hardlink_decision(
-                options.global_resources.get(const.WINE_TOOL), wineprefix
-            )
+            wine_root = options.global_resources.get(const.WINE_TOOL)
+            wine_links_env, wine_links_reason = wine_env.fakedll_hardlink_decision(wine_root, wineprefix)
             env.update(wine_links_env)
 
         user_env = {}
@@ -1681,6 +1680,12 @@ def main():
         if wineprefix:
             wine_mode = wine_env.describe(env, user_env)
             logger.info("wine env: mode=%s prefix=%s reason=%s", wine_mode, wineprefix, wine_links_reason or "-")
+            # A ready prefix from the template in the wine resource saves the wineboot in every chunk
+            clone, reason = wine_env.clone_prefix(wine_root, wineprefix, dict(os.environ, **user_env))
+            if clone:
+                logger.info("wine prefix: cloned linked=%d copied=%d", clone["linked"], clone["copied"])
+            else:
+                logger.info("wine prefix: created by wine (%s)", reason)
 
         context.update_env(user_env)
 
