@@ -5,6 +5,7 @@ PY_NAMESPACE(yalibrary.bazel_warming.manifest)
 PY_SRCS(
     __init__.py
     model.py
+    stream.py
     writer.py
 )
 

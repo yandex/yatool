@@ -1,7 +1,6 @@
 """Строгий формат manifest: проверка схемы, идентификатора запуска и файловых путей."""
 
 from dataclasses import dataclass
-import json
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -12,7 +11,7 @@ import stat
 # -----------------------------------------------------------------------------
 
 SCHEMA_VERSION = 1
-MAX_MANIFEST_BYTES = 256 * 1024 * 1024
+_MANIFEST_FIELDS = ('schema_version', 'run_id', 'complete', 'build_exit_code', 'max_file_size', 'nodes')
 # Ограничиваем число UID, чтобы сбой кеша не запускал массовую пересборку.
 # У одного UID может быть несколько файлов CAS; лимит относится к результатам сборки.
 MAX_CACHE_REPAIR_RESULTS = 100
@@ -155,13 +154,20 @@ class Node:
 
     @classmethod
     def from_dict(cls, data, max_file_size):
+        result = cls._from_dict(data)
+        result.validate(max_file_size)
+        return result
+
+    @classmethod
+    def _from_dict(cls, data):
+        """Преобразовать узел до проверки ограничений из заголовка манифеста."""
         expected = ('uid', 'outputs', 'cacheable', 'put_status', 'written_files')
         if isinstance(data, dict) and 'build_error' in data:
             expected += ('build_error',)
         _object(data, expected, 'nodes')
         if not isinstance(data['outputs'], list) or not isinstance(data['written_files'], list):
             raise ManifestError('outputs и written_files должны быть JSON-массивами.')
-        result = cls(
+        return cls(
             uid=data['uid'],
             outputs=tuple(data['outputs']),
             cacheable=data['cacheable'],
@@ -169,8 +175,6 @@ class Node:
             written_files=tuple(WrittenFile.from_dict(item) for item in data['written_files']),
             build_error=data.get('build_error', ''),
         )
-        result.validate(max_file_size)
-        return result
 
     @property
     def requires_verification(self):
@@ -263,7 +267,12 @@ class Manifest:
 
     @classmethod
     def from_dict(cls, data):
-        expected = ('schema_version', 'run_id', 'complete', 'build_exit_code', 'max_file_size', 'nodes')
+        return cls._from_dict(data, Node._from_dict)
+
+    @classmethod
+    def _from_dict(cls, data, node_from_dict):
+        """Собрать манифест из JSON или уже прочитанных узлов."""
+        expected = _MANIFEST_FIELDS
         if isinstance(data, dict) and 'local_cache' in data:
             expected += ('local_cache',)
         _object(data, expected, 'manifest')
@@ -274,7 +283,7 @@ class Manifest:
             raise ManifestError('nodes должен быть JSON-массивом.')
         result = cls(
             run_id=data['run_id'],
-            nodes=tuple(Node.from_dict(node, data['max_file_size']) for node in data['nodes']),
+            nodes=tuple(node_from_dict(node) for node in data['nodes']),
             max_file_size=data['max_file_size'],
             complete=data['complete'],
             build_exit_code=data['build_exit_code'],
@@ -286,7 +295,7 @@ class Manifest:
 
 
 # -----------------------------------------------------------------------------
-# Чтение только окончательного manifest текущего запуска
+# Чтение и проверка manifest
 # -----------------------------------------------------------------------------
 
 
@@ -300,26 +309,30 @@ def _unique_object(pairs):
     return result
 
 
-def read_manifest(path, expected_run_id):
-    """Прочитать обычный файл в пределах лимита и отклонить незавершённый или чужой запуск."""
-    validate_run_id(expected_run_id)
+def _load_manifest(path, check=None):
+    """Прочитать и проверить документ, включая незавершённый."""
+    from .stream import read_document
+
     flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
     descriptor = os.open(Path(path), flags)
     with os.fdopen(descriptor, 'rb') as source:
         info = os.fstat(source.fileno())
         if not stat.S_ISREG(info.st_mode):
             raise ManifestError('Manifest должен быть обычным файлом.')
-        if info.st_size > MAX_MANIFEST_BYTES:
-            raise ManifestError(f'Манифест превышает лимит {MAX_MANIFEST_BYTES / 1024**2:g} МиБ.')
-        # BufferedReader reserves the requested size even for a tiny file.
-        raw = source.read(info.st_size + 1)
-    if len(raw) != info.st_size:
-        raise ManifestError('Размер манифеста изменился во время чтения.')
-    try:
-        data = json.loads(raw.decode('utf-8'), object_pairs_hook=_unique_object)
-    except (UnicodeDecodeError, ValueError, RecursionError) as error:
-        raise ManifestError(f'Не удалось прочитать JSON manifest: {error}.') from error
-    result = Manifest.from_dict(data)
+        data = read_document(
+            source,
+            expected_size=info.st_size,
+            node_from_dict=Node._from_dict,
+            fields=(*_MANIFEST_FIELDS, 'local_cache'),
+            check=check,
+        )
+    return Manifest._from_dict(data, lambda node: node)
+
+
+def read_manifest(path, expected_run_id):
+    """Прочитать манифест любого размера и проверить завершение текущего запуска."""
+    validate_run_id(expected_run_id)
+    result = _load_manifest(path)
     if result.run_id != expected_run_id:
         raise ManifestError('Manifest принадлежит другому запуску.')
     if not result.complete:
