@@ -301,16 +301,20 @@ def _unique_object(pairs):
 
 
 def read_manifest(path, expected_run_id):
-    """Прочитать обычный файл до 256 MiB и отклонить незавершённый или чужой запуск."""
+    """Прочитать обычный файл в пределах лимита и отклонить незавершённый или чужой запуск."""
     validate_run_id(expected_run_id)
     flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
     descriptor = os.open(Path(path), flags)
     with os.fdopen(descriptor, 'rb') as source:
-        if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+        info = os.fstat(source.fileno())
+        if not stat.S_ISREG(info.st_mode):
             raise ManifestError('Manifest должен быть обычным файлом.')
-        raw = source.read(MAX_MANIFEST_BYTES + 1)
-    if len(raw) > MAX_MANIFEST_BYTES:
-        raise ManifestError('Manifest превышает лимит 256 MiB.')
+        if info.st_size > MAX_MANIFEST_BYTES:
+            raise ManifestError(f'Манифест превышает лимит {MAX_MANIFEST_BYTES / 1024**2:g} МиБ.')
+        # BufferedReader reserves the requested size even for a tiny file.
+        raw = source.read(info.st_size + 1)
+    if len(raw) != info.st_size:
+        raise ManifestError('Размер манифеста изменился во время чтения.')
     try:
         data = json.loads(raw.decode('utf-8'), object_pairs_hook=_unique_object)
     except (UnicodeDecodeError, ValueError, RecursionError) as error:
