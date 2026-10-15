@@ -1348,15 +1348,13 @@ def _test_tool_file_signature(file_stat: os.stat_result) -> tuple[int, ...]:
 @functools.lru_cache(maxsize=32)
 def _local_test_tool_digest(opts, path: str, signature: tuple[int, ...]) -> str:
     # Include opts in the cache key to reread tools for each build invocation.
-    # Tools must remain immutable while that build's graph is generated.
+    # The tool's contents must remain immutable while that build's graph is generated.
+    # The signature only invalidates cached hashes: hardlink operations can change
+    # ctime during reading without changing the contents.
     hasher = hashlib.sha256()
     with open(path, 'rb') as tool:
-        if _test_tool_file_signature(os.fstat(tool.fileno())) != signature:
-            raise RuntimeError(f"Local test_tool changed while calculating its UID: {path}")
         for chunk in iter(lambda: tool.read(1 << 20), b''):
             hasher.update(chunk)
-        if _test_tool_file_signature(os.fstat(tool.fileno())) != signature:
-            raise RuntimeError(f"Local test_tool changed while calculating its UID: {path}")
     return hasher.hexdigest()
 
 
@@ -1372,8 +1370,6 @@ def _local_test_tool_uid(path: str, opts) -> str:
         digest = _local_test_tool_digest.__wrapped__(opts, path, signature)
     else:
         digest = _local_test_tool_digest(opts, path, signature)
-    if _test_tool_file_signature(os.stat(path)) != signature:
-        raise RuntimeError(f"Local test_tool changed while calculating its UID: {path}")
     return f"local-test-tool-sha256:{digest}"
 
 
