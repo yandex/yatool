@@ -116,7 +116,7 @@ def truncate_middle(filename, size, msg=None):
         rstart = filesize - rsize
 
         afile.seek(rstart, os.SEEK_SET)
-        data += afile.read(rsize)
+        data += afile.read(rstart)
 
         afile.seek(lend, os.SEEK_SET)
         afile.write(data)

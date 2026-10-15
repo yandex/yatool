@@ -41,8 +41,6 @@ logger = logging.getLogger(__name__)
 
 
 MAX_FILE_SIZE = 1024 * 1024  # 1MiB
-# A smaller limit leaves no room for the tail next to the truncation marker
-UT_ERR_LIMIT_MIN = 4 * 1024
 TIMEOUT_RC = 98
 VALGRIND_ERROR_RC = 101
 START_MARKER = "###subtest-started:"
@@ -88,12 +86,6 @@ def parse_args():
         help="Truncate logs. Don't collect core dump files. Care about autocheck",
     )
     parser.add_argument(
-        "--ut-err-limit",
-        type=int,
-        default=0,
-        help="Keep at most this many bytes of ut.err: its head and tail (default: the whole file)",
-    )
-    parser.add_argument(
         "--dont-store-cores", dest='collect_cores', action="store_false", help="Don't collect core dump files"
     )
     parser.add_argument("--valgrind-path", dest="valgrind_path", action='store', default='')
@@ -136,9 +128,6 @@ def parse_args():
             parser.error("Failed to determine project path")
         args.project_path = path.rsplit("arcadia")[1]
     args.project_path.strip("/")
-
-    if args.ut_err_limit and args.ut_err_limit < UT_ERR_LIMIT_MIN:
-        parser.error("--ut-err-limit must be 0 or at least %d bytes: %d" % (UT_ERR_LIMIT_MIN, args.ut_err_limit))
 
     # Don't collect core dump files if truncation is required
     if args.truncate_logs:
@@ -643,7 +632,6 @@ def execute_ut(
     test_mode=False,
     wine_path='',
     stop_signal=None,
-    ut_err_limit=0,
 ):
     outfile = os.path.join(logsdir, "ut.out")
     errfile = os.path.join(logsdir, "ut.err")
@@ -799,10 +787,6 @@ def execute_ut(
         files = list(filter(os.path.isfile, files))
         logger.debug("Truncating logs to %d bytes", MAX_FILE_SIZE)
         tools.truncate_logs([outfile, errfile] + files, MAX_FILE_SIZE)
-    if ut_err_limit:
-        # The whole file, so every launch that appends to it keeps it within the limit
-        logger.debug("Truncating ut.err to %d bytes", ut_err_limit)
-        tools.truncate_logs([errfile], ut_err_limit)
 
     return Result(
         proc.returncode,
@@ -880,7 +864,6 @@ def launch_tests(
     test_binary_args,
     is_parallel,
     temp_tracefile_dir,
-    ut_err_limit=0,
 ):
 
     logger.debug("Single launch for %d tests", len(test_names))
@@ -899,18 +882,7 @@ def launch_tests(
     cmd += ["+%s" % x for x in test_names]
     for additional_arg in test_binary_args:
         cmd.append(additional_arg)
-    res = execute_ut(
-        cmd,
-        logsdir,
-        truncate,
-        gdb_path,
-        gdb_debug,
-        valgrind_path,
-        test_mode,
-        wine_path,
-        stop_signal,
-        ut_err_limit=ut_err_limit,
-    )
+    res = execute_ut(cmd, logsdir, truncate, gdb_path, gdb_debug, valgrind_path, test_mode, wine_path, stop_signal)
 
     performed_suite = gen_suite(suite.project_path)
 
@@ -1241,7 +1213,6 @@ def main():
             args.test_binary_args,
             is_parallel,
             temp_tracefile_dir,
-            ut_err_limit=args.ut_err_limit,
         )
         logger.debug("Finished executing tests: %s", tests)
         return res
