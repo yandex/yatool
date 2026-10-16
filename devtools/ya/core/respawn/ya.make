@@ -2,6 +2,7 @@ PY23_LIBRARY()
 
 PEERDIR(
     devtools/ya/core/config
+    devtools/ya/core/sec
     devtools/ya/exts
     devtools/ya/yalibrary/find_root
 )

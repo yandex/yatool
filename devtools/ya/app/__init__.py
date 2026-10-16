@@ -202,7 +202,7 @@ def execute(action, respawn=RespawnType.MANDATORY):
             el = getattr(ctx, "evlog", None)
             if el:
                 stage_tracer.stage_tracer.add_consumer(stage_tracer.EvLogConsumer(el))
-            logger.debug('Run action on %s with params %s', action, ctx.params)
+            logger.debug('Run action on %s with params %s', action, sec.cleanup_bazel_cache_data(ctx.params.__dict__))
             report_params(ctx)
             action_name = getattr(action, "__name__", "module")
             modules_initialization_full_stage.finish()

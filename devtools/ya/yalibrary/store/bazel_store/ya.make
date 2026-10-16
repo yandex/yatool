@@ -22,6 +22,7 @@ RECURSE(protocol)
 RECURSE_FOR_TESTS(
     tests
     ut/http
+    ut/multi
     ut/repair
     ut/restore
 )

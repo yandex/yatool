@@ -22,6 +22,7 @@ import devtools.ya.core.common_opts
 import devtools.ya.core.config
 import devtools.ya.core.error
 import devtools.ya.core.profiler
+import devtools.ya.core.sec
 import devtools.ya.core.stage_tracer as stage_tracer
 import devtools.ya.core.yarg
 import devtools.ya.handlers.package.opts as package_opts
@@ -404,6 +405,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.bazel_remote_password = params.bazel_remote_password
     build_options.bazel_remote_password_file = params.bazel_remote_password_file
     build_options.bazel_remote_readonly = params.bazel_remote_readonly
+    build_options.bazel_remote_caches = params.bazel_remote_caches
 
     build_options.sandbox_oauth_token = params.sandbox_oauth_token
     if app_config.in_house:
@@ -415,7 +417,10 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
 
     app_ctx.dump_debug['package_builds'] += [(build_key, build_options.__dict__)]
 
-    logger.debug("Build options %s", json.dumps(build_options.__dict__, sort_keys=True, indent=2))
+    logger.debug(
+        "Build options %s",
+        json.dumps(devtools.ya.core.sec.cleanup_bazel_cache_data(build_options.__dict__), sort_keys=True, indent=2),
+    )
 
     builder = devtools.ya.build.targets_deref.intercept(
         lambda x: devtools.ya.build.ya_make.YaMake(x, app_ctx), build_options

@@ -46,6 +46,7 @@ PEERDIR(
     devtools/ya/core/config
     devtools/ya/core/error
     devtools/ya/core/profiler
+    devtools/ya/core/sec
     devtools/ya/core/stage_tracer
     devtools/ya/core/yarg
     devtools/ya/exts

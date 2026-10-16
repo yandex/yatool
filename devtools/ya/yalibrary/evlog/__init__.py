@@ -12,6 +12,7 @@ import six
 import zstandard as zstd
 
 import devtools.ya.core.gsid
+import devtools.ya.core.sec
 from exts import fs, os2, yjson, archive
 
 import typing as tp  # noqa
@@ -183,6 +184,7 @@ class EvlogWriter(BaseEvlogWriter):
             'event': event,
             'value': kwargs,
         }
+        value = devtools.ya.core.sec.cleanup_bazel_cache_data(value)
         try:
             s = yjson.dumps(value) + '\n'
         except (UnicodeDecodeError, OverflowError):

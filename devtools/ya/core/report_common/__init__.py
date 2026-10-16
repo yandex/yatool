@@ -64,7 +64,7 @@ def sanitize_value(value, suppressions):
     # type: (object, list[str]) -> object
     """Sanitize and normalize a telemetry value."""
     try:
-        value = strings.unicodize_deep(value)
+        value = sec.cleanup_bazel_cache_data(strings.unicodize_deep(value))
         return json.loads(sec.cleanup(json.dumps(value, cls=ReportEncoder), suppressions))
     except Exception as e:
         # Do not expose the input or traceback: they may contain a secret.

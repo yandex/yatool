@@ -6,6 +6,7 @@ import yalibrary.find_root
 import exts.process
 
 import devtools.ya.core.config
+import devtools.ya.core.sec
 
 RESPAWNS_PARAM = 'YA_RESPAWNS'
 
@@ -74,7 +75,9 @@ def _src_root_respawn(from_arcadia_root, to_arcadia_root):
     # -s     : don't add user site directory to sys.path; also PYTHONNOUSERSITE
     # -S     : don't imply 'import site' on initialization
     full_cmd = ["-E", "-s", "-S"] + cmd
-    logger.debug('Respawn %s %s (triggered by: %s)', py_path, ' '.join(full_cmd), new_respawns)
+    logger.debug(
+        'Respawn %s %s (triggered by: %s)', py_path, ' '.join(devtools.ya.core.sec.argv(full_cmd)), new_respawns
+    )
 
     exts.process.execve(
         py_path,

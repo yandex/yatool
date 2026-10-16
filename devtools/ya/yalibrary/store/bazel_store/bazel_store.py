@@ -502,6 +502,14 @@ class BazelStore(DistStore):
             self._put_observer(uid, status.name.lower(), root_dir, files)
         return status
 
+    @property
+    def base_uri(self):
+        return self._client.base_uri
+
+    @property
+    def disabled(self):
+        return self._disabled
+
     def _get_data_size(self, meta_info):
         return sum(x.get('size', 0) for x in meta_info['files'].values())
 
@@ -621,3 +629,118 @@ class BazelStore(DistStore):
     @property
     def avg_compression_ratio(self):
         return 1.0
+
+
+class MultiBazelStore(DistStore):
+    """Ordered chain of Bazel caches: reads fall through the chain, writes go to the first cache only."""
+
+    support_content_uids = False
+
+    def __init__(self, stores):
+        if not stores:
+            raise ValueError('MultiBazelStore requires at least one BazelStore')
+        self._stores = list(stores)
+        self._primary = self._stores[0]
+        super(MultiBazelStore, self).__init__(
+            name='bazel-store',
+            stats_name='bazel_store_status',
+            tag='BAZEL',
+            readonly=self._primary.readonly(),
+        )
+
+    @property
+    def stores(self):
+        return list(self._stores)
+
+    @property
+    def primary(self):
+        return self._primary
+
+    @property
+    def disabled(self):
+        return all(store.disabled for store in self._stores)
+
+    def fits(self, node):
+        return self._primary.fits(node)
+
+    def prepare(self, *args, **kwargs):
+        return
+
+    def readonly(self):
+        return self._primary.readonly()
+
+    # Public methods are overridden on purpose: every child keeps its own timers and counters,
+    # the chain itself only aggregates them in stats().
+    def has(self, uid):
+        for store in self._stores:
+            if store.disabled:
+                continue
+            if store.has(uid):
+                return True
+        return False
+
+    def try_restore(self, uid, into_dir, filter_func=None, expected_outputs=None):
+        for store in self._stores:
+            if store.disabled:
+                continue
+            if store.try_restore(uid, into_dir, filter_func=filter_func, expected_outputs=expected_outputs):
+                return True
+        return False
+
+    def put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
+        return self._primary.put(self_uid, uid, root_dir, files, codec=codec, cuid=cuid)
+
+    @property
+    def avg_compression_ratio(self):
+        return 1.0
+
+    def _cache_summary(self, store):
+        return {
+            'base_uri': store.base_uri,
+            'cache_hit': dict(store._cache_hit),
+            'failures': dict(store._failures),
+            'disabled': store.disabled,
+        }
+
+    def _aggregate(self):
+        for key in self._timers:
+            self._timers[key] = sum(store._timers.get(key, 0) for store in self._stores)
+        for key in self._time_intervals:
+            intervals = []
+            for store in self._stores:
+                intervals.extend(store._time_intervals.get(key, []))
+            self._time_intervals[key] = intervals
+        for key in self._counters:
+            self._counters[key] = sum(store._counters.get(key, 0) for store in self._stores)
+        for key in self._failures:
+            self._failures[key] = sum(store._failures.get(key, 0) for store in self._stores)
+        for key in self._data_size:
+            self._data_size[key] = sum(store._data_size.get(key, 0) for store in self._stores)
+        for key in self._cache_hit:
+            self._cache_hit[key] = sum(store._cache_hit.get(key, 0) for store in self._stores)
+
+    def stats(self, execution_log, evlog_writer):
+        self._aggregate()
+        summaries = [self._cache_summary(store) for store in self._stores]
+        for summary in summaries:
+            logger.debug(
+                'Bazel cache %s: requested=%d found=%d failures=%s disabled=%s',
+                summary['base_uri'],
+                summary['cache_hit']['requested'],
+                summary['cache_hit']['found'],
+                summary['failures'],
+                summary['disabled'],
+            )
+
+        super(MultiBazelStore, self).stats(execution_log, self._wrap_evlog_writer(evlog_writer, summaries))
+
+    @staticmethod
+    def _wrap_evlog_writer(evlog_writer, summaries):
+        if evlog_writer is None:
+            return None
+
+        def writer(name, **kwargs):
+            kwargs['caches'] = summaries
+            return evlog_writer(name, **kwargs)
+
+        return writer

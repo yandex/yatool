@@ -472,6 +472,36 @@ class CacheFactory:
 
     def _init_bazel_remote_cache(self):
         from yalibrary.store.bazel_store import bazel_store
+        from devtools.ya.build.build_opts import parse_bazel_remote_caches
+
+        caches = parse_bazel_remote_caches(getattr(self._opts, 'bazel_remote_caches', None))
+        if caches:
+            fits_filter = self._get_fits_filter()
+            connection_pool_size = self._get_connection_pool_size()
+            readonly = getattr(self._opts, 'bazel_remote_readonly', True)
+            max_file_size = getattr(self._opts, 'dist_cache_max_file_size', 0)
+            put_observer = self.warming_manifest.record_put if self.warming_manifest else None
+
+            logger.debug("Bazel remote caches: %s", [cache['baseuri'] for cache in caches])
+            stores = []
+            for index, cache in enumerate(caches):
+                stores.append(
+                    bazel_store.BazelStore(
+                        base_uri=cache['baseuri'],
+                        username=cache.get('username'),
+                        password=self._read_bazel_password(cache.get('password'), cache.get('password_file')),
+                        readonly=readonly,
+                        max_file_size=max_file_size,
+                        max_connections=connection_pool_size,
+                        timeout=getattr(self._opts, 'bazel_remote_timeout', bazel_store.DEFAULT_TIMEOUT),
+                        fits_filter=fits_filter,
+                        # Uploads go to the first cache only, so only it feeds the warming manifest.
+                        put_observer=put_observer if index == 0 else None,
+                    )
+                )
+            if len(stores) == 1:
+                return stores[0]
+            return bazel_store.MultiBazelStore(stores)
 
         password = self._get_bazel_password()
         fits_filter = self._get_fits_filter()
@@ -540,9 +570,13 @@ class CacheFactory:
         )
 
     def _get_bazel_password(self):
-        password = getattr(self._opts, 'bazel_remote_password', None)
-        password_file = getattr(self._opts, 'bazel_remote_password_file', None)
+        return self._read_bazel_password(
+            getattr(self._opts, 'bazel_remote_password', None),
+            getattr(self._opts, 'bazel_remote_password_file', None),
+        )
 
+    @staticmethod
+    def _read_bazel_password(password, password_file):
         if not password and password_file:
             logger.debug("Using '%s' file to obtain bazel remote password", password_file)
             try:

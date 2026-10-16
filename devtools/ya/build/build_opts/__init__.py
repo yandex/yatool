@@ -4,6 +4,7 @@ import logging
 import math
 import multiprocessing
 import enum
+from urllib.parse import urlsplit
 
 from humanfriendly import parse_size, parse_timespan, InvalidSize, InvalidTimespan
 
@@ -2673,6 +2674,70 @@ class DistCacheSetupOptions(LocalCacheOptions):
             self.yt_token_path = None
 
 
+BAZEL_REMOTE_CACHE_KEYS = ('baseuri', 'username', 'password', 'password_file')
+
+
+def parse_bazel_remote_caches(value):
+    """Parse the bazel_remote_caches option (JSON string or list of dicts) into a validated list of dicts.
+
+    Every entry describes one cache: {"baseuri": ..., "username": ..., "password": ..., "password_file": ...}.
+    Caches are read in list order; only the first one receives uploads.
+    """
+    if value is None or value == '' or value == []:
+        return []
+    if isinstance(value, str):
+        import exts.yjson as json
+
+        try:
+            value = json.loads(value)
+        except ValueError as e:
+            raise ArgsValidatingException('bazel_remote_caches must be a JSON list: {}'.format(e))
+    if not isinstance(value, (list, tuple)):
+        raise ArgsValidatingException('bazel_remote_caches must be a list of cache descriptions')
+    caches = []
+    seen = set()
+    for index, item in enumerate(value):
+        if isinstance(item, str):
+            item = {'baseuri': item}
+        if not isinstance(item, dict):
+            raise ArgsValidatingException('bazel_remote_caches[{}] must be an object with "baseuri"'.format(index))
+        unknown = sorted(set(item) - set(BAZEL_REMOTE_CACHE_KEYS))
+        if unknown:
+            raise ArgsValidatingException(
+                'bazel_remote_caches[{}] has unknown keys {}; allowed: {}'.format(
+                    index, ', '.join(unknown), ', '.join(BAZEL_REMOTE_CACHE_KEYS)
+                )
+            )
+        baseuri = item.get('baseuri')
+        if not isinstance(baseuri, str) or not baseuri.strip():
+            raise ArgsValidatingException('bazel_remote_caches[{}] must have a non-empty "baseuri"'.format(index))
+        baseuri = baseuri.strip()
+        try:
+            uri = urlsplit(baseuri)
+        except ValueError:
+            raise ArgsValidatingException('bazel_remote_caches[{}].baseuri is not a valid URL'.format(index)) from None
+        if uri.username is not None or uri.password is not None:
+            raise ArgsValidatingException(
+                'bazel_remote_caches[{}].baseuri must not contain credentials; '
+                'set username and password or password_file separately'.format(index)
+            )
+        if not baseuri.startswith(('http://', 'https://')):
+            raise ArgsValidatingException(
+                'bazel_remote_caches[{}].baseuri must start with http:// or https://, got {!r}'.format(index, baseuri)
+            )
+        if baseuri in seen:
+            raise ArgsValidatingException('bazel_remote_caches contains a duplicate baseuri {!r}'.format(baseuri))
+        seen.add(baseuri)
+        cache = {'baseuri': baseuri}
+        for key in ('username', 'password', 'password_file'):
+            if key in item and item[key] is not None:
+                if not isinstance(item[key], str):
+                    raise ArgsValidatingException('bazel_remote_caches[{}].{} must be a string'.format(index, key))
+                cache[key] = item[key]
+        caches.append(cache)
+    return caches
+
+
 class DistCacheOptions(DistCacheSetupOptions):
     def __init__(self):
         super().__init__()
@@ -2711,6 +2776,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.bazel_remote_username = None
         self.bazel_remote_password = None
         self.bazel_remote_password_file = None
+        self.bazel_remote_caches = []
         self.bazel_remote_readonly = True
         self.bazel_remote_warming = False
         self.bazel_remote_warming_manifest = None
@@ -2831,6 +2897,16 @@ class DistCacheOptions(DistCacheSetupOptions):
                     visible=HelpLevel.ADVANCED,
                 ),
                 ConfigConsumer('bazel_remote_password_file'),
+                ArgConsumer(
+                    ['--bazel-remote-caches'],
+                    help='JSON list of Bazel-remote caches read in order, the first one receives uploads: '
+                    '[{"baseuri": "http://a/", "username": "u", "password_file": "/path"}, {"baseuri": "http://b/"}]. '
+                    'Overrides --bazel-remote-base-uri/--bazel-remote-username/--bazel-remote-password',
+                    hook=SetValueHook('bazel_remote_caches'),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.ADVANCED,
+                ),
+                ConfigConsumer('bazel_remote_caches'),
                 ArgConsumer(
                     ['--bazel-remote-put'],
                     help='Upload to Bazel-remote store',
@@ -3163,6 +3239,8 @@ class DistCacheOptions(DistCacheSetupOptions):
 
         if not self.bazel_remote_store:
             self.dist_store_threads = 0
+
+        self.bazel_remote_caches = parse_bazel_remote_caches(self.bazel_remote_caches)
 
         if self.yt_store:
             if not self.yt_proxy:
