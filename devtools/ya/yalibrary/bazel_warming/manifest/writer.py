@@ -1,6 +1,7 @@
 """Снимок плана до HEAD/strip и итоги PUT до освобождения build root."""
 
 from dataclasses import replace
+import io
 import json
 import os
 from pathlib import Path
@@ -9,23 +10,30 @@ import tempfile
 import threading
 
 from .model import Manifest, ManifestError, WrittenFile, relative_output
+from .fileio import encoded_stream
 
 # -----------------------------------------------------------------------------
 # Атомарная запись приватного файла
 # -----------------------------------------------------------------------------
 
 
-def _write_atomic(path, manifest):
-    """Записать JSON через fsync/replace, не оставляя обрезанный итоговый файл."""
+def write_manifest(path, manifest):
+    """Атомарно записать приватный JSON; суффикс .gz включает сжатие."""
+    path = Path(path)
     data = manifest.to_dict()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     descriptor, temporary = tempfile.mkstemp(prefix='.' + path.name + '-', dir=path.parent)
     try:
-        with os.fdopen(descriptor, 'w', encoding='utf-8') as output:
-            json.dump(data, output, ensure_ascii=False, indent=2)
-            output.write('\n')
-            output.flush()
-            os.fsync(output.fileno())
+        with os.fdopen(descriptor, 'wb') as raw:
+            with encoded_stream(raw, path.suffix == '.gz') as destination:
+                output = io.TextIOWrapper(destination, encoding='utf-8')
+                try:
+                    json.dump(data, output, ensure_ascii=False, indent=2, allow_nan=False)
+                    output.write('\n')
+                finally:
+                    output.detach()  # flush, но gzip trailer должен записаться до fsync raw.
+            raw.flush()
+            os.fsync(raw.fileno())
         os.replace(temporary, path)
         directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
         try:
@@ -55,7 +63,7 @@ class ManifestWriter:
         self._selected = False
         self._finished = False
         self._error = None
-        _write_atomic(self.path, self._snapshot())
+        write_manifest(self.path, self._snapshot())
 
     def _snapshot(self, complete=False, build_exit_code=None):
         return Manifest(
@@ -77,7 +85,7 @@ class ManifestWriter:
                 raise ManifestError('Начальный план не должен содержать итоги PUT.')
             self._nodes = {node.uid: node for node in snapshot.nodes}
             try:
-                _write_atomic(self.path, snapshot)
+                write_manifest(self.path, snapshot)
             except Exception as error:
                 self._error = error
                 raise
@@ -125,5 +133,5 @@ class ManifestWriter:
                 raise ManifestError('Нельзя завершить незафиксированный или уже завершённый manifest.')
             if self._error is not None:
                 raise ManifestError('Не удалось сохранить план или один из итогов PUT.') from self._error
-            _write_atomic(self.path, self._snapshot(complete=True, build_exit_code=build_exit_code))
+            write_manifest(self.path, self._snapshot(complete=True, build_exit_code=build_exit_code))
             self._finished = True

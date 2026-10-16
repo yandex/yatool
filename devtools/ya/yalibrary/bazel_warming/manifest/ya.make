@@ -4,6 +4,7 @@ PY_NAMESPACE(yalibrary.bazel_warming.manifest)
 
 PY_SRCS(
     __init__.py
+    fileio.py
     model.py
     stream.py
     writer.py
@@ -11,4 +12,6 @@ PY_SRCS(
 
 END()
 
-RECURSE_FOR_TESTS(tests)
+RECURSE_FOR_TESTS(
+    tests
+)

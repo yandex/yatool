@@ -33,10 +33,14 @@ class _JSONStream:
         while amount > 0 and not self.eof:
             if self.check is not None:
                 self.check()
-            size = min(_READ_SIZE, amount, self.expected_size + 1 - self.bytes_read)
+            size = min(_READ_SIZE, amount)
+            if self.expected_size is not None:
+                size = min(size, self.expected_size + 1 - self.bytes_read)
             chunk = self.source.read(size)
             self.bytes_read += len(chunk)
-            if self.bytes_read > self.expected_size or (not chunk and self.bytes_read != self.expected_size):
+            if self.expected_size is not None and (
+                self.bytes_read > self.expected_size or (not chunk and self.bytes_read != self.expected_size)
+            ):
                 raise ManifestError('Размер манифеста изменился во время чтения.')
             self.eof = not chunk
             try:

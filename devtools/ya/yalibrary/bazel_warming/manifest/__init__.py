@@ -11,7 +11,7 @@ from .model import (
     relative_output,
     validate_run_id,
 )
-from .writer import ManifestWriter
+from .writer import ManifestWriter, write_manifest
 
 __all__ = [
     'Manifest',
@@ -24,4 +24,5 @@ __all__ = [
     'read_manifest',
     'relative_output',
     'validate_run_id',
+    'write_manifest',
 ]

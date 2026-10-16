@@ -312,6 +312,7 @@ def _unique_object(pairs):
 def _load_manifest(path, check=None):
     """Прочитать и проверить документ, включая незавершённый."""
     from .stream import read_document
+    from .fileio import GzipError, decoded_stream, is_gzip
 
     flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
     descriptor = os.open(Path(path), flags)
@@ -319,13 +320,20 @@ def _load_manifest(path, check=None):
         info = os.fstat(source.fileno())
         if not stat.S_ISREG(info.st_mode):
             raise ManifestError('Manifest должен быть обычным файлом.')
-        data = read_document(
-            source,
-            expected_size=info.st_size,
-            node_from_dict=Node._from_dict,
-            fields=(*_MANIFEST_FIELDS, 'local_cache'),
-            check=check,
-        )
+        compressed = is_gzip(source)
+        try:
+            with decoded_stream(source) as decoded:
+                data = read_document(
+                    decoded,
+                    expected_size=None if compressed else info.st_size,
+                    node_from_dict=Node._from_dict,
+                    fields=(*_MANIFEST_FIELDS, 'local_cache'),
+                    check=check,
+                )
+        except GzipError as error:
+            raise ManifestError('Не удалось прочитать gzip-манифест: повреждённый или неполный поток.') from error
+        if os.fstat(source.fileno()).st_size != info.st_size or source.tell() != info.st_size:
+            raise ManifestError('Размер манифеста изменился во время чтения.')
     return Manifest._from_dict(data, lambda node: node)
 
 
