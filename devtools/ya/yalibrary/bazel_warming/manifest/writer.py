@@ -133,6 +133,13 @@ class ManifestWriter:
                 self._error = error
                 raise
 
+    def checkpoint(self):
+        """Сохранить весь выбранный план и накопленные итоги PUT без завершения запуска."""
+        with self._lock:
+            if not self._selected or self._finished:
+                raise ManifestError('Нельзя сохранить снимок незафиксированного или уже завершённого manifest.')
+            write_manifest(self.path, self._snapshot())
+
     def finish(self, build_exit_code):
         """Завершить manifest после ожидания runner; ни один потерянный итог не допускается."""
         with self._lock:

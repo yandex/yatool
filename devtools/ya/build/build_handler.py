@@ -157,13 +157,22 @@ def do_ya_make(params):
 
 
 def _run_build_with_warming_manifest(builder):
-    """Завершить manifest лишь после возврата runner; исключение оставляет его неполным."""
-    exit_code = builder.go()
-    # go() уже дождался upload workers и освобождения build roots.
-    warming_manifest = getattr(builder.ctx, 'warming_manifest', None)
-    if warming_manifest is not None:
-        warming_manifest.finish(exit_code)
-    return exit_code
+    """Save final PUT outcomes after runner teardown, keeping interrupted runs incomplete."""
+    try:
+        exit_code = builder.go()
+        # go() has joined upload workers and released build roots.
+        warming_manifest = getattr(builder.ctx, 'warming_manifest', None)
+        if warming_manifest is not None:
+            warming_manifest.finish(exit_code)
+        return exit_code
+    except BaseException:
+        try:
+            warming_manifest = getattr(builder.ctx, 'warming_manifest', None)
+            if warming_manifest is not None:
+                warming_manifest.checkpoint()
+        except Exception:
+            logger.warning('Failed to save interrupted Bazel warming manifest', exc_info=True)
+        raise
 
 
 def _do_ya_make(params, app_ctx):
