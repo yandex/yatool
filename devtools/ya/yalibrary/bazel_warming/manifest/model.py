@@ -96,15 +96,21 @@ def _object(data, expected, name):
 class WrittenFile:
     path: str
     size: int
+    symlink: str | None = None
 
     def validate(self):
         if relative_output(self.path) != self.path:
             raise ManifestError('written_files должен содержать относительные пути.')
         _integer(self.size, 'written_files.size')
+        if self.symlink is not None and (
+            not isinstance(self.symlink, str) or not self.symlink or '\0' in self.symlink or os.path.isabs(self.symlink)
+        ):
+            raise ManifestError('Цель симлинка должна быть непустым относительным путём.')
 
     @classmethod
     def from_dict(cls, data):
-        _object(data, ('path', 'size'), 'written_files')
+        expected = ('path', 'size', 'symlink') if isinstance(data, dict) and 'symlink' in data else ('path', 'size')
+        _object(data, expected, 'written_files')
         result = cls(**data)
         result.validate()
         return result
@@ -257,7 +263,14 @@ class Manifest:
                     'outputs': list(node.outputs),
                     'cacheable': node.cacheable,
                     'put_status': node.put_status,
-                    'written_files': [{'path': item.path, 'size': item.size} for item in node.written_files],
+                    'written_files': [
+                        {
+                            'path': item.path,
+                            'size': item.size,
+                            **({'symlink': item.symlink} if item.symlink is not None else {}),
+                        }
+                        for item in node.written_files
+                    ],
                     **({'build_error': node.build_error} if node.build_error else {}),
                 }
                 for node in self.nodes

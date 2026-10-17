@@ -302,19 +302,37 @@ class BazelStoreClient(object):
 
     def put_data(self, files, root_dir, uid, name):
         result = {'files': {}, 'name': name}
+        sources = {}
+        root = os_path.realpath(root_dir)
         for file in sorted(files):
-            if not file.startswith(root_dir):
-                raise AssertionError('File is outside of rootpath')
-
-            stat = os.stat(file)
-            result['files'][os_path.relpath(file, root_dir)] = {
-                'hash': self._retry_func(
-                    self.put_blob, f_args=(os_path.abspath(file),), conf=self.retry_policy.write_conf
-                ),
-                'executable': os.access(file, os.X_OK),
-                'mode': stat.st_mode,
-                'size': stat.st_size,
-            }
+            relative = os_path.relpath(os_path.abspath(file), os_path.abspath(root_dir))
+            path = os_path.abspath(os_path.join(root, relative))
+            self._check_parents(path, root)
+            info = os.lstat(path)
+            if stat.S_ISLNK(info.st_mode):
+                data = {'symlink': os.readlink(path)}
+            elif stat.S_ISREG(info.st_mode):
+                data = {
+                    'hash': '0' * SHA256_LENGTH,
+                    'executable': os.access(path, os.X_OK),
+                    'mode': info.st_mode,
+                    'size': info.st_size,
+                }
+            else:
+                raise BazelStoreIntegrityError("Only regular files and relative file symlinks can be cached")
+            result['files'][relative.replace(os.sep, '/')] = data
+            sources[relative.replace(os.sep, '/')] = path
+        links = self._validate_meta(result, root)
+        for relative, terminal in links.items():
+            if os_path.realpath(sources[relative]) != sources[terminal] or not stat.S_ISREG(
+                os.stat(sources[relative]).st_mode
+            ):
+                raise BazelStoreIntegrityError("Symlink does not point to a regular bundle output")
+        for relative, data in result['files'].items():
+            if 'symlink' not in data:
+                data['hash'] = self._retry_func(
+                    self.put_blob, f_args=(sources[relative],), conf=self.retry_policy.write_conf
+                )
         self._retry_func(self.put_meta, f_args=(uid, result), conf=self.retry_policy.write_conf)
         return result
 
@@ -323,41 +341,58 @@ class BazelStoreClient(object):
         os.chmod(file_path, file_data['mode'])
 
     @staticmethod
+    def _check_parents(path, root):
+        if os_path.commonpath((root, path)) != root or path == root:
+            raise BazelStoreIntegrityError("Metadata file is outside the build directory")
+        parent = os_path.dirname(path)
+        while parent != root:
+            if os_path.islink(parent):
+                raise BazelStoreIntegrityError("A cache output parent cannot be a symlink")
+            parent = os_path.dirname(parent)
+
+    @staticmethod
     def _validate_meta(meta, root_dir):
         if not isinstance(meta, dict) or not isinstance(meta.get('files'), dict):
             raise BazelStoreIntegrityError("Metadata must contain a mapping of files")
         root = os_path.realpath(root_dir)
         paths = set()
+        symlinks = {}
         for rel_path, data in meta['files'].items():
             if (
                 not isinstance(rel_path, str)
                 or not rel_path
+                or '\0' in rel_path
                 or os_path.isabs(rel_path)
                 or '..' in rel_path.replace(os.altsep or os.sep, os.sep).split(os.sep)
             ):
                 raise BazelStoreIntegrityError("Metadata contains an invalid relative path")
-            path = os_path.realpath(os_path.join(root, rel_path))
-            if os_path.commonpath((root, path)) != root or path == root:
-                raise BazelStoreIntegrityError("Metadata file is outside the build directory")
-            if path in paths:
+            path = os_path.abspath(os_path.join(root, rel_path))
+            BazelStoreClient._check_parents(path, root)
+            relative = os_path.relpath(path, root).replace(os.sep, '/')
+            if relative in paths:
                 raise BazelStoreIntegrityError("Metadata contains duplicate file paths")
-            paths.add(path)
-            if not isinstance(data, dict) or not isinstance(data.get('hash'), str):
+            paths.add(relative)
+            if not isinstance(data, dict):
                 raise BazelStoreIntegrityError("Metadata contains an invalid file description")
-            if re.fullmatch(r'[0-9a-f]{64}', data['hash']) is None:
+            if 'symlink' in data:
+                if set(data) != {'symlink'}:
+                    raise BazelStoreIntegrityError("Symlink metadata must contain only its target")
+                target = data['symlink']
+                if isinstance(target, str) and os_path.isabs(target):
+                    raise BazelStoreIntegrityError("Symlink target must be relative")
+                symlinks[relative] = target.replace(os.sep, '/') if isinstance(target, str) else target
+                continue
+            if not isinstance(data.get('hash'), str) or re.fullmatch(r'[0-9a-f]{64}', data['hash']) is None:
                 raise BazelStoreIntegrityError("Metadata contains an invalid CAS digest")
             if type(data.get('mode')) is not int or not 0 <= data['mode'] <= 0o177777:
                 raise BazelStoreIntegrityError("Metadata contains an invalid file mode")
             # Older entries may omit sizes. Verify a declared size before installing the file.
             if 'size' in data and (type(data['size']) is not int or data['size'] < 0):
                 raise BazelStoreIntegrityError("Metadata contains an invalid file size")
-
-        for path in paths:
-            parent = os_path.dirname(path)
-            while parent != root:
-                if parent in paths:
-                    raise BazelStoreIntegrityError("Metadata uses a file as a directory")
-                parent = os_path.dirname(parent)
+        try:
+            return _protocol.resolve_symlinks(paths, symlinks)
+        except ValueError as error:
+            raise BazelStoreIntegrityError("Metadata contains an invalid symlink bundle") from error
 
     @staticmethod
     def _install_staged_files(staging_dir, root_dir, backup_dir):
@@ -369,28 +404,31 @@ class BazelStoreClient(object):
             raise error
 
         try:
-            for dirname, _, filenames in os.walk(staging_dir, onerror=on_walk_error):
-                for filename in filenames:
-                    source = os_path.join(dirname, filename)
-                    relative = os_path.relpath(source, staging_dir)
-                    destination = os_path.join(root_dir, relative)
-                    if os_path.commonpath((root, os_path.realpath(destination))) != root:
-                        raise BazelStoreIntegrityError("Filtered file is outside the build directory")
-                    parent = os_path.dirname(destination)
-                    missing_dirs = []
-                    while not os_path.exists(parent):
-                        missing_dirs.append(parent)
-                        parent = os_path.dirname(parent)
-                    created_dirs.extend(reversed(missing_dirs))
-                    os.makedirs(os_path.dirname(destination), exist_ok=True)
-                    if os_path.isdir(destination):
-                        raise IsADirectoryError(destination)
-                    backup = None
-                    if os_path.lexists(destination):
-                        backup = os_path.join(backup_dir, str(len(installed)))
-                        os.replace(destination, backup)
-                    installed.append((destination, backup))
-                    os.replace(source, destination)
+            sources = []
+            for dirname, directories, filenames in os.walk(staging_dir, onerror=on_walk_error):
+                if any(os_path.islink(os_path.join(dirname, name)) for name in directories):
+                    raise BazelStoreIntegrityError("A staged parent cannot be a symlink")
+                sources.extend(os_path.join(dirname, name) for name in filenames)
+            # Install targets before aliases, while keeping one rollback transaction.
+            for source in sorted(sources, key=lambda path: (os_path.islink(path), path)):
+                relative = os_path.relpath(source, staging_dir)
+                destination = os_path.join(root, relative)
+                BazelStoreClient._check_parents(os_path.abspath(destination), root)
+                parent = os_path.dirname(destination)
+                missing_dirs = []
+                while not os_path.exists(parent):
+                    missing_dirs.append(parent)
+                    parent = os_path.dirname(parent)
+                created_dirs.extend(reversed(missing_dirs))
+                os.makedirs(os_path.dirname(destination), exist_ok=True)
+                if os_path.isdir(destination) and not os_path.islink(destination):
+                    raise IsADirectoryError(destination)
+                backup = None
+                if os_path.lexists(destination):
+                    backup = os_path.join(backup_dir, str(len(installed)))
+                    os.replace(destination, backup)
+                installed.append((destination, backup))
+                os.replace(source, destination)
         except Exception:
             # Restore the previous files if installing a later file fails.
             rollback_error = None
@@ -417,7 +455,7 @@ class BazelStoreClient(object):
     def get_data(self, root_dir, uid, filter_func=None, expected_outputs=None):
         meta = self.get_meta(uid)
         try:
-            self._validate_meta(meta, root_dir)
+            links = self._validate_meta(meta, root_dir)
         except (ValueError, OSError) as e:
             raise BazelStoreIntegrityError("Metadata contains an invalid file path") from e
         if filter_func is None:
@@ -432,22 +470,46 @@ class BazelStoreClient(object):
                 backup_dir = os_path.join(temporary_dir, 'backups')
                 os.makedirs(staging_dir)
                 os.makedirs(backup_dir)
-                # Keep both downloaded files and links created by the filter out of the build root until ready.
+                # The filter also receives a content URL for aliases replaced with .link files.
+                descriptions = {
+                    os_path.normpath(path).replace(os.sep, '/'): data for path, data in meta['files'].items()
+                }
+                retained_links = {}
                 for rel_path, file_data in meta['files'].items():
                     file_path = os_path.join(staging_dir, rel_path)
-                    if not filter_func(file_path, self._cas_url(file_data['hash'])):
+                    terminal = links.get(
+                        os_path.normpath(rel_path).replace(os.sep, '/'), os_path.normpath(rel_path).replace(os.sep, '/')
+                    )
+                    if filter_func(file_path, self._cas_url(descriptions[terminal]['hash'])):
+                        continue
+                    if 'symlink' in file_data:
+                        retained_links[rel_path] = file_data['symlink']
+                    else:
                         self.download_file(file_path, file_data)
+                for rel_path, target in retained_links.items():
+                    file_path = os_path.join(staging_dir, rel_path)
+                    os.makedirs(os_path.dirname(file_path), exist_ok=True)
+                    os.symlink(target, file_path)
+                for rel_path in retained_links:
+                    file_path = os_path.join(staging_dir, rel_path)
+                    terminal = os_path.normpath(
+                        os_path.join(
+                            os_path.realpath(staging_dir), links[os_path.normpath(rel_path).replace(os.sep, '/')]
+                        )
+                    )
+                    if not os_path.isfile(file_path) or os_path.realpath(file_path) != terminal:
+                        raise BazelStoreIntegrityError("Filtered result does not contain a symlink target")
                 # An existing dependency file must not hide an incomplete cached result.
                 for output in expected_outputs or ():
-                    relative = os_path.relpath(output, root_dir)
+                    relative = os_path.relpath(output, root_dir).replace(os.sep, '/')
                     try:
                         mode = os.lstat(os_path.join(staging_dir, relative)).st_mode
                     except FileNotFoundError as e:
                         raise BazelStoreIntegrityError(
                             "Required output is missing from cached result: " + relative
                         ) from e
-                    if not stat.S_ISREG(mode):
-                        raise BazelStoreIntegrityError("Required output is not a regular file: " + relative)
+                    if not stat.S_ISREG(mode) and not (stat.S_ISLNK(mode) and relative in retained_links):
+                        raise BazelStoreIntegrityError("Required output is not a cached file or symlink: " + relative)
                 try:
                     self._install_staged_files(staging_dir, root_dir, backup_dir)
                 except BazelStoreRollbackError:

@@ -3290,8 +3290,6 @@ class DistCacheOptions(DistCacheSetupOptions):
             raise ArgsValidatingException('Bazel cache warming requires a positive integer number of build threads')
         unsupported = (
             'use_distbuild',
-            'custom_context',
-            'custom_json',
             'make_context_only',
             'make_context_on_distbuild',
             'make_context_on_distbuild_only',
@@ -3303,6 +3301,9 @@ class DistCacheOptions(DistCacheSetupOptions):
             'yt_replace_result',
             'yt_store_exclusive',
         )
+        if params.bazel_remote_warming:
+            # Манифест без прогрева также описывает обычную пересборку выбранного подграфа.
+            unsupported += ('custom_context', 'custom_json')
         if getattr(params, 'larry_addr', None) is not None or any(getattr(params, name, False) for name in unsupported):
             raise ArgsValidatingException('Bazel cache warming supports only ordinary local ya make execution')
 

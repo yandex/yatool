@@ -111,10 +111,17 @@ class ManifestWriter:
                         path.resolve(strict=True).relative_to(resolved_root)
                     except ValueError as error:
                         raise ManifestError('Выход PUT находится вне build root.') from error
-                    info = path.stat()
-                    if not stat.S_ISREG(info.st_mode):
-                        raise ManifestError('Выход PUT должен быть обычным файлом.')
-                    written.append(WrittenFile(relative_output(relative), info.st_size))
+                    mode = path.lstat().st_mode
+                    if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode)) or not path.is_file():
+                        raise ManifestError('Выход PUT должен быть обычным файлом или симлинком на файл.')
+                    # Размер содержимого сохраняет общий лимит DistStore; цель ссылки проверяется отдельно.
+                    written.append(
+                        WrittenFile(
+                            relative_output(relative),
+                            path.stat().st_size,
+                            os.readlink(path) if stat.S_ISLNK(mode) else None,
+                        )
+                    )
                 node = replace(
                     self._nodes[uid],
                     put_status='skipped_size' if status == 'skipped' else status,
