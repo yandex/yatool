@@ -3234,8 +3234,8 @@ class DistCacheOptions(DistCacheSetupOptions):
 
         # YA-1354: The plan is to unify YT and Bazel store interfaces
         # presently dist_store_threads is only a Bazel's option
-        if self.dist_store_threads == 0 and self.bazel_remote_store:
-            raise ArgsValidatingException('Bazel remote storage is enabled but dist store max threads is set to 0')
+        if self.dist_store_threads <= 0 and self.bazel_remote_store:
+            raise ArgsValidatingException('Bazel remote storage requires a positive integer for --dist-store-threads')
 
         if not self.bazel_remote_store:
             self.dist_store_threads = 0
