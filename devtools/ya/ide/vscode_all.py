@@ -69,8 +69,8 @@ class VSCodeProject:
         params = devtools.ya.core.yarg.merge_params(extra_params, params)
         params.hide_arm64_host_warning = True
         params.flags.update(extra_params.flags)
-        if self.is_go:
-            params.flags["CGO_ENABLED"] = "0"
+        if self.is_go or params.enable_cgo:
+            params.flags["CGO_ENABLED"] = "1" if params.enable_cgo else "0"
 
         self.tool_platform = None
         if params.host_platform:
@@ -80,6 +80,9 @@ class VSCodeProject:
         self.common_args = (
             params.ya_make_extra + [f"-j{params.build_threads}"] + [f"-D{k}={v}" for k, v in flags.items()]
         )
+
+        if params.enable_cgo:
+            self.common_args.append("-DCGO_ENABLED=1")
 
         if pm.is_windows() and not params.output_root:
             params.output_root = os.path.join(self.project_root, ".build")
@@ -231,9 +234,6 @@ class VSCodeProject:
                 build_params.create_symlinks = False
                 build_params.output_root = self.params.output_root or self.params.arc_root
 
-            if self.is_go:
-                build_params.flags["CGO_ENABLED"] = "0"
-
             if module_info_dump_dir is not None and not module_info_dumped:
                 vscode.dump.configure_module_info_dump(build_params, module_info_dump_dir)
 
@@ -314,7 +314,7 @@ class VSCodeProject:
                     (
                         "go.toolsEnvVars",
                         {
-                            "CGO_ENABLED": "0",
+                            "CGO_ENABLED": "1" if self.params.enable_cgo else "0",
                             "GOFLAGS": "-mod=vendor",
                             "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
                         },
@@ -326,7 +326,7 @@ class VSCodeProject:
                                 (
                                     "build.env",
                                     {
-                                        "CGO_ENABLED": "0",
+                                        "CGO_ENABLED": "1" if self.params.enable_cgo else "0",
                                         "GOFLAGS": "-mod=vendor",
                                         "GOPRIVATE": "*.yandex-team.ru,*.yandexcloud.net",
                                     },

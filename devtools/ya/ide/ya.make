@@ -69,4 +69,5 @@ RECURSE(
 
 RECURSE_FOR_TESTS(
     tests_gradle
+    tests_vscode
 )

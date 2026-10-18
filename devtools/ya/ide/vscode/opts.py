@@ -41,6 +41,7 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
         self.patch_gopls = True
         self.gopls_index_targets = True
         self.dlv_enabled = True
+        self.enable_cgo = False
         self.compile_commands_fix = True
         self.allow_project_inside_arc = False
         self.ext_py_enabled = True
@@ -196,6 +197,12 @@ class VSCodeAllOptions(devtools.ya.core.yarg.Options):
                 ['--no-gopls-index-targets'],
                 help='Do not index targets with gopls',
                 hook=devtools.ya.core.yarg.SetConstValueHook('gopls_index_targets', False),
+                group=cls.GROUP,
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                ["--enable-cgo"],
+                help="Enable CGO in the workspace (disabled by default for Go; may affect dlv debugging and platform compatibility)",
+                hook=devtools.ya.core.yarg.SetConstValueHook("enable_cgo", True),
                 group=cls.GROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
