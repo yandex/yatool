@@ -1949,6 +1949,7 @@ class YaMake:
                 self._generate_report()
 
             self._strip_cache(self.ctx.threads)
+            self.ctx.cache.flush()
             release_all_data()
 
             return self._calc_exit_code()
