@@ -158,7 +158,14 @@ namespace NUniversalFetcher {
             TString ChooseManifest(const TString uri, const NJson::TJsonValue& jsonManifest) {
                 NJson::TJsonValue::TArray manifests = jsonManifest["manifests"].GetArraySafe();
                 Y_ENSURE(manifests.size() > 0);
-                auto urlWithImageName = TString(TStringBuf(uri).NextTok('@'));
+                // skopeo rejects name:tag@digest, so drop the tag along with the digest
+                TStringBuf name = TStringBuf(uri).Before('@');
+                const size_t slash = name.rfind('/');
+                const size_t colon = name.rfind(':');
+                if (colon != TStringBuf::npos && (slash == TStringBuf::npos || colon > slash)) {
+                    name = name.Head(colon);
+                }
+                auto urlWithImageName = TString(name);
                 for (auto& manifest : manifests) {
                     if (manifest["platform"]["architecture"].GetStringSafe() == "amd64") {
                         TString digest = manifest["digest"].GetStringSafe();
