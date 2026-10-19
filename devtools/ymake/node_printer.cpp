@@ -2405,37 +2405,54 @@ void Out<TDartManager::EDartType>(IOutputStream& out, TDartManager::EDartType da
     }
 }
 
-void TDartManager::Dump(EDartType dartType, const TString& dartName) {
-    TFsPath dartPath{dartName};
-    TFsPath cachePath = YMake_.Conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache");
-    TString dartTypeStr = ToString(dartType);
-    Y_ASSERT(cachePath != dartPath);
-    if (YMake_.Conf.ShouldLoadDartCaches() && YMake_.CanBypassConfigure() && cachePath.Exists()) {
-        NYMake::TTraceStage trace{fmt::format("Load {} from cache", dartTypeStr)};
-        cachePath.CopyTo(dartName, true);
-        return;
-    } else {
-        NYMake::TTraceStage trace{fmt::format("Render {}", dartTypeStr)};
-        THolder<IOutputStream> dartOut;
-        dartOut.Reset(new TFileOutput(dartName));
-        switch (dartType) {
-        case EDartType::Test:
-            YMake_.DumpTestDart(*dartOut);
-            break;
-        case EDartType::Java:
-            YMake_.DumpJavaDart(*dartOut);
-            break;
-        case EDartType::Makefiles:
-            YMake_.DumpMakeFilesDart(*dartOut);
-            break;
-        default:
-            // Unreachable code
-            Y_ASSERT(0);
-        }
-        dartOut->Finish();
+void TDartManager::DumpTestDart() {
+    if (!YMake_.Conf.WriteTestDart.empty()) {
+        Dump(EDartType::Test, YMake_.Conf.WriteTestDart);
     }
+}
+
+bool TDartManager::TryLoad(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath) {
+    if (!YMake_.Conf.ShouldLoadDartCaches() || !YMake_.CanBypassConfigure() || !cachePath.Exists()) {
+        return false;
+    }
+    NYMake::TTraceStage trace{fmt::format("Load {} from cache", ToString(dartType))};
+    cachePath.CopyTo(dartPath, true);
+    return true;
+}
+
+void TDartManager::Render(EDartType dartType, const TFsPath& dartPath) {
+    NYMake::TTraceStage trace{fmt::format("Render {}", ToString(dartType))};
+    TFileOutput dartOut(dartPath);
+    switch (dartType) {
+    case EDartType::Test:
+        YMake_.DumpTestDart(dartOut);
+        break;
+    case EDartType::Java:
+        YMake_.DumpJavaDart(dartOut);
+        break;
+    case EDartType::Makefiles:
+        YMake_.DumpMakeFilesDart(dartOut);
+        break;
+    default:
+        Y_ASSERT(0);
+    }
+    dartOut.Finish();
+}
+
+void TDartManager::Save(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath) {
     if (YMake_.Conf.ShouldSaveDartCaches()) {
-        NYMake::TTraceStage trace{fmt::format("Save {} to cache", dartTypeStr)};
-        TFsPath{dartName}.CopyTo(cachePath, true);
+        NYMake::TTraceStage trace{fmt::format("Save {} to cache", ToString(dartType))};
+        dartPath.CopyTo(cachePath, true);
     }
+}
+
+void TDartManager::Dump(EDartType dartType, const TString& dartName) {
+    const TFsPath dartPath{dartName};
+    const TFsPath cachePath = YMake_.Conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache");
+    Y_ASSERT(cachePath != dartPath);
+    if (TryLoad(dartType, dartPath, cachePath)) {
+        return;
+    }
+    Render(dartType, dartPath);
+    Save(dartType, dartPath, cachePath);
 }

@@ -230,7 +230,12 @@ public:
 
     ~TDartManager() = default;
 
+    void DumpTestDart();
     void Dump(EDartType dartType, const TString& dartName);
 private:
+    bool TryLoad(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath);
+    void Render(EDartType dartType, const TFsPath& dartPath);
+    void Save(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath);
+
     TYMake& YMake_;
 };

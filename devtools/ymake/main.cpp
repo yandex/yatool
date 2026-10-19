@@ -880,9 +880,7 @@ void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
 
     TDartManager dartManager(*yMake);
 
-    if (!conf.WriteTestDart.empty()) {
-        dartManager.Dump(TDartManager::EDartType::Test, conf.WriteTestDart);
-    }
+    dartManager.DumpTestDart();
 
     if (!conf.WriteJavaDart.empty()) {
         dartManager.Dump(TDartManager::EDartType::Java, conf.WriteJavaDart);
