@@ -9,11 +9,9 @@ import shutil
 import tempfile
 import uuid
 
-import library.python.filelock
 import library.python.resource as rs
 
 import exts.fs as fs
-import exts.hashing as hashing
 import library.python.tmp as tmp
 import exts.yjson as json
 import yalibrary.makelists.macro_definitions as md
@@ -210,42 +208,39 @@ def restore_graph(meta):
 
 
 def resolve_transitively(artifacts, local_repo, remote_repos, opts, app_ctx, resolve_type):
-    temp_project = os.path.join(devtools.ya.core.config.user_junk_dir(), 'maven_import_tmp')
-    temp_project_path = os.path.join(opts.arc_root, temp_project)
     session_id = str(uuid.uuid4())
+    # A project per session: concurrent runs in one checkout must not rewrite each other's ya.make while building
+    temp_project = os.path.join(devtools.ya.core.config.user_junk_dir(), 'maven_import_tmp', session_id)
+    temp_project_path = os.path.join(opts.arc_root, temp_project)
 
-    cache = os.path.join(devtools.ya.core.config.misc_root(), 'maven_import')
-    locks = fs.create_dirs(os.path.join(cache, 'locks'))
-    lock_path = os.path.join(locks, '{}.lock'.format(hashing.md5_value(temp_project_path)))
-    with library.python.filelock.FileLock(lock_path):
-        if os.path.exists(temp_project_path):
-            fs.remove_tree_safe(temp_project_path)
-        fs.ensure_dir(temp_project_path)
-        with open(os.path.join(temp_project_path, 'ya.make'), 'w') as f:
-            jinja_resource = six.ensure_str(rs.find('maven_import_tmp/ya.make.jinja'))
-            f.write(
-                jinja2.Template(jinja_resource).render(
-                    artifacts=artifacts,
-                    local_repo_abs_path=os.path.abspath(local_repo),
-                    remote_repos=remote_repos,
-                    resolve_type=resolve_type,
-                    session_id=session_id,
-                    minimal_pom_validation=opts.minimal_pom_validation,
-                    skip_artifacts=opts.skip_artifacts,
-                    import_dm=opts.import_dm,
-                    ignore_errors=opts.ignore_errors,
-                    repo_auth_username=opts.repo_auth_username,
-                    repo_auth_password=opts.repo_auth_password,
-                )
+    fs.ensure_dir(temp_project_path)
+    with open(os.path.join(temp_project_path, 'ya.make'), 'w') as f:
+        jinja_resource = six.ensure_str(rs.find('maven_import_tmp/ya.make.jinja'))
+        f.write(
+            jinja2.Template(jinja_resource).render(
+                artifacts=artifacts,
+                local_repo_abs_path=os.path.abspath(local_repo),
+                remote_repos=remote_repos,
+                resolve_type=resolve_type,
+                session_id=session_id,
+                minimal_pom_validation=opts.minimal_pom_validation,
+                skip_artifacts=opts.skip_artifacts,
+                import_dm=opts.import_dm,
+                ignore_errors=opts.ignore_errors,
+                repo_auth_username=opts.repo_auth_username,
+                repo_auth_password=opts.repo_auth_password,
             )
+        )
     merge_opts = devtools.ya.core.yarg.merge_opts(bo.ya_make_options(free_build_targets=True))
     merge_opts.create_symlinks = False
     merge_opts.output_root = tempfile.mkdtemp()
     build_opts = merge_opts.initialize([])
     build_opts.__dict__.update(opts.__dict__)
     build_opts.abs_targets = [os.path.join(opts.arc_root, temp_project)]
-    rc = devtools.ya.build.build_handler.do_ya_make(build_opts)
-    fs.remove_tree_safe(temp_project_path)
+    try:
+        rc = devtools.ya.build.build_handler.do_ya_make(build_opts)
+    finally:
+        fs.remove_tree_safe(temp_project_path)
 
     if rc != 0:
         raise MavenImporterError("Can't resolve one or more artifacts.")
