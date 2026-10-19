@@ -307,6 +307,19 @@ def merge_suites(suites):
     return suite
 
 
+def relink_run_logs(suite, outputs, result_path, build_root):
+    # Per-run run_test.log is not an output of the merge node, so point links to the concatenated one
+    merged_log = os.path.relpath(os.path.join(result_path, 'run_test.log'), build_root)
+    replacements = []
+    for output in outputs:
+        run_log = os.path.relpath(os.path.join(output, 'run_test.log'), build_root)
+        # Trace paths use '/' even on Windows
+        replacements += [(run_log, merged_log), (run_log.replace(os.sep, '/'), merged_log.replace(os.sep, '/'))]
+    relinker = reports.TextTransformer(replacements)
+    for container in [suite] + list(suite.chunks):
+        container.logs = {k: relinker.substitute(v) for k, v in container.logs.items()}
+
+
 def merge(
     source_root,
     build_root,
@@ -345,6 +358,7 @@ def merge(
 
     logger.debug("Merging suites")
     suite = merge_suites(suites)
+    relink_run_logs(suite, outputs, result_path, build_root)
     suite.set_work_dir(result_path)
 
     # TODO add logs to files from generate_merge_reports
