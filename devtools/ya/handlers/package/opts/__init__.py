@@ -42,6 +42,7 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
         self.docker_dest_remote_image_version = None
         self.docker_export_cache_to_registry = False
         self.docker_use_buildx = False
+        self.docker_use_podman = False
         self.docker_ssh = None
         self.dump_build_targets = None
         self.dump_inputs = None
@@ -252,6 +253,13 @@ class PackageOperationalOptions(devtools.ya.core.yarg.Options):
                     'debian_force_bad_version',
                     devtools.ya.core.yarg.return_true_if_enabled,
                 ),
+            ),
+            devtools.ya.core.yarg.ArgConsumer(
+                names=['--docker-use-podman'],
+                help='Use Podman from PATH instead of Docker',
+                hook=devtools.ya.core.yarg.SetConstValueHook('docker_use_podman', True),
+                group=devtools.ya.core.yarg.PACKAGE_OPT_GROUP,
+                subgroup=DOCKER_SUBGROUP,
             ),
             devtools.ya.core.yarg.ArgConsumer(
                 names=['--docker-push'],

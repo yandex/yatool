@@ -36,6 +36,13 @@ def get_docker_binary():
     raise Exception("Docker binary not found".format())
 
 
+@func.lazy
+def get_podman_binary() -> str:
+    if path := shutil.which("podman"):
+        return path
+    raise RuntimeError("Podman binary not found in PATH")
+
+
 def get_image_name(registry, repository, image_name, package_name, package_version):
     docker_image_name = image_name or package_name
     prefix = "/".join([_f for _f in [registry, repository] if _f])
@@ -77,10 +84,13 @@ def create_package(
     docker_pull,
     labels,
     docker_ssh,
+    docker_use_podman,
 ):
     package_name = package_context.package_name
     package_version = package_context.version
     image_full_name = get_image_name(registry, repository, image_name, package_name, package_version)
+    binary = get_podman_binary() if docker_use_podman else get_docker_binary()
+    engine = 'podman' if docker_use_podman else 'docker'
 
     buildx_required = False
     build_command = ["build", ".", "-t", image_full_name]
@@ -146,19 +156,19 @@ def create_package(
         build_command += ["--ssh", docker_ssh]
 
     build_out, _ = package.process.run_process(
-        get_docker_binary(),
+        binary,
         build_command,
         cwd=docker_root,
         add_line_timestamps=True,
         tee=True,
         env=docker_build_env,
     )
-    out = ["docker build:", build_out]
+    out = [f"{engine} build:", build_out]
 
     digest = None
     if push:
         push_out, _ = package.process.run_process(
-            get_docker_binary(),
+            binary,
             [
                 "push",
                 image_full_name,
@@ -168,7 +178,7 @@ def create_package(
         )
         digest = extract_digest(push_out)
 
-        out += ["docker push:", push_out]
+        out += [f"{engine} push:", push_out]
 
         if nanny_release:
             nanny_release = nanny_release.upper()
@@ -198,7 +208,7 @@ def create_package(
         if save_docker_image:
             image_file = os.path.join(temp_dir, base_result_name + ".img")
             exts.fs.ensure_dir(os.path.dirname(image_file))
-            package.process.run_process(get_docker_binary(), ["save", "-o", image_file, image_full_name])
+            package.process.run_process(binary, ["save", "-o", image_file, image_full_name])
 
         package_filename = package_context.resolve_filename(extra={"package_ext": "tar.gz"})
         result_file = os.path.join(result_dir, package_filename)
