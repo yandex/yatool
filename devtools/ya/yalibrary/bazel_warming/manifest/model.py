@@ -350,12 +350,12 @@ def _load_manifest(path, check=None):
     return Manifest._from_dict(data, lambda node: node)
 
 
-def read_manifest(path, expected_run_id):
-    """Прочитать манифест любого размера и проверить завершение текущего запуска."""
+def read_manifest(path, expected_run_id, *, require_complete=True):
+    """Проверить план текущего запуска; незавершённый допустим только для диагностики."""
     validate_run_id(expected_run_id)
     result = _load_manifest(path)
     if result.run_id != expected_run_id:
         raise ManifestError('Manifest принадлежит другому запуску.')
-    if not result.complete:
+    if require_complete and not result.complete:
         raise ManifestError('Сборка не завершила manifest; полнота результатов неизвестна.')
     return result
