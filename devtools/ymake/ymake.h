@@ -130,7 +130,6 @@ public:
     asio::awaitable<THolder<TUidsData>> LoadUidsAsync(asio::any_io_executor exec);
     void SortAllEdges();
     void CheckBlacklist();
-    void CheckIsolatedProjects();
     void CheckStartDirsChanges();
     void DumpDependentDirs(IOutputStream& cmsg, bool skipDepends = false) const;
     void DumpSrcDeps(IOutputStream& cmsg);

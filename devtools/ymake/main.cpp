@@ -788,12 +788,9 @@ namespace {
 asio::awaitable<TMaybe<EBuildResult>> AnalysesStage(TBuildConfiguration& conf, TYMake& yMake, bool hasBadLoops, TExecutorWithContext<TExecContext> exec) {
     const bool checkBlacklist = !yMake.CanBypassConfigure() || conf.IsBlacklistHashChanged();
     const bool checkIsolatedProjects = !yMake.CanBypassConfigure() || conf.IsIsolatedProjectsHashChanged();
-    if (!conf.ParallelIsolatedProjects || !checkIsolatedProjects) {
+    if (!checkIsolatedProjects) {
         if (checkBlacklist) {
             yMake.CheckBlacklist();
-        }
-        if (checkIsolatedProjects) {
-            yMake.CheckIsolatedProjects();
         }
         co_return AnalyseDependencies(conf, yMake, hasBadLoops);
     }

@@ -92,15 +92,6 @@ void TYMake::CheckBlacklist() {
     blacklistChecker.CheckAll();
 }
 
-void TYMake::CheckIsolatedProjects() {
-    NYMake::TTraceStage stageTracer{"Check isolated projects"};
-    TRestoreContext restoreContext(Conf, Graph, Modules);
-    TRestoreContext recurseRestoreContext(Conf, RecurseGraph, Modules);
-    const auto input = Conf.IsolatedProjects.PrepareCheck(restoreContext, StartTargets, recurseRestoreContext, RecurseStartTargets);
-    const auto result = Conf.IsolatedProjects.CheckAll(input);
-    result.Apply(Graph);
-}
-
 void TYMake::TransferStartDirs() {
     for (const auto& dir : Conf.StartDirs) {
         TString curDir = NPath::ConstructPath(NPath::FromLocal(dir), NPath::Source);

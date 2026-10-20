@@ -206,7 +206,6 @@ TDebugOptions::EShowExpressionErrors TDebugOptions::ParseShowExpressionErrors(TS
 }
 
 void TDebugOptions::AddOptions(NLastGetopt::TOpts& opts) {
-    opts.AddLongOption("xparallel-isolated-projects", "check isolated projects concurrently with other graph analyses").SetFlag(&ParallelIsolatedProjects).NoArgument();
     opts.AddLongOption("xx", "fully rebuild graph").SetFlag(&RebuildGraph).NoArgument();
     opts.AddLongOption("xN", "do not parse source files").SetFlag(&NoParseSrc).NoArgument();
     opts.AddLongOption("xX", "do not use plugins").SetFlag(&DontUsePlugins).NoArgument();
