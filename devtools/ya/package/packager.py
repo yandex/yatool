@@ -401,6 +401,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.bazel_remote_store = params.bazel_remote_store
     build_options.dist_store_threads = params.dist_store_threads
     build_options.bazel_remote_baseuri = params.bazel_remote_baseuri
+    build_options.bazel_remote_timeout = params.bazel_remote_timeout
     build_options.bazel_remote_username = params.bazel_remote_username
     build_options.bazel_remote_password = params.bazel_remote_password
     build_options.bazel_remote_password_file = params.bazel_remote_password_file
