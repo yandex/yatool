@@ -2789,7 +2789,7 @@ class DistCacheOptions(DistCacheSetupOptions):
             + [
                 ArgConsumer(
                     ['--dist-cache-evict-bins'],
-                    help='Remove all non-tool binaries from build results. Works only with --bazel-remote-put mode',
+                    help='Exclude non-tool binaries and shared libraries from Bazel cache reads and writes',
                     hook=SetConstValueHook('dist_cache_evict_binaries', True),
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.ADVANCED,
@@ -2797,7 +2797,7 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ConfigConsumer('dist_cache_evict_binaries'),
                 ArgConsumer(
                     ['--dist-cache-evict-bundles'],
-                    help='Remove all bundles from build results. Works only with --bazel-remote-put mode',
+                    help='Exclude bundles from Bazel cache reads and writes',
                     hook=SetConstValueHook('dist_cache_evict_bundles', True),
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.ADVANCED,
@@ -2813,7 +2813,7 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ConfigConsumer('dist_cache_evict_cached'),
                 ArgConsumer(
                     ['--dist-cache-evict-test-runs'],
-                    help="Remove all test_runs from build results. Works only with --bazel-remote-put mode",
+                    help='Exclude test results from Bazel cache reads and writes',
                     hook=SetConstValueHook('dist_cache_evict_test_runs', True),
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.ADVANCED,
