@@ -69,6 +69,13 @@ class JsonlProgressView(object):
         event['active'] = len(active)
         event['done'] = self._status.done()
         event['total'] = self._status.count
+        preparations = [
+            task.progress_event()
+            for task, _ in getattr(self._status, 'auxiliary_active', lambda: [])()
+            if hasattr(task, 'progress_event')
+        ]
+        if preparations:
+            event['resources'] = preparations
         node = self._longest_node(active)
         if node is not None:
             event['node'] = node
@@ -87,7 +94,7 @@ class JsonlProgressView(object):
         snapshot = self.snapshot()
         if self._changed(snapshot):
             self._pacer.note_change(now)
-        if self._pacer.due(now, bool(snapshot['active'])):
+        if self._pacer.due(now, bool(snapshot['active'] or snapshot.get('resources'))):
             self._write(snapshot)
 
     def finish(self):
@@ -210,4 +217,5 @@ def _comparable(snapshot):
         snapshot['done'],
         snapshot['total'],
         (node['kind'], node['path']) if node else None,
+        tuple(tuple(sorted(resource.items())) for resource in snapshot.get('resources', [])),
     )

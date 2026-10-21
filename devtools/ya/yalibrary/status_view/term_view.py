@@ -187,7 +187,7 @@ class TermView(object):
         for task in self._status.finished(self._last_id):
             self._last_id += 1
             self._plain_finished(task)
-        active = self._status.active()
+        active = getattr(self._status, "display_active", self._status.active)()
         line = self._progress.tick(
             time.time(), self._last_id, self._status.count, len(active), lambda: self._running(active)
         )
@@ -230,7 +230,7 @@ class TermView(object):
                 if body:
                     self._display.emit_message(yalibrary.formatter.ansi_codes_to_markup(body))
 
-        active = self._status.active()
+        active = getattr(self._status, "display_active", self._status.active)()
         for task, tm in reversed(active):
             task_status = self._fmt(task)
             if not task_status:

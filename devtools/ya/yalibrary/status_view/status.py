@@ -68,6 +68,7 @@ class Status(object):
 
     def __init__(self):
         self._active = collections.OrderedDict()
+        self._auxiliary = collections.OrderedDict()
         self._finished = []
         self._lock = threading.Lock()
         self._qty = 0
@@ -102,3 +103,19 @@ class Status(object):
             except AttributeError:
                 iter_over = self._active
             return [(task, now - tm) for task, tm in iter_over]
+
+    def start_auxiliary(self, task):
+        with self._lock:
+            self._auxiliary[task] = time.time()
+
+    def finish_auxiliary(self, task):
+        with self._lock:
+            self._auxiliary.pop(task, None)
+
+    def auxiliary_active(self):
+        with self._lock:
+            now = time.time()
+            return [(task, now - started) for task, started in self._auxiliary.items()]
+
+    def display_active(self):
+        return sorted(self.active() + self.auxiliary_active(), key=lambda item: -item[1])
