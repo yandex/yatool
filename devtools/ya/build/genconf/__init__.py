@@ -287,6 +287,10 @@ def gen_conf(
     extra_conf=None,
 ):
     # do not even dare to download stuff from this function
+    # Targets select graph roots, not toolchain settings. Serializing a large
+    # target platform here can exceed the OS limit for --toolchain-params.
+    tool_chain = {key: value for key, value in tool_chain.items() if key != 'targets'}
+
     build_path = os.path.join(arc_dir, ymake_build_dir())
     build_internal_path = os.path.join(arc_dir, ymake_build_internal_dir())
 

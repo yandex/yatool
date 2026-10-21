@@ -1,11 +1,13 @@
+import copy
 import logging
 from pathlib import Path
 from datetime import datetime
 
 from devtools.ya.core import yarg
+from devtools.ya.core.common_opts import CrossCompilationOptions
 from devtools.ya.build import build_opts, ya_make
 
-from devtools.ya.ide.gradle.common import tracer, YaIdeGradleException, ExclusiveLock
+from devtools.ya.ide.gradle.common import YaIdeGradleException, ExclusiveLock
 from devtools.ya.ide.gradle.config import _JavaSemConfig
 from devtools.ya.ide.gradle.graph import _JavaSemGraph
 
@@ -21,7 +23,7 @@ class _Builder:
     def build(self) -> str:
         """Extract build targets from sem-graph and build they"""
         try:
-            build_rel_targets: list[Path] = list(set(self.sem_graph.get_run_java_program_rel_targets()))
+            java_rel_targets: list[Path] = list(self.sem_graph.get_run_java_program_rel_targets())
             proto_rel_targets: list[Path] = []
             rel_targets = self.sem_graph.get_rel_targets()
             for rel_target, consumer_type, module_type in rel_targets:
@@ -43,66 +45,96 @@ class _Builder:
                     proto_rel_targets.append(rel_target)
                 else:
                     # Collect other targets
-                    build_rel_targets.append(rel_target)
+                    java_rel_targets.append(rel_target)
         except Exception as e:
             return f'Fail extract build targets from sem-graph {self.sem_graph.sem_graph_file}: {e}'
 
-        if build_rel_targets:
-            with tracer.scope('export & build>||build>java'):
-                self._build_rel_targets(build_rel_targets, proto_rel_targets)
-
-        if self.config.params.build_foreign and self.sem_graph.foreign_targets:
-            with tracer.scope('export & build>||build>foreign'):
-                self._build_rel_targets(self.sem_graph.foreign_targets, build_all_langs=True)
-        return None
+        self._build_rel_targets(
+            java_rel_targets,
+            proto_rel_targets,
+            self.sem_graph.foreign_targets if self.config.params.build_foreign else [],
+        )
 
     def _build_rel_targets(
-        self, build_rel_targets: list[Path], proto_rel_targets: list[Path] = None, build_all_langs: bool = False
+        self, java_rel_targets: list[Path], proto_rel_targets: list[Path] = None, foreign_rel_targets: list[Path] = None
     ) -> None:
-        """Build all relative targets by one graph, build_all_langs control only java targets or all languages targets"""
+        """Build all relative targets in one request."""
+
+        if not java_rel_targets and not proto_rel_targets and not foreign_rel_targets:
+            return  # Nothing to build
+
         import app_ctx
 
         try:
             ya_make_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release', free_build_targets=True))
-            extra_args = self.config.provided_make_args
-            if not build_all_langs:
-                extra_args = self.config.params.ya_make_extra + ['-DSOURCES_JAR=yes']
-                if proto_rel_targets:
-                    build_rel_targets += proto_rel_targets
-            opts = yarg.merge_params(ya_make_opts.initialize(extra_args))
-
-            opts.bld_dir = self.config.params.bld_dir
-            opts.arc_root = str(self.config.arcadia_root)
-            opts.bld_root = self.config.params.bld_root
-            opts.ignore_recurses = True
+            params = yarg.merge_params(ya_make_opts.initialize(self.config.provided_make_args))
+            java_opts = yarg.merge_opts(build_opts.ya_make_options(build_type='release', free_build_targets=True))
+            java_flags = yarg.merge_params(java_opts.initialize(self.config.params.ya_make_extra)).flags
+            params.bld_dir = self.config.params.bld_dir
+            params.arc_root = str(self.config.arcadia_root)
+            params.bld_root = self.config.params.bld_root
+            params.ignore_recurses = True
             if self.config.output_root != self.config.arcadia_root:
-                # Exported project awaits build results in output root, not in arcadia
-                # Symlinks, not hardlinks: SymlinkResultStore recreates them every run,
-                # hardlinks of ResultStore are never refreshed once the file is there
-                opts.symlink_root = str(self.config.output_root)
-                opts.create_symlinks = True
-
-            opts.rel_targets = []
-            opts.abs_targets = []
-            build_rel_targets = list(set(build_rel_targets))
-            for build_rel_target in build_rel_targets:  # Add all targets for build simultaneously
-                opts.rel_targets.append(str(build_rel_target))
-                opts.abs_targets.append(str(self.config.arcadia_root / build_rel_target))
-
-            self.logger.info(
-                "Building %i %s targets...", len(build_rel_targets), "foreign" if build_all_langs else "java"
+                # Exported project awaits build results in output root, not in arcadia.
+                # Symlinks are refreshed on every build, unlike existing hardlinks.
+                params.symlink_root = str(self.config.output_root)
+                params.create_symlinks = True
+            params.build_graph_cache_force_local_cl = (
+                True  # workaround for local changelist (enabled by default, but not work here)
             )
+            params.ymake_internal_servermode = (
+                False  # workaround for Error[ToolConf]: in ...: Tool is not found in a host graph
+            )
+            params.rel_targets = (
+                []  # workaround for Error: Failed in build process: 'Params' object has no attribute 'rel_targets'
+            )
+            # workaround get few changelists for ymakes at the same time, else some ymakes without changelist
+            params.build_graph_arc_command_timeout = 5
+            params.build_graph_arc_commit_lock_timeout = 5
+
+            base_platforms = params.target_platforms or [
+                CrossCompilationOptions.make_platform(params.host_platform or 'default')
+            ]
+            params.target_platforms = []
+
+            def add_platforms(rel_targets: list[str], flags: dict[str, str], *, java=False):
+                for base_platform in base_platforms:
+                    platform = copy.deepcopy(base_platform)
+                    platform['flags'] = dict(flags, **platform.get('flags', {}))
+                    if java:
+                        platform['flags'].update(BUILD_LANGUAGES='JAVA', SOURCES_JAR='yes')
+                    platform['ignore_recurses'] = True
+                    platform['targets'] = rel_targets
+                    params.target_platforms.append(platform)
+
+            build_infos = []
+            if foreign_rel_targets:
+                foreign_rel_targets = sorted({str(target) for target in foreign_rel_targets})
+                add_platforms(foreign_rel_targets, params.flags)
+                build_infos.append(f"{len(foreign_rel_targets)} foreign targets")
+
+            if java_rel_targets or proto_rel_targets:
+                java_rel_targets = sorted({str(target) for target in java_rel_targets + (proto_rel_targets or [])})
+                add_platforms(java_rel_targets, java_flags, java=True)
+                proto_info = f" (including {len(proto_rel_targets)} proto)" if proto_rel_targets else ""
+                build_infos.append(f"{len(java_rel_targets)}{proto_info} java targets")
+
+            build_infos.reverse()
+            self.logger.info("Building %s...", " and ".join(build_infos))
             lock = None
             if self.config.params.exclusive_lock_build:
                 start = datetime.now()
                 self.logger.info("Getting lock for build...")
                 lock = ExclusiveLock(self.config.export_root.parent / 'build')
                 lock.acquire()
-                self.logger.info("Got lock for build [ %.4fs ]", (datetime.now() - start).total_seconds())
-            builder = ya_make.YaMake(opts, app_ctx)
-            return_code = builder.go()
-            if lock:
-                lock.release()
+            try:
+                if lock:
+                    self.logger.info("Got lock for build [ %.4fs ]", (datetime.now() - start).total_seconds())
+                builder = ya_make.YaMake(params, app_ctx)
+                return_code = builder.go()
+            finally:
+                if lock:
+                    lock.release()
             if return_code != 0:
                 raise YaIdeGradleException('Some builds failed')
         except Exception as e:

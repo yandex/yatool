@@ -14,6 +14,7 @@
 #include <util/string/cast.h>
 #include <util/system/pipe.h>
 #include <util/system/platform.h>
+#include <util/system/tempfile.h>
 
 #ifdef  _win_
     #include <Windows.h>
@@ -26,6 +27,77 @@ using NPyBind::TPyObjectPtr;
 extern void RestoreThreadName();
 
 namespace {
+    // Windows limits CreateProcessW command lines to 32,767 UTF-16 code units.
+    // Linux and macOS allow larger argument vectors, so this budget leaves room
+    // for quoting and encoding differences on every supported host.
+    constexpr size_t PortableCommandLineLimit = 30 * 1024;
+
+    bool NeedsResponseFile(TStringBuf binary, const TList<TString>& args) {
+        size_t commandLength = binary.size() + 1;
+        for (const auto& arg : args) {
+            commandLength += arg.size() + 1;
+            if (ArgNeedsQuotes(arg)) {
+                commandLength += 2;
+                for (const char ch : arg) {
+                    commandLength += ch == '"';
+                }
+            }
+            if (commandLength >= PortableCommandLineLimit) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    class TPreparedCommandLine {
+    public:
+        TPreparedCommandLine(TStringBuf binary, const TList<TString>& args) {
+            // The runner accepts literal arguments. Escape them for ymake's
+            // response-file parser on both the short and the long command path.
+            for (const auto& arg : args) {
+                Y_ENSURE(arg.find('\0') == TString::npos, "A ymake argument cannot contain NUL");
+                Arguments_.push_back(arg.StartsWith('@') ? "@" + arg : arg);
+            }
+            if (!NeedsResponseFile(binary, Arguments_)) {
+                return;
+            }
+
+            TList<TString> directArguments;
+            THolder<TFileOutput> output;
+            for (const auto& arg : Arguments_) {
+                // Empty arguments and line breaks cannot be represented by the
+                // line-oriented format. Keep them in place on the command line.
+                if (arg.empty() || arg.find_first_of("\r\n") != TString::npos) {
+                    if (output) {
+                        output->Finish();
+                        output.Reset();
+                    }
+                    directArguments.push_back(arg);
+                    continue;
+                }
+                if (!output) {
+                    ResponseFiles_.push_back(MakeHolder<TTempFile>(MakeTempName(nullptr, "ymake", "rsp")));
+                    const auto& path = ResponseFiles_.back()->Name();
+                    output = MakeHolder<TFileOutput>(path);
+                    directArguments.push_back("@" + path);
+                }
+                *output << arg << '\n';
+            }
+            if (output) {
+                output->Finish();
+            }
+            Arguments_.swap(directArguments);
+        }
+
+        const TList<TString>& Arguments() const {
+            return Arguments_;
+        }
+
+    private:
+        TList<TString> Arguments_;
+        TList<THolder<TTempFile>> ResponseFiles_;
+    };
+
     void CallReader(PyObject* stderrLineReader, const TString& line) {
         PyGILState_STATE gilState = PyGILState_Ensure();
         Y_DEFER {PyGILState_Release(gilState);};
@@ -141,7 +213,8 @@ TRunYMakeResultPtr RunYMake(
         options.SetInputStream(input.Get());
     }
 
-    TShellCommand shCmd{binary, args, options};
+    TPreparedCommandLine commandLine{binary, args};
+    TShellCommand shCmd{binary, commandLine.Arguments(), options};
     shCmd.Run();
     TFile cmdErrors{shCmd.GetErrorHandle().Release()};
 
@@ -219,6 +292,8 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
         Args.insert(Args.end(), param.Args.begin(), param.Args.end());
     }
 
+    TPreparedCommandLine commandLine{Binary, Args};
+
     for (auto& thread: pollThreads) {
         thread.Start();
     }
@@ -239,7 +314,7 @@ TRunYmakeMulticonfigResultPtr RunYMakeMulticonfig(const TList<TRunYmakeParams>& 
     TStringStream errStream{};
     options.SetErrorStream(&errStream);
 
-    TShellCommand shCmd{Binary, Args, options};
+    TShellCommand shCmd{Binary, commandLine.Arguments(), options};
     shCmd.Run();
 
     for (auto& s: Concatenate(stdoutw, stderrw, stdinw, stdinr)) {
