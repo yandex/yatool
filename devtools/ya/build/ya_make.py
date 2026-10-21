@@ -2071,6 +2071,10 @@ class YaMake:
         return ''  # clear stderr
 
     def _validate_opts(self):
+        if sys.platform == 'darwin' and self.opts.larry_addr is not None and self.opts.sandboxing:
+            self.app_ctx.display.emit_message(
+                '[[warn]]Warning: Larry source sandboxing on macOS may not work correctly (YMAKE-2422).[[rst]]'
+            )
         if self.opts.build_results_report_file and not self.opts.output_root:
             raise devtools.ya.core.yarg.FlagNotSupportedException(
                 "--build-results-report must be used with not empty --output"
