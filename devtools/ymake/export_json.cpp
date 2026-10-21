@@ -423,16 +423,20 @@ namespace {
         ComputeFullUID(graph, cmdbuilder, nodeId);
     }
 
-    asio::awaitable<void> RenderJSONGraph(TYMake& yMake, TMakePlan& plan, asio::any_io_executor exec) {
+    struct TJSONGraphState {
+        THolder<TUidsData> UidsCache;
+        THolder<TJSONVisitor> Visitor;
+    };
+
+    asio::awaitable<void> VisitJSONGraph(TYMake& yMake, TJSONGraphState& state, asio::any_io_executor exec) {
         auto& graph = yMake.Graph;
-        const auto& conf = yMake.Conf;
         const auto& startTargets = yMake.StartTargets;
 
         YDebug() << "Exporting JSON" << Endl;
 
         FORCE_TRACE(U, NEvent::TStageStarted("Visit JSON"));
-        THolder<TJSONVisitor> cmdbuilderHolder;
-        THolder<TUidsData> uidsCache;
+        auto& cmdbuilderHolder = state.Visitor;
+        auto& uidsCache = state.UidsCache;
         YDebug() << "RenderJSONGraph: before waiting for UIDS cache" << Endl;
         if (yMake.UidsCachePreloadingPromise) {
             YDebug() << "RenderJSONGraph: waiting for UIDS cache preload" << Endl;
@@ -458,6 +462,12 @@ namespace {
             return !t.IsNonDirTarget && !t.IsModuleTarget;
         });
         FORCE_TRACE(U, NEvent::TStageFinished("Visit JSON"));
+    }
+
+    asio::awaitable<void> RenderJSONGraph(TYMake& yMake, TMakePlan& plan, TJSONVisitor& cmdbuilder, asio::any_io_executor exec) {
+        auto& graph = yMake.Graph;
+        const auto& conf = yMake.Conf;
+        const auto& startTargets = yMake.StartTargets;
 
         {
             NYMake::TTraceStageWithTimer renderJsonTimer("Render JSON", MON_NAME(EYmakeStats::RenderJSONTime));
@@ -633,7 +643,7 @@ namespace {
 
 }
 
-asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
+asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit) {
     FORCE_TRACE(U, NEvent::TStageStarted("Export JSON"));
 
     {
@@ -658,7 +668,12 @@ asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec) {
             TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, yMake.Conf.OutputStream.Get()};
             NYMake::TJsonWriter jsonWriter(*output.Get());
             TMakePlan plan(jsonWriter);
-            co_await RenderJSONGraph(yMake, plan, exec);
+            TJSONGraphState state;
+            co_await VisitJSONGraph(yMake, state, exec);
+            if (afterVisit) {
+                co_await afterVisit();
+            }
+            co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
         }
     }
 
