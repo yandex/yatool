@@ -2117,6 +2117,7 @@ class YaMake:
                     ),
                     result_context=self.ctx,
                     build_variables=collect_build_variables(self.ctx, self.app_ctx),
+                    build_threads=self.opts.build_threads,
                 ).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
