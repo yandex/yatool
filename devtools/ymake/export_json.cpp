@@ -11,6 +11,7 @@
 #include "saveload.h"
 #include "vars.h"
 #include "ymake.h"
+#include "ymake_async.h"
 
 #include <devtools/ymake/action.h>
 #include <devtools/ymake/common/md5sig.h>
@@ -434,9 +435,9 @@ namespace {
         THolder<TJSONVisitor> cmdbuilderHolder;
         THolder<TUidsData> uidsCache;
         YDebug() << "RenderJSONGraph: before waiting for UIDS cache" << Endl;
-        if (yMake.UidsCachePreloadingPromise) {
+        if (yMake.AsyncState_->UidsCachePreloadingPromise) {
             YDebug() << "RenderJSONGraph: waiting for UIDS cache preload" << Endl;
-            uidsCache = co_await yMake.UidsCachePreloadingPromise.value()(asio::use_awaitable);
+            uidsCache = co_await yMake.AsyncState_->UidsCachePreloadingPromise.value()(asio::use_awaitable);
         } else {
             YDebug() << "RenderJSONGraph: waiting for UIDS cache load" << Endl;
             uidsCache = co_await yMake.LoadUidsAsync(exec);
@@ -502,9 +503,9 @@ namespace {
 
                 THolder<TMakePlanCache> cachePtr;
                 YDebug() << "RenderJSONGraph: before waiting for JSON cache" << Endl;
-                if (yMake.JSONCachePreloadingPromise) {
+                if (yMake.AsyncState_->JSONCachePreloadingPromise) {
                     YDebug() << "RenderJSONGraph: waiting for JSON cache preload" << Endl;
-                    cachePtr = co_await yMake.JSONCachePreloadingPromise.value()(asio::use_awaitable);
+                    cachePtr = co_await yMake.AsyncState_->JSONCachePreloadingPromise.value()(asio::use_awaitable);
                 } else {
                     YDebug() << "RenderJSONGraph: waiting for JSON cache load" << Endl;
                     cachePtr = co_await yMake.LoadJsonCacheAsync(exec);
