@@ -710,6 +710,9 @@ def _substitute_uids(graph, tests, replaces, propagate=False):
         test.uid = replaces.get(test.uid, test.uid)
         test._result_uids = [replaces.get(dep_uid, dep_uid) for dep_uid in test._result_uids]
         test._output_uids = [replaces.get(dep_uid, dep_uid) for dep_uid in test._output_uids]
+        prepare_uids = getattr(test, '_test_prepare_uids', None)
+        if prepare_uids is not None:
+            test._test_prepare_uids = {replaces.get(uid, uid) for uid in prepare_uids}
         test.dep_uids = [replaces.get(dep_uid, dep_uid) for dep_uid in test.dep_uids]
         test.change_build_dep_uids(replaces)
 

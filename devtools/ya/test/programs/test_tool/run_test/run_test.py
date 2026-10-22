@@ -1348,6 +1348,7 @@ def main():
     if list_path:
         cmd += ["--test-list-path", list_path]
         if not os.path.exists(list_path):
+            suite.chunk.metrics[const.TEST_PREPARATION_FAILED] = 1
             suite.add_chunk_error("tests were not listed")
             suite.generate_trace_file(trace_report)
             return 0
@@ -1419,6 +1420,7 @@ def main():
     # [src] = dst. Src will be copied to the dst at test finalization stage.
     backup_map = {}
     command_cwd = None
+    preparation_completed = False
 
     try:
         if os.environ.get("YA_TEST_FAIL_RUN_TEST"):
@@ -1693,6 +1695,7 @@ def main():
             binary_path = cmd[cmd.index("--binary") + 1]
             env["DYLD_LIBRARY_PATH"] = os.path.dirname(binary_path)
 
+        preparation_completed = True
         failed_recipes = []
 
         # Run persistent recipes via Recipe Manager when:
@@ -2286,9 +2289,11 @@ def main():
             options.disable_memory_snippet,
         )
 
+        suite.chunk.metrics[const.TEST_PREPARATION_FAILED] = int(not preparation_completed)
         finalize(options, suite, work_dir, test_rc, main_start_timestamp, time.time(), {}, backup_map, is_subreaper_set)
         return get_exit_code(suite)
 
+    suite.chunk.metrics[const.TEST_PREPARATION_FAILED] = int(not preparation_completed)
     finalize(
         options,
         suite,

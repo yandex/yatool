@@ -290,6 +290,10 @@ class TestNodeListener:
             suite.add_suite_error(msg, test_const.Status.INTERNAL)
             logging.debug(msg)
 
+        # A completed graph node has resolved its dependencies. Publish trace facts
+        # before the streaming reporter freezes the suite result.
+        test_result.record_test_preparation(suite)
+
         if self._report_generator is not None:
             self._report_generator.add_tests_results([suite], None, {}, defaultdict(list))
 

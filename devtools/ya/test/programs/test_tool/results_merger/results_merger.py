@@ -145,7 +145,13 @@ class MergePlan(object):
         for c in chunks[1:]:
             assert str(chunks[0]) == str(c), (chunks[0], c)
 
+        preparation_result = devtools.ya.test.result.get_test_preparation_result(chunks)
         chunk = select_worst_container(chunks)
+        # Runtime severity must not hide a preparation failure in another attempt.
+        if preparation_result is None:
+            chunk.metrics.pop(const.TEST_PREPARATION_FAILED, None)
+        else:
+            chunk.metrics[const.TEST_PREPARATION_FAILED] = preparation_result
         chunk.logs = merge_logs(chunks)
         self.chunks[chunks[0].get_name()] = chunk
 

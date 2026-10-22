@@ -104,6 +104,7 @@ class AbstractTestSuite(facility.Suite):
         self.meta = self._get_meta_constructor()(raw_meta)
         self._result_uids = []
         self._output_uids = []
+        self._test_prepare_uids = None
         self.dep_uids = []
         self.preresults = []
         self.flaky = False
@@ -159,11 +160,13 @@ class AbstractTestSuite(facility.Suite):
 
     def save(self):
         #  needed for ya dump
+        prepare_uids = getattr(self, '_test_prepare_uids', None)
         return {
             'dart_info': self.meta.meta_raw,
             'tests': self.tests,
             'result_uids': self._result_uids,
             'output_uids': self._output_uids,
+            'test_prepare_uids': sorted(prepare_uids) if prepare_uids is not None else None,
             'flaky': self.flaky,
             'uid': self.uid,
             'build_deps': dict(self._build_deps),

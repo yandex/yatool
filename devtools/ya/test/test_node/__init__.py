@@ -1014,7 +1014,12 @@ def create_test_node(
     if build_tags:
         node["tags"] = testdeps.unique(build_tags)
 
-    return wrap_test_node(node, suite, work_dir, opts, platform_descriptor, split_index)
+    node = wrap_test_node(node, suite, work_dir, opts, platform_descriptor, split_index)
+    # These are execution dependencies, not the result-merging nodes.
+    if getattr(suite, '_test_prepare_uids', None) is None:
+        suite._test_prepare_uids = set()
+    suite._test_prepare_uids.update(node['deps'])
+    return node
 
 
 def get_test_kv(suite, **kwargs):
@@ -1276,6 +1281,9 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
 
     if timeout:
         node['timeout'] = timeout
+
+    if getattr(suite, '_test_prepare_uids', None) is not None:
+        suite._test_prepare_uids = set(node['deps'])
 
     return node
 

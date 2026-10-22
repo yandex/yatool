@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import os
 import re
 import traceback
@@ -183,6 +184,37 @@ def convert_distbuild_to_test_status(status_node, strict=False):
         return devtools.ya.test.const.Status.INTERNAL
 
 
+def get_test_preparation_result(chunks):
+    """A failure dominates; success requires an explicit zero from every chunk."""
+    metric = devtools.ya.test.const.TEST_PREPARATION_FAILED
+    results = [chunk.metrics.get(metric) for chunk in chunks]
+    known_results = [value for value in results if type(value) in (int, float) and math.isfinite(value) and value >= 0]
+    if any(value > 0 for value in known_results):
+        return 1
+    if results and len(known_results) == len(results):
+        return 0
+    return None
+
+
+def record_test_preparation(suite, build_result=None):
+    """Combine graph dependency failures with explicit environment preparation facts."""
+    metric = devtools.ya.test.const.TEST_PREPARATION_FAILED
+    dependencies = getattr(suite, '_test_prepare_uids', None)
+    preparation_result = get_test_preparation_result(suite.chunks)
+    dependency_failed = (
+        build_result is not None
+        and dependencies is not None
+        and any(uid in build_result.node_build_errors for uid in dependencies)
+    )
+    if dependency_failed or preparation_result == 1:
+        suite.metrics[metric] = 1
+    elif dependencies is not None and preparation_result == 0:
+        suite.metrics[metric] = 0
+    else:
+        # Cached traces and saved graphs may predate the preparation contract.
+        suite.metrics.pop(metric, None)
+
+
 def fill_suites_results(suites, builder, results_root, resolver=None):
     if not suites:
         return
@@ -328,6 +360,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         if uid in ok_tests:
             # XXX suite has already been loaded
             if suite.chunks:
+                record_test_preparation(suite, builder.build_result)
                 continue
 
             result = TestPackedResultView(work_dir)
@@ -395,3 +428,5 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
 
             if resolver:
                 suite.fix_roots(resolver)
+
+        record_test_preparation(suite, builder.build_result)
