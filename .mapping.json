@@ -34,6 +34,7 @@
   "build/docs/ru/ya_dump.md":"devtools/ya/opensource/github/doc_ru/ya_dump.md",
   "build/docs/ru/ya_make.md":"devtools/ya/opensource/github/doc_ru/ya_make.md",
   "build/mapping.conf.json":"devtools/ya/opensource/mapping.conf.json",
+  "build/tools":"devtools/ya/opensource/tools",
   "build/ya.conf.json":"devtools/ya/opensource/ya.conf.json",
   "ya":"devtools/ya/opensource/ya",
   "ya.conf":"devtools/ya/opensource/ya.conf",
