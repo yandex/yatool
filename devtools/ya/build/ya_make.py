@@ -672,7 +672,7 @@ def configure_build_graph_cache_dir(app_ctx, opts):
         if not build_graph_cache_resource_dir.enabled():
             logger.debug("Build graph cache processing disabled")
 
-            if build_graph_cache.is_cache_provided(opts) and not opts.build_graph_cache_cl and not opts.distbuild_patch:
+            if build_graph_cache.is_cache_provided(opts) and not opts.build_graph_cache_cl:
                 logger.warning(
                     '--build-graph-cache-dir/--build-graph-cache-archive needs change list provided with --build-graph-cache-cl for improved ymake performance'
                 )
