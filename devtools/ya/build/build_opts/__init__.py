@@ -164,6 +164,8 @@ class BuildThreadsOptions(Options):
 
         self.build_threads = build_threads
         self.link_threads = 2
+        # SetValueHook tracks explicit flag, environment and config assignments.
+        self._link_threads_counter = 0
 
     @staticmethod
     def consumer():
@@ -186,7 +188,7 @@ class BuildThreadsOptions(Options):
                 help=(
                     'Maximum number of concurrent link tasks. '
                     'Use a lower value when OOM occurs during linking; '
-                    'it does not reduce concurrency in other build stages'
+                    'it does not reduce concurrency in other build stages. Unsupported with Larry'
                 ),
                 hook=SetValueHook('link_threads', int),
                 group=OPERATIONAL_CONTROL_GROUP,
@@ -197,6 +199,8 @@ class BuildThreadsOptions(Options):
         ]
 
     def postprocess2(self, params):
+        if self._link_threads_counter and getattr(params, 'larry_addr', None) is not None:
+            raise ArgsValidatingException('--link-threads is not supported with Larry')
         if getattr(params, 'lto', False) or getattr(params, 'thinlto', False):
             self.link_threads = self.link_threads or 1
 
@@ -1274,7 +1278,7 @@ class ExecutorOptions(Options):
                 help=(
                     'Restrict new build work when host memory usage exceeds this threshold '
                     '(Examples: 50GB, 92%). This does not limit memory of an individual process '
-                    'or guarantee that OOM cannot occur'
+                    'or guarantee that OOM cannot occur. Unsupported with Larry'
                 ),
                 hook=SetValueHook('memory_limit'),
                 group=ADVANCED_OPT_GROUP,
@@ -1292,6 +1296,8 @@ class ExecutorOptions(Options):
                 self.memory_limit = {'abs': parse_size(self.memory_limit, binary=True), 'rel': None}
 
     def postprocess2(self, params):
+        if self.memory_limit is not None and getattr(params, 'larry_addr', None) is not None:
+            raise ArgsValidatingException('--memory-limit is not supported with Larry')
         if (
             self.eager_execution
             and getattr(params, 'run_tests', 0) > 0

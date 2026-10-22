@@ -2119,8 +2119,6 @@ class YaMake:
                     build_variables=collect_build_variables(self.ctx, self.app_ctx),
                     build_threads=self.opts.build_threads,
                     test_threads=getattr(self.opts, 'test_threads', 0),
-                    link_threads=getattr(self.opts, 'link_threads', 2),
-                    memory_limit=getattr(self.opts, 'memory_limit', None),
                 ).build(self.opts.larry_addr)
             else:
                 return self._build_local(callback)
