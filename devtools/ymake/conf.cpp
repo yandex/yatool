@@ -291,7 +291,6 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
 
     if (!PatchPath2.empty()) {
         PatchPath = PatchPath2;
-        ReadFileContentFromZipatch = ReadFileContentFromZipatch2;
     }
 
     TCommandLineOptions::PostProcess(freeArgs);

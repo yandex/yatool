@@ -26,7 +26,6 @@ struct TCommandLineOptions {
     bool DumpInputsInJSON = false;
     bool StoreInputsInJsonCache = true;
     bool CheckDataPaths = false;
-    bool ReadFileContentFromZipatch = false;
 
     TString WriteTestDart;
     TString WriteJavaDart;

@@ -130,14 +130,6 @@ TResolveFile TPathResolver::CheckSourceCacheParent(TFileView dir, TStringBuf pat
         return fileFast; // this may be empty if file absence is proven by changelist
     }
 
-    auto [foundInChanges, removedOrInvalidKind] = FileConf_.FindFileInChangesNoFS(path, true, Options_.AllowDir);
-    if (removedOrInvalidKind) {
-        return {}; // not found
-    }
-    if (foundInChanges) {
-        return TResolveFile(FileConf_.GetStoredName(path));
-    }
-
     if (Options_.NoFS) { // recache source forbidden, check of symbol table already executed in CheckSourceById
         return {}; // not found
     }
@@ -148,11 +140,6 @@ TResolveFile TPathResolver::CheckSourceCacheParent(TFileView dir, TStringBuf pat
     }
 
     TStringBuf directParent = NPath::Parent(path); // direct parent of path
-    auto [_, directParentRemovedOrInvalidKind] = FileConf_.FindFileInChangesNoFS(directParent, false, true);
-    if (directParentRemovedOrInvalidKind) {
-        return {}; // not found
-    }
-
     ListDir(directParent);
 
     auto [done, file] = CheckSourceById(path, true); // retry check with do data up to date, if need

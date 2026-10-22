@@ -185,8 +185,8 @@ message TFileConfStats {
     optional uint64 MaxMappedMD5Time = 9;
     optional uint32 MappedCount = 10;
     optional uint64 MapTime = 11;
-    optional uint32 FromPatchCount = 12;
-    optional uint32 FromPatchSize = 13;
+    reserved "FromPatchCount"; reserved 12;
+    reserved "FromPatchSize"; reserved 13;
     optional uint32 FileStatCount = 14;
     optional uint32 LstatCount = 15;
     optional uint64 LstatSumUs = 16;

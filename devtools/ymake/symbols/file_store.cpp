@@ -152,10 +152,6 @@ const TFileData& TFileConf::CheckFS(TFileElemId elemId, bool runStat, const TFil
     Y_ASSERT(data.IsSource);
 
     auto targetPath = nameView.GetTargetStr();
-    auto [removed, content, kind] = GetFileChanges(targetPath);
-    if (removed) {
-        return data.MarkNotFound(curStamp);
-    }
 
     if (!runStat && !fileStat) {
         return data;
@@ -165,7 +161,7 @@ const TFileData& TFileConf::CheckFS(TFileElemId elemId, bool runStat, const TFil
     TFileStat stats_;
 
     if (!fileStat) {
-        int err = FileStat(targetPath, content, kind, stats_);
+        int err = FileStat(targetPath, stats_);
         if (!err) {
             fileStat = &stats_;
         } else if (CanTrustStatError(err)) {
@@ -317,34 +313,24 @@ void TFileConf::ReadContent(TFileView view, TString&& realPath, TFileContentHold
     auto curStamp = TimeStamps.CurStamp();
 
     try {
-        bool isFromExternalChanges = IsChangesContentSupported_ && ExternalChanges.contains(view.GetElemId());
-        if (isFromExternalChanges) {
-            Y_ABORT_UNLESS(view.IsType(NPath::Source));
-            auto [content, kind] = Changes->GetFileContent(view.CutType());
-            Y_ABORT_UNLESS(kind == IChanges::EFK_File);
-            blob = TBlob::NoCopy(content.data(), content.size());
-            Stats.Inc(NStats::EFileConfStats::FromPatchCount);
-            Stats.Inc(NStats::EFileConfStats::FromPatchSize, content.size());
-        } else {
-            const auto read = [&]() {
-                auto wrapped = Reclaim::Instance().OpenFile(realPath, RdOnly | Seq);
-                TFile& f = wrapped.GetFile();
+        const auto read = [&]() {
+            auto wrapped = Reclaim::Instance().OpenFile(realPath, RdOnly | Seq);
+            TFile& f = wrapped.GetFile();
 
-                if (data.Size < (64 << 10)) {
-                    blob = TBlob::FromFileContentSingleThreaded(f);
-                } else {
-                    // Read 1 byte before mapping to detect access problems for encrypted and banned files in arc
-                    TBlob::FromFileContentSingleThreaded(f, 0, 1);
-                    mapped = true;
-                    blob = TBlob::FromFile(f);
-                }
-                Reclaim::Instance().MarkToRemove(std::move(wrapped));
-            };
+            if (data.Size < (64 << 10)) {
+                blob = TBlob::FromFileContentSingleThreaded(f);
+            } else {
+                // Read 1 byte before mapping to detect access problems for encrypted and banned files in arc
+                TBlob::FromFileContentSingleThreaded(f, 0, 1);
+                mapped = true;
+                blob = TBlob::FromFile(f);
+            }
+            Reclaim::Instance().MarkToRemove(std::move(wrapped));
+        };
 
-            const auto start = Now();
-            DoWithRetry<TFileError>(read, onFail, TRetryOptions(3, TDuration::Seconds(1)), true);
-            RecordStats(data.Size, start, mapped);
-        }
+        const auto start = Now();
+        DoWithRetry<TFileError>(read, onFail, TRetryOptions(3, TDuration::Seconds(1)), true);
+        RecordStats(data.Size, start, mapped);
     } catch (TFileError& e) {
         NEvent::TInvalidFile event;
         event.SetFile(TString(view.GetTargetStr()));
@@ -439,52 +425,8 @@ bool TFileConf::DirHasYaMakeFile(TFileView dirView) {
     return DirHasFile(dirView, YA_MAKE, EPathKind::File);
 }
 
-/// Return <removed, content, kind> from Changes
-std::tuple<bool, TStringBuf, IChanges::EFileKind> TFileConf::GetFileChanges(TStringBuf name) const {
-    if (!IsChangesContentSupported_) {
-        return { false, TStringBuf(), IChanges::EFK_NotFound };
-    }
-
-    auto relPath = NPath::CutType(name);
-    // Check if the file is deleted in the patch
-    if (Changes->IsRemoved(relPath)) {
-        return { true, TStringBuf(), IChanges::EFK_NotFound };
-    }
-
-    // Check if the file is added in the patch
-    auto [content, kind] = Changes->GetFileContent(relPath);
-    return { false, content, kind };
-}
-
-/// Return <found, removedOrInvalidKind> from Changes, if content supported in Changes
-std::tuple<bool, bool> TFileConf::FindFileInChangesNoFS(TStringBuf name, bool allowFile, bool allowDir) const {
-    if (!IsChangesContentSupported_) {
-        return { false, false };
-    }
-    auto [removed, content, kind] = GetFileChanges(name);
-    bool removedOrInvalidKind  = removed ||
-        (!allowFile && (kind == IChanges::EFK_File)) ||
-        (!allowDir && (kind == IChanges::EFK_Dir));
-    return { IChanges::EFK_NotFound != kind, removedOrInvalidKind };
-}
-
-int TFileConf::FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind kind, TFileStat& result) const {
+int TFileConf::FileStat(TStringBuf name, TFileStat& result) const {
     Y_ASSERT(NPath::IsType(name, NPath::Source));
-    if (kind != IChanges::EFK_NotFound) {
-        result = {};
-        if (kind == IChanges::EFK_File) {
-            // regular file
-            result.Mode = S_IFREG;
-            result.Size = content.size();
-        } else {
-            Y_ASSERT(kind == IChanges::EFK_Dir);
-            // directory
-            result.Mode = S_IFDIR;
-            result.Size = 4096;
-        }
-        return 0;
-    }
-
     TString realPath = Configuration.RealPath(name);
     const auto checkpoint = MakeCheckpoint<THPClock>();
 
@@ -512,17 +454,8 @@ void TFileConf::ListDir(TFileElemId dirElemId, bool forceList, bool forceStat) {
     TString fullPath = Configuration.RealPath(pathView);
     YDIAG(VV) << "  listing dir: " << fullPath << Endl;
 
-    THashSet<TFileElemId>* addedContent = nullptr;
-    if (IsChangesContentSupported_ && !ChangesAddedDirContent.empty()) {
-        // Add entries which were added in the patch
-        if (auto iter = ChangesAddedDirContent.find(dirElemId); iter != ChangesAddedDirContent.end()) {
-            addedContent = &iter->second; // edit below inplace, and clear after use
-            Y_ASSERT(!addedContent->empty()); // can't be empty here, must be used one time only, and cleared after use
-        }
-    }
-
     auto& dirItems = SortedReadDir_.ReadDir(fullPath, forceStat, Stats);
-    if (SortedReadDir_.IsReadFailed() && !addedContent) {
+    if (SortedReadDir_.IsReadFailed()) {
         const auto dirName = pathView.GetTargetStr();
 
         TRACE(P, NEvent::TInvalidSrcDir(TString{dirName}));
@@ -534,16 +467,8 @@ void TFileConf::ListDir(TFileElemId dirElemId, bool forceList, bool forceStat) {
         // return;
     }
 
-    const TFileElemId REMOVED = TFileId::RemovedElemId();// Magic value for mark removed elements in directory items list
     for (auto& dirItem: dirItems) {
         auto arcFullname  = Base2FullNamer_.GetFullname(SortedReadDir_.GetBasename(dirItem));
-        if (IsChangesContentSupported_) {
-            // Filter out the entries which were removed in the patch
-            if (Changes->IsRemoved(NPath::CutType(arcFullname))) {
-                dirItem.ElemId = REMOVED; // mark this item as removed
-                continue;
-            }
-        }
         const auto elemId = GetStoredName(arcFullname).GetElemId();
         dirItem.ElemId = elemId;
         if (dirItem.Stat.has_value()) { // fill stat data to TFileData
@@ -556,51 +481,10 @@ void TFileConf::ListDir(TFileElemId dirElemId, bool forceList, bool forceStat) {
         }
     }
 
-    if (addedContent) {
-        // Fill IsDir flag from Changes
-        auto fillAddedIsDir = [&](TFileElemId elemId) {
-            auto addedFileView = GetName(elemId);
-            auto [_, kind] = Changes->GetFileContent(addedFileView.CutType());
-            // We set IsDir for all entries from Changes which are explicitly
-            // marked as EFK_Dir and those entries which do not belong to Changes
-            // but present in addedContent.
-            auto& fileData = GetFileDataById(elemId);
-            auto isDir = (kind != IChanges::EFK_File);
-            fileData.IsDir = isDir;
-            fileData.NotFound = false; // here all always found
-            return std::tuple<TFileView, bool>(addedFileView, isDir);
-        };
-
-        for (const auto& dirItem : dirItems) {
-            const auto elemId = dirItem.ElemId;
-            const auto it = addedContent->find(elemId);
-            if (it == addedContent->end()) {
-                continue;
-            }
-            addedContent->erase(it); // already in dirFilenames
-            fillAddedIsDir(elemId);
-        }
-
-        if (!addedContent->empty()) {
-            for (auto elemId: *addedContent) {
-                auto [addedFileView, isDir] = fillAddedIsDir(elemId);
-                SortedReadDir_.AddItem(addedFileView.Basename(), isDir, elemId);
-            }
-            SortedReadDir_.ResortDirItems(); // Resort after add
-
-            // use swap for clear and release used by THashSet memory
-            THashSet<TFileElemId> emptySet;
-            std::swap(*addedContent, emptySet); // empty set is flag about was already used
-        }
-    }
-
     MD5 dirHash;
     auto& dirData = DirData[dirElemId] = {};
     for (const auto& dirItem: dirItems) {
         auto elemId = dirItem.ElemId;
-        if (elemId == REMOVED) {
-            continue; // item removed, skip it
-        }
         dirHash.Update(SortedReadDir_.GetBasename(dirItem));
         dirData.push_back(elemId);
     }
@@ -626,12 +510,6 @@ TFileConf::EMarkAsChangedResult TFileConf::MarkFileAsChanged(const TString& file
         return EMarkAsChangedResult::DONE;
     }
 
-    if (!fileExisted && IsChangesContentSupported_) {
-        auto dir_id = Add(NPath::Parent(filename));
-        auto [iter, _] = ChangesAddedDirContent.try_emplace(dir_id);
-        iter->second.insert(id);
-    }
-
     auto& data = GetFileDataById(id);
     auto fileNotFound = data.NotFound;
     auto hasActualCachedData = data.IsStatusUpToDate(TimeStamps.CurStamp() - 1);
@@ -649,10 +527,6 @@ void TFileConf::MarkAsMakeFile(TFileView view) {
 void TFileConf::UseExternalChanges(THolder<IChanges> changes) {
     UseExternalChangesSource = true;
 
-    // Changes is used inside MarkFileAsChanged
-    Changes.Reset(std::move(changes));
-    IsChangesContentSupported_ = Changes->IsContentSupported();
-
     auto&& markChanged = [this](const IChanges::TChange& change) {
         auto fileName = ArcPath(change.Name);
         auto type = change.Type;
@@ -668,12 +542,7 @@ void TFileConf::UseExternalChanges(THolder<IChanges> changes) {
         }
     };
 
-    Changes->Walk(markChanged);
-
-    if (!IsChangesContentSupported_) {
-        // No need to keep Changes any longer
-        Changes.Reset(nullptr);
-    }
+    changes->Walk(markChanged);
 }
 
 void TFileConf::RecordStats(ui64 size, TInstant start, bool mapped) {

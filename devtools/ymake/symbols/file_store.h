@@ -212,11 +212,6 @@ public: // Creating ElemId from TargetId and LinkType
         return Create(linkName, targetId).GetElemId();
     }
 
-    /// Magic value for mark removed elements in directory items list
-    static TFileElemId RemovedElemId() {
-        return TFileId::CreateElemId(ELT_Default, TFileElemId(Max<ui32>()));
-    }
-
 private:
     union {
         TFileElemId ElemId; ///< Combine TargetId and LinkType in one ui32 word
@@ -379,26 +374,12 @@ class IChanges {
 public:
     struct TChange {
         TStringBuf Name;
-        TStringBuf Content;
         EChangeType Type;
     };
     using TOnChange = std::function<void(const TChange&)>;
 
-    enum EFileKind {
-        EFK_NotFound,
-        EFK_File,
-        EFK_Dir
-    };
-
     virtual ~IChanges() = default;
     virtual void Walk(TOnChange visitor) = 0;
-    virtual bool IsContentSupported() const = 0;
-    virtual std::pair<TStringBuf, EFileKind> GetFileContent(TStringBuf /* fileName */) const {
-        return {TStringBuf(), EFK_NotFound};
-    }
-    virtual bool IsRemoved(TStringBuf /* path */) const {
-        return false;
-    }
 };
 
 class TFileConf: public TNameDataStore<TFileData, TFileView> {
@@ -411,8 +392,6 @@ private:
     TFileView BuildDummyFile;
     THashSet<TFileElemId> ExternalChanges;
     THashMap<TFileElemId, TVector<TFileElemId>> DirData;
-    THolder<IChanges> Changes = nullptr;
-    THashMap<TFileElemId, THashSet<TFileElemId>> ChangesAddedDirContent;
 
     mutable NStats::TFileConfStats Stats{"File access stats"};
     mutable THolder<NStats::TFileConfSubStats> SubStats = nullptr;
@@ -434,7 +413,7 @@ private:
     void RecordMD5Stats(TInstant start, bool mapped);
 
     /// Returns system error code upon failure, 0 on success
-    int FileStat(TStringBuf name, TStringBuf content, IChanges::EFileKind kind, TFileStat& result) const;
+    int FileStat(TStringBuf name, TFileStat& result) const;
 
     void ReadContent(TStringBuf fileName, TFileContentHolder& contentHolder);
     void ReadContent(TFileElemId id, TFileContentHolder& contentHolder);
@@ -461,7 +440,6 @@ public:
         Stats.Set(NStats::EFileConfStats::LstatMinUs, Max<ui64>());
         Stats.Set(NStats::EFileConfStats::OpendirMinUs, Max<ui64>());
         Stats.Set(NStats::EFileConfStats::ReaddirMinUs, Max<ui64>());
-        IsChangesContentSupported_ = false;
     }
 
     const TRootsOptions& Configuration;
@@ -535,11 +513,6 @@ public:
     bool CheckLostDirectory(TFileView name);
     bool IsNonExistedSrcDir(TStringBuf name);
 
-    /// Return <removed, content, kind> from Changes
-    std::tuple<bool, TStringBuf, IChanges::EFileKind> GetFileChanges(TStringBuf name) const;
-    /// Return <found, removedOrInvalidKind> from Changes, if content supported in Changes
-    std::tuple<bool, bool> FindFileInChangesNoFS(TStringBuf name, bool allowFile, bool allowDir) const;
-
     // ATTN! Will invalidate any other TFileData refs and pointers
     void ListDir(TFileElemId dirElemId, bool forceList = false, bool forceStat = false);
 
@@ -585,7 +558,6 @@ public:
 private:
     TSortedReadDir SortedReadDir_;
     TBase2FullNamer Base2FullNamer_;
-    bool IsChangesContentSupported_;
 };
 
 

@@ -50,7 +50,6 @@ PEERDIR(
     library/cpp/svnversion
     library/cpp/threading/light_rw_lock
     library/cpp/ucompress
-    library/cpp/zipatch
 )
 
 IF (MSVC)

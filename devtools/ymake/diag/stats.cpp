@@ -147,8 +147,6 @@ namespace NStats {
         event.SetMaxMappedMD5Time(Get(EFileConfStats::MaxMappedMD5Time));
         event.SetMappedCount(Get(EFileConfStats::MappedCount));
         event.SetMapTime(Get(EFileConfStats::MapTime));
-        event.SetFromPatchCount(Get(EFileConfStats::FromPatchCount));
-        event.SetFromPatchSize(Get(EFileConfStats::FromPatchSize));
         event.SetFileStatCount(Get(EFileConfStats::FileStatCount));
         event.SetLstatCount(Get(EFileConfStats::LstatCount));
         event.SetLstatSumUs(Get(EFileConfStats::LstatSumUs));

@@ -10,7 +10,6 @@
 
 #include <library/cpp/json/json_reader.h>
 #include <library/cpp/svnversion/svnversion.h>
-#include <library/cpp/zipatch/reader.h>
 
 #include <util/generic/algorithm.h>
 #include <util/generic/scope.h>
@@ -65,120 +64,6 @@ namespace {
         return TVersion{GetProgramCommitId(), GetProgramBuildTimestamp()};
     }
 
-    class TZipatchChanges: public IChanges {
-        struct TChangeInfo {
-            TString Path;
-            ui32 BlobIndex;
-            EChangeType Type;
-        };
-    public:
-        TZipatchChanges(const TFsPath& path, bool readFileContentFromZipatch)
-            : Path(path), ReadFileContentFromZipatch(readFileContentFromZipatch)
-        {
-            Blobs.emplace_back();
-        }
-
-        bool IsContentSupported() const override {
-            return ReadFileContentFromZipatch;
-        }
-
-        void Walk(IChanges::TOnChange visitor) override {
-            for (const auto& item : Changes) {
-                auto& path = item.Path;
-                auto index = item.BlobIndex;
-                auto type = item.Type;
-                TStringBuf content;
-                if (index != 0) {
-                    Y_ASSERT(index < Blobs.size());
-                    auto& blob = Blobs[index];
-                    content = TStringBuf(static_cast<const char*>(blob.Data()), blob.Size());
-                }
-                visitor(IChanges::TChange{path, content, type});
-            }
-        }
-
-        std::pair<TStringBuf, EFileKind> GetFileContent(TStringBuf fileName) const override {
-            if (auto iter = BlobMap.find(fileName); iter != BlobMap.end()) {
-                auto index = iter->second;
-                if (index > 0) {
-                    Y_ASSERT(index < Blobs.size());
-                    auto& blob = Blobs[index];
-                    auto content = TStringBuf(static_cast<const char*>(blob.Data()), blob.Size());
-                    return {content, EFK_File};
-                }
-                Y_ASSERT(index == 0);
-                return {TStringBuf(), EFK_Dir};
-            }
-            return {TStringBuf(), EFK_NotFound};
-        }
-
-        bool IsRemoved(TStringBuf path) const override {
-            auto iter = LowerBound(Removed.begin(), Removed.end(), path);
-            if (iter != Removed.end() && path.StartsWith(*iter)) {
-                const auto size = iter->size();
-                if (size == path.size() || path[size] == NPath::PATH_SEP) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        void Read() {
-            NZipatch::TReader reader(Path);
-
-            auto handleEntry = [&](const NZipatch::TReader::TEvent& event) {
-                switch (event.Action) {
-                    case NZipatch::TReader::MkDir:
-                        Changes.push_back(TChangeInfo{TString(event.Path), 0, EChangeType::Create});
-                        if (auto [_, ok] = BlobMap.emplace(event.Path, 0); !ok) {
-                            ythrow yexception() << "file [" << event.Path << "] have been already seen in zipatch.";
-                        }
-                        break;
-                    case NZipatch::TReader::Remove:
-                        Changes.push_back(TChangeInfo{TString(event.Path), 0, EChangeType::Remove});
-                        Removed.push_back(Changes.back().Path);
-                        break;
-                    case NZipatch::TReader::StoreFile: {
-                        ui32 index = 0;
-                        if (ReadFileContentFromZipatch) {
-                            index = Blobs.size();
-                            Blobs.emplace_back();
-                            TBlob::Copy(event.Data.data(), event.Data.size()).Swap(Blobs.back());
-                            if (auto [_, ok] = BlobMap.emplace(event.Path, index); !ok) {
-                                ythrow yexception() << "file [" << event.Path << "] have been already seen in zipatch.";
-                            }
-                        }
-                        Changes.push_back(TChangeInfo{TString(event.Path), index, EChangeType::Create});
-                        break;
-                    }
-                    case NZipatch::TReader::Copy:
-                    case NZipatch::TReader::Move:
-                        break;
-                    case NZipatch::TReader::Unknown:
-                        ythrow yexception() << "unknown action " << (int) event.Action;
-                }
-            };
-
-            reader.Enumerate(handleEntry);
-
-            Sort(Removed);
-        }
-
-    private:
-        TFsPath Path;
-        TVector<TChangeInfo> Changes;
-        THashMap<TStringBuf, ui32> BlobMap;
-        TVector<TBlob> Blobs;
-        TVector<TStringBuf> Removed;
-        bool ReadFileContentFromZipatch = false;
-    };
-
-    THolder<IChanges> ReadZipatch(const TFsPath& path, bool readFileContentFromZipatch) {
-        auto changes = MakeHolder<TZipatchChanges>(path, readFileContentFromZipatch);
-        changes->Read();
-        return changes;
-    }
-
     EChangeType GetChangeType(TStringBuf type) {
         if (type == "modified") {
             return EChangeType::Modify;
@@ -193,13 +78,9 @@ namespace {
         TArcChangeListChanges(const TFsPath& path) : Path(path) {
         }
 
-        bool IsContentSupported() const override {
-            return false;
-        }
-
         void Walk(IChanges::TOnChange visitor) override {
             for (const auto& change : Changes) {
-                visitor(IChanges::TChange{change.first, TStringBuf(), change.second});
+                visitor(IChanges::TChange{change.first, change.second});
             }
         }
 
@@ -234,7 +115,7 @@ namespace {
         return changes;
     }
 
-    THolder<IChanges> GetChanges(const TFsPath& path, bool readFileContentFromZipatch) {
+    THolder<IChanges> GetChanges(const TFsPath& path) {
         YDIAG(FU) << "Read changelist from: " << path << Endl;
         THolder<IChanges> changes = nullptr;
 
@@ -243,8 +124,6 @@ namespace {
             extension.to_lower();
             if (extension == "cl") {
                 changes.Reset(ReadArcChangeList(path));
-            } else if (extension == "zipatch") {
-                changes.Reset(ReadZipatch(path, readFileContentFromZipatch));
             } else {
                 ythrow yexception() << "unknown changelist extension " << extension;
             }
@@ -936,7 +815,7 @@ bool TYMake::LoadPatch() {
     if (TimeStamps.IsNeedNewSession()) { // if cache not loaded by Load() must init session
         TimeStamps.InitSession(Graph.GetFileNodeData());
     }
-    auto changes = GetChanges(Conf.PatchPath, Conf.ReadFileContentFromZipatch);
+    auto changes = GetChanges(Conf.PatchPath);
     if (changes) {
         AnalyzeGraphChanges(*changes);
         Names.FileConf.UseExternalChanges(std::move(changes));

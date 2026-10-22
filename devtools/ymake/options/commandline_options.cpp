@@ -9,7 +9,7 @@ void TCommandLineOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption("managed-deps", "print managed dependencies for the given target").EmplaceTo(&DumpDMRoots);
     opts.AddLongOption('m', "write-meta-data", "metadata export file").StoreResult(&WriteMetaData);
     opts.AddLongOption('z', "cache-path", "load cache from path and do not update graph").StoreResult(&CachePath);
-    opts.AddLongOption('p', "patch-path", "use list of changes from patch (.zipatch) or from arc changelist (.cl)").StoreResult(&PatchPath);
+    opts.AddLongOption('p', "patch-path", "use list of changes from arc changelist (.cl)").StoreResult(&PatchPath);
 
     opts.AddLongOption('a', "add-tests", "add tests to graph").SetFlag(&Test).NoArgument();
     opts.AddLongOption('k', "keep-going", "make as much as possible").SetFlag(&KeepGoing).NoArgument();
@@ -20,7 +20,6 @@ void TCommandLineOptions::AddOptions(NLastGetopt::TOpts& opts) {
     opts.AddLongOption('G', "add-inputs-map", "dump inputs map into build plan").SetFlag(&DumpInputsMapInJSON).NoArgument();
     opts.AddLongOption('N', "add-inputs", "dump inputs for build plan nodes").SetFlag(&DumpInputsInJSON).NoArgument();
     opts.AddLongOption('e', "check-data-paths", "check paths in DATA section and emit configure error if they are absent on current filesystem").SetFlag(&CheckDataPaths).NoArgument();
-    opts.AddLongOption("apply-zipatch", "read file content from zipatch").SetFlag(&ReadFileContentFromZipatch).NoArgument();
 
     opts.AddLongOption('A', "test-dart", "test_dart export file").StoreResult(&WriteTestDart);
     opts.AddLongOption('H', "java-dart", "java_dart export file").StoreResult(&WriteJavaDart);

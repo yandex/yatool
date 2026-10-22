@@ -47,8 +47,6 @@ namespace NStats {
         MaxMappedMD5Time /* "Max mapped MD5 time" */,
         MappedCount /* "mapped count" */,
         MapTime /* "map time" */,
-        FromPatchCount /* "from patch count" */,
-        FromPatchSize /* "from patch size" */,
         FileStatCount /* "file stat count" */,
         LstatCount /* "lstat count" */,
         LstatSumUs /* "lstat sum us" */,

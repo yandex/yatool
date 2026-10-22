@@ -116,7 +116,6 @@ struct TDebugOptions {
     bool ConfCacheWasSetExplicitly = false;
 
     TString PatchPath2;
-    bool ReadFileContentFromZipatch2 = false;
 
     bool DisableGrandBypass = false;
 
