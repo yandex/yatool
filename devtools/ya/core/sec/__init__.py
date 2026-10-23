@@ -19,12 +19,24 @@ ENDSWITH_CHECKS = (
     'token',
     'secret',
     'password',
+    'passwd',
+    '_pwd',  # not 'pwd': PWD/OLDPWD hold the working directory
     '_rsa',
+    '_key',
+    '_keys',
 )
+# Comma-separated names of env vars that hold secrets whatever their names are,
+# e.g. yav/sb_vault REQUIREMENTS of a test suite exported by the Sandbox task that runs ya
+SECRET_ENV_NAMES_VAR = 'YA_SECRET_ENV_NAMES'
 
 
 class DoNotSearch(object):
     pass
+
+
+def _secret_env_names():
+    # type: () -> set[str]
+    return {name.strip() for name in os.environ.get(SECRET_ENV_NAMES_VAR, '').split(',')}
 
 
 # Please use one of public methods
@@ -35,6 +47,8 @@ def _search_secrets(key, value):
         return []
     if not isinstance(value, six.string_types):
         return []
+    if key and key in _secret_env_names():
+        return [value]
 
     if len(value) < 6 and (value.islower() or value.isalpha()):
         # Euristic for short text value, f.e. `token`
