@@ -1,3 +1,4 @@
+import errno
 import os
 import time
 import logging
@@ -69,20 +70,27 @@ class UidStore(object):
             return None
 
         ret = []
+        cache_path = None
 
         try:
             for rel_path, file_hash in six.iteritems(kv):
                 f_path = os.path.join(into_dir, rel_path)
+                cache_path = self._file_store.get(file_hash)
 
-                yalibrary.runner.fs.make_clone_or_hardlink(self._file_store.get(file_hash), f_path, prefer_clone=True)
+                yalibrary.runner.fs.make_clone_or_hardlink(cache_path, f_path, prefer_clone=True)
                 ret.append(f_path)
-        except file_store.NotInCacheError as e:
-            logger.error(
-                "Could not restore some files from cache: %s"
-                "It likely means that the cache has been corrupted. Run 'ya gc cache --age-limit 0' to drop the cache.",
-                e,
-            )
-            raise
+        except (file_store.NotInCacheError, OSError) as e:
+            if isinstance(e, OSError) and (e.errno not in (errno.EACCES, errno.ENOENT) or e.filename != cache_path):
+                raise
+
+            # A restore may have already linked some outputs. Do not let a
+            # cache miss leave stale outputs for the command that will run.
+            for path in ret:
+                exts.fs.ensure_removed(path)
+            exts.fs.ensure_removed(f_path)
+            self._lru_store.remove_uid(uid)
+            logger.warning("Could not restore uid %s from cache, treating it as a cache miss: %s", uid, e)
+            return None
 
         return ret
 
