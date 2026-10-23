@@ -566,8 +566,8 @@ void TYMake::DumpMetaData() {
     }
 
     NJson::TJsonValue metaJson;
-    metaJson["source_root"] = Conf.SourceRoot.c_str();
-    metaJson["build_root"] = Conf.BuildRoot.c_str();
+    metaJson["source_root"] = Conf.RenderPaths().SourceRoot.c_str();
+    metaJson["build_root"] = Conf.RenderPaths().BuildRoot.c_str();
 
     NJsonWriter::TBuf jsonWriter(NJsonWriter::HEM_UNSAFE, out);
     jsonWriter.WriteJsonValue(&metaJson, true);
@@ -872,8 +872,8 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
 void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     yMake->ReportMakeCommandStats();
 
-    yMake->Conf.SourceRoot = "$(SOURCE_ROOT)";
-    yMake->Conf.BuildRoot = "$(BUILD_ROOT)";
+    TRenderPathContext paths(conf, conf.NormalizeRealPath);
+    TCurrentContextScope<TRenderPathContext> pathScope(&paths);
 
     TDartManager dartManager(*yMake);
 

@@ -43,8 +43,8 @@ TMakeModuleState::TMakeModuleState(const TBuildConfiguration& conf, TDepGraph& g
     Vars.SetPathResolvedValue(NVariableDefs::VAR_TARGET, conf.RealPath(modName));
     Vars.SetPathResolvedValue(NVariableDefs::VAR_BINDIR, conf.RealPath(fileConf.ReplaceRoot(CurDir, NPath::Build)));
     Vars.SetPathResolvedValue(NVariableDefs::VAR_CURDIR, conf.RealPath(CurDir));
-    Vars.SetValue(NVariableDefs::VAR_ARCADIA_BUILD_ROOT, conf.BuildRoot.c_str());
-    Vars.SetValue(NVariableDefs::VAR_ARCADIA_ROOT, conf.SourceRoot.c_str());
+    Vars.SetValue(NVariableDefs::VAR_ARCADIA_BUILD_ROOT, conf.RenderPaths().BuildRoot.c_str());
+    Vars.SetValue(NVariableDefs::VAR_ARCADIA_ROOT, conf.RenderPaths().SourceRoot.c_str());
 
     Vars[NVariableDefs::VAR_SRCS_GLOBAL];
     Vars[NVariableDefs::VAR_AUTO_INPUT];
@@ -304,7 +304,7 @@ void TMakeCommand::MineLateOuts(TDumpInfoEx* addInfo, const TUniqVector<TNodeId>
     }
     auto& lateOuts = isModule ? Modules.GetModuleLateOuts(nodeElemId) : cmdLateOuts;
     TCommandInfo::TSubstObserver lateOutsObserver = [&](const TVarStr& subst) {
-        if (!subst.Name.StartsWith(Conf.BuildRoot.c_str())) {
+        if (!subst.Name.StartsWith(Conf.RenderPaths().BuildRoot.c_str())) {
             YConfErr(Misconfiguration) << "Late output must be full arcadia path strarting from ${ARCADIA_BUILD_ROOT} or ${BINDIR} " << subst.Name << Endl;
             return;
         }

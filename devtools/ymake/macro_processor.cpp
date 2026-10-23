@@ -1256,7 +1256,7 @@ bool TCommandInfo::ApplyMods(const TYVar* valVar, TVarStr& value, const TYVar* m
         YConfWarn(BadMacro) << "Don't use to_namespace and prefix modifiers together. The prefix modifier will be selected." << Endl;
     }
     if (!ns.empty() && prefix.empty()) {
-        value.Name = ApplyNamespaceModifier(Conf->BuildRoot.c_str(), ns, modtoken, suffix);
+        value.Name = ApplyNamespaceModifier(Conf->RenderPaths().BuildRoot.c_str(), ns, modtoken, suffix);
     } else {
         value.Name = TString::Join(prefix, modtoken, suffix);
     }

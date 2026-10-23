@@ -1,5 +1,7 @@
 #include "roots_options.h"
 
+#include <devtools/ymake/context_executor.h>
+
 #include <devtools/ymake/common/npath.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/symbols/symbols.h>
@@ -8,9 +10,24 @@
 
 using NPath::TUnixPath;
 
+TRenderPathContext::TRenderPathContext(const TRootsOptions& owner, bool normalize, TFileConf* names)
+    : Owner(owner)
+{
+    Paths.SourceRoot = "$(SOURCE_ROOT)";
+    Paths.BuildRoot = "$(BUILD_ROOT)";
+    Paths.ArcadiaTestsDataRoot = owner.ArcadiaTestsDataRoot.GetPath();
+    Paths.NormalizeRealPath = normalize;
+    Paths.EnableRealPathCache(names);
+}
+
+const TRootsOptions& TRootsOptions::RenderPaths() const {
+    const auto* context = CurrentContext<TRenderPathContext>;
+    return context && &context->Owner == this ? context->Paths : *this;
+}
+
 bool TRootsOptions::NeedNormalizeRealPath() const {
     // On non-Windows systems this should be false at compile time
-    return TPathSplitTraitsLocal::IsPathSep('\\') && NormalizeRealPath;
+    return TPathSplitTraitsLocal::IsPathSep('\\') && RenderPaths().NormalizeRealPath;
 }
 
 void TRootsOptions::AddOptions(NLastGetopt::TOpts& opts) {
@@ -102,7 +119,8 @@ const TFsPath& TRootsOptions::RealPathRoot(const TStringBuf& p) const {
     Y_ASSERT(NPath::IsType(p, NPath::Source) || NPath::IsType(p, NPath::Build));
     Y_ASSERT(p.at(0) != NPath::PATH_SEP);
 
-    return NPath::IsType(p, NPath::Source) ? SourceRoot : BuildRoot;
+    const auto& paths = RenderPaths();
+    return NPath::IsType(p, NPath::Source) ? paths.SourceRoot : paths.BuildRoot;
 }
 
 struct TFakeView {
@@ -142,6 +160,10 @@ void TRootsOptions::EnableRealPathCache(TFileConf* refNames) {
 }
 
 bool TRootsOptions::CanonPath(const TStringBuf& abspath, TString& result) const {
+    const auto& paths = RenderPaths();
+    if (&paths != this) {
+        return paths.CanonPath(abspath, result);
+    }
     TFsPath abs(abspath);
     // TFsPath lazily mutates its split cache even in const methods. Construct
     // local paths from strings: copying TFsPath would also read that cache.

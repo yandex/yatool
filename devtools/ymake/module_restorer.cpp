@@ -445,8 +445,8 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
         TLangId langId = NLanguages::GetLanguageId(lang);
         Y_ASSERT(langId != TModuleIncDirs::BAD_LANG);
         auto&& includeVarName = TModuleIncDirs::GetIncludeVarName(langId);
-        AddPath(vars[includeVarName], conf.BuildRoot.c_str());
-        AddPath(vars[includeVarName], conf.SourceRoot.c_str());
+        AddPath(vars[includeVarName], conf.RenderPaths().BuildRoot.c_str());
+        AddPath(vars[includeVarName], conf.RenderPaths().SourceRoot.c_str());
     }
 
     // This code uses cache-accelerated RealPath

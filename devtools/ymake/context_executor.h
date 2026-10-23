@@ -6,10 +6,13 @@
 
 #include <asio/any_io_executor.hpp>
 
+#include <type_traits>
+
 class TConfMsgManager;
 class TProgressManager;
 class TModuleStagesStatsManager;
 struct TDiagCtrl;
+struct TRenderPathContext;
 
 struct TExecContext: TNonCopyable {
     std::shared_ptr<NCommonDisplay::TLockedStream> LockedStream;
@@ -40,20 +43,26 @@ template <class T>
 inline thread_local T* CurrentContext = nullptr;
 
 template <class T>
+class TCurrentContextScope: TNonCopyable {
+public:
+    explicit TCurrentContextScope(T* context)
+        : Previous_(CurrentContext<T>)
+    {
+        CurrentContext<T> = context;
+    }
+
+    ~TCurrentContextScope() {
+        CurrentContext<T> = Previous_;
+    }
+
+private:
+    T* Previous_;
+};
+
+template <class T>
 class TExecutorWithContext {
     asio::any_io_executor Underlying_;
     std::shared_ptr<T> Context_;
-
-    struct ContextValueSetter {
-        T* Prev;
-        ContextValueSetter(T* new_ptr) {
-            Prev = CurrentContext<T>;
-            CurrentContext<T> = new_ptr;
-        }
-        ~ContextValueSetter() {
-            CurrentContext<T> = Prev;
-        }
-    };
 
 public:
     TExecutorWithContext(const asio::any_io_executor& underlying, std::shared_ptr<T> context)
@@ -78,8 +87,13 @@ public:
     void execute(Func f) const {
         auto ctxCopy = Context_;
         auto wrapper = [ctxCopy, f = std::move(f)]() mutable {
-            ContextValueSetter setter(ctxCopy.get());
-            f();
+            TCurrentContextScope<T> setter(ctxCopy.get());
+            if constexpr (std::is_same_v<T, TExecContext>) {
+                TCurrentContextScope<TRenderPathContext> renderScope(nullptr);
+                f();
+            } else {
+                f();
+            }
         };
         Underlying_.execute(std::move(wrapper));
     }

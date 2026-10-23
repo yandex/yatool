@@ -11,6 +11,8 @@
 class TFileConf;
 
 struct TRootsOptions {
+    const TRootsOptions& RenderPaths() const;
+
     void AddOptions(NLastGetopt::TOpts& opts);
     void PostProcess(const TVector<TString>& freeArgs);
 
@@ -24,6 +26,10 @@ struct TRootsOptions {
 
     template<typename TView>
     TString RealPath(TView view) const {
+        const auto& paths = RenderPaths();
+        if (&paths != this) {
+            return paths.RealPath(view);
+        }
         if (!IsRealPathCacheEnabled() || !view.HasId()) {
             return RealPathByStr(view.GetTargetStr());
         }
@@ -84,4 +90,11 @@ private:
 
     mutable ::NTls::TValue<THashMap<TElemId::TUnderlying, TString>> PathsCache;
     const TFileConf* RefNames = nullptr;
+};
+
+struct TRenderPathContext: TNonCopyable {
+    TRenderPathContext(const TRootsOptions& owner, bool normalize, TFileConf* names = nullptr);
+
+    const TRootsOptions& Owner;
+    TRootsOptions Paths;
 };

@@ -1,6 +1,7 @@
 #include "node_printer.h"
 
 #include "ymake.h"
+#include "context_executor.h"
 #include "module_restorer.h"
 #include "macro.h"
 #include "mkcmd.h"
@@ -2421,6 +2422,8 @@ bool TDartManager::TryLoad(EDartType dartType, const TFsPath& dartPath, const TF
 }
 
 void TDartManager::Render(EDartType dartType, const TFsPath& dartPath) {
+    TRenderPathContext paths(YMake_.Conf, YMake_.Conf.NormalizeRealPath);
+    TCurrentContextScope<TRenderPathContext> pathScope(&paths);
     NYMake::TTraceStage trace{fmt::format("Render {}", ToString(dartType))};
     TFileOutput dartOut(dartPath);
     switch (dartType) {

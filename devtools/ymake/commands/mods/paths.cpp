@@ -110,7 +110,7 @@ namespace {
             [[maybe_unused]] ICommandSequenceWriter* writer
         ) const override {
             CheckArgCount(args);
-            TStringBuf buildRoot = ctx.BuildConf.BuildRoot.c_str();
+            TStringBuf buildRoot = ctx.BuildConf.RenderPaths().BuildRoot.c_str();
             auto apply = [buildRoot](TStringBuf name) {
                 // lifted from EMF_Namespace/ApplyNamespaceModifier processing:
                 Y_ASSERT(name.StartsWith(buildRoot));

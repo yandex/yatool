@@ -1,6 +1,7 @@
 #include "export_json.h"
 
 #include "conf.h"
+#include "context_executor.h"
 #include "dump_info.h"
 #include "export_json_debug.h"
 #include "json_subst.h"
@@ -34,7 +35,6 @@
 #include <util/generic/algorithm.h>
 #include <util/generic/hash_set.h>
 #include <util/generic/ptr.h>
-#include <util/generic/scope.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 #include <util/stream/buffered.h>
@@ -643,42 +643,32 @@ namespace {
 
 }
 
-asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit) {
+static asio::awaitable<void> ExportJSONWithPaths(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit) {
     FORCE_TRACE(U, NEvent::TStageStarted("Export JSON"));
 
     {
         auto& conf = yMake.Conf;
-        TFsPath sysSourceRoot = conf.SourceRoot;
-        TFsPath sysBuildRoot = conf.BuildRoot;
-        const bool sysNormalize = conf.NormalizeRealPath;
-        Y_DEFER {
-            conf.EnableRealPathCache(nullptr);
-            conf.SourceRoot = std::move(sysSourceRoot);
-            conf.BuildRoot = std::move(sysBuildRoot);
-            conf.NormalizeRealPath = sysNormalize;
-        };
-        conf.SourceRoot = "$(SOURCE_ROOT)";
-        conf.BuildRoot = "$(BUILD_ROOT)";
-        conf.NormalizeRealPath = true;
-        conf.EnableRealPathCache(&yMake.Names.FileConf);
+        NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
 
-        {
-            NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
-
-            TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, yMake.Conf.OutputStream.Get()};
-            NYMake::TJsonWriter jsonWriter(*output.Get());
-            TMakePlan plan(jsonWriter);
-            TJSONGraphState state;
-            co_await VisitJSONGraph(yMake, state, exec);
-            if (afterVisit) {
-                co_await afterVisit();
-            }
-            co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
+        TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, conf.OutputStream.Get()};
+        NYMake::TJsonWriter jsonWriter(*output.Get());
+        TMakePlan plan(jsonWriter);
+        TJSONGraphState state;
+        co_await VisitJSONGraph(yMake, state, exec);
+        if (afterVisit) {
+            co_await afterVisit();
         }
+        co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
     }
 
     FORCE_TRACE(U, NEvent::TStageFinished("Export JSON"));
 
     yMake.JSONCacheMonEvent();
     yMake.UidsCacheMonEvent();
+}
+
+asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit) {
+    auto paths = std::make_shared<TRenderPathContext>(yMake.Conf, true, &yMake.Names.FileConf);
+    auto renderExec = TExecutorWithContext<TRenderPathContext>(exec, std::move(paths));
+    co_await asio::co_spawn(renderExec, ExportJSONWithPaths(yMake, renderExec, std::move(afterVisit)), asio::use_awaitable);
 }

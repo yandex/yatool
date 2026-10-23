@@ -10,6 +10,7 @@ SRCS(
 )
 
 PEERDIR(
+    contrib/libs/asio
     devtools/ymake/common
     devtools/ymake/diag
     library/cpp/getopt/small
