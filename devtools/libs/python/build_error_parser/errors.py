@@ -148,6 +148,7 @@ class YaRunnerLateImportFlakyError(error_base.Error):
     """
     Hopefully, will be fixed in https://st.yandex-team.ru/DEVTOOLSSUPPORT-69240
     """
+
     ERROR_RE = re.compile(r'AttributeError: module \'yalibrary\.runner\.tasks\' has no attribute')
     MESSAGE = 'Ya runner late import flaky error'
 
@@ -155,14 +156,54 @@ class YaRunnerLateImportFlakyError(error_base.Error):
 class PythonBuildInErrors(error_base.Error):
     # sorted in the hope that exceptions in first rows occur more often
     PYTHON_BUILTIN_EXCEPTIONS = [
-        'Exception:', 'KeyError:', 'ValueError:', 'AttributeError:', 'IndexError:', 'AssertionError:', 'TimeoutError:',
-        'FileExistsError:', 'FileNotFoundError:', 'UnicodeError:', 'UnicodeDecodeError:', 'UnicodeEncodeError:', 'RuntimeError:',
-        'NotImplementedError:', 'RecursionError:', 'SyntaxError:', 'StopIteration:', 'StopAsyncIteration:', 'ArithmeticError:',
-        'FloatingPointError:', 'OverflowError:', 'ZeroDivisionError:', 'BufferError:', 'EOFError:', 'ImportError:',
-        'ModuleNotFoundError:', 'LookupError:', 'MemoryError:', 'NameError:', 'UnboundLocalError:', 'BlockingIOError:',
-        'ChildProcessError:', 'ConnectionError:', 'BrokenPipeError:', 'ConnectionAbortedError:', 'ConnectionRefusedError:', 'ConnectionResetError:',
-        'InterruptedError:', 'IsADirectoryError:', 'NotADirectoryError:', 'PermissionError:', 'ProcessLookupError:',
-        'ReferenceError:', 'IndentationError:', 'TabError:', 'SystemError:', 'TypeError:', 'UnicodeTranslateError:',
+        'Exception:',
+        'KeyError:',
+        'ValueError:',
+        'AttributeError:',
+        'IndexError:',
+        'AssertionError:',
+        'TimeoutError:',
+        'FileExistsError:',
+        'FileNotFoundError:',
+        'UnicodeError:',
+        'UnicodeDecodeError:',
+        'UnicodeEncodeError:',
+        'RuntimeError:',
+        'NotImplementedError:',
+        'RecursionError:',
+        'SyntaxError:',
+        'StopIteration:',
+        'StopAsyncIteration:',
+        'ArithmeticError:',
+        'FloatingPointError:',
+        'OverflowError:',
+        'ZeroDivisionError:',
+        'BufferError:',
+        'EOFError:',
+        'ImportError:',
+        'ModuleNotFoundError:',
+        'LookupError:',
+        'MemoryError:',
+        'NameError:',
+        'UnboundLocalError:',
+        'BlockingIOError:',
+        'ChildProcessError:',
+        'ConnectionError:',
+        'BrokenPipeError:',
+        'ConnectionAbortedError:',
+        'ConnectionRefusedError:',
+        'ConnectionResetError:',
+        'InterruptedError:',
+        'IsADirectoryError:',
+        'NotADirectoryError:',
+        'PermissionError:',
+        'ProcessLookupError:',
+        'ReferenceError:',
+        'IndentationError:',
+        'TabError:',
+        'SystemError:',
+        'TypeError:',
+        'UnicodeTranslateError:',
     ]
 
     ERROR_RE = re.compile('|'.join(['^' + e for e in PYTHON_BUILTIN_EXCEPTIONS]), re.MULTILINE)
@@ -190,5 +231,7 @@ class FailedToReadDirDuringConfInitializationError(error_base.Error):
 
 
 class IOErrorFromYmakeConf(error_base.Error):
-    ERROR_RE = re.compile(r'Config was not generated due to errors in .*\/ymake_conf.py.*OSError: \[Errno 5\] I\/O error:', re.DOTALL)
+    ERROR_RE = re.compile(
+        r'Config was not generated due to errors in .*\/ymake_conf.py.*OSError: \[Errno 5\] I\/O error:', re.DOTALL
+    )
     MESSAGE = 'IO error from ymake_conf.py'
