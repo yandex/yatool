@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 TOKEN_RE = re.compile(r'AQAD-[a-zA-Z0-9_\-\\]+')
+OAUTH_HEADER_VALUE_RE = re.compile(r'(Authorization:\s*OAuth\s+)[^\s"\\]+', re.IGNORECASE)
 PRIVATE_KEY_PREFIX_RE = re.compile(r"-----BEGIN (RSA |EC |DSA |PGP )?PRIVATE KEY( BLOCK)?-----")
 IN_CHECKS = ('access_key', 'secret_key')
 ENDSWITH_CHECKS = (
@@ -85,7 +86,7 @@ def cleanup(s, suppressions, replacement='[SECRET]'):
     """Cleanup string from any secrets"""
     for sup in suppressions:
         s = s.replace(sup, replacement)
-    return s
+    return OAUTH_HEADER_VALUE_RE.sub(lambda match: match.group(1) + replacement, s)
 
 
 def environ(env=None):
