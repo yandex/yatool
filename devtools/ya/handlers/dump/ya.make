@@ -3,6 +3,7 @@ PY3_LIBRARY()
 PY_SRCS(
     __init__.py
     gen_conf_docs.py
+    resources.py
 )
 
 PEERDIR(
@@ -26,6 +27,7 @@ PEERDIR(
     devtools/ya/yalibrary/debug_store
     devtools/ya/yalibrary/debug_store/processor
     devtools/ya/yalibrary/debug_store/store
+    devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/tools
     devtools/ya/yalibrary/vcs
     devtools/ya/yalibrary/vcs/vcsversion

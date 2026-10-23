@@ -28,6 +28,7 @@ from devtools.ya.build.build_facade import (
 from devtools.ya.handlers.dump.gen_conf_docs import dump_mmm_docs
 from devtools.ya.build.dir_graph import reachable, gen_dir_graph
 from devtools.ya.build.compilation_database import dump_compilation_database, COMPILATION_DATABASE_OPTS
+from devtools.ya.handlers.dump.resources import dump_resources, DUMP_RESOURCES_OPTS
 
 from exts.strtobool import strtobool
 from library.python.tmp import temp_dir
@@ -255,6 +256,11 @@ class DumpYaHandler(CompositeHandler):
             action=devtools.ya.app.execute(action=dump_compilation_database),
             description='Alias for compile-commands',
             opts=COMPILATION_DATABASE_OPTS + [ToolsOptions(), CustomFetcherOptions(), SandboxAuthOptions()],
+        )
+        self['resources'] = OptsHandler(
+            action=devtools.ya.app.execute(action=do_dump_resources),
+            description='All external resources (toolchains, tools, DATA(sbr://...)) referenced by the build graph',
+            opts=DUMP_RESOURCES_OPTS,
         )
         self['relation'] = OptsHandler(
             action=devtools.ya.app.execute(action=do_relation),
@@ -1267,6 +1273,10 @@ def do_dump_vcs_info(params):
 
 def do_dump_svn_revision(params):
     sys.stdout.write(str(vcsversion.repo_config(params.arc_root)))
+
+
+def do_dump_resources(params):
+    delay_stdout_write(dump_resources(params) + '\n')
 
 
 def do_recipes(params):
