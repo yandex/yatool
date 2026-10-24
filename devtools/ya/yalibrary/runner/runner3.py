@@ -94,7 +94,7 @@ class CapCalculator:
         if not self._mem_limit:
             return self._max_cap
         host_state = self._host_health.get_host_state()
-        if host_state is None:
+        if host_state is None or "mem_limit" not in host_state:
             return self._max_cap
         cur_mem_state = host_state["mem_limit"]
         memory_is_over = any(
