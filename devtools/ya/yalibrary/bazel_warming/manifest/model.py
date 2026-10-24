@@ -12,9 +12,6 @@ import stat
 
 SCHEMA_VERSION = 1
 _MANIFEST_FIELDS = ('schema_version', 'run_id', 'complete', 'build_exit_code', 'max_file_size', 'nodes')
-# Ограничиваем число UID, чтобы сбой кеша не запускал массовую пересборку.
-# У одного UID может быть несколько файлов CAS; лимит относится к результатам сборки.
-MAX_CACHE_REPAIR_RESULTS = 100
 PUT_STATUSES = frozenset(('not_attempted', 'ok', 'failed', 'skipped_size'))
 _RUN_ID = re.compile(r'[A-Za-z0-9_.-]{1,128}\Z')
 

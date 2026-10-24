@@ -1,7 +1,6 @@
 """План прогрева и итоги PUT; наличие файлов в удалённом кеше проверяется отдельно."""
 
 from .model import (
-    MAX_CACHE_REPAIR_RESULTS,
     LocalCacheDescriptor,
     Manifest,
     ManifestError,
@@ -15,7 +14,6 @@ from .writer import ManifestWriter, write_manifest
 
 __all__ = [
     'Manifest',
-    'MAX_CACHE_REPAIR_RESULTS',
     'LocalCacheDescriptor',
     'ManifestError',
     'ManifestWriter',
