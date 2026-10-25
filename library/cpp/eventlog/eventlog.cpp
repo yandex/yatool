@@ -497,24 +497,15 @@ TEventClass TProtobufEventFactory::ClassByName(TStringBuf name) const {
     return EventFactory_->IdByName(name);
 }
 
-TEventClass TProtobufEventFactory::EventClassBegin() const {
+TVector<TEventClass> TProtobufEventFactory::EventClasses() const {
     const auto& items = EventFactory_->FactoryItems();
-
-    if (items.empty()) {
-        return static_cast<TEventClass>(0);
+    TVector<TEventClass> eventClasses;
+    eventClasses.reserve(items.size());
+    for (const auto& [eventClass, item] : items) {
+        Y_UNUSED(item);
+        eventClasses.push_back(static_cast<TEventClass>(eventClass));
     }
-
-    return static_cast<TEventClass>(items.begin()->first);
-}
-
-TEventClass TProtobufEventFactory::EventClassEnd() const {
-    const auto& items = EventFactory_->FactoryItems();
-
-    if (items.empty()) {
-        return static_cast<TEventClass>(0);
-    }
-
-    return static_cast<TEventClass>(items.rbegin()->first + 1);
+    return eventClasses;
 }
 
 namespace NEvClass {

@@ -154,8 +154,8 @@ public:
     virtual THolder<TEvent> CreateLogEvent(TEventClass c) = 0;
     virtual TEventLogFormat CurrentFormat() = 0;
     virtual TEventClass ClassByName(TStringBuf name) const = 0;
-    virtual TEventClass EventClassBegin() const = 0;
-    virtual TEventClass EventClassEnd() const = 0;
+    // Returns registered event IDs in ascending order.
+    virtual TVector<TEventClass> EventClasses() const = 0;
     virtual ~IEventFactory() = default;
 };
 
@@ -611,9 +611,7 @@ public:
 
     TEventClass ClassByName(TStringBuf name) const override;
 
-    TEventClass EventClassBegin() const override;
-
-    TEventClass EventClassEnd() const override;
+    TVector<TEventClass> EventClasses() const override;
 
     ~TProtobufEventFactory() override = default;
 
