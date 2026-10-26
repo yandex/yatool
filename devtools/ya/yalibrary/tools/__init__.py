@@ -671,12 +671,12 @@ class _ToolConfigReader:
             tool_data = self._tool_toolchains.get(name_parts, {})
             tool_cfg.toolchains = tool_data.get("toolchains", {})
             tool_cfg.bottles = tool_data.get("bottles", {})
-            host_platforms = []
+            host_platforms = set()
             for toolchain in tool_cfg.toolchains.values():
                 for platform in toolchain["platforms"]:
                     if platform.get("default", False):
                         host_platform = platform["host"]
-                        host_platforms.append(
+                        host_platforms.add(
                             "-".join([host_platform["os"].lower(), host_platform.get("arch", _DEFAULT_ARCH).lower()])
                         )
             tool_cfg.host_platforms = sorted(host_platforms)
