@@ -872,7 +872,7 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
 void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
     yMake->ReportMakeCommandStats();
 
-    TRenderPathContext paths(conf, conf.NormalizeRealPath);
+    TRenderPathContext paths(conf, true);
     TCurrentContextScope<TRenderPathContext> pathScope(&paths);
 
     TDartManager dartManager(*yMake);

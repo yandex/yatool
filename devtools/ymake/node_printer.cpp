@@ -2370,7 +2370,7 @@ TTestDartRenderPlan::~TTestDartRenderPlan() = default;
 
 void TTestDartRenderPlan::Render(IOutputStream& out) const {
     auto& ymake = Impl_->YMake;
-    TRenderPathContext paths(ymake.Conf, ymake.Conf.NormalizeRealPath);
+    TRenderPathContext paths(ymake.Conf, true);
     TCurrentContextScope<TRenderPathContext> pathScope(&paths);
     TFilteredOutputStream filtered(out, ymake.Graph, ymake.DependsToModulesClosure, ymake.Conf.ShouldCheckDependsInDart());
     for (const auto& property : Impl_->Properties) {
@@ -2484,7 +2484,7 @@ bool TDartManager::TryLoad(EDartType dartType, const TFsPath& dartPath, const TF
 }
 
 void TDartManager::Render(EDartType dartType, const TFsPath& dartPath) {
-    TRenderPathContext paths(YMake_.Conf, YMake_.Conf.NormalizeRealPath);
+    TRenderPathContext paths(YMake_.Conf, true);
     TCurrentContextScope<TRenderPathContext> pathScope(&paths);
     NYMake::TTraceStage trace{fmt::format("Render {}", ToString(dartType))};
     TFileOutput dartOut(dartPath);
