@@ -1,40 +1,15 @@
 # coding: utf-8
 
 import argparse
+import json
 import os
 import sys
-import six
+from collections.abc import Iterable
 
 import exts.archive
-import re
 from yatest.common import process
 from library.python.testing import coverage_utils as coverage_utils_library
-
-
-def combine_cov_files(cov_files, merge_dir, new_cov_filename, prefix_filter, exclude_regexp):
-    """returns merged coverage filename"""
-    file_filter = coverage_utils_library.make_filter(prefix_filter, exclude_regexp)
-    merged_coverage = {}
-    for filename in cov_files:
-        with open(filename, 'r') as afile:
-            afile.readline()  # skip mode
-            for line in afile:
-                line = line.strip()
-                cover_flag = bool(int(line[-1]))
-                segment_info = line[:-1]
-                segment_info = re.split(r'[/]', segment_info, maxsplit=1)[1]
-                # filtering filenames by prefix and regexp
-                if file_filter(extract_filename(segment_info)):
-                    if not merged_coverage.get(segment_info):
-                        merged_coverage[segment_info] = False
-                    merged_coverage[segment_info] = cover_flag | merged_coverage[segment_info]
-
-    merged_coverage_filename = os.path.join(merge_dir, new_cov_filename)
-    with open(merged_coverage_filename, 'w') as afile:
-        afile.write("mode: set\n")
-        for key, value in six.iteritems(merged_coverage):
-            afile.write("{}{}\n".format(key, str(int(value))))
-    return merged_coverage_filename
+import devtools.ya.test.programs.test_tool.lib.coverage as lib_coverage
 
 
 def get_options():
@@ -49,16 +24,21 @@ def get_options():
     return parser.parse_args()
 
 
-def extract_filename(segment_info):
-    return segment_info.split(":")[0]
+def build_summary(blocks: Iterable[lib_coverage.go_covdata.Block]) -> dict:
+    """Statement coverage per file and in total.
 
-
-def resolve_go_tool(path, binname):
-    path = os.path.join(path, "pkg/tool")
-    names = os.listdir(path)
-    # go toolchain contains only one platform
-    assert len(names) == 1, names
-    return os.path.join(path, names[0], binname)
+    A source shared by several test modules is instrumented in each of them and 'covdata textfmt' emits its blocks
+    once per package, so equal blocks are merged by coordinates with OR of the covered flag, as the html report does.
+    """
+    file_blocks: dict[str, lib_coverage.summary.GoBlocks] = {}
+    for block in blocks:
+        lib_coverage.summary.add_go_blocks(
+            file_blocks.setdefault(block.filename, {}), [block.segment], [block.num_statements]
+        )
+    files = {name: lib_coverage.summary.go_statement_summary(file_blocks[name]) for name in sorted(file_blocks)}
+    covered = sum(summary["statements"]["covered"] for summary in files.values())
+    count = sum(summary["statements"]["count"] for summary in files.values())
+    return {"total": lib_coverage.summary.statement_summary(covered, count), "files": files}
 
 
 def build_report(args):
@@ -76,20 +56,32 @@ def build_report(args):
 
     mergedir = 'merge'
     os.mkdir(mergedir)
-    for cov_tar in args.coverage_tars:
-        exts.archive.extract_from_tar(cov_tar, tmpdir)
-    cov_files = [os.path.join(tmpdir, fn) for fn in os.listdir(tmpdir)]
-    merged_coverage_file = combine_cov_files(cov_files, mergedir, 'cov', args.prefix_filter, args.exclude_regexp)
+    tar_dirs = [os.path.join(tmpdir, str(index)) for index in range(len(args.coverage_tars))]
+    for cov_tar, tar_dir in zip(args.coverage_tars, tar_dirs):
+        exts.archive.extract_from_tar(cov_tar, tar_dir)
+    # one text profile over all suites: counters are merged by covdata itself
+    covdata_dir = lib_coverage.go_covdata.collect_coverage_data(tar_dirs, os.path.join(mergedir, 'covdata'))
+    raw_profile = os.path.join(mergedir, 'raw')
+    lib_coverage.go_covdata.write_text_profile(args.gotools_path, covdata_dir, raw_profile)
+    file_filter = coverage_utils_library.make_filter(args.prefix_filter, args.exclude_regexp)
+    # 'cover -html' looks sources up under GOPATH/src, so file paths are module-relative
+    merged_coverage_file = os.path.join(mergedir, 'cov')
+    with open(raw_profile) as profile, open(merged_coverage_file, 'w') as afile:
+        afile.writelines(line + "\n" for line in lib_coverage.go_covdata.filter_profile(profile, file_filter))
 
     result_dir = "go.coverage.report"
     os.mkdir(result_dir)
     cmd = [
-        resolve_go_tool(args.gotools_path, "cover"),
+        lib_coverage.go_covdata.resolve_go_tool(args.gotools_path, "cover"),
         "-html=" + merged_coverage_file,
         "-o",
         os.path.join(cwd, result_dir, "report.html"),
     ]
     process.execute(cmd, stderr=sys.stderr, check_sanitizer=False)
+
+    # machine-readable counterpart of the html report
+    with open(raw_profile) as profile, open(os.path.join(result_dir, "summary.json"), "w") as afile:
+        json.dump(build_summary(lib_coverage.go_covdata.parse_profile(profile, file_filter)), afile, indent=2)
 
     exts.archive.create_tar(result_dir, args.output)
 

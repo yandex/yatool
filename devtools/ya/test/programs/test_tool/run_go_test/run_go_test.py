@@ -88,8 +88,6 @@ def parse_args():
     )
     parser.add_argument("--allure", action="store_true")
 
-    parser.add_argument("--go-toolchain", help="Path to the go toolchain")
-
     args = parser.parse_args()
     args.binary = os.path.abspath(args.binary)
     if not os.path.exists(args.binary):
@@ -100,8 +98,6 @@ def parse_args():
         parser.error("--gdb-debug and --dlv-debug are mutually exclusive")
     if args.dlv_args:
         args.dlv_args = shlex.split(args.dlv_args)
-    if os.environ.get(const.COVERAGE_GO_ENV_NAME) and not args.go_toolchain:
-        parser.error("Go coverage requires --go-toolchain")
     return args
 
 
@@ -525,59 +521,6 @@ def terminate(proc):
         return proc.returncode
 
 
-def resolve_go_tool(path, binname):
-    path = os.path.join(path, "pkg/tool")
-    names = os.listdir(path)
-    # go toolchain contains only one platform
-    assert len(names) == 1, names
-    return os.path.join(path, names[0], binname)
-
-
-# Convert Go 1.25 binary coverage data to text format
-def covdata_textfmt(opts, cov_path):
-    gocover_dir = os.path.dirname(cov_path)
-    covdata = resolve_go_tool(opts.go_toolchain, 'covdata')
-    if not os.path.exists(covdata):
-        logger.error("Not found Go tool covdata in Go toolchain at %s", covdata)
-        return const.TestRunExitCode.InfrastructureError
-    try:
-        # Move binary Go coverage data to *.raw directory
-        gocover_dir_raw = gocover_dir + '.raw'
-        os.rename(gocover_dir, gocover_dir_raw)
-        os.makedirs(gocover_dir)
-    except Exception as e:
-        logger.error("Failed move Go coverage directory '%s' -> '%s': %s", gocover_dir, gocover_dir_raw, str(e))
-        return const.TestRunExitCode.InfrastructureError
-    try:
-        # Convert Go binary coverage data to text format by covdata tool
-        covdata_stderr = os.path.join(gocover_dir_raw, 'covdata.err')
-        covdata_stdout = os.path.join(gocover_dir_raw, 'covdata.out')
-        textfmt_cmd = [
-            covdata,
-            "textfmt",
-            "-i",
-            gocover_dir_raw,
-            "-o",
-            cov_path,
-        ]
-        logger.debug("cmd: %s", textfmt_cmd)
-        res = shared.tee_execute(
-            textfmt_cmd, covdata_stdout, covdata_stderr, strip_ansi_codes=False, on_timeout=terminate
-        )
-        if res.returncode != 0:
-            logger.error(
-                "Failed with return code %d convert Go coverage data to text format by cmd: %s",
-                res.returncode,
-                textfmt_cmd,
-            )
-        return res.returncode
-    except process.SignalInterruptionError:
-        return const.TestRunExitCode.TimeOut
-    except Exception as e:
-        logger.error("Fail convert Go coverage to text format: %s", str(e))
-        return const.TestRunExitCode.InfrastructureError
-
-
 def run_tests(opts):
     if opts.tracefile:
         open(opts.tracefile, "w").close()
@@ -589,9 +532,11 @@ def run_tests(opts):
 
     cov_path = os.environ.get(const.COVERAGE_GO_ENV_NAME)
     if cov_path:
+        # binary coverage data (covmeta/covcounters) of this run and its child processes goes to
+        # its own directory; downstream nodes read it with 'go tool covdata'
         cov_path = cov_path.format(pid=os.getpid(), time=time.time())
-        cmd += [f"-test.coverprofile={cov_path}"]
-        cmd += [f"-test.gocoverdir={os.path.dirname(cov_path)}"]
+        os.makedirs(cov_path)
+        cmd += [f"-test.gocoverdir={cov_path}"]
 
     #  here we get only Test names without benchmarks, subbenchmarks and subtests. thus we can't detect not launched subtests
     tests, deselected = get_tests(opts, opts.wine_path)
@@ -739,13 +684,10 @@ def run_tests(opts):
                 test_case.comment = "Test was filtered by the Go test runner"
     shared.dump_trace_file(empty_suite, opts.tracefile)
 
-    if exit_code == 0 and cov_path and opts.go_toolchain:
-        exit_code = covdata_textfmt(opts, cov_path)  # inplace convert Go 1.25 binary coverage data to text format
-
     if exit_code not in [0, const.TestRunExitCode.TimeOut]:
-        if cov_path and (
-            "cannot use -test.coverprofile because test binary was not built with coverage enabled" in std_err
-            or "cannot use -test.gocoverdir because test binary was not built with coverage enabled" in std_err
+        if (
+            cov_path
+            and "cannot use -test.gocoverdir because test binary was not built with coverage enabled" in std_err
         ):
             suite.add_chunk_error('Test did not provide coverage data', const.Status.DESELECTED)
         elif results and results.result == const.Status.GOOD:

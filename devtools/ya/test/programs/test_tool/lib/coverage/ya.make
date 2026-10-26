@@ -3,6 +3,8 @@ PY3_LIBRARY()
 PY_SRCS(
     __init__.py
     export.py
+    go_covdata.py
+    summary.py
     jacoco_report.py
     util.py
 )

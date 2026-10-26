@@ -39,9 +39,13 @@ def get_unified_coverage(coverage_path):
     return coverage
 
 
-def add_resolved_file(merged_coverage, current_coverage):
+def add_resolved_file(merged_coverage, current_coverage, go_blocks):
     for filename, data in six.iteritems(current_coverage):
         ext = os.path.splitext(filename)[-1]
+        if "statements" in data:
+            # go resolver keeps statement weights per segment: merged segments lose block granularity,
+            # so statement summary is accumulated from the original blocks of every suite
+            lib_coverage.summary.add_go_blocks(go_blocks.setdefault(filename, {}), data["segments"], data["statements"])
         if filename not in merged_coverage:
             merged_coverage[filename] = {}
             if ext == ".nlg":
@@ -64,9 +68,12 @@ def add_resolved_file(merged_coverage, current_coverage):
 
 def merge_coverage(resolved_coverage_files, output_path):
     merged_coverage = {}
+    go_blocks = {}
     for coverage_path in resolved_coverage_files:
         current_coverage = get_unified_coverage(coverage_path)
-        add_resolved_file(merged_coverage, current_coverage)
+        add_resolved_file(merged_coverage, current_coverage, go_blocks)
+    for filename, blocks in go_blocks.items():
+        merged_coverage[filename]["summary"] = lib_coverage.summary.go_statement_summary(blocks)
 
     lib_coverage.export.dump_coverage(merged_coverage, output_path)
 

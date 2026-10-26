@@ -94,6 +94,7 @@ def inject_go_coverage_resolve_nodes(graph, suite, coverage_tar, resolved_fn, op
     ]
 
     cmd.extend(["--coverage-path", coverage_tar])
+    cmd.extend(["--gotools-path", suite.global_resources[devtools.ya.test.const.GO_TOOLS_RESOURCE]])
     if opts.coverage_prefix_filter:
         cmd.extend(['--prefix-filter', opts.coverage_prefix_filter])
     if opts.coverage_exclude_regexp:

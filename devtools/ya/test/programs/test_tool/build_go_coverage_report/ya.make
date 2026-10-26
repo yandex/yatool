@@ -6,7 +6,9 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/exts
+    devtools/ya/test/programs/test_tool/lib/coverage
     devtools/ya/test/util
+    library/python/testing/coverage_utils
 )
 
 END()

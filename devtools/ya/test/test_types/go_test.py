@@ -88,40 +88,29 @@ class GoTestSuite(common_types.AbstractTestSuite):
             multi_target_platform_run=self.multi_target_platform_run,
             remove_tos=opts.remove_tos,
         )
-        cmd = (
-            devtools.ya.test.util.tools.get_test_tool_cmd(
-                opts, 'run_go_test', self.global_resources, wrapper=True, run_on_target_platform=True
-            )
-            + [
-                '--binary',
-                self.binary_path('$(BUILD_ROOT)'),
-                '--test-work-dir',
-                test_work_dir,
-                '--tracefile',
-                os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
-                '--modulo',
-                str(self._modulo),
-                '--modulo-index',
-                str(self._modulo_index),
-                '--partition-mode',
-                self.get_fork_partition_mode(),
-                '--output-dir',
-                os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
-                '--project-path',
-                self.project_path,
-                '--timeout',
-                str(self.timeout),
-                '--verbose',
-            ]
-            + (
-                [
-                    '--go-toolchain',
-                    self.global_resources.get(devtools.ya.test.const.GO_TOOLS_RESOURCE),
-                ]
-                if opts.go_coverage
-                else []
-            )
-        )
+        cmd = devtools.ya.test.util.tools.get_test_tool_cmd(
+            opts, 'run_go_test', self.global_resources, wrapper=True, run_on_target_platform=True
+        ) + [
+            '--binary',
+            self.binary_path('$(BUILD_ROOT)'),
+            '--test-work-dir',
+            test_work_dir,
+            '--tracefile',
+            os.path.join(test_work_dir, devtools.ya.test.const.TRACE_FILE_NAME),
+            '--modulo',
+            str(self._modulo),
+            '--modulo-index',
+            str(self._modulo_index),
+            '--partition-mode',
+            self.get_fork_partition_mode(),
+            '--output-dir',
+            os.path.join(test_work_dir, devtools.ya.test.const.TESTING_OUT_DIR_NAME),
+            '--project-path',
+            self.project_path,
+            '--timeout',
+            str(self.timeout),
+            '--verbose',
+        ]
 
         if opts and hasattr(opts, "tests_filters") and opts.tests_filters:
             for flt in opts.tests_filters:
