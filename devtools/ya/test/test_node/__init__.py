@@ -1445,6 +1445,7 @@ def get_suite_self_uid(
             'dir_outputs_test_mode',
             'fast_clang_coverage_merge',
             'keep_temps',
+            'merge_split_tests',
             'save_test_outputs',
             'test_output_compression_filter',
             'test_output_compression_level',
