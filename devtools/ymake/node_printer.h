@@ -141,6 +141,27 @@ private:
     EOption Option;
 };
 
+class TPreparedDartModule {
+public:
+    TPreparedDartModule(TRestoreContext context, TConstDepNodeRef node);
+
+    const TModule& GetModule() const;
+    void UpdateVars(TVars& vars, const TBuildConfiguration& conf, const TDepGraph& graph) const;
+
+private:
+    const TModule* Module_;
+    const TVars* Globals_;
+    const TUniqVector<TNodeId>* ManagedPeers_ = nullptr;
+    const TUniqVector<TNodeId>* ManagedDirectPeers_ = nullptr;
+    TVector<const TVars*> PeerGlobals_;
+    struct TExcludedModule {
+        const TModule* Module;
+        const TVars* Globals;
+    };
+    TVector<TExcludedModule> ExcludedModules_;
+    bool HasExcludes_ = false;
+};
+
 class TTestDartRenderPlan: TNonCopyable {
 public:
     explicit TTestDartRenderPlan(TYMake& ymake);

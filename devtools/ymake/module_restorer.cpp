@@ -376,7 +376,7 @@ namespace {
     };
 }
 
-TVarStr& TModuleRestorer::AddPath(TYVar& var, const TStringBuf& what) {
+TVarStr& NModuleVars::AddResolvedPath(TYVar& var, const TStringBuf& what) {
     TVarStr path(what);
     path.IsPathResolved = true;
     path.IsYPath = false;
@@ -437,32 +437,46 @@ bool TModuleRestorer::IsFakeModule(TFileElemId elemId) const {
     return Context.Modules.Get(elemId)->IsFakeModule();
 }
 
-void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfiguration& conf, bool moduleUsesPeers) {
-    MinePeers();
-    MineGlobVars();
-
+void NModuleVars::FillIncludes(TVars& vars, const TBuildConfiguration& conf, const TModule& module) {
     for (auto lang : conf.LangsRequireBuildAndSrcRoots) {
         TLangId langId = NLanguages::GetLanguageId(lang);
         Y_ASSERT(langId != TModuleIncDirs::BAD_LANG);
         auto&& includeVarName = TModuleIncDirs::GetIncludeVarName(langId);
-        AddPath(vars[includeVarName], conf.RenderPaths().BuildRoot.c_str());
-        AddPath(vars[includeVarName], conf.RenderPaths().SourceRoot.c_str());
+        NModuleVars::AddResolvedPath(vars[includeVarName], conf.RenderPaths().BuildRoot.c_str());
+        NModuleVars::AddResolvedPath(vars[includeVarName], conf.RenderPaths().SourceRoot.c_str());
     }
 
     // This code uses cache-accelerated RealPath
 
-    for (const auto& [langId, dirs] : Module->IncDirs.GetAll()) {
+    for (const auto& [langId, dirs] : module.IncDirs.GetAll()) {
         const bool nonPathAddincls = NLanguages::GetLanguageAddinclsAreNonPaths(langId);
 
         auto&& varName = TModuleIncDirs::GetIncludeVarName(langId);
         for (const auto& incl : dirs.Get()) {
             if (nonPathAddincls) {
-                AddPath(vars[varName], incl.CutAllTypes());
+                NModuleVars::AddResolvedPath(vars[varName], incl.CutAllTypes());
             } else {
-                AddPath(vars[varName], conf.RealPath(incl));
+                NModuleVars::AddResolvedPath(vars[varName], conf.RealPath(incl));
             }
         }
     }
+}
+
+void NModuleVars::AppendGlobals(TVars& vars, const TVars& globals, bool unique) {
+    for (const auto& [name, value] : globals) {
+        if (unique) {
+            vars[name].AppendUnique(value);
+        } else {
+            vars[name].Append(value);
+        }
+    }
+}
+
+void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfiguration& conf, bool moduleUsesPeers) {
+    MinePeers();
+    MineGlobVars();
+
+    NModuleVars::FillIncludes(vars, conf, *Module);
 
     if (Module->GetAttrs().RequireDepManagement) {
         Y_ASSERT(Module->IsDependencyManagementApplied());
@@ -470,17 +484,17 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
         vars["MANAGED_PEERS_CLOSURE"];
         vars["MANAGED_PEERS"];
         for (TNodeId peer: lists.UniqPeers()) {
-            AddPath(vars["MANAGED_PEERS_CLOSURE"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(peer))));
+            NModuleVars::AddResolvedPath(vars["MANAGED_PEERS_CLOSURE"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(peer))));
         }
         for (TNodeId peer: lists.ManagedDirectPeers()) {
-            AddPath(vars["MANAGED_PEERS"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(peer))));
+            NModuleVars::AddResolvedPath(vars["MANAGED_PEERS"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(peer))));
         }
         if (const auto* dmInfo = Context.Modules.FindExtraDependencyManagementInfo(Module->GetId())) {
             auto& var = vars["APPLIED_EXCLUDES"];
             for (TNodeId excl: dmInfo->AppliedExcludes) {
                 auto* exclMod = Context.Modules.Get(AssumeFile(Context.Graph.Get(excl)->ElemId));
                 Y_ASSERT(exclMod);
-                AddPath(var, conf.RealPath(exclMod->GetDir().GetTargetStr()));
+                NModuleVars::AddResolvedPath(var, conf.RealPath(exclMod->GetDir().GetTargetStr()));
             }
         }
     }
@@ -495,7 +509,7 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
         auto modLists = Context.Modules.GetModuleNodeLists(Module->GetId());
 
         for (const auto& glSrcId : modLists.GlobalSrcsIds()) {
-            AddPath(vars["SRCS_GLOBAL"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(glSrcId))));
+            NModuleVars::AddResolvedPath(vars["SRCS_GLOBAL"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(glSrcId))));
         }
         TUniqVector<TString> lateOuts;
         bool usePeersLateOuts = Module->GetAttrs().UsePeersLateOuts;
@@ -526,13 +540,13 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
             }
             (prefix += ",") += peerModule->GetTag();
 
-            auto& varStr = AddPath(vars["PEERS"], prefix + peerPath);
+            auto& varStr = NModuleVars::AddResolvedPath(vars["PEERS"], prefix + peerPath);
             varStr.HasPeerDirTags = true;
         }
         if (usePeersLateOuts) {
             vars["PEERS_LATE_OUTS"];
             for (auto& lateOut : lateOuts) {
-                AddPath(vars["PEERS_LATE_OUTS"], lateOut);
+                NModuleVars::AddResolvedPath(vars["PEERS_LATE_OUTS"], lateOut);
             }
         }
     }
@@ -548,13 +562,7 @@ void TModuleRestorer::UpdateGlobalVarsFromModule(TVars& vars) {
     MineGlobalVars();
     auto appendModVars = [&] (TFileElemId modId, bool uniq) {
         const TVars& globalVars = Context.Modules.GetGlobalVars(modId).GetVars();
-        for (auto& [name, val] : globalVars) {
-            if (uniq) {
-                vars[name].AppendUnique(val);
-            } else {
-                vars[name].Append(val);
-            }
-        }
+        NModuleVars::AppendGlobals(vars, globalVars, uniq);
     };
     appendModVars(Module->GetId(), false);
 

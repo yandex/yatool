@@ -3,6 +3,7 @@
 #include "ymake.h"
 #include "context_executor.h"
 #include "module_restorer.h"
+#include "dependency_management.h"
 #include "macro.h"
 #include "mkcmd.h"
 #include "shell_subst.h"
@@ -2181,14 +2182,8 @@ bool TDumpDartVisitor::Enter(TState& state) {
 }
 
 static void RenderDartModuleProperty(const TRestoreContext& restoreContext, const TCommands& commands,
-                                    IOutputStream& out, TConstDepNodeRef moduleNode, TStringBuf value,
-                                    TDumpDartProc::EOption option) {
-    TModuleRestorer restorer(restoreContext, moduleNode);
-    const auto module = restorer.RestoreModule();
-    TScopedContext context(module->GetMakefile());
-    TVars vars;
-    restorer.UpdateLocalVarsFromModule(vars, restoreContext.Conf, false);
-    restorer.UpdateGlobalVarsFromModule(vars);
+                                    IOutputStream& out, const TModule& module, const TVars& vars,
+                                    TStringBuf value, TDumpDartProc::EOption option) {
     THashMap<TString, TString> globalResources;
     for (const auto& gvar : vars) {
         if (NYMake::IsGlobalResource(gvar.first)) {
@@ -2198,7 +2193,7 @@ static void RenderDartModuleProperty(const TRestoreContext& restoreContext, cons
             }
         }
     }
-    auto dartData = SubstDartModuleVars(value, *module, restoreContext, option);
+    auto dartData = SubstDartModuleVars(value, module, restoreContext, option);
     for (const auto& igvar : globalResources) {
         dartData = TString::Join(igvar.first, ": ", igvar.second, "\n", dartData);
     }
@@ -2206,7 +2201,13 @@ static void RenderDartModuleProperty(const TRestoreContext& restoreContext, cons
 }
 
 void TDumpDartProc::OnProperty(TConstDepNodeRef moduleNode, TStringBuf value) {
-    RenderDartModuleProperty(RestoreContext, Commands, Out, moduleNode, value, Option);
+    TModuleRestorer restorer(RestoreContext, moduleNode);
+    const auto* module = restorer.RestoreModule();
+    TScopedContext context(module->GetMakefile());
+    TVars vars;
+    restorer.UpdateLocalVarsFromModule(vars, RestoreContext.Conf, false);
+    restorer.UpdateGlobalVarsFromModule(vars);
+    RenderDartModuleProperty(RestoreContext, Commands, Out, *module, vars, value, Option);
 }
 
 bool TDumpMakeFileDartVisitor::AcceptDep(TState& state) {
@@ -2321,10 +2322,88 @@ private:
     bool ValidateDepends;
 };
 
+TPreparedDartModule::TPreparedDartModule(TRestoreContext context, TConstDepNodeRef node) {
+    TModuleRestorer restorer(context, node);
+    Module_ = restorer.RestoreModule();
+    TScopedContext owner(Module_->GetMakefile());
+    restorer.MinePeers();
+    restorer.MineGlobVars();
+    restorer.MineGlobalVars();
+    const auto globals = [&](TFileElemId id) {
+        const auto& data = std::as_const(context.Modules).GetGlobalVars(id);
+        Y_ENSURE(data.IsVarsComplete(), "Dart module globals are not complete");
+        return &data.GetVars();
+    };
+    Globals_ = globals(Module_->GetId());
+    if (Module_->GetAttrs().RequireDepManagement) {
+        const auto lists = context.Modules.GetModuleNodeLists(Module_->GetId());
+        ManagedPeers_ = &lists.UniqPeers();
+        ManagedDirectPeers_ = &lists.ManagedDirectPeers();
+        for (TNodeId peer : *ManagedPeers_) {
+            PeerGlobals_.push_back(globals(AssumeFile(context.Graph[peer]->ElemId)));
+        }
+        if (const auto* info = context.Modules.FindExtraDependencyManagementInfo(Module_->GetId())) {
+            HasExcludes_ = true;
+            for (TNodeId exclude : info->AppliedExcludes) {
+                const auto id = AssumeFile(context.Graph[exclude]->ElemId);
+                ExcludedModules_.push_back({context.Modules.Get(id), globals(id)});
+            }
+        }
+    }
+}
+
+const TModule& TPreparedDartModule::GetModule() const {
+    return *Module_;
+}
+
+void TPreparedDartModule::UpdateVars(TVars& vars, const TBuildConfiguration& conf, const TDepGraph& graph) const {
+    NModuleVars::FillIncludes(vars, conf, *Module_);
+    if (ManagedPeers_) {
+        vars["MANAGED_PEERS_CLOSURE"];
+        vars["MANAGED_PEERS"];
+        for (TNodeId peer : *ManagedPeers_) {
+            NModuleVars::AddResolvedPath(vars["MANAGED_PEERS_CLOSURE"], conf.RealPath(graph.GetFileName(graph.Get(peer))));
+        }
+        for (TNodeId peer : *ManagedDirectPeers_) {
+            NModuleVars::AddResolvedPath(vars["MANAGED_PEERS"], conf.RealPath(graph.GetFileName(graph.Get(peer))));
+        }
+        if (HasExcludes_) {
+            auto& var = vars["APPLIED_EXCLUDES"];
+            for (const auto& excluded : ExcludedModules_) {
+                NModuleVars::AddResolvedPath(var, conf.RealPath(excluded.Module->GetDir().GetTargetStr()));
+            }
+        }
+    }
+    const auto& usedIncludes = Module_->IncDirs.GetAllUsed();
+    for (size_t lang = 0; lang < usedIncludes.size(); ++lang) {
+        vars.try_emplace(TModuleIncDirs::GetIncludeVarName(static_cast<TLangId>(lang)));
+    }
+    for (const auto& [name, value] : Module_->Vars) {
+        if (value.IsReservedName) {
+            vars[name] = value;
+        }
+    }
+    NModuleVars::AppendGlobals(vars, *Globals_, false);
+    for (const auto* globals : PeerGlobals_) {
+        NModuleVars::AppendGlobals(vars, *globals, true);
+    }
+    if (HasExcludes_) {
+        for (const auto& [name, _] : *Globals_) {
+            vars["EXCLUDED_" + name] = {};
+        }
+        for (const auto& excluded : ExcludedModules_) {
+            for (const auto& [name, value] : *excluded.Globals) {
+                vars["EXCLUDED_" + name].AppendUnique(value);
+            }
+        }
+    }
+}
+
 struct TTestDartRenderPlan::TImpl {
     struct TProperty {
         TNodeId Module = TNodeId::Invalid;
         TStringBuf Value;
+        size_t PreparedModule = 0;
     };
 
     class TVisitor: public TDumpDartProcStartTargets {
@@ -2359,11 +2438,25 @@ struct TTestDartRenderPlan::TImpl {
 
     TYMake& YMake;
     TVector<TProperty> Properties;
+    TVector<TPreparedDartModule> Modules;
 };
 
 TTestDartRenderPlan::TTestDartRenderPlan(TYMake& ymake) {
-    NYMake::TTraceStage trace{"Collect TestDart properties"};
-    Impl_ = MakeHolder<TImpl>(ymake);
+    {
+        NYMake::TTraceStage trace{"Collect TestDart properties"};
+        Impl_ = MakeHolder<TImpl>(ymake);
+    }
+    TRenderPathContext paths(ymake.Conf, true);
+    TCurrentContextScope<TRenderPathContext> pathScope(&paths);
+    NYMake::TTraceStage trace{"Prepare TestDart modules"};
+    THashMap<TNodeId, size_t> modules;
+    for (auto& property : Impl_->Properties) {
+        const auto [it, inserted] = modules.try_emplace(property.Module, Impl_->Modules.size());
+        if (inserted) {
+            Impl_->Modules.emplace_back(ymake.GetRestoreContext(), ymake.Graph[property.Module]);
+        }
+        property.PreparedModule = it->second;
+    }
 }
 
 TTestDartRenderPlan::~TTestDartRenderPlan() = default;
@@ -2373,9 +2466,15 @@ void TTestDartRenderPlan::Render(IOutputStream& out) const {
     TRenderPathContext paths(ymake.Conf, true);
     TCurrentContextScope<TRenderPathContext> pathScope(&paths);
     TFilteredOutputStream filtered(out, ymake.Graph, ymake.DependsToModulesClosure, ymake.Conf.ShouldCheckDependsInDart());
+    NYMake::TTraceStage trace{"Render prepared TestDart"};
     for (const auto& property : Impl_->Properties) {
+        const auto& prepared = Impl_->Modules[property.PreparedModule];
+        const auto& module = prepared.GetModule();
+        TScopedContext context(module.GetMakefile());
+        TVars vars;
+        prepared.UpdateVars(vars, ymake.Conf, ymake.Graph);
         RenderDartModuleProperty(ymake.GetRestoreContext(), ymake.Commands, filtered,
-                                 ymake.Graph[property.Module], property.Value, TDumpDartProc::SubstVarsGlobaly);
+                                 module, vars, property.Value, TDumpDartProc::SubstVarsGlobaly);
     }
 }
 

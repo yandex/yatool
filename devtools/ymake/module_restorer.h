@@ -78,8 +78,6 @@ public:
     void MineGlobalVars();
 
 private:
-    TVarStr& AddPath(TYVar& var, const TStringBuf& what);
-
     bool IsFakeModule(TFileElemId elemId) const;
 
 private:
@@ -87,6 +85,12 @@ private:
     const TConstDepNodeRef Node;
     TModule* Module;
 };
+
+namespace NModuleVars {
+    TVarStr& AddResolvedPath(TYVar& var, const TStringBuf& path);
+    void FillIncludes(TVars& vars, const TBuildConfiguration& conf, const TModule& module);
+    void AppendGlobals(TVars& vars, const TVars& globals, bool unique);
+}
 
 struct TTarget;
 
