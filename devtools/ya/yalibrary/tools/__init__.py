@@ -198,7 +198,7 @@ class _XTool:
 
     def environ(self) -> dict[str, list[str]]:
         assert self._tool_cfg.type != ToolType.PARENT, "Not applicable to parent tool"
-        environ = self._toolchain.get("env", {})
+        environ = copy.deepcopy(self._toolchain.get("env", {}))
         if not environ:
             return {}
         # XXX Transformations are copied from old code (it may be outdated and require rethinking):
@@ -800,6 +800,7 @@ class _ToolConfigReader:
         definition = raw_tool_cfg.get("definition", {})
         formula = definition.get("formula")
         env = definition.get("env")
+        params = definition.get("params")
         platforms = definition.get("platforms")
         executable = definition.get("executable")
         untar = definition.get("untar", True)
@@ -830,18 +831,19 @@ class _ToolConfigReader:
         # It's a bit more safe to use file names without spaces.
         bottle_name = ".".join(name_parts)
 
-        toolchains = {
-            name: {
-                "tools": {
-                    name: {
-                        "bottle": bottle_name,
-                        "executable": name,
-                    },
+        toolchain = {
+            "tools": {
+                name: {
+                    "bottle": bottle_name,
+                    "executable": name,
                 },
-                "platforms": tc_platforms,
-                "env": env,
             },
+            "platforms": tc_platforms,
+            "env": env,
         }
+        if params is not None:
+            toolchain["params"] = params
+        toolchains = {name: toolchain}
         bottles = {
             bottle_name: {
                 "formula": formula,
