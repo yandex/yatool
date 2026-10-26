@@ -2115,22 +2115,24 @@ void TYMake::DumpBuildTargets(IOutputStream& cmsg) const {
     }
 }
 
-TString TDumpDartProc::SubstModuleVars(const TStringBuf& data, const TModule& module) const {
+static TString SubstDartModuleVars(TStringBuf data, const TModule& module,
+                                  const TRestoreContext& restoreContext, TDumpDartProc::EOption option) {
+    using EOption = TDumpDartProc::EOption;
     TString dartData;
     TStringBuf name, value, finish;
     constexpr auto beginDelim = ": ";
     constexpr auto endDelim = '\n';
-    if (Option != EOption::SubstVarsGlobaly) {
+    if (option != EOption::SubstVarsGlobaly) {
         data.Split(beginDelim, name, value);
         value.Split(endDelim, value, finish);
 
-        dartData = Option == EOption::Encoded ? Base64Decode(value) : TString(value);
+        dartData = option == EOption::Encoded ? Base64Decode(value) : TString(value);
     } else {
         dartData = TString{data};
     }
 
-    auto moduleDirsVars = module.ModuleDirsToVars();
-    TCommandInfo cmdInfo(RestoreContext.Conf, &RestoreContext.Graph, nullptr);
+    const auto moduleDirsVars = module.ModuleDirsToVars();
+    TCommandInfo cmdInfo(restoreContext.Conf, &restoreContext.Graph, nullptr);
 
     NJson::TJsonValue jsonData;
     if (NJson::ReadJsonTree(dartData, &jsonData)) {
@@ -2145,14 +2147,14 @@ TString TDumpDartProc::SubstModuleVars(const TStringBuf& data, const TModule& mo
         dartData = cmdInfo.SubstMacroDeeply(nullptr, dartData, module.Vars);
     }
 
-    if (Option == EOption::Encoded) {
+    if (option == EOption::Encoded) {
         dartData = Base64Encode(dartData);
     }
 
-    return Option != EOption::SubstVarsGlobaly ? TString::Join(name, beginDelim, dartData, endDelim, finish) : dartData;
+    return option != EOption::SubstVarsGlobaly ? TString::Join(name, beginDelim, dartData, endDelim, finish) : dartData;
 }
 
-bool TDumpDartProc::AcceptDep(TState& state) {
+bool TDumpDartVisitor::AcceptDep(TState& state) {
     const auto dep = state.NextDep();
     if (IsDirToModuleDep(dep) && state.Size() > 1) {
         return false;
@@ -2161,41 +2163,50 @@ bool TDumpDartProc::AcceptDep(TState& state) {
     return TBase::AcceptDep(state);
 }
 
-bool TDumpDartProc::Enter(TState& state) {
+bool TDumpDartVisitor::Enter(TState& state) {
     bool first = TBase::Enter(state);
     if (!first) {
         return false;
     }
     const auto node = state.TopNode();
     if (node->NodeType == EMNT_Property) {
-        THashMap<TString, TString> globalResources;
-        TStringBuf propVal = TDepGraph::GetCmdName(state.TopNode()).GetStr();
+        const auto propVal = TDepGraph::GetCmdName(node).GetStr();
         if (GetPropertyName(propVal) == DartPropertyName) {
-            TVars vars;
             const auto moduleIt = FindModule(state);
             AssertEx(moduleIt != state.end(), "Can't find module");
-            TModuleRestorer restorer(RestoreContext, moduleIt->Node());
-            const auto module = restorer.RestoreModule();
-            TScopedContext context(module->GetMakefile());
-            restorer.UpdateLocalVarsFromModule(vars, RestoreContext.Conf, false);
-            restorer.UpdateGlobalVarsFromModule(vars);
-            for (const auto& gvar: vars) {
-                if (NYMake::IsGlobalResource(gvar.first)) {
-                    auto [it, added] = globalResources.try_emplace(gvar.first);
-                    if (added) {
-                        it->second = JoinSeq(" ", EvalAll(gvar.second, vars, Commands, RestoreContext.Graph.Names().CommandConf, RestoreContext.Conf));
-                    }
-                }
-            }
-            const auto propertyValue = GetPropertyValue(propVal);
-            auto dartData = SubstModuleVars(propertyValue, *module);
-            for (const auto& igvar: globalResources) {
-                dartData = TString::Join(igvar.first, ": ", igvar.second, "\n", dartData);
-            }
-            Out << dartData;
+            OnProperty(moduleIt->Node(), GetPropertyValue(propVal));
         }
     }
     return first;
+}
+
+static void RenderDartModuleProperty(const TRestoreContext& restoreContext, const TCommands& commands,
+                                    IOutputStream& out, TConstDepNodeRef moduleNode, TStringBuf value,
+                                    TDumpDartProc::EOption option) {
+    TModuleRestorer restorer(restoreContext, moduleNode);
+    const auto module = restorer.RestoreModule();
+    TScopedContext context(module->GetMakefile());
+    TVars vars;
+    restorer.UpdateLocalVarsFromModule(vars, restoreContext.Conf, false);
+    restorer.UpdateGlobalVarsFromModule(vars);
+    THashMap<TString, TString> globalResources;
+    for (const auto& gvar : vars) {
+        if (NYMake::IsGlobalResource(gvar.first)) {
+            auto [it, added] = globalResources.try_emplace(gvar.first);
+            if (added) {
+                it->second = JoinSeq(" ", EvalAll(gvar.second, vars, commands, restoreContext.Graph.Names().CommandConf, restoreContext.Conf));
+            }
+        }
+    }
+    auto dartData = SubstDartModuleVars(value, *module, restoreContext, option);
+    for (const auto& igvar : globalResources) {
+        dartData = TString::Join(igvar.first, ": ", igvar.second, "\n", dartData);
+    }
+    out << dartData;
+}
+
+void TDumpDartProc::OnProperty(TConstDepNodeRef moduleNode, TStringBuf value) {
+    RenderDartModuleProperty(RestoreContext, Commands, Out, moduleNode, value, Option);
 }
 
 bool TDumpMakeFileDartVisitor::AcceptDep(TState& state) {
@@ -2310,17 +2321,68 @@ private:
     bool ValidateDepends;
 };
 
-void TYMake::DumpTestDart(IOutputStream& cmsg) {
-    if (HasNonDirTargets) {
-        return;
+struct TTestDartRenderPlan::TImpl {
+    struct TProperty {
+        TNodeId Module = TNodeId::Invalid;
+        TStringBuf Value;
+    };
+
+    class TVisitor: public TDumpDartProcStartTargets {
+    private:
+        using TBase = TDumpDartProcStartTargets;
+
+    public:
+        explicit TVisitor(TImpl& input)
+            : TBase(input.YMake.GetRestoreContext(), "DART_DATA")
+            , Input(input)
+        {
+        }
+
+    private:
+        void OnProperty(TConstDepNodeRef node, TStringBuf value) override {
+            Input.Properties.push_back({node.Id(), value});
+        }
+
+        TImpl& Input;
+    };
+
+    explicit TImpl(TYMake& ymake)
+        : YMake(ymake)
+    {
+        if (!ymake.HasNonDirTargets) {
+            TVisitor visitor(*this);
+            IterateAll(ymake.Graph, ymake.StartTargets, visitor, [](const TTarget& t) {
+                return (!t.IsDependsTarget || t.IsRecurseTarget) && t.IsModuleTarget;
+            });
+        }
     }
-    // Wrap up the output stream cmsg to a special adaptor which will
-    // update CUSTOM-DEPENDECIES property (apply DEPENDS to modules closure
-    // for each directory from the list of CUSTOM-DEPENDECIES property
-    // if there is one in the DEPENDS to modules closure map)
-    TFilteredOutputStream out(cmsg, Graph, DependsToModulesClosure, Conf.ShouldCheckDependsInDart());
-    TDumpDartProcStartTargets proc(GetRestoreContext(), Commands, out, "DART_DATA", TDumpDartProc::SubstVarsGlobaly);
-    IterateAll(Graph, StartTargets, proc, [](const TTarget& t) -> bool { return (!t.IsDependsTarget || t.IsRecurseTarget) && t.IsModuleTarget; });
+
+    TYMake& YMake;
+    TVector<TProperty> Properties;
+};
+
+TTestDartRenderPlan::TTestDartRenderPlan(TYMake& ymake) {
+    NYMake::TTraceStage trace{"Collect TestDart properties"};
+    Impl_ = MakeHolder<TImpl>(ymake);
+}
+
+TTestDartRenderPlan::~TTestDartRenderPlan() = default;
+
+void TTestDartRenderPlan::Render(IOutputStream& out) const {
+    auto& ymake = Impl_->YMake;
+    TRenderPathContext paths(ymake.Conf, ymake.Conf.NormalizeRealPath);
+    TCurrentContextScope<TRenderPathContext> pathScope(&paths);
+    TFilteredOutputStream filtered(out, ymake.Graph, ymake.DependsToModulesClosure, ymake.Conf.ShouldCheckDependsInDart());
+    for (const auto& property : Impl_->Properties) {
+        RenderDartModuleProperty(ymake.GetRestoreContext(), ymake.Commands, filtered,
+                                 ymake.Graph[property.Module], property.Value, TDumpDartProc::SubstVarsGlobaly);
+    }
+}
+
+void TYMake::DumpTestDart(IOutputStream& cmsg) {
+    if (!HasNonDirTargets) {
+        TTestDartRenderPlan(*this).Render(cmsg);
+    }
 }
 
 void TYMake::DumpJavaDart(IOutputStream& cmsg) {

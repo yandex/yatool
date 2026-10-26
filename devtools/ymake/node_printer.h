@@ -86,12 +86,31 @@ public:
     }
 };
 
-class TDumpDartProc: public TManagedPeerConstVisitor<> {
+class TDumpDartVisitor: public TManagedPeerConstVisitor<> {
 protected:
     using TBase = TManagedPeerConstVisitor<>;
 
-    IOutputStream& Out;
+public:
+    TDumpDartVisitor(const TRestoreContext& restoreContext, const TString& dartPropertyName)
+        : TBase{restoreContext}
+        , DartPropertyName(dartPropertyName)
+    {
+    }
+
+    virtual ~TDumpDartVisitor() = default;
+    bool AcceptDep(TState& state);
+    bool Enter(TState& state);
+
+protected:
+    virtual void OnProperty(TConstDepNodeRef module, TStringBuf value) = 0;
+
+private:
     const TString DartPropertyName;
+};
+
+class TDumpDartProc: public TDumpDartVisitor {
+private:
+    using TBase = TDumpDartVisitor;
 
 public:
     enum EOption {
@@ -107,23 +126,31 @@ public:
         const TString& dartPropertyName,
         EOption opt = EOption::Regular
     )
-        : TBase{restoreContext}
+        : TBase(restoreContext, dartPropertyName)
         , Out(out)
-        , DartPropertyName(dartPropertyName)
         , Commands(commands)
         , Option(opt)
     {
     }
 
-    bool AcceptDep(TState& state);
-    bool Enter(TState& state);
-
 private:
-    TString SubstModuleVars(const TStringBuf& data, const TModule& module) const;
+    void OnProperty(TConstDepNodeRef module, TStringBuf value) override;
 
-private:
+    IOutputStream& Out;
     const TCommands& Commands;
-    EOption Option = EOption::Regular;
+    EOption Option;
+};
+
+class TTestDartRenderPlan: TNonCopyable {
+public:
+    explicit TTestDartRenderPlan(TYMake& ymake);
+    ~TTestDartRenderPlan();
+
+    void Render(IOutputStream& out) const;
+
+private:
+    struct TImpl;
+    THolder<TImpl> Impl_;
 };
 
 struct TMakeFileData {
@@ -161,14 +188,14 @@ public:
     void Leave(TState& state);
 };
 
-class TDumpDartProcStartTargets: public TDumpDartProc {
+class TDumpDartProcStartTargets: public TDumpDartVisitor {
 private:
-    using TBase = TDumpDartProc;
+    using TBase = TDumpDartVisitor;
 
 public:
     template <typename... Args>
     TDumpDartProcStartTargets(Args&&... args)
-        : TDumpDartProc(std::forward<Args>(args)...)
+        : TBase(std::forward<Args>(args)...)
     {
     }
 
