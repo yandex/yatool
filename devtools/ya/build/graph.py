@@ -3633,27 +3633,30 @@ def _strip_graph_results(
     return graph
 
 
+LITE_GRAPH_NODE_KEYS = (
+    'deps',
+    'self_uid',
+    'uid',
+    'target_properties',
+    'node-type',
+    'platform',
+    'platform_id',
+    'tags',
+    'java_tags',
+    'inputs',
+    'outputs',
+    'kv',
+    'host_platform',
+    'tared_outputs',
+)
+
+
 def build_lite_graph(graph):
     lite_graph = {'inputs': graph.get('inputs', {}), 'result': graph['result'], 'graph': [], 'conf': graph['conf']}
 
     for node in graph['graph']:
         lite_node = {}
-        for key in [
-            'deps',
-            'self_uid',
-            'uid',
-            'target_properties',
-            'node-type',
-            'platform',
-            'platform_id',
-            'tags',
-            'java_tags',
-            'inputs',
-            'outputs',
-            'kv',
-            'host_platform',
-            'tared_outputs',
-        ]:
+        for key in LITE_GRAPH_NODE_KEYS:
             if key in node:
                 lite_node[key] = node[key]
         lite_graph['graph'].append(lite_node)

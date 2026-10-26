@@ -3,6 +3,7 @@
 #include <Python.h>
 
 #include <util/generic/hash_set.h>
+#include <util/generic/vector.h>
 
 namespace NSJson {
     struct TLoaderOptions {
@@ -11,7 +12,10 @@ namespace NSJson {
         bool InternValues{};
         THashSet<TString> RootKeyBlackList{};
         THashSet<TString> RootKeyWhiteList{};
+        TVector<TString> ArrayItemPath{};
+        THashSet<TString> ArrayItemKeyWhiteList{};
     };
 
     PyObject* LoadFromStream(PyObject* stream, const TLoaderOptions& options = {});
+    PyObject* LoadFromFile(const TString& path, const TLoaderOptions& options = {});
 }

@@ -1101,6 +1101,15 @@ class Context:
 
         self.ymake_stats = YmakeTimeStatistic()
         self.configure_errors = {}
+        # DiskGraph is a serialization source; consumers below eagerly use only
+        # its already-filtered local graph, never the full node descriptions.
+        disk_graph = None
+        if graph is not None and not isinstance(graph, dict):
+            from devtools.ya.build.disk_graph import DiskGraph
+
+            if isinstance(graph, DiskGraph):
+                disk_graph = graph
+                graph = disk_graph.local_graph
         if (graph is not None or opts.custom_json) and tests is not None:
             if graph is None and opts.custom_json:
                 with udopen(opts.custom_json, "rb") as custom_json_file:
@@ -1293,8 +1302,11 @@ class Context:
             self._dump_predictive_build_statistics()
 
         if self.opts.use_distbuild:
-            self._full_graph = self.graph
-            self.graph = lg.build_lite_graph(self.graph)
+            if disk_graph is not None:
+                self._full_graph = disk_graph
+            else:
+                self._full_graph = self.graph
+                self.graph = lg.build_lite_graph(self.graph)
 
         if app_config.in_house:
             import yalibrary.diagnostics as diag

@@ -6,6 +6,7 @@ PY_SRCS(
     const.py
     commands.py
     node.py
+    source.py
 )
 
 PEERDIR(

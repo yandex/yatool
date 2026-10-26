@@ -4,6 +4,7 @@
 #include <library/cpp/pybind/ptr.h>
 
 #include <util/generic/buffer.h>
+#include <util/generic/algorithm.h>
 #include <util/generic/maybe.h>
 #include <util/generic/scope.h>
 #include <util/generic/strbuf.h>
@@ -107,8 +108,11 @@ namespace NSJson {
             }
 
             void Write(const char* data, std::size_t len) {
-                if (Y_LIKELY(len)) {
-                    TPyObjectPtr buffer{PyBytes_FromStringAndSize(data, len), BORROW};
+                // Large string values may bypass TBufferedOutputStream. Bound
+                // the Python bytes allocation and each downstream write too.
+                while (len) {
+                    const auto size = Min<std::size_t>(len, 65536);
+                    TPyObjectPtr buffer{PyBytes_FromStringAndSize(data, size), BORROW};
                     if (!buffer.Get()) {
                         ythrow yexception() << "Cannot create bytes object";
                     }
@@ -116,6 +120,8 @@ namespace NSJson {
                     if (!result.Get()) {
                         ythrow yexception() << "write() method failed";
                     }
+                    data += size;
+                    len -= size;
                 }
             }
 

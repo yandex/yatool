@@ -166,6 +166,9 @@ def make_build_errors_by_project(
     errors: Errors,
     errors_links: ErrorLinks,
 ):
+    if not errors:
+        return {}, {}, {}, {}, {}
+
     node_by_uid: NodeByUid = {node['uid']: node for node in graph}
     project_by_uid = {
         node['uid']: (BuildPlan.node_name(node), BuildPlan.node_platform(node), node['uid']) for node in graph

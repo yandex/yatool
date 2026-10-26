@@ -9,7 +9,6 @@ from devtools.ya.core import stage_tracer, stages_profiler
 from devtools.ya.yalibrary import sjson
 import exts.fs
 from exts.compress import ucopen
-from exts.decompress import udopen
 import library.python.filelock as filelock
 from yalibrary.monitoring import YaMonEvent
 import yalibrary.status_view as status_view
@@ -207,8 +206,9 @@ def _do_ya_make(params, app_ctx):
         context = remote_graph_generator.generate(params, app_ctx)
         builder = context.builder
     elif params.custom_context:
-        with udopen(params.custom_context, 'rb') as custom_context_file:
-            custom_context_json = sjson.load(custom_context_file, intern_keys=True, intern_vals=True)
+        from devtools.ya.build.disk_graph import load_custom_context
+
+        custom_context_json = load_custom_context(params)
         context = ya_make.BuildContext.load(params, app_ctx, custom_context_json)
         builder = context.builder
         del custom_context_json

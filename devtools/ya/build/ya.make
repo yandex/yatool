@@ -4,6 +4,7 @@ PY_SRCS(
     build_handler.py
     compilation_database.py
     dir_graph.py
+    disk_graph.py
     frepkage.py
     gen_plan2.py
     graph.py

@@ -1,6 +1,7 @@
 #include "load.h"
 #include "common.h"
 #include "filter.h"
+#include "native_input.h"
 
 #include <Python.h>
 
@@ -218,10 +219,11 @@ namespace NSJson {
 
         class TParserCallbacks: public ::NJson::TJsonCallbacks {
         public:
-            TParserCallbacks(bool internKeys=false, bool internVals=false)
+            TParserCallbacks(const TLoaderOptions& options)
                 : TJsonCallbacks(true)
-                , InternKeys_{internKeys}
-                , InternVals_{internVals}
+                , InternKeys_{options.InternKeys}
+                , InternVals_{options.InternValues}
+                , Options_{options}
             {
                 StateStack_.push_back(START);
                 HolderStack_.push_back(MakeHolder<TPyObjectHolderProxy>(ResultObjHolder_));
@@ -232,30 +234,40 @@ namespace NSJson {
             }
 
             bool OnNull() override {
+                if (SkipScalar()) return true;
                 return SetValue(MakePyNoneObject());
             }
 
             bool OnBoolean(bool val) override {
+                if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnInteger(long long val) override {
+                if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnUInteger(unsigned long long val) override {
+                if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnString(const TStringBuf& val) override {
+                if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val, InternVals_));
             }
 
             bool OnDouble(double val) override {
+                if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnOpenArray() override {
+                if (Skipping_) {
+                    ++SkipDepth_;
+                    return true;
+                }
                 if (StateStack_.empty()) {
                     return false;
                 }
@@ -284,6 +296,7 @@ namespace NSJson {
             }
 
             bool OnCloseArray() override {
+                if (Skipping_) return CloseSkippedContainer();
                 if (StateStack_.empty()) {
                     return false;
                 }
@@ -304,6 +317,10 @@ namespace NSJson {
             }
 
             bool OnOpenMap() override {
+                if (Skipping_) {
+                    ++SkipDepth_;
+                    return true;
+                }
                 if (StateStack_.empty()) {
                     return false;
                 }
@@ -331,6 +348,7 @@ namespace NSJson {
             }
 
             bool OnCloseMap() override {
+                if (Skipping_) return CloseSkippedContainer();
                 if (StateStack_.empty()) {
                     return false;
                 }
@@ -350,11 +368,16 @@ namespace NSJson {
             }
 
             bool OnMapKey(const TStringBuf& key) override {
+                if (Skipping_) return true;
                 if (StateStack_.empty()) {
                     return false;
                 }
                 try {
                     if (StateStack_.back() == IN_MAP) {
+                        if (FilterArrayItem() && !Options_.ArrayItemKeyWhiteList.contains(TString{key})) {
+                            Skipping_ = true;
+                            return true;
+                        }
                         HolderStack_.push_back(MakeHolder<TPyDictItemHolder>(*HolderStack_.back(), MakePyObject(key, InternKeys_)));
                         Path_.push_back(TString{key});
                         StateStack_.push_back(AFTER_MAP_KEY);
@@ -369,7 +392,7 @@ namespace NSJson {
             }
 
             bool OnEnd() override {
-                return StateStack_.empty();
+                return StateStack_.empty() && !Skipping_;
             }
 
             void OnError(std::size_t off, TStringBuf reason) override {
@@ -379,6 +402,32 @@ namespace NSJson {
             }
 
         private:
+            bool FilterArrayItem() const {
+                if (Options_.ArrayItemKeyWhiteList.empty() || Path_.size() != Options_.ArrayItemPath.size() + 1 ||
+                    !std::holds_alternative<std::size_t>(Path_.back())) {
+                    return false;
+                }
+                for (std::size_t i = 0; i < Options_.ArrayItemPath.size(); ++i) {
+                    if (!std::holds_alternative<TString>(Path_[i]) ||
+                        std::get<TString>(Path_[i]) != Options_.ArrayItemPath[i]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            bool SkipScalar() {
+                if (!Skipping_) return false;
+                if (!SkipDepth_) Skipping_ = false;
+                return true;
+            }
+
+            bool CloseSkippedContainer() {
+                Y_ENSURE(SkipDepth_);
+                if (!--SkipDepth_) Skipping_ = false;
+                return true;
+            }
+
             bool SetValue(PyObject* value) {
                 TPyObjectPtr valKeeper{value, BORROW};
                 if (StateStack_.empty()) {
@@ -447,6 +496,9 @@ namespace NSJson {
 
             bool InternKeys_;
             bool InternVals_;
+            const TLoaderOptions& Options_;
+            bool Skipping_{};
+            std::size_t SkipDepth_{};
             TPyObjectHolder ResultObjHolder_{};
 
             TVector<TState> StateStack_{};
@@ -456,18 +508,25 @@ namespace NSJson {
         };
     }
 
-    PyObject* LoadFromStream(PyObject* stream, const TLoaderOptions& options) {
+    static PyObject* Load(PyObject* stream, const TLoaderOptions& options, const TString* path) {
         try {
-            TPythonInputStreamWrapper input{stream};
-            TParserCallbacks parserCallbacks{options.InternKeys, options.InternValues};
+            THolder<IInputStream> input;
+            if (path) {
+                input = MakeHolder<TNativeFileInput>(*path);
+            } else {
+                input = MakeHolder<TPythonInputStreamWrapper>(stream);
+            }
+            TParserCallbacks parserCallbacks{options};
             ::NJson::TJsonCallbacks* callbacksPtr = &parserCallbacks;
             THolder<TRootKeyFilter> rootKeyFilter{};
             if (options.RootKeyWhiteList || options.RootKeyBlackList) {
                 rootKeyFilter.Reset(new TRootKeyFilter(parserCallbacks, options.RootKeyWhiteList, options.RootKeyBlackList));
                 callbacksPtr = rootKeyFilter.get();
             }
-            NYa::NJson::ReadJson(input, callbacksPtr);
+            NYa::NJson::ReadJson(*input, callbacksPtr);
             return parserCallbacks.GetResult();
+        } catch (TFileError& e) {
+            if (!PyErr_Occurred()) PyErr_SetString(PyExc_IOError, e.what());
         } catch (TValueError& e) {
             PyErr_SetString(PyExc_ValueError, e.what());
         } catch (yexception& e) {
@@ -480,5 +539,13 @@ namespace NSJson {
             }
         }
         return NULL;
+    }
+
+    PyObject* LoadFromStream(PyObject* stream, const TLoaderOptions& options) {
+        return Load(stream, options, nullptr);
+    }
+
+    PyObject* LoadFromFile(const TString& path, const TLoaderOptions& options) {
+        return Load(nullptr, options, &path);
     }
 }

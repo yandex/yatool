@@ -11,12 +11,15 @@ SRCS(
     lib/dump.cpp
     lib/load.cpp
     lib/filter.cpp
+    lib/native_input.cpp
+    lib/rewrite.cpp
 )
 
 PEERDIR(
     contrib/python/six
     devtools/libs/json_sax
     library/cpp/pybind
+    library/cpp/ucompress
 )
 
 END()
