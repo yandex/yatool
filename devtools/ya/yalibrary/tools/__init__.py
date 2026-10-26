@@ -45,6 +45,7 @@ class ToolTier(enum.StrEnum):
 _TOOLCHAIN_SEPARATOR = ','
 _TOOL_NAME_SEPARATOR = " "
 _DEFAULT_ARCH = "x86_64"
+_OS_MAPPING = {"win32": "WIN"}
 
 
 class ToolNotFoundException(Exception):
@@ -823,7 +824,7 @@ class _ToolConfigReader:
         for platform in platforms:
             tc_platform = {"default": True, "host": {}}
             p_parts = platform.split("-")
-            tc_platform["host"]["os"] = p_parts[0].upper()
+            tc_platform["host"]["os"] = _OS_MAPPING.get(p_parts[0].lower(), p_parts[0]).upper()
             if len(p_parts) > 1:
                 tc_platform["host"]["arch"] = p_parts[1].lower()
             tc_platforms.append(tc_platform)
