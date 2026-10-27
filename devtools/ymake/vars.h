@@ -166,8 +166,27 @@ struct hash<TVarStr> {
     }
 };
 
+class TVariableRef {
+public:
+    TVariableRef(const TYVar* value = nullptr);
+    TVariableRef(const TYVar* value, TElemId scopeId)
+        : Value_(value)
+        , ScopeId_(scopeId)
+    {
+    }
+
+    operator const TYVar*() const { return Value_; }
+    const TYVar* operator->() const { return Value_; }
+    const TYVar& operator*() const { return *Value_; }
+    TElemId GetScopeId() const { return ScopeId_; }
+
+private:
+    const TYVar* Value_;
+    TElemId ScopeId_;
+};
+
 struct TYVar: public TVector<TVarStr> {
-    const TYVar* BaseVal = nullptr;
+    TVariableRef BaseVal;
     mutable TUpdEntryPtr EntryPtr = nullptr; // element state in UpdIter, valid only for vars serving as TCommandInfo::Cmd
     union {
         ui32 Flags;
@@ -183,7 +202,7 @@ struct TYVar: public TVector<TVarStr> {
             ui32 DontParse : 1;
         };
     };
-    TElemId Id; // tmp hack! only used to return id from Lookup commands
+    TElemId Id;
 
     TYVar()
         : Flags(0)
@@ -312,6 +331,12 @@ public:
     }
 };
 
+inline TVariableRef::TVariableRef(const TYVar* value)
+    : Value_(value)
+    , ScopeId_(value ? value->Id : TElemId())
+{
+}
+
 struct TVars: public THashMap<TString, TYVar> {
 public:
     const TVars* Base;
@@ -344,10 +369,10 @@ public:
         (*this)[k].DelFromSingleVal(args);
     }
 
-    value_type& SetValue(const TStringBuf& key, const TStringBuf& args, const TYVar* baseVal = nullptr) {
+    value_type& SetValue(const TStringBuf& key, const TStringBuf& args, TVariableRef baseVal = nullptr) {
         auto [pos, _] = emplace(key, TYVar{});
         pos->second.SetSingleVal(FormatCmd(Id, key, args), true);
-        pos->second.BaseVal = baseVal ? baseVal : Base ? Base->Lookup(key) : nullptr;
+        pos->second.BaseVal = baseVal ? baseVal : Base ? Base->LookupWithScope(key) : nullptr;
         return *pos;
     }
 
@@ -366,8 +391,8 @@ public:
     }
 
     void ResetAppend(const TStringBuf& name, const TStringBuf& value) {
-        const TYVar* baseVal;
-        if (Base && (baseVal = Base->Lookup(name)) != nullptr && !baseVal->IsReservedName) {
+        TVariableRef baseVal;
+        if (Base && (baseVal = Base->LookupWithScope(name)) != nullptr && !baseVal->IsReservedName) {
             SetValue(name, TString::Join("$", name, " ", value), baseVal);
         } else {
             SetValue(name, value);
@@ -397,16 +422,19 @@ public:
     }
 
     const TYVar* Lookup(const TStringBuf& name) const {
+        return LookupWithScope(name);
+    }
+
+    TVariableRef LookupWithScope(const TStringBuf& name) const {
         auto varIt = find(name);
         if (varIt != end()) {
-            TYVar* var = (TYVar*)&varIt->second;
-            var->Id = Id; // tmp
-            VarLookupHook(*var, name);
-            return var;
+            const auto& var = varIt->second;
+            VarLookupHook(var, name);
+            return {&var, Id};
         }
 
         if (Base) {
-            auto var = Base->Lookup(name);
+            auto var = Base->LookupWithScope(name);
             if (var) {
                 VarLookupHook(*var, name);
             }

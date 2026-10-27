@@ -196,7 +196,7 @@ void TCommandInfo::SetCommandSource(const TCommands* commands) {
 }
 
 // macroDef is "(X Y Z)zzz"
-inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBuf& macroDef, const TYVar* modsVar, const TStringBuf& args, ESubstMode substMode, const TVars& vars, ECmdFormat cmdFormat, bool convertNamedArgs) {
+inline TString TCommandInfo::MacroCall(TVariableRef macroDefVar, const TStringBuf& macroDef, TVariableRef modsVar, const TStringBuf& args, ESubstMode substMode, const TVars& vars, ECmdFormat cmdFormat, bool convertNamedArgs) {
     SBDIAG << "MacroCall: macroDef = " << macroDef << ", args = " << args << Endl;
     const ESubstMode nmode = substMode == ESM_DoSubst ? ESM_DoBothCm : ESM_DoBoth; // hack :(
 
@@ -295,7 +295,7 @@ inline TString TCommandInfo::MacroCall(const TYVar* macroDefVar, const TStringBu
 
     }
 
-    if (blockData && !DisableStructCmd && !AllVarsNeedSubst) {
+    if (blockData && UpdIter && !DisableStructCmd && !AllVarsNeedSubst) {
         Y_ASSERT (CommandSink);
         auto command = MacroDefBody(macroDef);
         TSpecFileList* knownInputs = {};
@@ -414,7 +414,7 @@ void TCommandInfo::CollectVarsDeep(TCommands& commands, TCmdElemId srcExpr, cons
             TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordLateOutput(dstBinding, value);
         }
 
-        auto var = varDefinitionSources.Lookup(exprVarName);
+        auto var = varDefinitionSources.LookupWithScope(exprVarName);
 
         if (!var || var->DontExpand)
             continue;
@@ -556,7 +556,7 @@ bool TCommandInfo::GetCommandInfoFromStructCmd(
 bool TCommandInfo::GetCommandInfoFromMacro(const TStringBuf& realMacroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, TElemId id) {
     // Take appropriate macro specialization
     const TStringBuf& macroName = Conf->GetSpecMacroName(realMacroName, args);
-    const TYVar* macroVar = vars.Lookup(macroName);
+    TVariableRef macroVar = vars.LookupWithScope(macroName);
     const TString pattern(Get1(macroVar));
     if (!pattern) {
         YConfErr(BadMacro) << "Trying to use undefined macro " << macroName << " in a command" << Endl;
@@ -642,7 +642,7 @@ bool TCommandInfo::Init(const TStringBuf& sname, TVarStrEx& src, const TVector<T
             GetOrInit(ExtraVars) = std::move(*extraVars);
         // pass the torch to the `CommandSink->Compile()` section in `MacroCall()`
         Cmd.SetSingleVal(macroName, GlueCmd(*args), mod.GetId(), mod.Vars.Id);
-        auto macroVar = mod.Vars.Lookup(macroName);
+        auto macroVar = mod.Vars.LookupWithScope(macroName);
         Cmd.BaseVal = macroVar;
         // TBD: the `convertNamedArgs` argument policy; by the old macro processing logic,
         // when we use `SRCS(name.ext)`, the `_SRC____ext` specialization macro is expanded via
@@ -815,7 +815,7 @@ TVariableSubmission TCommandInfo::TakeVariableSubmission(TVariableSubmission&& s
 
 
 void TCommandInfo::FillCoords(
-    const TYVar* origin,
+    TVariableRef origin,
     TVector<TMacroData>& macros,
     ESubstMode substMode,
     const TVars& localVars,
@@ -833,16 +833,16 @@ void TCommandInfo::FillCoords(
                << ",D=" << macroData.Flags.Get(EMF_WorkDir)
                << ")\n";
 
-        const TYVar* macroVar = nullptr;
+        TVariableRef macroVar = nullptr;
         if (macroData.HasArgs) {
             macroVar = GetSpecMacroVar(origin, macroData.Name, macroData.Args(), localVars);
         }
         if (macroVar == nullptr) {
-            macroVar = (macroData.SameName && origin) ? origin->BaseVal : (macroData.RawString ? nullptr : localVars.Lookup(macroData.Name));
+            macroVar = (macroData.SameName && origin) ? origin->BaseVal : (macroData.RawString ? nullptr : localVars.LookupWithScope(macroData.Name));
         }
         SBDIAG << "FMJ: " << macroData.SameName << !!macroVar << (!macroVar || macroVar->DontExpand) << Endl;
         if (macroData.SameName && origin && !macroVar && cmdFormat != ECF_Json) {
-            if (origin->Id) {
+            if (origin.GetScopeId()) {
                 ythrow TError() << macroData.Name << " in " << Get1(origin) << " was set with recurse but not defined on base level of config." << Endl;
             } else {
                 ythrow TError() << macroData.Name << " in " << Get1(origin) << " was declared with recurse in ymake.conf." << Endl;
@@ -873,19 +873,19 @@ void TCommandInfo::FillCoords(
         if (origin && macroVar && !macroData.IsOwnArg && !macroVar->empty() && (*macroVar)[0].HasPrefix /* TODO: !.IsFile ? */ && !IsInternalReservedVar(macroData.Name)) {
             Y_ASSERT(macroVar->size() == 1); // not implemented yet
             if (GetAddCtx(Cmd)) { // as a flag of graph construction mode
-                Y_ASSERT(GetId(Get1(macroVar)) == macroVar->Id);
+                Y_ASSERT(GetId(Get1(macroVar)) == macroVar.GetScopeId());
                 Y_ENSURE(UpdIter != nullptr);
                 const TCmdElemId macroVarElemId = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
                     *macroVar,
                     TActionGraphEncoder::EStorageFormat::Legacy,
                     TActionGraphEncoder::EExpressionRole::Binding
                 );
-                const TYVar* addMacroDataTo = origin;
-                if (macroVar->GenFromFile || localVars.IsIdDeeper(AssumeFile(origin->Id), AssumeFile(macroVar->Id))) {
+                TVariableRef addMacroDataTo = origin;
+                if (macroVar->GenFromFile || localVars.IsIdDeeper(AssumeFile(origin.GetScopeId()), AssumeFile(macroVar.GetScopeId()))) {
                     addMacroDataTo = &Cmd;
                     if (!macroVar->GenFromFile) {
-                        const TVars* baseVars = localVars.GetBase(AssumeFile(origin->Id));
-                        const TYVar* macroVarFromBaseVars = baseVars->Lookup(macroData.Name);
+                        const TVars* baseVars = localVars.GetBase(AssumeFile(origin.GetScopeId()));
+                        TVariableRef macroVarFromBaseVars = baseVars->LookupWithScope(macroData.Name);
                         if (macroVarFromBaseVars && !origin->AddCtxFilled) {
                             Y_ENSURE(UpdIter != nullptr);
                             const TCmdElemId macroVarFromBaseVarsElemId = TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).InternCommand(
@@ -896,7 +896,7 @@ void TCommandInfo::FillCoords(
                             TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachLegacyBinding(*origin, macroVarFromBaseVarsElemId);
 
                             if (!macroVarFromBaseVars->AddCtxFilled) {
-                                FillAddCtx(*macroVarFromBaseVars, *baseVars);
+                                FillAddCtx(macroVarFromBaseVars, *baseVars);
                             }
                         }
                     }
@@ -934,7 +934,7 @@ void TCommandInfo::FillCoords(
             // inInp? NPath::ConstructPath(NPath::CutType(var[n]), NPath::Build) : var[n]
             TVarStr val = macroData.RawString ? TVarStr(macroData.Name) : (*macroVar)[cnt];
             if (val.HasPrefix) {
-                SBDIAG << "FM.HasPrefix: " << val.Name << ", " << macroVar->Id << Endl;
+                SBDIAG << "FM.HasPrefix: " << val.Name << ", " << macroVar.GetScopeId() << Endl;
             }
 
             // note: same condition in ApplyMods (still check for CommandSeparator if you remove this limitation)
@@ -995,8 +995,8 @@ TString TCommandInfo::GetToolValue(const TMacroData& macroData, const TVars& var
     return SubstVarDeeply(macroData.Name, vars);
 }
 
-const TYVar* TCommandInfo::GetSpecMacroVar(const TYVar* origin, const TStringBuf& genericMacroName, const TStringBuf& args, const TVars& vars) {
-    const TYVar* specMacroVar = nullptr;
+TVariableRef TCommandInfo::GetSpecMacroVar(TVariableRef origin, const TStringBuf& genericMacroName, const TStringBuf& args, const TVars& vars) {
+    TVariableRef specMacroVar = nullptr;
     const auto it = Conf->BlockData.find(genericMacroName);
     if (it != Conf->BlockData.end()) {
         const auto& data = it->second;
@@ -1014,30 +1014,30 @@ const TYVar* TCommandInfo::GetSpecMacroVar(const TYVar* origin, const TStringBuf
                 ythrow yexception() << "Expected argument list in () braces, but got [" << args << "]";
             }
             auto specMacroName = Conf->GetSpecMacroName(genericMacroName, actualArgs);
-            specMacroVar = vars.Lookup(specMacroName);
+            specMacroVar = vars.LookupWithScope(specMacroName);
         }
     }
     return specMacroVar;
 }
 
-void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
+void TCommandInfo::FillAddCtx(TVariableRef var, const TVars& parentVars) {
     // from GeneralParser::ProcessBuildCommand
     TVector<TMacroData> tokens;
-    GetMacrosFromPattern(Get1(&var), tokens, true);
+    GetMacrosFromPattern(Get1(var), tokens, true);
     if (tokens.empty()) {
         return;
     }
 
-    const TVars& vars = *parentVars.GetBase(var.Id);
+    const TVars& vars = *parentVars.GetBase(var.GetScopeId());
     for (const auto& token : tokens) {
         const TStringBuf tokenName = token.Name;
-        SBDIAG << "FillAddCtx " << Get1(&var) << " -> " << tokenName << "\n";
+        SBDIAG << "FillAddCtx " << Get1(var) << " -> " << tokenName << "\n";
         if (IsInternalReservedVar(tokenName)) {
             continue;
         }
 
         if (IsGlobalReservedVar(tokenName)) {
-            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordReservedVariable(var, tokenName);
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).RecordReservedVariable(*var, tokenName);
         }
 
         if (token.Flags.Get(EMF_Tool) && !token.IsOwnArg) {
@@ -1047,7 +1047,7 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
             }
             const TString tool = NPath::ConstructPath(toolValue, NPath::Source);
             SBDIAG << "Tool dep: " << tool << Endl;
-            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachToolDirectory(var, tool.data());
+            TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachToolDirectory(*var, tool.data());
             continue;
         }
 
@@ -1055,14 +1055,14 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
             continue;
         }
 
-        const TYVar* cmd = token.RawString ? nullptr : vars.Lookup(tokenName);
+        TVariableRef cmd = token.RawString ? nullptr : vars.LookupWithScope(tokenName);
         if (cmd && token.SameName) {
-            cmd = var.BaseVal;
+            cmd = var->BaseVal;
         }
 
         if (cmd && cmd->GenFromFile) {
-            if (var.Id && !Conf->NoParseSrc) {
-                YConfWarn(UndefVar) << GetCmdName(Get1(&var)) << ": command dep " << tokenName << " must be redefined\n";
+            if (var.GetScopeId() && !Conf->NoParseSrc) {
+                YConfWarn(UndefVar) << GetCmdName(Get1(var)) << ": command dep " << tokenName << " must be redefined\n";
             }
             continue;
         }
@@ -1071,9 +1071,9 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
 
         if (!cmd) {
             if (!IsGlobalReservedVar(tokenName)) {
-                YConfWarn(UndefVar) << GetCmdName(Get1(&var)) << ": command dep " << tokenName << " not found\n";
-                YConfWarn(UndefVar) << "> HERE: " << Get1(&var) << Endl;
-                TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachMissingBinding(var, tokenName);
+                YConfWarn(UndefVar) << GetCmdName(Get1(var)) << ": command dep " << tokenName << " not found\n";
+                YConfWarn(UndefVar) << "> HERE: " << Get1(var) << Endl;
+                TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachMissingBinding(*var, tokenName);
             }
         } else {
             const TStringBuf cmdStr = Get1(cmd);
@@ -1083,17 +1083,17 @@ void TCommandInfo::FillAddCtx(const TYVar& var, const TVars& parentVars) {
                 TActionGraphEncoder::EStorageFormat::Legacy,
                 TActionGraphEncoder::EExpressionRole::Binding
             );
-            if (TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachLegacyBinding(var, cmdElemId)) {
+            if (TActionGraphEncoder(*Conf, *Graph, *UpdIter, Module).AttachLegacyBinding(*var, cmdElemId)) {
                 SBDIAG << "Command dep: " << cmdStr << Endl;
                 if (!cmd->AddCtxFilled) {
-                    FillAddCtx(*cmd, vars);
+                    FillAddCtx(cmd, vars);
                 }
             }
         }
     }
 
     if (GetAddCtx(Cmd)) {
-        var.AddCtxFilled = true;
+        var->AddCtxFilled = true;
     }
 }
 
@@ -1118,7 +1118,7 @@ static void PostProcessRawMacroValue(ECmdFormat cmdFormat, const TMacroData& mac
     }
 }
 
-bool TCommandInfo::ApplyMods(const TYVar* valVar, TVarStr& value, const TYVar* modsVar, const TMacroData& macroData, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat) {
+bool TCommandInfo::ApplyMods(TVariableRef valVar, TVarStr& value, TVariableRef modsVar, const TMacroData& macroData, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat) {
     if (macroData.Flags.Get(EMF_Comma)) {
         value.Name = TStringBuf(",");
         return true;
@@ -1344,7 +1344,7 @@ bool TCommandInfo::ApplyMods(const TYVar* valVar, TVarStr& value, const TYVar* m
 }
 
 bool TCommandInfo::SubstData(
-    const TYVar* origin,
+    TVariableRef origin,
     TMacroData& macro,
     const TVars& vars,
     ECmdFormat cmdFormat,
@@ -1358,13 +1358,13 @@ bool TCommandInfo::SubstData(
         return false;
     }
 
-    const TYVar* macroVar = nullptr;
+    TVariableRef macroVar = nullptr;
     if (macro.HasArgs && Conf != nullptr) {
         macroVar = GetSpecMacroVar(origin, macro.Name, macro.Args(), vars);
     }
     if (macroVar == nullptr) {
         macroVar = (macro.SameName && !macro.HasOwnArgs && origin) ? origin->BaseVal // for SET_APPEND
-                                                                   : vars.Lookup(macro.Name);
+                                                                   : vars.LookupWithScope(macro.Name);
     }
 
     if (!macro.RawString && (!macroVar || macroVar->DontExpand)) {
@@ -1376,9 +1376,9 @@ bool TCommandInfo::SubstData(
 }
 
 void TCommandInfo::SubstData(
-    const TYVar* origin,
+    TVariableRef origin,
     TMacroData& macro,
-    const TYVar* pvar,
+    TVariableRef pvar,
     const TVars& vars,
     ECmdFormat cmdFormat,
     ESubstMode substMode,
@@ -1393,7 +1393,7 @@ void TCommandInfo::SubstData(
         return;
     }
 
-    const TYVar* macroCoordVal = macro.NeedCoord() ? vars.Lookup(macro.CoordWhere()) : nullptr;
+    TVariableRef macroCoordVal = macro.NeedCoord() ? vars.LookupWithScope(macro.CoordWhere()) : nullptr;
     bool hasPrev = false;
     size_t num = (macro.RawString || pvar == nullptr) ? 1 : (*pvar).size();
     SBDIAG << "SD IN " << macro.Name << ": " << num << Endl;
@@ -1576,7 +1576,7 @@ void TCommandInfo::SubstData(
     SBDIAG << "SD: " << macro.Name << "(" << num << ") --> " << result << "<---\n";
 }
 
-TString TCommandInfo::SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor) {
+TString TCommandInfo::SubstMacro(TVariableRef origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor) {
     TPadDiag msgPad(MsgDepth);
     if (MsgDepth > 30) {
         ythrow yexception() << "Macro call stack exceeded the limit" << Endl;
@@ -1657,14 +1657,14 @@ TString TCommandInfo::SubstMacro(const TYVar* origin, TStringBuf pattern, TVecto
     return result;
 }
 
-TString TCommandInfo::SubstMacro(const TYVar* origin, TStringBuf pattern, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, bool patHasPrefix, ECmdFormat formatFor) {
+TString TCommandInfo::SubstMacro(TVariableRef origin, TStringBuf pattern, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, bool patHasPrefix, ECmdFormat formatFor) {
     TVector<TMacroData> macros;
 
     GetMacrosFromPattern(pattern, macros, patHasPrefix);
     return SubstMacro(origin, patHasPrefix ? GetCmdValue(pattern) : pattern, macros, substMode, subst, cmdFormat, formatFor);
 }
 
-TString TCommandInfo::SubstMacroDeeply(const TYVar* origin, const TStringBuf& macro, const TVars& vars, bool patternHasPrefix, ECmdFormat cmdFormat) {
+TString TCommandInfo::SubstMacroDeeply(TVariableRef origin, const TStringBuf& macro, const TVars& vars, bool patternHasPrefix, ECmdFormat cmdFormat) {
     TString res(macro);
     TString modifiedRes = res;
     bool haveToSubst = res.find('$') != TString::npos;
@@ -1695,7 +1695,7 @@ TString TCommandInfo::SubstMacroDeeply(const TYVar* origin, const TStringBuf& ma
 }
 
 TString TCommandInfo::SubstVarDeeply(const TStringBuf& varName, const TVars& vars, ECmdFormat cmdFormat) {
-    const TYVar* var = vars.Lookup(varName);
+    TVariableRef var = vars.LookupWithScope(varName);
     if (!Get1(var)) {
         return TString();
     }
@@ -1726,7 +1726,8 @@ void ConvertSpecFiles(const TBuildConfiguration& conf, TSpecFileArr& flist, TYVa
 void TCommandInfo::GetDirsFromOpts(const TStringBuf opt, const TVars& vars, THolder<TVector<TStringBuf>>& dst) {
     auto dirs = MakeHolder<TVector<TStringBuf>>();
     if (!opt.empty()) {
-        TStringBuf optsSubst = Conf->GetStringPool()->Append(SubstMacroDeeply(nullptr, opt, vars, false));
+        ToolOptionStrings.push_back(SubstMacroDeeply(nullptr, opt, vars, false));
+        TStringBuf optsSubst = ToolOptionStrings.back();
         Split(optsSubst, " ", *dirs);
     }
     if (dst)

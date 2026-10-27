@@ -7,6 +7,7 @@
 #include <devtools/ymake/commands/compilation.h>
 
 #include <util/generic/maybe.h>
+#include <util/generic/deque.h>
 #include <util/generic/hash.h>
 #include <util/generic/string.h>
 #include <util/generic/variant.h>
@@ -106,6 +107,7 @@ private:
     bool AllVarsNeedSubst = false;
     bool HasGlobalInput = false;
 
+    TDeque<TString> ToolOptionStrings;
     THolder<TVector<TStringBuf>> AddIncls;
     THolder<TVector<TStringBuf>> AddPeers;
 
@@ -148,14 +150,14 @@ public:
         const TVars& vars
     );
     bool GetCommandInfoFromMacro(const TStringBuf& macroName, EMacroType type, const TVector<TStringBuf>& args, const TVars& vars, TElemId id);
-    TString SubstMacro(const TYVar* origin, TStringBuf pattern, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, bool patHasPrefix, ECmdFormat formatFor = ECF_Unset);
+    TString SubstMacro(TVariableRef origin, TStringBuf pattern, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, bool patHasPrefix, ECmdFormat formatFor = ECF_Unset);
 
-    TString SubstMacroDeeply(const TYVar* origin, const TStringBuf& macro, const TVars& vars, bool patternHasPrefix = false, ECmdFormat cmdFormat = ECF_ExpandVars);
+    TString SubstMacroDeeply(TVariableRef origin, const TStringBuf& macro, const TVars& vars, bool patternHasPrefix = false, ECmdFormat cmdFormat = ECF_ExpandVars);
     TString SubstVarDeeply(const TStringBuf& varName, const TVars& vars, ECmdFormat cmdFormat = ECF_ExpandVars);
 
     // Convenience overload performing vars.Lookop(macroData.Name) with necessary fallbacks and calls full SubstData implementation
     bool SubstData(
-        const TYVar* origin,
+        TVariableRef origin,
         TMacroData& macro,
         const TVars& vars,
         ECmdFormat cmdFormat,
@@ -165,9 +167,9 @@ public:
         const TSubstObserver& substObserver = {});
 
     void SubstData(
-        const TYVar* origin,
+        TVariableRef origin,
         TMacroData& macro,
-        const TYVar* var,
+        TVariableRef var,
         const TVars& vars,
         ECmdFormat cmdFormat,
         ESubstMode substMode,
@@ -216,19 +218,19 @@ private:
     void Finalize();
 
     // TODO: move MsgPad here, too?
-    TString SubstMacro(const TYVar* origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor = ECF_Unset);
-    void FillCoords(const TYVar* origin, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& localVars, ECmdFormat cmdFormat, bool setAddCtxFilled = true);
-    TString MacroCall(const TYVar* macroDefVar, const TStringBuf& macroDef, const TYVar* argsVar, const TStringBuf& args, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat, bool convertNamedArgs);
-    bool ApplyMods(const TYVar* valVar, TVarStr& value, const TYVar* modsVar, const TMacroData& macroData, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat);
+    TString SubstMacro(TVariableRef origin, TStringBuf pattern, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& subst, ECmdFormat cmdFormat, ECmdFormat formatFor = ECF_Unset);
+    void FillCoords(TVariableRef origin, TVector<TMacroData>& macros, ESubstMode substMode, const TVars& localVars, ECmdFormat cmdFormat, bool setAddCtxFilled = true);
+    TString MacroCall(TVariableRef macroDefVar, const TStringBuf& macroDef, TVariableRef argsVar, const TStringBuf& args, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat, bool convertNamedArgs);
+    bool ApplyMods(TVariableRef valVar, TVarStr& value, TVariableRef modsVar, const TMacroData& macroData, ESubstMode substMode, const TVars& parentVars, ECmdFormat cmdFormat);
 
-    void FillAddCtx(const TYVar& var, const TVars& parentVars);
+    void FillAddCtx(TVariableRef var, const TVars& parentVars);
 
     bool IsReservedVar(const TStringBuf& cur) const;
     bool IsGlobalReservedVar(const TStringBuf& cur) const;
 
     TString GetToolValue(const TMacroData& macroData, const TVars& vars);
 
-    const TYVar* GetSpecMacroVar(const TYVar* origin, const TStringBuf& genericMacroname, const TStringBuf& args, const TVars& vars);
+    TVariableRef GetSpecMacroVar(TVariableRef origin, const TStringBuf& genericMacroname, const TStringBuf& args, const TVars& vars);
 
     void GetDirsFromOpts(const TStringBuf opt, const TVars& vars, THolder<TVector<TStringBuf>>& dst);
     void ApplyToolOptions(const TStringBuf macroName, const TVars& vars);

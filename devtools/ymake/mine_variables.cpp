@@ -57,7 +57,7 @@ namespace {
         TYVar& var = lvarsIt->second;
         descend();
         var.push_back(TVarStr(name, true, false));
-        var.BaseVal = lvars.Base ? lvars.Base->Lookup(cmdName) : nullptr;
+        var.BaseVal = lvars.Base ? lvars.Base->LookupWithScope(cmdName) : nullptr;
         var.back().NeedSubst = true;
         var.back().StructCmdForVars = structCmd;
     }
