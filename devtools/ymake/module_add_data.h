@@ -20,6 +20,9 @@ struct TModAddData {
     TAutoPtr<TActionContinuation> ActionData;
     THolder<THashSet<TFileElemId>> ParsedPeerdirs;
 
+    // The makefile that registered this output during the current graph update.
+    TFileElemId OutputMakefileId;
+
     union {
         ui8 AllFlags = 0;
         struct {  // 6 bits used

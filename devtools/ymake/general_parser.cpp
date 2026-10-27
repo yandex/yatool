@@ -490,6 +490,11 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
         for (auto fileId: *entries) {
             auto it = YMake.UpdIter->Nodes.find(MakeDepFileCacheId(fileId));
             if (it != YMake.UpdIter->Nodes.end()) {
+                const auto owner = it->second.ModuleData.OutputMakefileId;
+                if (owner && owner != elemId) {
+                    // Another makefile has already taken over this output in the current update.
+                    continue;
+                }
                 it->second.MarkedAsUnknown = true;
                 YDIAG(Dev) << fileConf.GetName(fileId) << " was previously in OwnEntries of " << resolvedName << " and now is marked as unknown" << Endl;
             }

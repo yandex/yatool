@@ -79,6 +79,7 @@ Y_FORCE_INLINE TAddDepAdaptor& TNodeAddCtx::AddOutput(TFileElemId elemId, EMakeN
 
             TModAddData& modData = add.GetModuleData();
             modData.Added = true;
+            modData.OutputMakefileId = Module->GetMakefileId();
         }
 
         nodeData.SetOnceEntered(false);

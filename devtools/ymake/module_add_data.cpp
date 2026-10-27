@@ -3,6 +3,7 @@
 
 TModAddData::TModAddData(const TModAddData& o)
     : ActionData(o.ActionData)
+    , OutputMakefileId(o.OutputMakefileId)
     , AllFlags(o.AllFlags)
 {
     if (o.ParsedPeerdirs) {

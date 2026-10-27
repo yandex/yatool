@@ -1222,6 +1222,7 @@ inline bool TUpdIter::Enter(TState& state) {
                         i->second.MarkedAsUnknown = true;
                         return false;
                     }
+                    i->second.ModuleData.OutputMakefileId = module->GetMakefileId();
                 }
             }
         }
@@ -1923,7 +1924,10 @@ void TUpdIter::NukeModuleDir(TState& state) {
                 if (auto* module = YMake.Modules.Get(AssumeFile(st.Dep.DepNode.ElemId)); module) {
                     for (auto id : module->GetOwnEntries()) {
                         if (auto i = Nodes.find(MakeDepFileCacheId(id)); i != Nodes.end()) {
-                            i->second.MarkedAsUnknown = true;
+                            const auto owner = i->second.ModuleData.OutputMakefileId;
+                            if (!owner || owner == module->GetMakefileId()) {
+                                i->second.MarkedAsUnknown = true;
+                            }
                         }
                     }
                 }
