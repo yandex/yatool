@@ -107,7 +107,7 @@ namespace NYa::NGraph {
             ((i8) Type),
             ((TMaybe<bool>) Cache),
             ((TMaybe<bool>) StableDirOutputs),
-            ((i32) Timeout),
+            ((i64) Timeout),
             ((TMaybe<i32>) Priority),
             ((TEnv) Env),
             ((TFilePath) Cwd),
