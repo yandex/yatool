@@ -1838,7 +1838,7 @@ class YaMake:
                 self.opts,
             )
         )
-        if self.opts.use_distbuild:
+        if self.opts.use_distbuild and 'slot_time' in bs.get_statistics(self.opts):
             self._slot_time_listener = pr.SlotListener(self.opts.statistics_out_dir)
             self._build_results_listener.add(self._slot_time_listener)
 
@@ -2296,18 +2296,7 @@ class YaMake:
         finally:
             distbs_result = run_db_async()
 
-        def result_analyzer():
-            return bs.analyze_distbuild_result(
-                distbs_result,
-                self.distbuild_graph.get_graph(),
-                self.opts.statistics_out_dir,
-                self.opts,
-                get_task_stats(),
-                local_result=local_execution_log,
-                ctx_stages=self.ctx.stage_times,
-                ymake_stats=self.ctx.ymake_stats,
-            )
-
+        result_analyzer = self._make_distbuild_result_analyzer(distbs_result, local_execution_log)
         build_errors, build_errors_links, status_map, exit_code_map = extract_build_errors(distbs_result)
         return (
             res,
@@ -2320,6 +2309,23 @@ class YaMake:
             result_analyzer,
             local_execution_log,
         )
+
+    def _make_distbuild_result_analyzer(self, distbs_result, local_execution_log):
+        def result_analyzer():
+            statistics = bs.get_statistics(self.opts)
+            graph = self.distbuild_graph.get_graph() if bs.requires_graph_statistics(statistics) else self.ctx.graph
+            return bs.analyze_distbuild_result(
+                distbs_result,
+                graph,
+                self.opts.statistics_out_dir,
+                self.opts,
+                get_task_stats() if 'disk_usage' in statistics else None,
+                local_result=local_execution_log,
+                ctx_stages=self.ctx.stage_times,
+                ymake_stats=self.ctx.ymake_stats,
+            )
+
+        return result_analyzer
 
     def _build_local(self, callback):
         res, errors, exit_code, execution_log, exit_code_map = self.ctx.runner(
@@ -2335,13 +2341,14 @@ class YaMake:
             return metrics
 
         def result_analyzer():
+            statistics = bs.get_statistics(self.opts)
             return bs.analyze_local_result(
                 execution_log,
                 self.ctx.graph,
                 self.opts.statistics_out_dir,
                 self.opts,
-                set(errors.keys()),
-                get_task_stats(),
+                set(errors.keys()) if bs.requires_graph_statistics(statistics) else None,
+                get_task_stats() if 'disk_usage' in statistics else None,
                 ctx_stages=self.ctx.stage_times,
                 ymake_stats=self.ctx.ymake_stats,
             )

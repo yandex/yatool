@@ -358,6 +358,7 @@ class PrintStatisticsOptions(Options):
     def __init__(self):
         self.print_statistics = False
         self.statistics_out_dir = None
+        self.only_autocheck_stats = False
 
     @staticmethod
     def consumer():
@@ -378,6 +379,21 @@ class PrintStatisticsOptions(Options):
             ),
             ConfigConsumer('print_statistics'),
             ConfigConsumer('statistics_out_dir'),
+            ArgConsumer(
+                ['--only-autocheck-stats'],
+                help='Restrict selected statistics to the Autocheck allowlist',
+                hook=SetConstValueHook('only_autocheck_stats', True),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            ArgConsumer(
+                ['--no-only-autocheck-stats'],
+                help='Do not restrict selected statistics to the Autocheck allowlist',
+                hook=SetConstValueHook('only_autocheck_stats', False),
+                group=PRINT_CONTROL_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            ConfigConsumer('only_autocheck_stats'),
         ]
 
 

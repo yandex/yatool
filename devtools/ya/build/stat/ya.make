@@ -3,6 +3,7 @@ PY3_LIBRARY()
 PY_SRCS(
     CYTHONIZE_PY
     __init__.py
+    cache_statistics.py
     graph.py
     graph_metrics.py
     statistics.py

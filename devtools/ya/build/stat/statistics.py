@@ -4,6 +4,7 @@
 import collections
 import copy
 import enum
+import functools
 import logging
 import math
 import os
@@ -24,6 +25,7 @@ from devtools.ya.build.stat.graph import (
 )
 from devtools.ya.core import profiler, stage_tracer
 from devtools.ya.build.stat.changelist_stats import get_changelist_stats
+from devtools.ya.build.stat.cache_statistics import collect_cache_statistics
 
 
 class TaskType(enum.Enum):
@@ -48,6 +50,59 @@ logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("statistics")
 
 NUMBER_OF_TASKS_ELAPSED_TIME_TO_OUTPUT = 50000
+
+DEFAULT_STATISTICS = (
+    'slot_time',
+    'cache_hit',
+    'dist_cache_stat',
+    'disk_usage',
+    'distbuild_download_stat',
+    'task_list',
+    'critical_path',
+    'longest_tasks',
+    'biggest_tasks',
+    'summary_times',
+    'substages',
+    'stages',
+    'context_stages',
+    'ymake_wall_time',
+    'changes_in_fs',
+    'gg_stages',
+    'graph_lang',
+    'external_program_fetcher',
+    'changelist',
+    'coverage_upload_status',
+)
+
+# Extend this allowlist to retain more collectors in Autocheck builds.
+AUTOCHECK_STATISTICS = frozenset(('slot_time', 'cache_hit'))
+
+# A newly added collector conservatively requires GraphStats unless listed here.
+GRAPH_FREE_STATISTICS = frozenset(
+    (
+        'slot_time',
+        'cache_hit',
+        'disk_usage',
+        'stages',
+        'context_stages',
+        'ymake_wall_time',
+        'changes_in_fs',
+        'gg_stages',
+        'changelist',
+    )
+)
+
+
+def requires_graph_statistics(statistics):
+    return any(name not in GRAPH_FREE_STATISTICS for name in statistics)
+
+
+def get_statistics(opts, statistics=None):
+    statistics = DEFAULT_STATISTICS if statistics is None else tuple(statistics)
+    if opts.only_autocheck_stats:
+        statistics = tuple(name for name in statistics if name in AUTOCHECK_STATISTICS)
+    return statistics
+
 
 SummaryResult = collections.namedtuple('SummaryResult', 'time_by_type task_execution_msec execution_stages')
 
@@ -426,10 +481,34 @@ def print_cache_statistics(graph, filename, display):
         elif task_type == 'prepare:get from dist cache':
             dist_cached_task_count += 1
 
+    return _print_cache_statistics(
+        filename,
+        display,
+        all_run_tasks_count=len(graph.run_tasks),
+        dyn_cached_tasks_count=dyn_cached_tasks_count,
+        failed_task_count=failed_task_count,
+        not_cached_task_count=not_cached_task_count,
+        tests_task_count=tests_task_count,
+        local_cached_task_count=local_cached_task_count,
+        dist_cached_task_count=dist_cached_task_count,
+    )
+
+
+def _print_cache_statistics(
+    filename,
+    display,
+    *,
+    all_run_tasks_count,
+    dyn_cached_tasks_count,
+    failed_task_count,
+    not_cached_task_count,
+    tests_task_count,
+    local_cached_task_count,
+    dist_cached_task_count,
+):
     cached_task_count = dist_cached_task_count + local_cached_task_count + dyn_cached_tasks_count
     not_tests_task_count = not_cached_task_count - tests_task_count
     executed_task_count = not_cached_task_count + cached_task_count
-    all_run_tasks_count = len(graph.run_tasks)
 
     logger.debug(
         'Run tasks %d: %d cached tasks (%d cache(s) resolved by dynamic uids), %d not cached, %d failed',
@@ -883,6 +962,16 @@ def _ymake_wall_time(ymake_stats):
     return wall_time
 
 
+def _collect_graph_stages():
+    stages = {name: stat.duration for name, stat in stage_tracer.get_stat('graph').items()}
+    return {'gg_stages': stages} if stages else {}
+
+
+def _collect_changelist():
+    value = get_changelist_stats()
+    return {'changelist': value} if value is not None else {}
+
+
 def print_graph_statistics(
     graph,
     directory,
@@ -892,6 +981,8 @@ def print_graph_statistics(
     ctx_stages=None,
     ymake_stats=None,
     dump_debug=None,
+    selected_statistics=None,
+    cache_counts_f=None,
 ):
     if directory is not None:
         exts.fs.create_dirs(directory)
@@ -899,42 +990,73 @@ def print_graph_statistics(
     def _make_file_path(path):
         return None if directory is None else os.path.join(directory, path)
 
+    selected_statistics = DEFAULT_STATISTICS if selected_statistics is None else selected_statistics
+
+    @functools.cache
+    def tasks_and_critical_path():
+        filename = _make_file_path('task-list') if 'task_list' in selected_statistics else None
+        return print_all_tasks(graph, filename, display)
+
+    def collect_task_list():
+        tasks_and_critical_path()
+
+    def collect_cache_hit():
+        filename = _make_file_path('cache-hit.json')
+        if cache_counts_f is not None:
+            value = _print_cache_statistics(filename, display, **cache_counts_f())
+        else:
+            value = print_cache_statistics(graph, filename, display)
+        return {'cache_hit': value}
+
+    # Creating the registry does not execute collectors. Selection is independent
+    # of --stat, which only controls where the selected statistics are displayed.
+    collectors = {
+        'cache_hit': collect_cache_hit,
+        'dist_cache_stat': lambda: {
+            'dist_cache_stat': print_dist_cache_statistics(graph, _make_file_path('yt-store-stat.json'), display)
+        },
+        'disk_usage': lambda: {'disk_usage': print_disk_usage(task_stats, _make_file_path('disk-usage.json'), display)},
+        'distbuild_download_stat': lambda: {
+            'distbuild_download_stat': print_distbuild_download_statistics(
+                graph, _make_file_path('distbuild-download-stat.json'), display
+            )
+        },
+        'task_list': collect_task_list,
+        'critical_path': lambda: {
+            'critical_path': print_critical_path(
+                tasks_and_critical_path()[1], graph, _make_file_path('critical-path'), display, ymake_stats
+            )
+        },
+        'longest_tasks': lambda: {
+            'longest_tasks': print_longest_tasks(
+                copy.copy(tasks_and_critical_path()[0]), _make_file_path('longest-tasks'), display, ymake_stats
+            )
+        },
+        'biggest_tasks': lambda: {
+            'biggest_tasks': print_biggest_copy_tasks(graph, _make_file_path('biggest-tasks'), display)
+        },
+        'summary_times': lambda: dict(
+            zip(
+                ('summary_times', 'task_execution_msec', 'execution_stages_msec'),
+                print_summary_times(tasks_and_critical_path()[0], display, ctx_stages=ctx_stages),
+            )
+        ),
+        'substages': lambda: {'substages': get_detailed_timings(tasks_and_critical_path()[0])},
+        'stages': lambda: print_stages(event_log, display),
+        'context_stages': lambda: {'context_stages': print_context_stages(ctx_stages, display)} if ctx_stages else {},
+        'ymake_wall_time': lambda: {'ymake_wall_time': _ymake_wall_time(ymake_stats)},
+        'changes_in_fs': lambda: {'changes_in_fs': _determine_fs_changes(dump_debug)},
+        'gg_stages': _collect_graph_stages,
+        'graph_lang': lambda: dict(zip(('graph_lang_usage', 'graph_lang'), _get_lang_statistics(graph))),
+        'external_program_fetcher': lambda: add_external_program_fetcher_metrics(graph),
+        'changelist': _collect_changelist,
+    }
+    # slot_time is collected online by SlotListener; coverage status is written
+    # after this function. Both participate in the same selection as collectors.
     stats = {}
-
-    stats['cache_hit'] = print_cache_statistics(graph, _make_file_path('cache-hit.json'), display)
-    stats['dist_cache_stat'] = print_dist_cache_statistics(graph, _make_file_path('yt-store-stat.json'), display)
-    stats['disk_usage'] = print_disk_usage(task_stats, _make_file_path('disk-usage.json'), display)
-    stats['distbuild_download_stat'] = print_distbuild_download_statistics(
-        graph, _make_file_path('distbuild-download-stat.json'), display
-    )
-    tasks, critical_data = print_all_tasks(graph, _make_file_path('task-list'), display)
-    stats['critical_path'] = print_critical_path(
-        critical_data, graph, _make_file_path('critical-path'), display, ymake_stats
-    )
-    stats['longest_tasks'] = print_longest_tasks(
-        copy.copy(tasks), _make_file_path('longest-tasks'), display, ymake_stats
-    )
-    stats['biggest_tasks'] = print_biggest_copy_tasks(graph, _make_file_path('biggest-tasks'), display)
-    stats['summary_times'], stats['task_execution_msec'], stats['execution_stages_msec'] = print_summary_times(
-        tasks, display, ctx_stages=ctx_stages
-    )
-    stats['substages'] = get_detailed_timings(tasks)
-    print_stages(event_log, display)
-    if ctx_stages:
-        stats['context_stages'] = print_context_stages(ctx_stages, display)
-    stats['ymake_wall_time'] = _ymake_wall_time(ymake_stats)
-    stats['changes_in_fs'] = _determine_fs_changes(dump_debug)
-    for name, stat in stage_tracer.get_stat('graph').items():
-        stats.setdefault('gg_stages', {})[name] = stat.duration
-
-    stats['graph_lang_usage'], stats['graph_lang'] = _get_lang_statistics(graph)
-
-    add_external_program_fetcher_metrics(graph)
-
-    cl_stats = get_changelist_stats()
-    if cl_stats is not None:
-        stats['changelist'] = cl_stats
-
+    for name in selected_statistics:
+        if name in collectors:
+            stats.update(collectors[name]() or {})
     return stats
 
 
@@ -1008,10 +1130,11 @@ def report_coverage_upload_status(graph, report_file, fail_report_file):
             reporter.write('\n'.join(failed))
 
 
-def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, ymake_stats=None):
+def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, ymake_stats=None, cache_counts_f=None):
     start_time = time.time()
     statistics_stage = stager.start('statistics')
-    graph = graph_f()
+    selected_statistics = get_statistics(opts)
+    graph = graph_f() if requires_graph_statistics(selected_statistics) else None
 
     if opts.print_statistics:
         import app_ctx
@@ -1040,12 +1163,16 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
             ctx_stages=ctx_stages,
             ymake_stats=ymake_stats,
             dump_debug=dump_debug,
+            selected_statistics=selected_statistics,
+            cache_counts_f=cache_counts_f if graph is None else None,
         )
     except Exception:
         stat_display.emit_message('Unable to calculate statistics because of {}'.format(traceback.format_exc()))
         logger.exception('While calculating statistics')
 
-    if opts.coverage_succeed_upload_uids_file or opts.coverage_failed_upload_uids_file:
+    if 'coverage_upload_status' in selected_statistics and (
+        opts.coverage_succeed_upload_uids_file or opts.coverage_failed_upload_uids_file
+    ):
         report_coverage_upload_status(
             graph, opts.coverage_succeed_upload_uids_file, opts.coverage_failed_upload_uids_file
         )
@@ -1073,7 +1200,13 @@ def analyze_distbuild_result(
         return graph
 
     _analyze_result(
-        lambda: process(graph), directory, opts, task_stats=task_stats, ctx_stages=ctx_stages, ymake_stats=ymake_stats
+        lambda: process(graph),
+        directory,
+        opts,
+        task_stats=task_stats,
+        ctx_stages=ctx_stages,
+        ymake_stats=ymake_stats,
+        cache_counts_f=lambda: collect_cache_statistics(graph, result, local_result),
     )
 
 
@@ -1087,4 +1220,5 @@ def analyze_local_result(
         task_stats=task_stats,
         ctx_stages=ctx_stages,
         ymake_stats=ymake_stats,
+        cache_counts_f=lambda: collect_cache_statistics(graph, local_result=result),
     )
