@@ -53,7 +53,7 @@ std::shared_ptr<IOutputStream> IDiagnosticReporter::ReportConfigureMessage(EConf
 }
 
 void IDiagnosticReporter::ReportConfigureEvent(ETraceEvent what, const TString& event) {
-    ReportEvent({what, event, Diag()->Where.back().first, Diag()->Persistency});
+    ReportDiagnosticEvent({what, event, Diag()->Where.back().first, Diag()->Persistency});
 }
 
 void EmitDiagnosticEvent(const TDiagnosticEvent& event) {
@@ -63,11 +63,13 @@ void EmitDiagnosticEvent(const TDiagnosticEvent& event) {
 }
 
 void TBufferedDiagnosticReporter::ReportMessage(TDiagnosticMessage message) {
-    HasConfigurationErrors |= message.IsConfigure && message.Type == EConfMsgType::Error;
+    if (message.IsConfigure && message.Type == EConfMsgType::Error) {
+        HasConfigurationErrors = true;
+    }
     Entries_.emplace_back(std::move(message));
 }
 
-void TBufferedDiagnosticReporter::ReportEvent(TDiagnosticEvent event) {
+void TBufferedDiagnosticReporter::ReportDiagnosticEvent(TDiagnosticEvent event) {
     Entries_.emplace_back(std::move(event));
 }
 

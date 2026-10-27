@@ -14,6 +14,8 @@
 #include "command_store.h"
 #include "var_eval.h"
 
+#include <devtools/ymake/libs/async/pipeline.h>
+
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/diag.h>
 #include <devtools/ymake/diag/display.h>
@@ -49,6 +51,7 @@
 #include <util/string/join.h>
 #include <util/string/type.h>
 #include <util/system/types.h>
+#include <util/system/fstat.h>
 
 #include <algorithm>
 #include <fmt/format.h>
@@ -2399,6 +2402,16 @@ void TPreparedDartModule::UpdateVars(TVars& vars, const TBuildConfiguration& con
     }
 }
 
+static void RenderPreparedDartProperty(TYMake& ymake, const TPreparedDartModule& prepared,
+                                       IOutputStream& out, TStringBuf value) {
+    const auto& module = prepared.GetModule();
+    TScopedContext owner(module.GetMakefile());
+    TVars vars;
+    prepared.UpdateVars(vars, ymake.Conf, ymake.Graph);
+    RenderDartModuleProperty(ymake.GetRestoreContext(), ymake.Commands, out,
+                             module, vars, value, TDumpDartProc::SubstVarsGlobaly);
+}
+
 struct TTestDartRenderPlan::TImpl {
     struct TProperty {
         TNodeId Module = TNodeId::Invalid;
@@ -2486,13 +2499,71 @@ void TTestDartRenderPlan::Render(IOutputStream& out, TExecContext& context) cons
     NYMake::TTraceStage trace{"Render prepared TestDart"};
     for (const auto& property : Impl_->Properties) {
         const auto& prepared = Impl_->Modules[property.PreparedModule];
-        const auto& module = prepared.GetModule();
-        TScopedContext context(module.GetMakefile());
-        TVars vars;
-        prepared.UpdateVars(vars, ymake.Conf, ymake.Graph);
-        RenderDartModuleProperty(ymake.GetRestoreContext(), ymake.Commands, filtered,
-                                 module, vars, property.Value, TDumpDartProc::SubstVarsGlobaly);
+        RenderPreparedDartProperty(ymake, prepared, filtered, property.Value);
     }
+}
+
+asio::awaitable<void> TTestDartRenderPlan::RenderPipelined(TYMake& ymake, IOutputStream& out,
+                                                      asio::any_io_executor executor, size_t capacity) {
+    THolder<TImpl> input;
+    {
+        NYMake::TTraceStage trace{"Collect TestDart properties"};
+        input = MakeHolder<TImpl>(ymake);
+    }
+    struct TWork {
+        std::shared_ptr<const TPreparedDartModule> Module;
+        TStringBuf Value;
+    };
+    THashMap<TNodeId, std::shared_ptr<const TPreparedDartModule>> modules;
+    THashMap<TNodeId, size_t> remaining;
+    for (const auto& property : input->Properties) {
+        ++remaining[property.Module];
+    }
+    size_t next = 0;
+    auto diagnostics = std::make_shared<TBufferedDiagnosticReporter>();
+    auto context = MakeRenderContext(diagnostics);
+    TRenderPathContext producerPaths(ymake.Conf, true);
+    TRenderPathContext consumerPaths(ymake.Conf, true);
+    TFilteredOutputStream filtered(out, ymake.Graph, ymake.DependsToModulesClosure, ymake.Conf.ShouldCheckDependsInDart());
+    const auto produce = [&]() -> std::optional<TWork> {
+        TCurrentContextScope<TRenderPathContext> pathScope(&producerPaths);
+        if (next == input->Properties.size()) {
+            return std::nullopt;
+        }
+        const auto& property = input->Properties[next++];
+        auto& prepared = modules[property.Module];
+        if (!prepared) {
+            prepared = std::make_shared<TPreparedDartModule>(ymake.GetRestoreContext(), ymake.Graph[property.Module]);
+        }
+        TWork work{prepared, property.Value};
+        if (--remaining.at(property.Module) == 0) {
+            modules.erase(property.Module);
+        }
+        return work;
+    };
+    const auto consume = [&](const TWork& work) {
+        TCurrentContextScope<TRenderPathContext> pathScope(&consumerPaths);
+        RenderPreparedDartProperty(ymake, *work.Module, filtered, work.Value);
+    };
+    const auto finish = [&] {
+        DiagnosticReporter()->HasConfigurationErrors |= diagnostics->HasConfigurationErrors;
+        diagnostics->Flush();
+    };
+    NYMake::TTraceStage trace{"Pipeline TestDart"};
+    NYMake::TPipelineStats stats;
+    try {
+        stats = co_await NYMake::RunPipeline<TWork>(executor, TExecutorWithContext<TExecContext>(executor, context),
+                                                  capacity, produce, consume);
+    } catch (...) {
+        finish();
+        throw;
+    }
+    finish();
+    NStats::TStatsBase::MonEvent("TestDartPreparationSeconds", stats.PreparationSeconds);
+    NStats::TStatsBase::MonEvent("TestDartRenderingSeconds", stats.RenderingSeconds);
+    NStats::TStatsBase::MonEvent("TestDartSendWaitSeconds", stats.SendWaitSeconds);
+    NStats::TStatsBase::MonEvent("TestDartReceiveWaitSeconds", stats.ReceiveWaitSeconds);
+    NStats::TStatsBase::MonEvent("TestDartProperties", static_cast<ui64>(stats.Items));
 }
 
 void TYMake::DumpTestDart(IOutputStream& cmsg) {
@@ -2584,18 +2655,112 @@ void Out<TDartManager::EDartType>(IOutputStream& out, TDartManager::EDartType da
     }
 }
 
+bool TDartManager::CanOverlapJSON() const {
+    const auto& conf = YMake_.Conf;
+    if (conf.RenderSemantics || conf.WriteJSON.empty() || conf.WriteTestDart.empty()) {
+        return false;
+    }
+    const TFsPath dartPath{conf.WriteTestDart};
+    TVector<TFsPath> dartFiles{dartPath};
+    if (conf.ShouldLoadDartCaches() || conf.ShouldSaveDartCaches()) {
+        dartFiles.push_back(conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache"));
+    }
+    TVector<TFsPath> jsonFiles;
+    if (conf.WriteJSON != "-") {
+        jsonFiles.emplace_back(conf.WriteJSON);
+    }
+    for (const auto& file : {conf.YmakeJsonCache, conf.YmakeUidsCache}) {
+        if (file.IsDefined()) {
+            jsonFiles.push_back(file);
+        }
+    }
+    try {
+        for (const auto& dart : dartFiles) {
+            for (const auto& json : jsonFiles) {
+                if ((dart.IsSymlink() && !dart.Exists()) || (json.IsSymlink() && !json.Exists())) {
+                    return false;
+                }
+                if (dart.RealLocation() == json.RealLocation()) {
+                    return false;
+                }
+                const TFileStat dartStat(dart);
+                const TFileStat jsonStat(json);
+                if (!dartStat.IsNull() && !jsonStat.IsNull() && dartStat.INode == jsonStat.INode) {
+                    return false;
+                }
+            }
+        }
+    } catch (const yexception&) {
+        return false;
+    }
+    return true;
+}
+
+THolder<TTestDartRenderPlan> TDartManager::PrepareTestDart() {
+    const TFsPath dartPath{YMake_.Conf.WriteTestDart};
+    const TFsPath cachePath = YMake_.Conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache");
+    Y_ASSERT(cachePath != dartPath);
+    if (CanLoad(cachePath)) {
+        return {};
+    }
+    return MakeHolder<TTestDartRenderPlan>(YMake_);
+}
+
+void TDartManager::RenderOrRestoreTestDart(const TTestDartRenderPlan* plan, TExecContext& context) {
+    const TFsPath dartPath{YMake_.Conf.WriteTestDart};
+    const TFsPath cachePath = YMake_.Conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache");
+    if (!plan) {
+        Load(EDartType::Test, dartPath, cachePath);
+        return;
+    }
+    {
+        NYMake::TTraceStage trace{"Render TestDart"};
+        TFileOutput output(dartPath);
+        plan->Render(output, context);
+        output.Finish();
+    }
+    Save(EDartType::Test, dartPath, cachePath);
+}
+
 void TDartManager::DumpTestDart() {
     if (!YMake_.Conf.WriteTestDart.empty()) {
         Dump(EDartType::Test, YMake_.Conf.WriteTestDart);
     }
 }
 
-bool TDartManager::TryLoad(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath) {
-    if (!YMake_.Conf.ShouldLoadDartCaches() || !YMake_.CanBypassConfigure() || !cachePath.Exists()) {
-        return false;
+asio::awaitable<void> TDartManager::DumpTestDart(asio::any_io_executor executor) {
+    if (YMake_.Conf.WriteTestDart.empty()) {
+        co_return;
     }
+    const TFsPath dartPath{YMake_.Conf.WriteTestDart};
+    const TFsPath cachePath = YMake_.Conf.YmakeDartsCacheDir / (dartPath.Basename() + ".cache");
+    Y_ASSERT(cachePath != dartPath);
+    if (TryLoad(EDartType::Test, dartPath, cachePath)) {
+        co_return;
+    }
+    {
+        NYMake::TTraceStage trace{"Render TestDart"};
+        TFileOutput output(dartPath);
+        co_await TTestDartRenderPlan::RenderPipelined(YMake_, output, executor);
+        output.Finish();
+    }
+    Save(EDartType::Test, dartPath, cachePath);
+}
+
+bool TDartManager::CanLoad(const TFsPath& cachePath) const {
+    return YMake_.Conf.ShouldLoadDartCaches() && YMake_.CanBypassConfigure() && cachePath.Exists();
+}
+
+void TDartManager::Load(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath) {
     NYMake::TTraceStage trace{fmt::format("Load {} from cache", ToString(dartType))};
     cachePath.CopyTo(dartPath, true);
+}
+
+bool TDartManager::TryLoad(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath) {
+    if (!CanLoad(cachePath)) {
+        return false;
+    }
+    Load(dartType, dartPath, cachePath);
     return true;
 }
 

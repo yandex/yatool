@@ -12,6 +12,9 @@
 #include "saveload.h"
 #include "vars.h"
 #include "ymake.h"
+#include "node_printer.h"
+
+#include <asio/experimental/concurrent_channel.hpp>
 
 #include <devtools/ymake/action.h>
 #include <devtools/ymake/common/md5sig.h>
@@ -643,7 +646,7 @@ namespace {
 
 }
 
-static asio::awaitable<void> ExportJSONWithPaths(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit) {
+static asio::awaitable<void> ExportJSONWithPaths(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit, TJSONPostVisit alongsideTail) {
     FORCE_TRACE(U, NEvent::TStageStarted("Export JSON"));
 
     {
@@ -658,7 +661,16 @@ static asio::awaitable<void> ExportJSONWithPaths(TYMake& yMake, asio::any_io_exe
         if (afterVisit) {
             co_await afterVisit();
         }
-        co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
+        if (alongsideTail) {
+            std::vector<std::function<asio::awaitable<void>()>> tasks;
+            tasks.emplace_back([&]() -> asio::awaitable<void> {
+                co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
+            });
+            tasks.emplace_back(std::move(alongsideTail));
+            co_await NYMake::RunAll(exec, std::move(tasks));
+        } else {
+            co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
+        }
     }
 
     FORCE_TRACE(U, NEvent::TStageFinished("Export JSON"));
@@ -667,8 +679,66 @@ static asio::awaitable<void> ExportJSONWithPaths(TYMake& yMake, asio::any_io_exe
     yMake.UidsCacheMonEvent();
 }
 
-asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit) {
+asio::awaitable<void> ExportJSON(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit afterVisit, TJSONPostVisit alongsideTail) {
     auto paths = std::make_shared<TRenderPathContext>(yMake.Conf, true, &yMake.Names.FileConf);
     auto renderExec = TExecutorWithContext<TRenderPathContext>(exec, std::move(paths));
-    co_await asio::co_spawn(renderExec, ExportJSONWithPaths(yMake, renderExec, std::move(afterVisit)), asio::use_awaitable);
+    co_await asio::co_spawn(renderExec, ExportJSONWithPaths(yMake, renderExec, std::move(afterVisit), std::move(alongsideTail)), asio::use_awaitable);
+}
+
+asio::awaitable<bool> ExportJSONAndTestDart(TYMake& yMake, asio::any_io_executor exec, TJSONPostVisit saveCoreCaches) {
+    TDartManager dartManager(yMake);
+    bool testDartDone = false;
+    THolder<TTestDartRenderPlan> dartPlan;
+    std::shared_ptr<TBufferedDiagnosticReporter> dartDiagnostics;
+    std::shared_ptr<TExecContext> dartContext;
+    asio::experimental::concurrent_channel<void(asio::error_code, std::exception_ptr)> coreSaved(exec, 1);
+    TJSONPostVisit prepareDart;
+    TJSONPostVisit renderDart;
+    if (dartManager.CanOverlapJSON()) {
+        prepareDart = [&]() -> asio::awaitable<void> {
+            {
+                NYMake::TTraceStage wait{"Wait for core caches before TestDart"};
+                if (auto error = co_await coreSaved.async_receive(asio::use_awaitable)) {
+                    std::rethrow_exception(error);
+                }
+            }
+            dartPlan = dartManager.PrepareTestDart();
+            dartDiagnostics = std::make_shared<TBufferedDiagnosticReporter>();
+            dartContext = MakeRenderContext(dartDiagnostics);
+            testDartDone = true;
+        };
+        renderDart = [&]() -> asio::awaitable<void> {
+            co_await asio::co_spawn(TExecutorWithContext<TExecContext>(exec, dartContext), [&]() -> asio::awaitable<void> {
+                dartManager.RenderOrRestoreTestDart(dartPlan.Get(), *dartContext);
+                co_return;
+            }, asio::use_awaitable);
+        };
+    }
+    std::vector<std::function<asio::awaitable<void>()>> tasks;
+    tasks.emplace_back([&]() -> asio::awaitable<void> {
+        try {
+            co_await saveCoreCaches();
+        } catch (...) {
+            coreSaved.try_send(asio::error_code{}, std::current_exception());
+            throw;
+        }
+        coreSaved.try_send(asio::error_code{}, std::exception_ptr{});
+    });
+    tasks.emplace_back([&]() -> asio::awaitable<void> {
+        co_await ExportJSON(yMake, exec, std::move(prepareDart), std::move(renderDart));
+    });
+    const auto finishDart = [&] {
+        if (dartDiagnostics) {
+            DiagnosticReporter()->HasConfigurationErrors |= dartDiagnostics->HasConfigurationErrors;
+            dartDiagnostics->Flush();
+        }
+    };
+    try {
+        co_await NYMake::RunAll(exec, std::move(tasks));
+    } catch (...) {
+        finishDart();
+        throw;
+    }
+    finishDart();
+    co_return testDartDone;
 }

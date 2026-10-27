@@ -63,7 +63,7 @@ class TExecutorWithContext {
 
 public:
     TExecutorWithContext(const asio::any_io_executor& underlying, std::shared_ptr<T> context)
-        : Underlying_(underlying)
+        : Underlying_(asio::require(underlying, asio::execution::blocking.never))
         , Context_(context) {}
 
     asio::execution_context& query(asio::execution::context_t) const noexcept {

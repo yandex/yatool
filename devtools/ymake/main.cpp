@@ -869,15 +869,16 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
     co_return TMaybe<EBuildResult>();
 }
 
-void DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
+asio::awaitable<void> DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMake, asio::any_io_executor exec, bool testDartDone) {
     yMake->ReportMakeCommandStats();
 
     TRenderPathContext paths(conf, true);
-    TCurrentContextScope<TRenderPathContext> pathScope(&paths);
-
     TDartManager dartManager(*yMake);
+    if (!testDartDone) {
+        co_await dartManager.DumpTestDart(exec);
+    }
 
-    dartManager.DumpTestDart();
+    TCurrentContextScope<TRenderPathContext> pathScope(&paths);
 
     if (!conf.WriteJavaDart.empty()) {
         dartManager.Dump(TDartManager::EDartType::Java, conf.WriteJavaDart);
@@ -929,7 +930,8 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         yMake->PrepareCacheSave();
     }
 
-    auto mainFlow = asio::co_spawn(exec, [exec, &conf, &yMake, hasBadLoops]() -> asio::awaitable<TMaybe<EBuildResult>> {
+    bool testDartDone = false;
+    auto mainFlow = asio::co_spawn(exec, [exec, &conf, &yMake, hasBadLoops, &testDartDone]() -> asio::awaitable<TMaybe<EBuildResult>> {
         auto result = co_await asio::co_spawn(exec, AnalysesStage(conf, *yMake, hasBadLoops, exec), asio::use_awaitable);
         if (result.Defined()) {
             co_return result.GetRef();
@@ -946,11 +948,16 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
             co_return BR_CONFIGURE_FAILED;
         }
 
-        co_await (asio::co_spawn(exec, SaveCoreCaches(conf, yMake), asio::use_awaitable)
-            && asio::co_spawn(exec, [&result, &conf, &yMake, &exec]() -> asio::awaitable<void> {
-                result = co_await RenderGraph(conf, yMake, exec);
-                co_return;
-            }, asio::use_awaitable));
+        if (!conf.RenderSemantics && !conf.WriteJSON.empty()) {
+            testDartDone = co_await ExportJSONAndTestDart(*yMake, exec, [&]() -> asio::awaitable<void> {
+                co_await SaveCoreCaches(conf, yMake);
+            });
+        } else {
+            co_await (asio::co_spawn(exec, SaveCoreCaches(conf, yMake), asio::use_awaitable)
+                && asio::co_spawn(exec, [&]() -> asio::awaitable<void> {
+                    result = co_await RenderGraph(conf, yMake, exec);
+                }, asio::use_awaitable));
+        }
         if (result.Defined()) {
             auto r = result.GetRef();
             if (BR_OK == r) {
@@ -968,7 +975,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         co_return result.GetRef();
     }
 
-    DumpDarts(conf, yMake);
+    co_await DumpDarts(conf, yMake, exec, testDartDone);
     if (ConfMsgManager()->HasConfigurationErrors && !yMake->Conf.KeepGoing) {
         co_return BR_CONFIGURE_FAILED;
     }

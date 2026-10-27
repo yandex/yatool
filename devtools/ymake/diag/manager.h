@@ -91,7 +91,7 @@ public:
     void FlushTopLevel() const;
 
     void ReportMessage(TDiagnosticMessage message) override;
-    void ReportEvent(TDiagnosticEvent event) override;
+    void ReportDiagnosticEvent(TDiagnosticEvent event) override;
     void AddDupSrcLink(TFileElemId id, TFileElemId modid, bool force = true);
     void AddVisitedModule(TFileElemId modId);
     void ReportDupSrcConfigureErrors(std::function<TStringBuf (TFileElemId)> toString);

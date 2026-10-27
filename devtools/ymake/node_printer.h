@@ -18,6 +18,9 @@
 
 #include <utility>
 
+#include <asio/awaitable.hpp>
+#include <asio/any_io_executor.hpp>
+
 class IOutputStream;
 class TModules;
 struct TRestoreContext;
@@ -168,6 +171,8 @@ public:
     explicit TTestDartRenderPlan(TYMake& ymake);
     ~TTestDartRenderPlan();
 
+    static asio::awaitable<void> RenderPipelined(TYMake& ymake, IOutputStream& out, asio::any_io_executor executor, size_t capacity = 16);
+
     void Render(IOutputStream& out) const;
     void Render(IOutputStream& out, TExecContext& context) const;
 
@@ -280,9 +285,16 @@ public:
 
     ~TDartManager() = default;
 
+    bool CanOverlapJSON() const;
+    THolder<TTestDartRenderPlan> PrepareTestDart();
+    void RenderOrRestoreTestDart(const TTestDartRenderPlan* plan, TExecContext& context);
+
     void DumpTestDart();
+    asio::awaitable<void> DumpTestDart(asio::any_io_executor executor);
     void Dump(EDartType dartType, const TString& dartName);
 private:
+    bool CanLoad(const TFsPath& cachePath) const;
+    void Load(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath);
     bool TryLoad(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath);
     void Render(EDartType dartType, const TFsPath& dartPath);
     void Save(EDartType dartType, const TFsPath& dartPath, const TFsPath& cachePath);

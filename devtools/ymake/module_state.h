@@ -528,18 +528,19 @@ private:
 
     union {
         ui32 AllInitializationFlags = 0;
-        struct { // 9 bits used
+        struct { // 8 bits used
             ui32 Committed: 1;
             ui32 InitComplete: 1;
             ui32 InputsComplete: 1;
             ui32 PeersComplete: 1;
             ui32 ToolsComplete: 1;
             ui32 IncludesComplete: 1;
-            ui32 Accessed: 1;
             ui32 GlobVarsComplete: 1;
             ui32 BuildComplete: 1;
         };
     };
+
+    bool Accessed = false;
 
     TSymbols& Symbols;
 

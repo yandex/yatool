@@ -33,7 +33,7 @@ class IDiagnosticReporter {
 public:
     virtual ~IDiagnosticReporter() = default;
     virtual void ReportMessage(TDiagnosticMessage message) = 0;
-    virtual void ReportEvent(TDiagnosticEvent event) = 0;
+    virtual void ReportDiagnosticEvent(TDiagnosticEvent event) = 0;
 
     std::shared_ptr<IOutputStream> ReportConfigureMessage(EConfMsgType type, TStringBuf kind, size_t row = 0, size_t column = 0);
     void ReportConfigureEvent(ETraceEvent what, const TString& event);
@@ -48,7 +48,7 @@ void EmitDiagnosticEvent(const TDiagnosticEvent& event);
 class TBufferedDiagnosticReporter final: public IDiagnosticReporter {
 public:
     void ReportMessage(TDiagnosticMessage message) override;
-    void ReportEvent(TDiagnosticEvent event) override;
+    void ReportDiagnosticEvent(TDiagnosticEvent event) override;
     void Flush();
 
 private:

@@ -48,11 +48,13 @@ void TConfMsgManager::ReportMessage(TDiagnosticMessage message) {
             TStringStream(std::move(message.Text)), message.Row, message.Column, message.IsPersistent);
         return;
     }
-    HasConfigurationErrors |= message.IsConfigure && message.Type == EConfMsgType::Error;
-    ReportEvent(Display()->EmitMessage(message));
+    if (message.IsConfigure && message.Type == EConfMsgType::Error) {
+        HasConfigurationErrors = true;
+    }
+    ReportDiagnosticEvent(Display()->EmitMessage(message));
 }
 
-void TConfMsgManager::ReportEvent(TDiagnosticEvent event) {
+void TConfMsgManager::ReportDiagnosticEvent(TDiagnosticEvent event) {
     if (Delayed) {
         Events[event.Owner].emplace_back(event.Type, event.Event, event.IsPersistent);
     } else {
