@@ -82,15 +82,18 @@ def _search_secrets(key, value):
 
 
 def cleanup(s, suppressions, replacement='[SECRET]'):
-    # type: (str, tp.Sequence[str], str) -> str
+    # type: (tp.Any, tp.Sequence[str], str) -> tp.Any
     """Cleanup string from any secrets"""
+    if not isinstance(s, six.string_types):
+        return s
+
     for sup in suppressions:
         s = s.replace(sup, replacement)
     return OAUTH_HEADER_VALUE_RE.sub(lambda match: match.group(1) + replacement, s)
 
 
 def environ(env=None):
-    # type: (dict[str, str] | None) -> dict[str, str]
+    # type: (dict[str, tp.Any] | None) -> dict[str, tp.Any]
     """Return env without tokens and secrets"""
     return {k: cleanup(v, _search_secrets(k, v)) for k, v in six.iteritems(env or os.environ)}
 
