@@ -10,7 +10,7 @@
 /// @brief Structure capturing properties of Added nodes w.r.t to their modules
 ///        For module nodes also contains output file nodes loaded from cached graph
 
-enum class EInputsStatus {
+enum class EInputsStatus : ui8 {
     EIS_NotChecked,
     EIS_NotChanged,
     EIS_Changed
