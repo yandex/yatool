@@ -164,6 +164,7 @@ class BuildThreadsOptions(Options):
 
         self.build_threads = build_threads
         self.link_threads = 2
+        self.lld_threads = None
         # SetValueHook tracks explicit flag, environment and config assignments.
         self._link_threads_counter = 0
 
@@ -196,9 +197,34 @@ class BuildThreadsOptions(Options):
             ),
             EnvConsumer('YA_LINK_THREADS', help='Link threads count', hook=SetValueHook('link_threads', int)),
             ConfigConsumer('link_threads'),
+            ArgConsumer(
+                ['--lld-threads'],
+                help=(
+                    'Number of threads per local ELF executable/shared-library LLD link. '
+                    'Does not change build graph or cache keys. Unsupported with Larry or distributed builds'
+                ),
+                hook=SetValueHook('lld_threads', int),
+                group=OPERATIONAL_CONTROL_GROUP,
+                visible=HelpLevel.ADVANCED,
+            ),
+            EnvConsumer(
+                'YA_LLD_THREADS',
+                help='ELF LLD threads per task',
+                hook=SetValueHook('lld_threads', int),
+            ),
+            ConfigConsumer('lld_threads'),
         ]
 
+    def postprocess(self):
+        if self.lld_threads is not None and (type(self.lld_threads) is not int or self.lld_threads <= 0):
+            raise ArgsValidatingException('--lld-threads requires a positive integer')
+
     def postprocess2(self, params):
+        if self.lld_threads is not None:
+            if getattr(params, 'larry_addr', None) is not None:
+                raise ArgsValidatingException('--lld-threads is not supported with Larry')
+            if getattr(params, 'use_distbuild', False):
+                raise ArgsValidatingException('--lld-threads is not supported with distributed builds')
         if self._link_threads_counter and getattr(params, 'larry_addr', None) is not None:
             raise ArgsValidatingException('--link-threads is not supported with Larry')
         if getattr(params, 'lto', False) or getattr(params, 'thinlto', False):

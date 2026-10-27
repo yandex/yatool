@@ -450,6 +450,12 @@ class RunNodeTask(object):
                 env = strings.ensure_str_deep(env)
                 this_env.update(env)
 
+            # Runtime overrides must not leak into unrelated commands via the parent environment.
+            this_env.pop('_YA_LLD_THREADS', None)
+            lld_threads = getattr(self._ctx.opts, 'lld_threads', None)
+            if lld_threads is not None and (self._node.kv or {}).get('p', '').lower() == 'ld':
+                this_env['_YA_LLD_THREADS'] = str(lld_threads)
+
             if getattr(self._ctx.opts, 'use_persistent_recipes', False):
                 this_env['_YA_INVOCATION_ID'] = self._ctx._invocation_id
                 this_env['_YA_BUILD_ID'] = self._ctx._build_id

@@ -215,6 +215,8 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.build_graph_cache_trust_cl = params.build_graph_cache_trust_cl
 
     build_options.build_threads = params.build_threads
+    build_options.lld_threads = getattr(params, 'lld_threads', None)
+    build_options.memory_limit = getattr(params, 'memory_limit', None)
     build_options.output_root = build_info["output_root"]
     build_options.create_symlinks = False
     build_options.keep_temps = params.keep_temps
