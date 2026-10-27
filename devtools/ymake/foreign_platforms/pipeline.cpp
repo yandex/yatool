@@ -3,6 +3,8 @@
 #include <library/cpp/protobuf/json/json2proto.h>
 #include <util/generic/queue.h>
 
+#include <limits>
+
 #include <devtools/ymake/conf.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/foreign_platforms/pipeline.h>
@@ -232,7 +234,11 @@ namespace NForeignTargetPipeline {
         conf.AddOptions(opts);
         const NLastGetopt::TOptsParseResult res(&opts, config.size(), const_cast<const char**>(config.data()));
 
-        auto queue = MakeAtomicShared<Queue>(Executor_, 4096u);
+        // Writers are synchronous and can share one executor thread with their
+        // readers. A bounded queue cannot apply backpressure here: the producer
+        // must finish its burst before the consumer gets a chance to run.
+        // The channel allocates only for queued events, not for this capacity.
+        auto queue = MakeAtomicShared<Queue>(Executor_, std::numeric_limits<size_t>::max());
         PipesByTargetPlatformId_[conf.TargetPlatformId][conf.TransitionSource] = queue;
         switch (conf.TransitionSource) {
             case ETransition::NoPic:
