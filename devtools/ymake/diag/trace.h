@@ -22,7 +22,7 @@ namespace NYMake {
 }
 
 #define TRACE(W, M)                                                    \
-    ConfMsgManager()->ReportConfigureEvent(::ETraceEvent::W, NYMake::EventToStr(M));  \
+    DiagnosticReporter()->ReportConfigureEvent(::ETraceEvent::W, NYMake::EventToStr(M));  \
 
 #define FORCE_TRACE(W, M)          \
     if (NYMake::TraceEnabled(::ETraceEvent::W)) { \

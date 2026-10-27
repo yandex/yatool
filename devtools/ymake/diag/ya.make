@@ -18,6 +18,7 @@ SRCS(
     display.cpp
     manager.cpp
     mod_stats_manager.cpp
+    reporter.cpp
     progress_manager.cpp
     stats.cpp
     trace.ev

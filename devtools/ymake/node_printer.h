@@ -22,6 +22,7 @@ class IOutputStream;
 class TModules;
 struct TRestoreContext;
 class TCommands;
+struct TExecContext;
 
 struct TDepthData {
     size_t Depth;
@@ -168,6 +169,7 @@ public:
     ~TTestDartRenderPlan();
 
     void Render(IOutputStream& out) const;
+    void Render(IOutputStream& out, TExecContext& context) const;
 
 private:
     struct TImpl;

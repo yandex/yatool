@@ -17,31 +17,6 @@
 
 using TStreamMessage = TDisplay::TStreamMessage;
 
-namespace {
-    class TChildOutputStream: public TString, public TStringOutput {
-    public:
-        using TFlusher = std::function<void(TString)>;
-
-    public:
-        TChildOutputStream(TFlusher&& flusher)
-            : TStringOutput(*static_cast<TString*>(this))
-            , Flusher(std::move(flusher))
-        {
-        }
-
-        ~TChildOutputStream() override {
-            try {
-                this->Flush();
-                Flusher(*this);
-            } catch (...) {
-            }
-        }
-
-    private:
-        TFlusher Flusher;
-    };
-} // namespace
-
 void TDisplay::SetCutoff(EConfMsgType value) noexcept {
     if (auto* context = CurrentContext<TExecContext>) {
         context->DisplayCutoff = static_cast<unsigned int>(value);
@@ -63,49 +38,46 @@ const TDisplay::TMsgType TDisplay::msgTypesAsString[4] = {
     std::make_pair(TStringBuf("Info"), TStringBuf("imp")),
     std::make_pair(TStringBuf("Debug"), TStringBuf("unimp"))};
 
-TStreamMessage TDisplay::PrepareStream(EConfMsgType msgType, TStringBuf sub, TStringBuf path, size_t row, size_t column) {
+TDiagnosticEvent TDisplay::EmitMessage(const TDiagnosticMessage& message) {
     static const ui32 pid = GetPID();
-
-    auto* targetStream = LockedStream();
-    const auto cutoff = GetCutoff();
-    const auto [type, mod] = msgTypesAsString[static_cast<ui32>(msgType)];
-    TString where = ToString(path);
-    if (row != 0 && column != 0) {
-        where += ":" + ToString(row) + ":" + ToString(column);
+    const auto [type, mod] = msgTypesAsString[static_cast<ui32>(message.Type)];
+    TString where = message.OwnerName;
+    if (message.Row != 0 && message.Column != 0) {
+        where += ":" + ToString(message.Row) + ":" + ToString(message.Column);
     }
-
-    TString prefix = type + (sub ? TString("[") + sub + "]" : "") + ": ";
-    if (path) {
+    TString prefix = type + (message.Kind ? TString("[") + message.Kind + "]" : "") + ": ";
+    if (message.OwnerName) {
         prefix += TString("in ") + where + ": ";
     }
-
-    TStreamMessage stream = new TChildOutputStream(
-        [prefix, msgType, type = type, mod = mod, sub, path, row, column, where, targetStream, cutoff](const TString& s) {
-            if (msgType < cutoff) {
-                targetStream->Emit(prefix + s);
-            }
-            NEvent::TDisplayMessage msg;
-            msg.SetType(type.data());
-            msg.SetMod(mod.data());
-            msg.SetSub(sub ? sub.data() : "");
-            msg.SetMessage(s);
-            if (path) {
-                msg.SetWhere(path.data());
-            }
-            if (row != 0 && column != 0) {
-                msg.SetRow(row);
-                msg.SetColumn(column);
-            }
-            msg.SetPID(pid);
-            ConfMsgManager()->ReportConfigureEvent(
-                (msgType == EConfMsgType::Error || msgType == EConfMsgType::Warning) ? ETraceEvent::E : ETraceEvent::D,
-                NYMake::EventToStr(msg));
-        });
-    return stream;
+    if (message.Type < message.Cutoff) {
+        Y_ENSURE(message.Output);
+        message.Output->Emit(prefix + message.Text);
+    }
+    NEvent::TDisplayMessage event;
+    event.SetType(type.data());
+    event.SetMod(mod.data());
+    event.SetSub(message.Kind);
+    event.SetMessage(message.Text);
+    if (message.OwnerName) {
+        event.SetWhere(message.OwnerName);
+    }
+    if (message.Row != 0 && message.Column != 0) {
+        event.SetRow(message.Row);
+        event.SetColumn(message.Column);
+    }
+    event.SetPID(pid);
+    return {
+        (message.Type == EConfMsgType::Error || message.Type == EConfMsgType::Warning) ? ETraceEvent::E : ETraceEvent::D,
+        NYMake::EventToStr(event), message.Owner, message.IsPersistent,
+    };
 }
 
-TStreamMessage TDisplay::NewConfMsg(EConfMsgType type, TStringBuf msg, TStringBuf path, size_t row, size_t column) {
-    return PrepareStream(type, msg, path, row, column);
+TStreamMessage TDisplay::NewConfMsg(EConfMsgType type, TStringBuf kind, TStringBuf path, size_t row, size_t column) {
+    return MakeDiagnosticStream(*DiagnosticReporter(), {
+        .Type = type, .Kind = TString(kind), .Text = {}, .Owner = Diag()->Where.back().first,
+        .OwnerName = TString(path), .Row = row, .Column = column,
+        .IsPersistent = Diag()->Persistency, .IsConfigure = false, .Cutoff = GetCutoff(), .Output = LockedStream(),
+    });
 }
 
 TDisplay* Display() {

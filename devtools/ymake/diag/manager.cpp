@@ -10,8 +10,6 @@
 #include <util/generic/string.h>
 #include <util/string/join.h>
 
-using TStreamMessage = TConfMsgManager::TStreamMessage;
-
 namespace {
     constexpr ui32 ChecksStateVersion = 1;
     constexpr TStringBuf ChkPeersMessageKind = "-WChkPeers";
@@ -44,28 +42,21 @@ void TConfMsgManager::TChecksState::Load(IInputStream* input) {
     }
 }
 
-TStringStream& TConfMsgManager::SaveConfigureMessage(EConfMsgType type, TStringBuf kind, size_t row, size_t column, bool isPersistent) {
-    TFileElemId owner = Diag()->Where.back().first;
-    Messages[owner].emplace_back(type, kind, TStringStream(), row, column, isPersistent);
-    return Messages[owner].back().Message;
-}
-
-void TConfMsgManager::ReportConfigureEvent(ETraceEvent what, const TString& event) {
-    if (Delayed) {
-        SaveEvent(what, event);
-    } else if (NYMake::TraceEnabled(what)) {
-        NYMake::Trace(event);
+void TConfMsgManager::ReportMessage(TDiagnosticMessage message) {
+    if (message.IsConfigure && Delayed) {
+        Messages[message.Owner].emplace_back(message.Type, message.Kind,
+            TStringStream(std::move(message.Text)), message.Row, message.Column, message.IsPersistent);
+        return;
     }
+    HasConfigurationErrors |= message.IsConfigure && message.Type == EConfMsgType::Error;
+    ReportEvent(Display()->EmitMessage(message));
 }
 
-TStreamMessage TConfMsgManager::ReportConfigureMessage(EConfMsgType type, TStringBuf var, size_t row, size_t column) {
+void TConfMsgManager::ReportEvent(TDiagnosticEvent event) {
     if (Delayed) {
-        return TStreamMessage(&SaveConfigureMessage(type, var, row, column, Diag()->Persistency), [](IOutputStream*) {});
+        Events[event.Owner].emplace_back(event.Type, event.Event, event.IsPersistent);
     } else {
-        if (type == EConfMsgType::Error) {
-            HasConfigurationErrors = true;
-        }
-        return TStreamMessage(Display()->NewConfMsg(type, var, Diag()->Where.back().second, row, column).Release());
+        EmitDiagnosticEvent(event);
     }
 }
 
@@ -104,10 +95,6 @@ void TConfMsgManager::ReportDupSrcConfigureErrors(std::function<TStringBuf (TFil
     }
 }
 
-void TConfMsgManager::SaveEvent(ETraceEvent what, const TString& event) {
-    Events[Diag()->Where.back().first].emplace_back(what, event, Diag()->Persistency);
-}
-
 void TConfMsgManager::Flush() const {
     for (const auto& msg : Messages) {
         FlushConfigureMessages(msg.first);
@@ -133,7 +120,12 @@ void TConfMsgManager::FlushConfigureMessages(TFileElemId owner) const {
             if (msg.Type == EConfMsgType::Error) {
                 HasConfigurationErrors = true;
             }
-            *Display()->NewConfMsg(msg.Type, msg.Kind, Diag()->Where.back().second, msg.Row, msg.Column) << msg.Message.Str();
+            EmitDiagnosticEvent(Display()->EmitMessage({
+                .Type = msg.Type, .Kind = msg.Kind, .Text = msg.Message.Str(), .Owner = owner,
+                .OwnerName = Diag()->Where.back().second, .Row = msg.Row, .Column = msg.Column,
+                .IsPersistent = msg.IsPersistent, .IsConfigure = true, .Cutoff = Display()->GetCutoff(),
+                .Output = LockedStream(),
+            }));
         }
     }
 }
@@ -308,7 +300,8 @@ void TConfMsgManager::Load(IInputStream* input, THashMap<TFileElemId, Container>
 
 TConfMsgManager* ConfMsgManager() {
     auto ctx = CurrentContext<TExecContext>;
-    if (ctx && ctx->ConfMsgManager) {
+    if (ctx) {
+        Y_ENSURE(ctx->ConfMsgManager, "Graph diagnostic storage is unavailable in a rendering task");
         return ctx->ConfMsgManager.get();
     }
     return Singleton<TConfMsgManager>();
@@ -331,3 +324,4 @@ void TConfMsgManager::ResetChkPeers() {
     ChecksState.ChkPeersCompleted = false;
     EraseMessagesByKind(ChkPeersMessageKind);
 }
+

@@ -18,6 +18,9 @@ enum class EConfMsgType {
     Count
 };
 
+struct TDiagnosticMessage;
+struct TDiagnosticEvent;
+
 class TDisplay : private TNonCopyable {
 private:
     std::atomic<EConfMsgType> FallbackCutoff_ = EConfMsgType::Count;
@@ -30,8 +33,7 @@ public:
 
     void SetCutoff(EConfMsgType val) noexcept;
 
-private:
-    TStreamMessage PrepareStream(EConfMsgType msgType, TStringBuf sub, TStringBuf path, size_t row = 0, size_t column = 0);
+    TDiagnosticEvent EmitMessage(const TDiagnosticMessage& message);
     EConfMsgType GetCutoff() const noexcept;
 };
 

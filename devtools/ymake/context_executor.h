@@ -9,6 +9,7 @@
 #include <type_traits>
 
 class TConfMsgManager;
+class IDiagnosticReporter;
 class TProgressManager;
 class TModuleStagesStatsManager;
 struct TDiagCtrl;
@@ -17,6 +18,7 @@ struct TRenderPathContext;
 struct TExecContext: TNonCopyable {
     std::shared_ptr<NCommonDisplay::TLockedStream> LockedStream;
     std::shared_ptr<TConfMsgManager> ConfMsgManager;
+    std::shared_ptr<IDiagnosticReporter> DiagnosticReporter;
     std::shared_ptr<TProgressManager> ProgressManager;
     std::shared_ptr<TModuleStagesStatsManager> ModStatsManager;
     std::shared_ptr<TDiagCtrl> DiagCtrl;
@@ -27,14 +29,9 @@ struct TExecContext: TNonCopyable {
         std::shared_ptr<TConfMsgManager> confManager,
         std::shared_ptr<TProgressManager> progressManager,
         std::shared_ptr<TModuleStagesStatsManager> modStatsManager,
-        std::shared_ptr<TDiagCtrl> diagCtrl
-    )
-        : LockedStream(std::move(lockedStream))
-        , ConfMsgManager(std::move(confManager))
-        , ProgressManager(std::move(progressManager))
-        , ModStatsManager(modStatsManager)
-        , DiagCtrl(std::move(diagCtrl))
-    {}
+        std::shared_ptr<TDiagCtrl> diagCtrl,
+        std::shared_ptr<IDiagnosticReporter> reporter = {}
+    );
 
     ~TExecContext();
 };
@@ -98,3 +95,5 @@ public:
         Underlying_.execute(std::move(wrapper));
     }
 };
+
+std::shared_ptr<TExecContext> MakeRenderContext(std::shared_ptr<IDiagnosticReporter> reporter);

@@ -3,6 +3,9 @@
 #include "display.h"
 #include "diag.h"
 #include "dbg.h"
+#include "reporter.h"
+
+#include <devtools/ymake/context_executor.h>
 
 #include <util/generic/vector.h>
 #include <util/generic/hash.h>
@@ -73,9 +76,8 @@ struct TConfigureEvent {
     Y_SAVELOAD_DEFINE(Type, Event);
 };
 
-class TConfMsgManager {
+class TConfMsgManager: public IDiagnosticReporter {
 public:
-    using TStreamMessage = std::shared_ptr<IOutputStream>;
     template<class T>
     using TConfValuesMap = THashMap<TFileElemId, TVector<T>>;
 
@@ -88,8 +90,8 @@ public:
     void Flush(TFileElemId owner);
     void FlushTopLevel() const;
 
-    void ReportConfigureEvent(ETraceEvent what, const TString& event);
-    TStreamMessage ReportConfigureMessage(EConfMsgType type, TStringBuf var, size_t row = 0, size_t column = 0);
+    void ReportMessage(TDiagnosticMessage message) override;
+    void ReportEvent(TDiagnosticEvent event) override;
     void AddDupSrcLink(TFileElemId id, TFileElemId modid, bool force = true);
     void AddVisitedModule(TFileElemId modId);
     void ReportDupSrcConfigureErrors(std::function<TStringBuf (TFileElemId)> toString);
@@ -113,7 +115,6 @@ public:
 
     void ClearTopLevelMessages();
 
-    mutable bool HasConfigurationErrors = false;
 
 private:
     // Persistent completion flags for checks whose diagnostics share this
@@ -126,8 +127,6 @@ private:
         void Load(IInputStream* input);
     };
 
-    void SaveEvent(ETraceEvent what, const TString& event);
-    TStringStream& SaveConfigureMessage(EConfMsgType type, TStringBuf var, size_t row = 0, size_t column = 0, bool useCache = true);
 
     void FlushEvents(TFileElemId owner) const;
     void FlushConfigureMessages(TFileElemId owner) const;
@@ -155,13 +154,13 @@ TConfMsgManager* ConfMsgManager();
 
 // Use these for user-intended messages, that are related to graph nodes
 // should be persisted in graph cache. These messages require TScopedContext.
-#define YConfInfo(var) Diag()->var && TEatStream() | *ConfMsgManager()->ReportConfigureMessage(EConfMsgType::Info, "-W" #var)
+#define YConfInfo(var) Diag()->var && TEatStream() | *DiagnosticReporter()->ReportConfigureMessage(EConfMsgType::Info, "-W" #var)
 
-#define YConfErr(var) Diag()->var && TEatStream() | *ConfMsgManager()->ReportConfigureMessage(EConfMsgType::Error, "-W" #var)
-#define YConfErrPrecise(var, row, column) Diag()->var && TEatStream() | *ConfMsgManager()->ReportConfigureMessage(EConfMsgType::Error, "-W" #var, row, column)
+#define YConfErr(var) Diag()->var && TEatStream() | *DiagnosticReporter()->ReportConfigureMessage(EConfMsgType::Error, "-W" #var)
+#define YConfErrPrecise(var, row, column) Diag()->var && TEatStream() | *DiagnosticReporter()->ReportConfigureMessage(EConfMsgType::Error, "-W" #var, row, column)
 
-#define YConfWarn(var) Diag()->var && TEatStream() | *ConfMsgManager()->ReportConfigureMessage(EConfMsgType::Warning, "-W" #var)
-#define YConfWarnPrecise(var, row, column) Diag()->var && TEatStream() | *ConfMsgManager()->ReportConfigureMessage(EConfMsgType::Warning, "-W" #var, row, column)
+#define YConfWarn(var) Diag()->var && TEatStream() | *DiagnosticReporter()->ReportConfigureMessage(EConfMsgType::Warning, "-W" #var)
+#define YConfWarnPrecise(var, row, column) Diag()->var && TEatStream() | *DiagnosticReporter()->ReportConfigureMessage(EConfMsgType::Warning, "-W" #var, row, column)
 
 #define YConfErase(var) Diag()->var && ConfMsgManager()->EraseMessagesByKind("-W" #var)
 #define YConfEraseByOwner(var, owner) Diag()->var && ConfMsgManager()->EraseMessagesByKind("-W" #var, owner)

@@ -2462,6 +2462,23 @@ TTestDartRenderPlan::TTestDartRenderPlan(TYMake& ymake) {
 TTestDartRenderPlan::~TTestDartRenderPlan() = default;
 
 void TTestDartRenderPlan::Render(IOutputStream& out) const {
+    auto diagnostics = std::make_shared<TBufferedDiagnosticReporter>();
+    auto context = MakeRenderContext(diagnostics);
+    const auto finish = [&] {
+        DiagnosticReporter()->HasConfigurationErrors |= diagnostics->HasConfigurationErrors;
+        diagnostics->Flush();
+    };
+    try {
+        Render(out, *context);
+    } catch (...) {
+        finish();
+        throw;
+    }
+    finish();
+}
+
+void TTestDartRenderPlan::Render(IOutputStream& out, TExecContext& context) const {
+    TCurrentContextScope<TExecContext> contextScope(&context);
     auto& ymake = Impl_->YMake;
     TRenderPathContext paths(ymake.Conf, true);
     TCurrentContextScope<TRenderPathContext> pathScope(&paths);
