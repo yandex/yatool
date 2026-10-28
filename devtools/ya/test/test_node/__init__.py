@@ -387,6 +387,15 @@ class TestFramer(object):
         return self.context_generator_cache[platform_descriptor]
 
 
+def get_test_target_properties(suite):
+    properties = {"module_lang": suite.meta.module_lang}
+    if suite.meta.build_folder_path is not None:
+        # suite.project_path may be a source subdirectory without ya.make (e.g. for gofmt).
+        # Use the originating module directory so its graph includes this test.
+        properties["module_dir"] = suite.meta.build_folder_path
+    return properties
+
+
 def get_test_node_uid(suite, opts, retry=None, split_test_factor=1, split_index=0, split_file=None):
     if split_test_factor > 1 or retry is not None or suite.fork_test_files_requested(opts):
         uid_prefix = suite.uid.split("-")[0]
@@ -971,9 +980,7 @@ def create_test_node(
 
     node = {
         "backup": backup,
-        "target_properties": {
-            "module_lang": suite.meta.module_lang,
-        },
+        "target_properties": get_test_target_properties(suite),
         "cache": _should_cache_suite(suite, opts),
         "cmds": node_cmds,
         "cwd": "$(BUILD_ROOT)",
@@ -1248,9 +1255,7 @@ def create_sandbox_run_test_node(orig_node, suite, nodes_map, frepkage_res_info,
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST,
         "backup": False,
-        "target_properties": {
-            "module_lang": suite.meta.module_lang,
-        },
+        "target_properties": get_test_target_properties(suite),
         "inputs": [frepkage_res_info],
         "uid": suite.uid,
         "cache": False,
@@ -1810,9 +1815,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
 
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST,
-        "target_properties": {
-            "module_lang": suite.meta.module_lang,
-        },
+        "target_properties": get_test_target_properties(suite),
         "cache": _should_cache_suite(suite, opts),
         "backup": backup,
         "inputs": testdeps.unique(node_inputs),
@@ -1919,9 +1922,7 @@ def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_t
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST,
         "cache": _should_cache_suite(suite, opts),
-        "target_properties": {
-            "module_lang": suite.meta.module_lang,
-        },
+        "target_properties": get_test_target_properties(suite),
         "backup": backup,
         "upload": upload_to_remote_store,
         "inputs": testdeps.unique(node_inputs),
@@ -2645,9 +2646,7 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
         "deps": testdeps.unique(suite.output_uids) + list(get_test_build_deps_or_throw(suite)),
         "env": sysenv.get_common_env().dump(),
         "cache": True,
-        "target_properties": {
-            "module_lang": suite.meta.module_lang,
-        },
+        "target_properties": get_test_target_properties(suite),
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "outputs": [node_log_path, node_result_path],
         'kv': {
@@ -2927,9 +2926,7 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
         "priority": _get_suite_priority(suite),
         "deps": testdeps.unique(deps),
         "env": env.dump(),
-        "target_properties": {
-            "module_lang": suite.meta.module_lang,
-        },
+        "target_properties": get_test_target_properties(suite),
         "outputs": output,
         'kv': kv,
         "cmds": cmds,
