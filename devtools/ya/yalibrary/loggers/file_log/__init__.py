@@ -131,12 +131,20 @@ def format_time(dt):
 
 
 def with_file_log(log_dir, run_uid):
-    now = log_creation_time(run_uid)
-
-    chunks = LogChunks(log_dir)
+    file_name = create_file_log_path(log_dir, run_uid)
 
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
+    root.addHandler(_file_logger(file_name))
+
+    return file_name
+
+
+def create_file_log_path(log_dir, run_uid):
+    # type: (str, str) -> str
+    now = log_creation_time(run_uid)
+
+    chunks = LogChunks(log_dir)
 
     def older_than(x):
         return now - x > datetime.timedelta(days=_DAYS_TO_SAVE) if x else False
@@ -144,10 +152,7 @@ def with_file_log(log_dir, run_uid):
     chunks.cleanup(func.compose(older_than, parse_log_dir))
 
     log_chunk = chunks.get_or_create(format_date(now))
-    file_name = os.path.join(log_chunk, format_time(now) + '.' + run_uid + '.log')
-    root.addHandler(_file_logger(file_name))
-
-    return file_name
+    return os.path.join(log_chunk, format_time(now) + '.' + run_uid + '.log')
 
 
 def with_custom_file_log(ctx, params, replacements):
