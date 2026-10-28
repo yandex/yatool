@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package sharedcache.v1;
+
+option go_package = "a.yandex-team.ru/devtools/shared_cache/proto;sharedcachepb";
+
+service Telemetry {
+    rpc Announce(AnnounceRequest) returns (Reply);
+}
+
+message Producer {
+    string host = 1;
+    string user = 2;
+    string session = 3;
+}
+
+message ManifestFile {
+    string path = 1;
+    string cas_hash = 2;
+    optional int64 size = 3;
+    // Local CAS file mode sampled by the worker, not the original build output mode.
+    optional uint32 mode = 4;
+}
+
+enum UidKind {
+    UNSPECIFIED = 0;
+    ACTION = 1;
+    CONTENT = 2;
+}
+
+message Announcement {
+    string uid = 1;
+    // Host Unix time in milliseconds when ya-tc enqueues the Put observation.
+    int64 put_timestamp_ms = 2;
+    repeated ManifestFile manifest = 3;
+    UidKind uid_kind = 4;
+}
+
+message AnnounceRequest {
+    uint32 version = 1;
+    string batch_id = 2;
+    Producer producer = 3;
+    repeated Announcement announcements = 4;
+    // Cumulative drops from enqueue/batch validation, queue limits and cooldown
+    // before any RPC attempt in producer.session.
+    // A snapshot shared by all retries; best-effort and not persisted across restarts.
+    uint64 dropped_announcements_total = 5;
+}
+
+message Reply {
+    // Reserved for a later stage. This receiver always leaves the list empty.
+    repeated string uploads = 1;
+}
