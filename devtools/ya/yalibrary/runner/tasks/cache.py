@@ -162,13 +162,23 @@ class PutInCacheTask(object):
     node_type = 'PutInCache'
     worker_pool_type = WorkerPoolType.SERVICE
 
-    def __init__(self, node, build_root, cache, cache_codec, execution_log, dir_outputs_test_mode=False):
+    def __init__(
+        self,
+        node,
+        build_root,
+        cache,
+        cache_codec,
+        execution_log,
+        dir_outputs_test_mode=False,
+        dist_cacheable=False,
+    ):
         self._node = node
         self._build_root = build_root
         self._cache = cache
         self._cache_codec = cache_codec
         self._execution_log = execution_log
         self._dir_outputs_test_mode = dir_outputs_test_mode
+        self._dist_cacheable = dist_cacheable
 
     def __call__(self, *args, **kwargs):
         start_time = time.time()
@@ -184,9 +194,17 @@ class PutInCacheTask(object):
                 fi = self._FileInfo(output)
                 fi.digest = digests.get(output)
                 file_list.add(fi)
-            self._cache.put(self._node.uid, self._build_root.path, file_list, codec)
+            put_kwargs = {}
+            if self._dist_cacheable and getattr(self._cache, 'support_dist_cache', False):
+                from devtools.local_cache.ac.proto.ac_pb2 import TPutUid
+
+                put_kwargs['dist_cacheable'] = True
+                put_kwargs['dist_cache_uid_kind'] = TPutUid.ACTION
+            self._cache.put(self._node.uid, self._build_root.path, file_list, codec, **put_kwargs)
             if self._node.content_uid is not None and getattr(self._cache, 'support_content_uids', False):
-                self._cache.put(self._node.content_uid, self._build_root.path, file_list, codec)
+                if put_kwargs:
+                    put_kwargs['dist_cache_uid_kind'] = TPutUid.CONTENT
+                self._cache.put(self._node.content_uid, self._build_root.path, file_list, codec, **put_kwargs)
             if hasattr(self._cache, 'put_dependencies'):
                 self._cache.put_dependencies(self._node.uid, self._node.deps)
         finally:
@@ -305,17 +323,18 @@ class WriteThroughCachesTask(DistCacheMixin):
     node_type = 'WriteThroughCaches'
     worker_pool_type = WorkerPoolType.SERVICE
 
-    def __init__(self, node, ctx, cache, dist_cache, build_root):
+    def __init__(self, node, ctx, cache, dist_cache, build_root, dist_cacheable=False):
         super().__init__(dist_cache, node, ctx.opts.yt_replace_result)
         self._node = node
         self._ctx = ctx
         self._cache = cache
         self._build_root = build_root
+        self._dist_cacheable = dist_cacheable
 
     def __call__(self, *args, **kwargs):
         if self._ctx.opts.yt_store_wt or not self.dist_cache_exists_and_writable():
             self._ctx.runq.add(
-                self._ctx.put_in_cache(self._node, self._build_root),
+                self._ctx.put_in_cache(self._node, self._build_root, dist_cacheable=self._dist_cacheable),
                 deps=[],
                 inplace_execution=self._ctx.opts.eager_execution,
             )

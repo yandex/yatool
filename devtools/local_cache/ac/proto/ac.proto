@@ -93,6 +93,12 @@ enum EPutMode {
 };
 
 message TPutUid {
+    enum EUidKind {
+        UNSPECIFIED = 0;
+        ACTION = 1;
+        CONTENT = 2;
+    }
+
     THash ACHash = 1;
     /// For each blob memoize path relative to RootPath.
     string RootPath = 2;
@@ -107,6 +113,10 @@ message TPutUid {
     int64 Weight = 6;
     EPutMode ReplacementMode = 7;
     bool Result = 8;
+    // Per-request consent; empty requests are never announced.
+    string DistCacheUrl = 10;
+    // Observation metadata only; does not affect local cache keys or storage.
+    EUidKind DistCacheUidKind = 11;
 }
 
 message TGetUid {

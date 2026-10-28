@@ -18,7 +18,8 @@ bool NACCachePrivate::TConfigOptions::HasParams() const {
            !MasterMode.Empty() || !GraphInfo.Empty() || !ForeignKeys.Empty() || !NoDb.Empty() ||
            !CasLogging.Empty() || !NoBlobIO.Empty() || !RecreateDB.Empty() ||
            !DiskLimit.Empty() || !QuiescenceTime.Empty() ||
-           FsStoreRoot != "";
+           FsStoreRoot != "" || !DistCacheUrl.empty() ||
+           !DistCacheBatchSize.Empty() || !DistCacheFlushMs.Empty() || !DistCacheQueueItems.Empty() || !DistCacheQueueBytes.Empty() || !DistCacheCooldownMs.Empty() || !DistCacheTimeoutMs.Empty() || !DistCacheDrainMs.Empty();
 }
 
 void NACCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const {
@@ -61,12 +62,68 @@ void NACCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const {
     if (auto* val = QuiescenceTime.Get()) {
         out << ToString(QuiescenceStr) << "=" << *val << Endl;
     }
+    if (!DistCacheUrl.empty()) {
+        out << ToString(DistCacheUrlStr) << "=" << DistCacheUrl << Endl;
+    }
+    if (auto* val = DistCacheBatchSize.Get()) {
+        out << ToString(DistCacheBatchSizeStr) << "=" << *val << Endl;
+    }
+    if (auto* val = DistCacheFlushMs.Get()) {
+        out << ToString(DistCacheFlushMsStr) << "=" << *val << Endl;
+    }
+    if (auto* val = DistCacheQueueItems.Get()) {
+        out << ToString(DistCacheQueueItemsStr) << "=" << *val << Endl;
+    }
+    if (auto* val = DistCacheQueueBytes.Get()) {
+        out << ToString(DistCacheQueueBytesStr) << "=" << *val << Endl;
+    }
+    if (auto* val = DistCacheCooldownMs.Get()) {
+        out << ToString(DistCacheCooldownMsStr) << "=" << *val << Endl;
+    }
+    if (auto* val = DistCacheTimeoutMs.Get()) {
+        out << ToString(DistCacheTimeoutMsStr) << "=" << *val << Endl;
+    }
+    if (auto* val = DistCacheDrainMs.Get()) {
+        out << ToString(DistCacheDrainMsStr) << "=" << *val << Endl;
+    }
     if (!FsStoreRoot.empty()) {
         out << ToString(FsStoreStr) << "=" << FsStoreRoot << Endl;
     }
 }
 
 void NACCachePrivate::TConfigOptions::AddOptions(NLastGetopt::TOpts& parser) {
+    parser.AddLongOption("ac-dist_cache_url", "Dist-cache telemetry url")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResult(&DistCacheUrl);
+    parser.AddLongOption("ac-dist_cache_batch_size", "Dist-cache telemetry batch_size")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&DistCacheBatchSize);
+    parser.AddLongOption("ac-dist_cache_flush_ms", "Dist-cache telemetry flush_ms")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&DistCacheFlushMs);
+    parser.AddLongOption("ac-dist_cache_queue_items", "Dist-cache telemetry queue_items")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&DistCacheQueueItems);
+    parser.AddLongOption("ac-dist_cache_queue_bytes", "Dist-cache telemetry queue_bytes")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&DistCacheQueueBytes);
+    parser.AddLongOption("ac-dist_cache_cooldown_ms", "Dist-cache telemetry cooldown_ms")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&DistCacheCooldownMs);
+    parser.AddLongOption("ac-dist_cache_timeout_ms", "Dist-cache telemetry timeout_ms")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&DistCacheTimeoutMs);
+    parser.AddLongOption("ac-dist_cache_drain_ms", "Dist-cache telemetry drain_ms")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&DistCacheDrainMs);
     parser.AddLongOption("ac-lock_file", "[local_cache.build_cache] lock_file")
         .Hidden()
         .RequiredArgument()

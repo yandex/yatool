@@ -19,6 +19,10 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
+IF (NOT OS_WINDOWS)
+    PEERDIR(devtools/local_cache/ac/proto)
+ENDIF()
+
 PEERDIR(
     devtools/libs/acdigest/python
     devtools/libs/parse_number/python

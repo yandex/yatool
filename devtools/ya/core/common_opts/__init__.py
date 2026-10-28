@@ -4,6 +4,7 @@ import os
 import re
 import six
 import sys
+from six.moves.urllib.parse import urlsplit
 
 from humanfriendly import parse_size, InvalidSize
 
@@ -1440,6 +1441,66 @@ class ToolsOptions(Options):
         # Enable ya-tc in ya-bin executed indirectly, for example, through test_tool.
         if params.tools_cache:
             os.environ['YA_TC'] = '1'
+
+
+class SharedCacheOptions(Options):
+    def __init__(self):
+        self.shared_cache = False
+        self.shared_cache_url = None
+
+    @staticmethod
+    def consumer():
+        return [
+            ArgConsumer(
+                ['--shared-cache-telemetry'],
+                help='Announce local build cache puts for the shared-cache telemetry pilot',
+                hook=SetConstValueHook('shared_cache', True),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ArgConsumer(
+                ['--shared-cache-url'],
+                help='Shared-cache telemetry endpoint (requires --shared-cache-telemetry)',
+                hook=SetValueHook('shared_cache_url'),
+                group=CACHE_CONTROL_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
+            ConfigConsumer('shared_cache_telemetry', hook=SetValueHook('shared_cache')),
+            ConfigConsumer('shared_cache_url'),
+        ]
+
+    def postprocess2(self, params):
+        if not params.shared_cache:
+            return
+        if not (params.tools_cache and params.build_cache):
+            logger.warning(
+                '--shared-cache-telemetry requires the artifact cache daemon; continuing without shared-cache telemetry. '
+                'Remove YA_TC=0 / --noya-tc and enable YA_AC=1 / --ya-ac.'
+            )
+            params.shared_cache = False
+            return
+        if not params.shared_cache_url:
+            raise ArgsValidatingException('--shared-cache-telemetry requires --shared-cache-url')
+        try:
+            endpoint = urlsplit(params.shared_cache_url)
+            valid = endpoint.scheme in ('grpc', 'grpcs') and endpoint.hostname and endpoint.port
+            valid = valid and not (
+                endpoint.username
+                or endpoint.password
+                or endpoint.query
+                or endpoint.fragment
+                or endpoint.path not in ('', '/')
+            )
+            valid = valid and not any(c.isspace() for c in params.shared_cache_url)
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ArgsValidatingException(
+                '--shared-cache-url must be grpc[s]://host:port without credentials, path, query or fragment'
+            )
+        if params.build_cache_shared:
+            raise ArgsValidatingException('--shared-cache-telemetry is not yet supported with --shared-ac')
+        params.shared_cache_url = params.shared_cache_url.rstrip('/')
 
 
 class SnowdenOpts(Options):

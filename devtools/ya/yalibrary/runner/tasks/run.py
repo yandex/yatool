@@ -700,7 +700,9 @@ class RunNodeTask(object):
             # Account for dist cache
             self._build_root.inc()
             self._ctx.runq.add(
-                self._ctx.write_through_caches(self._node, self._build_root),
+                self._ctx.write_through_caches(
+                    self._node, self._build_root, locally_executed=not cached_by_content_uid
+                ),
                 deps=[],
                 inplace_execution=self._ctx.opts.eager_execution,
             )

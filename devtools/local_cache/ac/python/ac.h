@@ -26,7 +26,9 @@ namespace NAcClient {
         bool isResult,
         const TVector<TString>& fileNames,
         double timeout,
-        bool waitForReady
+        bool waitForReady,
+        const TString& distCacheUrl,
+        int distCacheUidKind
     );
 
     PyObject* GetUid(

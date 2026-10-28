@@ -283,7 +283,7 @@ class TaskContext(object):
             self._execution_log,
         )
 
-    def put_in_cache(self, node: "Node", build_root: build_root.BuildRoot) -> "PutInCacheTask":
+    def put_in_cache(self, node: "Node", build_root: build_root.BuildRoot, dist_cacheable=False) -> "PutInCacheTask":
         import yalibrary.runner.tasks.cache
 
         return yalibrary.runner.tasks.cache.PutInCacheTask(
@@ -293,13 +293,21 @@ class TaskContext(object):
             self.opts.cache_codec,
             self._execution_log,
             dir_outputs_test_mode=self.opts.dir_outputs_test_mode,
+            dist_cacheable=dist_cacheable,
         )
 
-    def write_through_caches(self, node: "Node", build_root: build_root.BuildRoot) -> "WriteThroughCachesTask":
+    def write_through_caches(
+        self, node: "Node", build_root: build_root.BuildRoot, locally_executed=False
+    ) -> "WriteThroughCachesTask":
         import yalibrary.runner.tasks.cache
 
         return yalibrary.runner.tasks.cache.WriteThroughCachesTask(
-            node, self, self._ctx.cache, self._dist_cache, build_root
+            node,
+            self,
+            self._ctx.cache,
+            self._dist_cache,
+            build_root,
+            dist_cacheable=locally_executed and self._ctx.is_shared_cache_candidate(node),
         )
 
     def clear_uid(self, uid: GraphNodeUid):

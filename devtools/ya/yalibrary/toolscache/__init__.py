@@ -262,6 +262,7 @@ class _Server(object):
     _tc_cache_size = None
 
     _ac_enable = False
+    _dist_cache_url = ""
     _ac_shared = False
     _ac_master = False
     _ac_full_address = None
@@ -340,7 +341,10 @@ class _Server(object):
 
             cls._gl_config_options = params.tools_cache_gl_conf
             cls._tc_config_options = params.tools_cache_conf
-            cls._ac_config_options = params.build_cache_conf
+            cls._ac_config_options = dict(params.build_cache_conf)
+            if getattr(params, "shared_cache", False):
+                cls._dist_cache_url = params.shared_cache_url
+                cls._ac_config_options["dist_cache_url"] = cls._dist_cache_url
 
             if params.tools_cache_ini:
                 cls._ini_file = params.tools_cache_ini
@@ -797,7 +801,19 @@ class _Server(object):
         return cls.unary_method(get_uid, kwargs, diag='(get uid {})'.format(uid), tc=False)
 
     @classmethod
-    def put_uid(cls, uid, root_path, blobs, weight, hardlink, replace, is_result, file_names):
+    def put_uid(
+        cls,
+        uid,
+        root_path,
+        blobs,
+        weight,
+        hardlink,
+        replace,
+        is_result,
+        file_names,
+        dist_cacheable=False,
+        dist_cache_uid_kind=0,
+    ):
         from devtools.local_cache.ac.python.ac import put_uid
 
         if cls._ac_shared:
@@ -814,6 +830,9 @@ class _Server(object):
             'file_names': file_names,
         }
 
+        if dist_cacheable and cls._dist_cache_url:
+            kwargs['dist_cache_url'] = cls._dist_cache_url
+            kwargs['dist_cache_uid_kind'] = dist_cache_uid_kind
         return cls.unary_method(put_uid, kwargs, diag='(put uid {})'.format(uid), tc=False)
 
     @classmethod
@@ -961,6 +980,7 @@ def release_all_data():
 
 
 class ACCache(object):
+    support_dist_cache = True
     support_content_uids = True
 
     def __init__(self, store_path):
@@ -992,7 +1012,19 @@ class ACCache(object):
             self.failures[tag] += 1
         return r.Success
 
-    def put(self, uid, root_path, files, codec=None, weight=0, hardlink=True, replace=True, is_result=False):
+    def put(
+        self,
+        uid,
+        root_path,
+        files,
+        codec=None,
+        weight=0,
+        hardlink=True,
+        replace=True,
+        is_result=False,
+        dist_cacheable=False,
+        dist_cache_uid_kind=0,
+    ):
         # Compute blob hashes on cache side.
         with AccumulateTime(lambda x: self._inc_time(x, 'put')):
             # Make sure files are unique
@@ -1004,7 +1036,18 @@ class ACCache(object):
                     fuid = digest.uid
                 blobs.add((file, fuid))
             blobs = list(blobs)
-            r = _SERVER.put_uid(uid, root_path, blobs, weight, hardlink, replace, is_result, file_names=None)
+            r = _SERVER.put_uid(
+                uid,
+                root_path,
+                blobs,
+                weight,
+                hardlink,
+                replace,
+                is_result,
+                file_names=None,
+                dist_cacheable=dist_cacheable,
+                dist_cache_uid_kind=dist_cache_uid_kind,
+            )
             self._set_stats(r.Stats)
         return self._acccount_failure('put', r)
 

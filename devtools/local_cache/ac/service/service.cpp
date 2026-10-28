@@ -131,23 +131,38 @@ namespace NACCache {
         // Start threads in process polling and gc/fs handling
         DBBE_->Initialize(PollMode_);
         DBBE_->SetMasterMode(MasterMode_);
+        if (acSection.contains(ToString(DistCacheUrlStr))) {
+            GetAnnouncer(acSection.At(ToString(DistCacheUrlStr)).Get<TString>());
+        }
         LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "Set master mode: " << MasterMode_ << Endl;
     }
 
     void TACCacheServer::StopProcessing() {
-        TWriteGuard lock(DBBEMutex_);
-        if (!DBBE_) {
-            return;
+        THolder<NDistCache::TAnnouncer> announcer;
+        {
+            TWriteGuard lock(DBBEMutex_);
+            if (!DBBE_) {
+                return;
+            }
+
+            LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "Set non-master mode: " << false << Endl;
+            DBBE_->SetMasterMode(false);
+            DBBE_->Finalize();
+            DBBE_->Flush();
+
+            {
+                std::lock_guard announcerLock(AnnouncerMutex_);
+                announcer = std::move(Announcer_);
+            }
+            DBBE_.Reset(nullptr);
+            LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "Stopped BE" << Endl;
+            Log_.ReopenLog();
         }
-
-        LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "Set non-master mode: " << false << Endl;
-        DBBE_->SetMasterMode(false);
-        DBBE_->Finalize();
-        DBBE_->Flush();
-
-        DBBE_.Reset(nullptr);
-        LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "Stopped BE" << Endl;
-        Log_.ReopenLog();
+        // No Put can retain this announcer after the write guard above.
+        // Wait for telemetry without blocking cache RPCs on network drain.
+        if (announcer) {
+            announcer->Stop();
+        }
     }
 
     bool TACCacheServer::IsQuiescent() const noexcept {
@@ -157,6 +172,12 @@ namespace NACCache {
         TReadGuard lock(DBBEMutex_);
         if (!DBBE_) {
             return false;
+        }
+        {
+            std::lock_guard announcerLock(AnnouncerMutex_);
+            if (Announcer_ && !Announcer_->IsIdle()) {
+                return false;
+            }
         }
         return NoDb_
                    ? MilliSeconds() >= static_cast<ui64>(AtomicGet(LastAccessTime_)) + static_cast<ui64>(QuiescenceTime_)
@@ -219,6 +240,59 @@ namespace NACCache {
         context->AddTrailingMetadata("io-exception", e.what());
     }
 
+    NDistCache::TAnnouncer* TACCacheServer::GetAnnouncer(const TString& url) noexcept {
+        if (url.empty() || SharedMode_ || NoDb_ || NoBlobIO_) {
+            return nullptr;
+        }
+        std::lock_guard lock(AnnouncerMutex_);
+        if (AnnouncerFailed_) {
+            return nullptr;
+        }
+        try {
+            TString normalized = url;
+            while (normalized.EndsWith('/')) {
+                normalized.pop_back();
+            }
+            if (Announcer_) {
+                if (Announcer_->Url() == normalized) {
+                    return Announcer_.Get();
+                }
+                if (!AnnouncerUrlMismatchLogged_) {
+                    LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_WARNING, "WARN[DIST-CACHE]")
+                        << "Different telemetry endpoint requested; restart ya-tc to change endpoint" << Endl;
+                    AnnouncerUrlMismatchLogged_ = true;
+                }
+                return nullptr;
+            }
+            const auto& section = GetSection();
+            auto value = [&section](EConfigStrings key, i64 fallback) {
+                const auto result = section.contains(ToString(key)) ? section.At(ToString(key)).As<i64>() : fallback;
+                Y_ENSURE(result > 0, "dist-cache limits must be positive");
+                return result;
+            };
+            NDistCache::TOptions options;
+            options.Url = normalized;
+            options.CacheDir = section.At(ToString(FsStoreStr)).Get<TString>();
+            options.BatchSize = value(DistCacheBatchSizeStr, options.BatchSize);
+            options.MaxQueueItems = value(DistCacheQueueItemsStr, options.MaxQueueItems);
+            options.MaxQueueBytes = value(DistCacheQueueBytesStr, options.MaxQueueBytes);
+            options.FlushInterval = TDuration::MilliSeconds(value(DistCacheFlushMsStr, options.FlushInterval.MilliSeconds()));
+            options.Cooldown = TDuration::MilliSeconds(value(DistCacheCooldownMsStr, options.Cooldown.MilliSeconds()));
+            options.RequestTimeout = TDuration::MilliSeconds(value(DistCacheTimeoutMsStr, options.RequestTimeout.MilliSeconds()));
+            options.DrainTimeout = TDuration::MilliSeconds(value(DistCacheDrainMsStr, options.DrainTimeout.MilliSeconds()));
+            Announcer_ = MakeHolder<NDistCache::TAnnouncer>(std::move(options), Log_);
+            return Announcer_.Get();
+        } catch (...) {
+            AnnouncerFailed_ = true;
+            try {
+                LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_WARNING, "WARN[DIST-CACHE]")
+                    << "Cannot initialize telemetry; cache operations remain enabled: " << CurrentExceptionMessage() << Endl;
+            } catch (...) {
+            }
+            return nullptr;
+        }
+    }
+
     Status TACCacheServer::Put(ServerContext* context, const TPutUid* request, TACStatus* response) {
         TReadGuard lock(DBBEMutex_);
         if (!DBBE_) {
@@ -237,7 +311,14 @@ namespace NACCache {
         REPORT_EXCEPTION_IDEMPOTENT_METHOD({
             if (!NoDb_) {
                 try {
-                    auto r = DBBE_->PutUid(*request);
+                    // A reused daemon may receive its first opted-in Put after startup.
+                    // Reuse the announcer only for requests opting in to the same URL.
+                    auto* announcer = GetAnnouncer(request->GetDistCacheUrl());
+                    TPutUid resolved;
+                    auto r = DBBE_->PutUid(*request, announcer ? &resolved : nullptr);
+                    if (announcer && !resolved.GetACHash().GetUid().empty()) {
+                        announcer->Enqueue(std::move(resolved));
+                    }
                     response->SetSuccess(r.Success);
                     response->SetOptim(r.CopyMode);
                 } catch (const TSystemError& e) {

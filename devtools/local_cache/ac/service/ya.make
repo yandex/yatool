@@ -1,6 +1,7 @@
 LIBRARY()
 
 PEERDIR(
+    devtools/local_cache/ac/announcer
     devtools/local_cache/common/logger-utils
     devtools/local_cache/psingleton/service
     devtools/local_cache/ac/dbbe

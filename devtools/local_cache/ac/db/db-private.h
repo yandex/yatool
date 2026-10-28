@@ -44,7 +44,7 @@ namespace NACCachePrivate {
 
         TImpl(NSQLite::TSQLiteDB& db);
 
-        TReturn PutUid(const NACCache::TPutUid&, NACCache::TCASManager&, i64 accessCnt);
+        TReturn PutUid(const NACCache::TPutUid&, NACCache::TCASManager&, i64 accessCnt, NACCache::TPutUid* resolved = nullptr);
 
         TReturn GetUid(const NACCache::TGetUid&, NACCache::TCASManager&, i64 accessCnt);
 

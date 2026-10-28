@@ -26,6 +26,14 @@ namespace NACCachePrivate {
         GraphInfoStr /* "graph_info" */,
         ForeignKeysStr /* "foreign_keys" */,
         RecreateStr /* "recreate_db" */,
+        DistCacheUrlStr /* "dist_cache_url" */,
+        DistCacheBatchSizeStr /* "dist_cache_batch_size" */,
+        DistCacheFlushMsStr /* "dist_cache_flush_ms" */,
+        DistCacheQueueItemsStr /* "dist_cache_queue_items" */,
+        DistCacheQueueBytesStr /* "dist_cache_queue_bytes" */,
+        DistCacheCooldownMsStr /* "dist_cache_cooldown_ms" */,
+        DistCacheTimeoutMsStr /* "dist_cache_timeout_ms" */,
+        DistCacheDrainMsStr /* "dist_cache_drain_ms" */,
     };
 
     inline TString IniSectionName() {
@@ -57,6 +65,14 @@ namespace NACCachePrivate {
         /// [local_cache.build_cache] quiescence_time
         TMaybe<i64> QuiescenceTime;
         TString FsStoreRoot;
+        TString DistCacheUrl;
+        TMaybe<i64> DistCacheBatchSize;
+        TMaybe<i64> DistCacheFlushMs;
+        TMaybe<i64> DistCacheQueueItems;
+        TMaybe<i64> DistCacheQueueBytes;
+        TMaybe<i64> DistCacheCooldownMs;
+        TMaybe<i64> DistCacheTimeoutMs;
+        TMaybe<i64> DistCacheDrainMs;
 
         bool HasParams() const;
         void WriteSection(IOutputStream& out) const;

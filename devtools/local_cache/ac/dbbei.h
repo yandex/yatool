@@ -45,7 +45,7 @@ namespace NACCache {
         void SetMasterMode(bool isMaster);
         bool GetMasterMode() const noexcept;
 
-        TDBBEReturn PutUid(const NACCache::TPutUid&);
+        TDBBEReturn PutUid(const NACCache::TPutUid&, NACCache::TPutUid* resolved = nullptr);
         TDBBEReturn GetUid(const NACCache::TGetUid&);
         TDBBEReturn RemoveUid(const NACCache::TRemoveUid&);
         TDBBEReturn HasUid(const NACCache::THasUid&);
@@ -113,7 +113,7 @@ namespace NACCache {
         TACCacheDBBE(TStringBuf dbPath, bool noBlobIO, bool enableForeignKey, ssize_t limit, TLog& log, const TCriticalErrorHandler& handler, TStringBuf casStoreDir, int procMaxSize, int gcMaxSize, int quiescenceTime, bool casLogging, bool recreate);
         ~TACCacheDBBE();
 
-        TDBBEReturn PutUid(const NACCache::TPutUid&);
+        TDBBEReturn PutUid(const NACCache::TPutUid&, NACCache::TPutUid* resolved = nullptr);
         TDBBEReturn GetUid(const NACCache::TGetUid&);
         TDBBEReturn RemoveUid(const NACCache::TRemoveUid&);
         TDBBEReturn HasUid(const NACCache::THasUid&);

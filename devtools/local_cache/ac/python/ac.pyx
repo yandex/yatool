@@ -40,7 +40,9 @@ cdef extern from "devtools/local_cache/ac/python/ac.h" namespace "NAcClient":
         cbool isResult,
         const TVector[TString]& fileNames,
         double timeout,
-        cbool waitForReady
+        cbool waitForReady,
+        const TString& distCacheUrl,
+        int distCacheUidKind
     ) except +ExceptionHandler
 
     object GetUid(
@@ -159,7 +161,9 @@ def put_uid(
     is_result:bool,
     file_names: list[str]|None = None,
     timeout: float|None = None,
-    wait_for_ready: bool = False
+    wait_for_ready: bool = False,
+    dist_cache_url: str = "",
+    dist_cache_uid_kind: int = 0
 ):
     assert file_names is None or len(file_names) == len(blobs), (len(file_names), len(blobs))
 
@@ -178,7 +182,9 @@ def put_uid(
         is_result,
         file_names if file_names else [],
         timeout or 0.0,
-        wait_for_ready
+        wait_for_ready,
+        dist_cache_url,
+        dist_cache_uid_kind
     )
 
 

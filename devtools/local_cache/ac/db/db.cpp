@@ -321,7 +321,7 @@ namespace NACCachePrivate {
         }
     }
 
-    TACStmts::TReturn TACStmts::TImpl::PutUid(const TPutUid& uidOrig, NACCache::TCASManager& cas, i64 accessCnt) {
+    TACStmts::TReturn TACStmts::TImpl::PutUid(const TPutUid& uidOrig, NACCache::TCASManager& cas, i64 accessCnt, TPutUid* resolved) {
         // Capture temp TString to pass as TStringBuf
         const auto& uidStr = uidOrig.GetACHash().GetUid();
         // Keep it for potential call to Bind, which may have stale TStringBuf on return from
@@ -339,7 +339,9 @@ namespace NACCachePrivate {
 
         LOGGER_CHECKED_GENERIC_LOG(cas.GetLog(), TRTYLogPreprocessor, TLOG_INFO, "INFO[ACST]") << "PU: uid=" << uidStr << Endl;
 
-        return TBase::WrapInTransaction([this, &uid, &cas, &uidStr, &relPath, &casGuard, accessCnt]() -> TReturn {
+        bool retainedExisting = false;
+        auto result = TBase::WrapInTransaction([this, &uid, &cas, &uidStr, &relPath, &casGuard, &retainedExisting, accessCnt]() -> TReturn {
+            retainedExisting = false;
             THolder<TSelf, TStmtResetter<true>> resetter(this);
 
             // Rename is the most aggressive optimization.
@@ -364,6 +366,7 @@ namespace NACCachePrivate {
                     out.Success = false;
                     updateGC(existing, acRowid, refCount);
                     casGuard.Commit();
+                    retainedExisting = true;
                     return out;
                 }
                 ssize_t size = 0, fsSize = 0;
@@ -439,6 +442,12 @@ namespace NACCachePrivate {
             casGuard.Commit();
             return out;
         });
+        if (resolved && (result.Success || retainedExisting)) {
+            // Retained duplicates are observations of a build result, unlike failed writes.
+            // Transfer the already computed hashes without re-reading files.
+            resolved->Swap(&uid);
+        }
+        return result;
     }
 
     TACStmts::TReturn TACStmts::TImpl::GetUid(const TGetUid& uid, NACCache::TCASManager& cas, i64 accessCnt) {
@@ -631,8 +640,8 @@ namespace NACCachePrivate {
     TACStmts::~TACStmts() {
     }
 
-    TACStmts::TReturn TACStmts::PutUid(const TPutUid& uid, TCASManager& cas, i64 accessCnt) {
-        return Ref_->PutUid(uid, cas, accessCnt);
+    TACStmts::TReturn TACStmts::PutUid(const TPutUid& uid, TCASManager& cas, i64 accessCnt, TPutUid* resolved) {
+        return Ref_->PutUid(uid, cas, accessCnt, resolved);
     }
 
     TACStmts::TReturn TACStmts::GetUid(const TGetUid& uid, TCASManager& cas, i64 accessCnt) {

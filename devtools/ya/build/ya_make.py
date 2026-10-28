@@ -867,6 +867,11 @@ def is_dist_cache_suitable(node, result, opts):
     return True
 
 
+def is_shared_cache_candidate(node, opts):
+    # Pilot observations must not inherit a remote store's upload policy.
+    return getattr(opts, 'shared_cache', False) and node.get('cache', True) and not is_target_binary(node)
+
+
 # Configure-time cache statistics without running the build
 def compute_predictive_build_statistics(graph, dist_cache, opts, local_cache=None):
     """
@@ -1031,6 +1036,9 @@ def _distbuild_trace_context_from_json(trace_context_json):
 
 class Context:
     RELEASED = {}  # sentinel to mark released full graph
+
+    def is_shared_cache_candidate(self, node):
+        return is_shared_cache_candidate(node.args, self.opts)
 
     def __init__(
         self,

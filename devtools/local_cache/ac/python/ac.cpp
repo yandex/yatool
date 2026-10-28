@@ -257,13 +257,17 @@ namespace NAcClient {
         bool isResult,
         const TVector<TString>& fileNames,
         double timeout,
-        bool waitForReady
+        bool waitForReady,
+        const TString& distCacheUrl,
+        int distCacheUidKind
     ) {
         TGILUnlocker gilUnlocker{};
 
         TGrpcConnectionPtr connection = TGrpcConnection::Get(paddress);
         THolder<grpc::ClientContext> context = MakeContext(timeout, waitForReady);
         NACCache::TPutUid request{};
+        request.SetDistCacheUrl(distCacheUrl);
+        request.SetDistCacheUidKind(static_cast<NACCache::TPutUid::EUidKind>(distCacheUidKind));
         NACCache::TACStatus response{};
         request.MutablePeer()->CopyFrom(connection->Peer);
         request.MutableACHash()->SetUid(uid);

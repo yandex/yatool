@@ -1,6 +1,8 @@
 #pragma once
 
 #include "config.h"
+#include <devtools/local_cache/ac/announcer/announcer.h>
+#include <mutex>
 
 #include "devtools/local_cache/ac/proto/ac.grpc.pb.h"
 #include "devtools/local_cache/ac/dbbei.h"
@@ -69,6 +71,8 @@ namespace NACCache {
         /// @}
 
     private:
+        NDistCache::TAnnouncer* GetAnnouncer(const TString& url) noexcept;
+
         std::string ErrorMessage(const char* method) const;
         grpc::Status SetStatus(TStringBuf method, grpc::ServerContext* context) const;
 
@@ -88,6 +92,10 @@ namespace NACCache {
         TRWMutex DBBEMutex_;
         NConfig::TConfig Config_;
         TLog& Log_;
+        mutable std::mutex AnnouncerMutex_;
+        THolder<NDistCache::TAnnouncer> Announcer_;
+        bool AnnouncerFailed_ = false;
+        bool AnnouncerUrlMismatchLogged_ = false;
         /// In milliseconds.
         int QuiescenceTime_;
         EPollersConf PollMode_;

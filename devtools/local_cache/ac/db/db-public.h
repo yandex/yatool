@@ -168,7 +168,7 @@ namespace NACCachePrivate {
         ///
         /// Validation is done in caller:
         ///     - TPutUid's RootPath should be absolute and parent directory of absolute paths in TPutUid's BlobInfo.
-        TReturn PutUid(const NACCache::TPutUid&, NACCache::TCASManager& cas, i64 accessCnt);
+        TReturn PutUid(const NACCache::TPutUid&, NACCache::TCASManager& cas, i64 accessCnt, NACCache::TPutUid* resolved = nullptr);
 
         /// \param cas is wrapper for TCASStmts
         ///

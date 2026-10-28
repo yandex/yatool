@@ -162,10 +162,10 @@ namespace NACCache {
         }                                                              \
     };
 
-        TDBBEReturn PutUid(const NACCache::TPutUid& uidInfo) {
+        TDBBEReturn PutUid(const NACCache::TPutUid& uidInfo, NACCache::TPutUid* resolved) {
             SET_REQUEST();
 
-            auto r = DBHandler_.PutUid(uidInfo, *Cas_, UpdateTimes());
+            auto r = DBHandler_.PutUid(uidInfo, *Cas_, UpdateTimes(), resolved);
             AtomicAdd(TotalFSSize, r.TotalFSSizeDiff);
             AtomicAdd(TotalSize, r.TotalSizeDiff);
             AtomicAdd(TotalACs, r.ACsDiff);
@@ -548,8 +548,8 @@ namespace NACCache {
         return Ref_->GetMasterMode();
     }
 
-    TDBBEReturn TIntegrityHandler::PutUid(const NACCache::TPutUid& uidInfo) {
-        return Ref_->PutUid(uidInfo);
+    TDBBEReturn TIntegrityHandler::PutUid(const NACCache::TPutUid& uidInfo, NACCache::TPutUid* resolved) {
+        return Ref_->PutUid(uidInfo, resolved);
     }
 
     TDBBEReturn TIntegrityHandler::GetUid(const NACCache::TGetUid& uidInfo) {

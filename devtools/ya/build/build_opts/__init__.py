@@ -59,6 +59,7 @@ from devtools.ya.core.common_opts import (
     DumpDebugCommonOptions,
     DumpDebugOptions,
     ToolsOptions,
+    SharedCacheOptions,
 )
 from devtools.ya.core.yarg import (
     ArgConsumer,
@@ -3746,6 +3747,7 @@ def ya_make_options(  # compat
             EventLogFileOptions(),
             StdoutOptions(),
             DistCacheOptions(),
+            SharedCacheOptions(),
             YWarnModeOptions(warn_mode),
             JavaSpecificOptions(),
             PGOOptions(),

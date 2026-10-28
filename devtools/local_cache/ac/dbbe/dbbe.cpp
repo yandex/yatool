@@ -49,8 +49,8 @@ namespace NACCache {
         Inserter_.SetRunningProcHandler(nullptr);
     }
 
-    TDBBEReturn TACCacheDBBE::PutUid(const NACCache::TPutUid& uidInfo) {
-        return Inserter_.PutUid(uidInfo);
+    TDBBEReturn TACCacheDBBE::PutUid(const NACCache::TPutUid& uidInfo, NACCache::TPutUid* resolved) {
+        return Inserter_.PutUid(uidInfo, resolved);
     }
 
     TDBBEReturn TACCacheDBBE::GetUid(const NACCache::TGetUid& uidInfo) {
