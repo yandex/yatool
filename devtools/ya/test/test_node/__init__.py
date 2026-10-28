@@ -1465,7 +1465,7 @@ def get_suite_self_uid(
         active_uid_opts = ["{}={}".format(x, getattr(opts, x)) for x in uid_changing_opts if getattr(opts, x, None)]
 
         paths = testdeps.get_test_related_paths(suite, arc_root, opts)
-        paths.extend([os.path.join(arc_root, "ya")])
+        paths.extend([os.path.join(arc_root, "build", "test-fake-id")])
         paths = testdeps.remove_redundant_paths(paths)
         test_paths_hashes = imprint.generate_path_imprint(paths)
 
