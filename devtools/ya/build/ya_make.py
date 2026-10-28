@@ -2144,6 +2144,8 @@ class YaMake:
                         ),
                         result_context=self.ctx,
                         build_variables=collect_build_variables(self.ctx, self.app_ctx, recipe_context=recipe_context),
+                        environment_whitelist=self.opts.larry_environment_whitelist,
+                        test_environment_whitelist=self.opts.larry_test_environment_whitelist,
                         build_threads=self.opts.build_threads,
                         test_threads=getattr(self.opts, 'test_threads', 0),
                     ).build(self.opts.larry_addr)
