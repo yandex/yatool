@@ -3316,7 +3316,12 @@ class DistCacheOptions(DistCacheSetupOptions):
                 validate_run_id(run_id)
             except ManifestError as error:
                 raise ArgsValidatingException(str(error)) from error
-        if not params.bazel_remote_store or params.bazel_remote_readonly or not params.bazel_remote_baseuri:
+        # Merged options can still expose the original JSON string during postprocess2.
+        if (
+            not params.bazel_remote_store
+            or params.bazel_remote_readonly
+            or not (parse_bazel_remote_caches(params.bazel_remote_caches) or params.bazel_remote_baseuri)
+        ):
             raise ArgsValidatingException('Bazel cache warming requires --bazel-remote-store and --bazel-remote-put')
         build_threads = getattr(params, 'build_threads', None)
         if type(build_threads) is not int or build_threads <= 0:

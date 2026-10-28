@@ -550,10 +550,13 @@ class CacheFactory:
         )
 
     def _can_use_bazel_remote_cache(self):
+        import devtools.ya.build.build_opts as build_opts
+
         return all(
             (
                 getattr(self._opts, 'bazel_remote_store', False),
-                getattr(self._opts, 'bazel_remote_baseuri', None),
+                build_opts.parse_bazel_remote_caches(getattr(self._opts, 'bazel_remote_caches', None))
+                or getattr(self._opts, 'bazel_remote_baseuri', None),
                 not (getattr(self._opts, 'use_distbuild', False) and getattr(self._opts, 'bazel_readonly', False)),
             )
         )
