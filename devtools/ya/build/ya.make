@@ -41,6 +41,7 @@ PEERDIR(
     devtools/ya/build/targets
     devtools/ya/build/ymake2
     devtools/ya/core/config
+    devtools/ya/core/gsid
     devtools/ya/core/error
     devtools/ya/core/event_handling
     devtools/ya/core/imprint
@@ -68,6 +69,7 @@ PEERDIR(
     devtools/ya/yalibrary/monitoring
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/runner
+    devtools/ya/yalibrary/recipe_context
     devtools/ya/yalibrary/status_view
     devtools/ya/yalibrary/sjson
     devtools/ya/yalibrary/store

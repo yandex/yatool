@@ -143,7 +143,9 @@ def _make_recipe_uid(package_path: str) -> str:
     return md5_value(package_path)
 
 
-def _shallow_recipe_dir(shallow_root: str, source_root: str, package_path: str) -> str:
+def _shallow_recipe_dir(
+    shallow_root: str, source_root: str, package_path: str, *, manager_root: str | None = None
+) -> str:
     """Каталог рецепта в data/ внутри shallow root.
 
     Recipe working dirs live in data/ — the subdirectory that gets cleaned on
@@ -151,9 +153,20 @@ def _shallow_recipe_dir(shallow_root: str, source_root: str, package_path: str) 
     """
     from devtools.recipe_manager.client.client import get_recipes_shallow_root_path, get_shallow_root_data_path
 
-    data_path = get_shallow_root_data_path(get_recipes_shallow_root_path(shallow_root, source_root))
+    data_path = get_shallow_root_data_path(manager_root or get_recipes_shallow_root_path(shallow_root, source_root))
     safe_path = package_path.replace('/', '__')
     return os.path.join(data_path, safe_path, 'persistent')
+
+
+def validate_recipe_context(options: object) -> None:
+    root = getattr(options, 'recipe_manager_root', None)
+    required = getattr(options, 'require_recipe_context', False)
+    if required or root:
+        if not (options.invocation_id and options.build_id and root and os.path.isabs(root)):
+            raise RecipeConflictError(
+                'Incomplete recipe context: require invocation ID, build ID and absolute Recipe Manager root. '
+                'Use matching versions of ya, test_tool and Larry.'
+            )
 
 
 def _get_build_root_tmp_recipe_dir(package_path: str) -> str:
@@ -231,11 +244,11 @@ def _read_env_file(env_file: str) -> dict[str, str | None]:
 
 
 @functools.cache
-def _get_rm_client(shallow_root: str, source_root: str) -> object:
+def _get_rm_client(shallow_root: str, source_root: str, manager_root: str | None = None) -> object:
     """Создать RM клиент по recipes_shallow_root (кэшируется на процесс run_test)."""
     from devtools.recipe_manager.client.client import RecipeManagerClient, get_recipes_shallow_root_path
 
-    return RecipeManagerClient(get_recipes_shallow_root_path(shallow_root, source_root))
+    return RecipeManagerClient(manager_root or get_recipes_shallow_root_path(shallow_root, source_root))
 
 
 def _build_recipe_cmd(shallow_dir: str, extra_args: list[str], action: str) -> list[str]:
@@ -470,10 +483,15 @@ def _start_one_recipe(package_path: str, options: object, rm_timeout: float = 0)
     import grpc
 
     recipe_uid = _make_recipe_uid(package_path)
-    shallow_dir = _shallow_recipe_dir(options.shallow_root, options.source_root, package_path)
+    shallow_dir = _shallow_recipe_dir(
+        options.shallow_root,
+        options.source_root,
+        package_path,
+        manager_root=getattr(options, 'recipe_manager_root', None),
+    )
     os.makedirs(shallow_dir, exist_ok=True)
 
-    rm = _get_rm_client(options.shallow_root, options.source_root)
+    rm = _get_rm_client(options.shallow_root, options.source_root, getattr(options, 'recipe_manager_root', None))
     force = options.force_restart_recipes
     current_invocation_id = options.invocation_id
     current_build_id = options.build_id
@@ -610,6 +628,7 @@ def run_all_persistent_recipes(
     - enable_recipe_timeout=False (нет node_timeout): ждёт бесконечно
     - enable_recipe_timeout=True: ограничивает ожидание chunk_time_left секундами
     """
+    validate_recipe_context(options)
     packages = decode_persistent_recipes(options.persistent_recipes)
     if not packages:
         return {}
@@ -631,7 +650,12 @@ def run_all_persistent_recipes(
             if uid in done_uids:
                 continue
 
-            shallow_dir = _shallow_recipe_dir(options.shallow_root, options.source_root, pkg)
+            shallow_dir = _shallow_recipe_dir(
+                options.shallow_root,
+                options.source_root,
+                pkg,
+                manager_root=getattr(options, 'recipe_manager_root', None),
+            )
             os.makedirs(shallow_dir, exist_ok=True)
             lock = FileLock(os.path.join(shallow_dir, '.lock'))
             safe_name = _make_log_safe_name(pkg, uid[:8])
@@ -663,7 +687,9 @@ def run_all_persistent_recipes(
     # Все рецепты "осознаны" чанком как работающие — собираем их env
     result_env: dict[str, str | None] = {}
     for pkg in packages:
-        shallow_dir = _shallow_recipe_dir(options.shallow_root, options.source_root, pkg)
+        shallow_dir = _shallow_recipe_dir(
+            options.shallow_root, options.source_root, pkg, manager_root=getattr(options, 'recipe_manager_root', None)
+        )
         recipe_env = _read_env_file(os.path.join(shallow_dir, RECIPE_ENV_FILE))
         result_env.update(recipe_env)
         logger.debug("Recipe %s is done, collected env keys: %s", pkg, list(recipe_env.keys()))

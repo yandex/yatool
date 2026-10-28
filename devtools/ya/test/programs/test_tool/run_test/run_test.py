@@ -86,6 +86,7 @@ from devtools.ya.test.programs.test_tool.run_test.recipe import (  # noqa: E402
     RecipeWaitTimeout,
     append_traceback_to_file,
     read_head_tail,
+    validate_recipe_context,
 )
 
 
@@ -522,6 +523,8 @@ def parse_args(args=None):
         default=None,
         help="path to shallow root directory for persistent recipes",
     )
+    parser.add_argument('--recipe-manager-root', default=os.environ.get('_YA_RECIPE_MANAGER_ROOT'))
+    parser.add_argument('--require-recipe-context', action='store_true')
     parser.add_argument(
         "--invocation-id",
         dest="invocation_id",
@@ -1423,6 +1426,7 @@ def main():
     preparation_completed = False
 
     try:
+        validate_recipe_context(options)
         if os.environ.get("YA_TEST_FAIL_RUN_TEST"):
             raise Exception("As you wish")
 
@@ -1707,7 +1711,7 @@ def main():
             (options.prepare_with_persistent or not options.prepare_only)
             and options.use_persistent_recipes
             and options.persistent_recipes
-            and options.shallow_root
+            and (options.recipe_manager_root or options.shallow_root)
         ):
             from devtools.ya.test.programs.test_tool.run_test.recipe import (
                 run_all_persistent_recipes,

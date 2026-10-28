@@ -456,9 +456,8 @@ class RunNodeTask(object):
             if lld_threads is not None and (self._node.kv or {}).get('p', '').lower() == 'ld':
                 this_env['_YA_LLD_THREADS'] = str(lld_threads)
 
-            if getattr(self._ctx.opts, 'use_persistent_recipes', False):
-                this_env['_YA_INVOCATION_ID'] = self._ctx._invocation_id
-                this_env['_YA_BUILD_ID'] = self._ctx._build_id
+            if self._ctx.recipe_context is not None and self._node.kv.get('run_test_node'):
+                this_env.update(self._ctx.recipe_context.environment())
 
             if self._ctx.opts.be_verbose:
                 env_vars = ['{}={}'.format(k, v) for k, v in env.items()]

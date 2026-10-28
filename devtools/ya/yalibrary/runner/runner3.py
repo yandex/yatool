@@ -72,10 +72,12 @@ def run(
     app_ctx: types.ModuleType,
     callback: Callable,
     output_replacements: OutputReplacements | None = None,
+    *,
+    recipe_context=None,
 ) -> RunResult:
     try:
         with contextlib.ExitStack() as exit_stack:
-            ctx.task_context = TaskContext(exit_stack, ctx, app_ctx, callback, output_replacements)
+            ctx.task_context = TaskContext(exit_stack, ctx, app_ctx, callback, output_replacements, recipe_context)
             return ctx.task_context.run()
     except Exception as e:
         logger.debug("Local executor failed with exception %s", str(e))
@@ -136,6 +138,7 @@ class TaskContext(object):
         app_ctx: types.ModuleType,
         callback: Callable,
         output_replacements: OutputReplacements | None,
+        recipe_context=None,
     ) -> None:
         self._exit_stack = exit_stack
         self._ctx = weakref.proxy(ctx)
@@ -151,15 +154,7 @@ class TaskContext(object):
         self._resources_map: dict[str, dict] = {x['pattern']: x for x in ctx.graph['conf']['resources']}
 
         self.opts = ctx.opts
-        if getattr(self.opts, 'use_persistent_recipes', False):
-            from devtools.ya.core import gsid
-            from library.python import unique_id as _unique_id
-
-            self._invocation_id = gsid.uid()
-            self._build_id = _unique_id.gen16()
-        else:
-            self._invocation_id = None
-            self._build_id = None
+        self.recipe_context = recipe_context
         self.state = app_ctx.state.sub(__name__)
         self.called_by_agent = _called_by_agent(app_ctx)
         self.resources: dict[str, dict] = {}
@@ -436,16 +431,6 @@ class TaskContext(object):
                     self._app_ctx.evlog.get_writer('yt_store') if getattr(self._app_ctx, 'evlog', None) else None
                 )
                 self._dist_cache.stats(self._execution_log, dist_cache_evlog_writer)
-
-            if self._build_id and getattr(self._app_ctx, 'recipe_manager_client', None):
-                try:
-                    self._app_ctx.recipe_manager_client.finish_build(
-                        invocation_id=self._invocation_id,
-                        build_id=self._build_id,
-                    )
-                    logger.debug("Notified RM that build %s finished", self._build_id)
-                except Exception:
-                    logger.debug("Failed to notify RM about build finish (build_id=%s)", self._build_id, exc_info=True)
 
         wall_time = time.time() - start_time
 

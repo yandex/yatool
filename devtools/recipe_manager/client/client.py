@@ -90,6 +90,10 @@ class RecipeManagerClient:
         self._stub = None
         self._heartbeat_stop = None
 
+    @property
+    def manager_root(self) -> str:
+        return self._shallow_root
+
     def start_manager(
         self,
         invocation_id: str,

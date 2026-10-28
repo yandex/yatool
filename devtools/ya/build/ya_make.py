@@ -2114,34 +2114,41 @@ class YaMake:
         with stager.scope('dispatch_build'):
             if self.opts.use_distbuild:
                 return self._build_distbs(callback)
-            if self.opts.larry_addr is not None:
-                try:
-                    from devtools.ya.build.larry_client import LarryClient
-                    from devtools.ya.build.larry_client.build_variables import collect_build_variables
-                except ImportError:
-                    raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
+            from devtools.ya.core import gsid
+            from yalibrary.recipe_context import recipe_build_context
 
-                sandbox_token = self.app_ctx.fetcher_params[2] or ''
-                return LarryClient(
-                    callback,
-                    self.ctx.graph,
-                    self.ctx.src_dir,
-                    display=self.app_ctx.display,
-                    output_replacements=self.ctx.output_replacements,
-                    sandbox_token=sandbox_token,
-                    yt_cache_mode=None if self.opts.yt_store else 'off',
-                    yt_token=(
-                        get_yt_token(self.opts)
-                        if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
-                        else ''
-                    ),
-                    result_context=self.ctx,
-                    build_variables=collect_build_variables(self.ctx, self.app_ctx),
-                    build_threads=self.opts.build_threads,
-                    test_threads=getattr(self.opts, 'test_threads', 0),
-                ).build(self.opts.larry_addr)
-            else:
-                return self._build_local(callback)
+            manager = (
+                self.app_ctx.recipe_manager_client if getattr(self.opts, 'use_persistent_recipes', False) else None
+            )
+            with recipe_build_context(manager, gsid.uid()) as recipe_context:
+                if self.opts.larry_addr is not None:
+                    try:
+                        from devtools.ya.build.larry_client import LarryClient
+                        from devtools.ya.build.larry_client.build_variables import collect_build_variables
+                    except ImportError:
+                        raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
+
+                    sandbox_token = self.app_ctx.fetcher_params[2] or ''
+                    return LarryClient(
+                        callback,
+                        self.ctx.graph,
+                        self.ctx.src_dir,
+                        display=self.app_ctx.display,
+                        output_replacements=self.ctx.output_replacements,
+                        sandbox_token=sandbox_token,
+                        yt_cache_mode=None if self.opts.yt_store else 'off',
+                        yt_token=(
+                            get_yt_token(self.opts)
+                            if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
+                            else ''
+                        ),
+                        result_context=self.ctx,
+                        build_variables=collect_build_variables(self.ctx, self.app_ctx, recipe_context=recipe_context),
+                        build_threads=self.opts.build_threads,
+                        test_threads=getattr(self.opts, 'test_threads', 0),
+                    ).build(self.opts.larry_addr)
+                else:
+                    return self._build_local(callback, recipe_context=recipe_context)
 
     def _build_distbs(self, callback):
         from devtools.ya.yalibrary.yandex.distbuild import distbs
@@ -2335,9 +2342,13 @@ class YaMake:
 
         return result_analyzer
 
-    def _build_local(self, callback):
+    def _build_local(self, callback, recipe_context=None):
         res, errors, exit_code, execution_log, exit_code_map = self.ctx.runner(
-            self.ctx, self.app_ctx, callback, output_replacements=self.ctx.output_replacements
+            self.ctx,
+            self.app_ctx,
+            callback,
+            output_replacements=self.ctx.output_replacements,
+            recipe_context=recipe_context,
         )
 
         def extract_tasks_metrics():
