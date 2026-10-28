@@ -80,6 +80,10 @@ cdef extern void YaYtStoreReportError(void* owner, const TString& errorType, con
     (<YtStoreImpl>owner)._report_yt_error(errorType, errorMessage)
 
 
+cdef extern void YaYtStoreReportWriteDisabled(void* owner, const TString& reason) with gil:
+    (<YtStoreImpl>owner)._report_write_disabled(reason)
+
+
 cdef extern void YaYtStoreStartStage(void* owner, const TString& name) with gil:
     restore_thread_name()
     if (<YtStoreImpl>owner)._stager:
@@ -676,6 +680,23 @@ cdef class YtStoreImpl:
         if seconds > 0 and int(seconds * 1_000_000) == 0:
             raise ValueError(f"Too small duration: {seconds}")
         return TDuration.MicroSeconds(int(seconds * 1_000_000))
+
+    def _report_write_disabled(self, reason):
+        try:
+            restore_thread_name()
+            import app_ctx
+
+            evlog = getattr(app_ctx, 'evlog', None)
+            if evlog:
+                evlog.get_writer('yt_store')(
+                    'write-disabled',
+                    schema_version=1,
+                    reason=reason,
+                    yt_proxy=self._proxy,
+                    yt_dir=self._data_dir,
+                )
+        except Exception:
+            logger.debug('Failed to report disabled YT cache writes', exc_info=True)
 
     def _report_yt_error(self, err_type, msg):
         labels = {

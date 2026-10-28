@@ -50,6 +50,7 @@ using namespace NYT;
 // see .pyx
 extern void YaYtStoreLoggingHook(ELogPriority priority, const char* msg, size_t size);
 extern void YaYtStoreReportError(void* callback, const TString& errorType, const TString& errorMessage);
+extern void YaYtStoreReportWriteDisabled(void* owner, const TString& reason);
 extern void YaYtStoreStartStage(void* owner, const TString& name);
 extern void YaYtStoreFinishStage(void* owner, const TString& name);
 
@@ -170,6 +171,7 @@ namespace NYa {
     }
 
     IYtClusterConnectorPtr YtClusterConnectorPtr{};
+    std::function<void(const TString&)> WriteDisabledCallbackForTests{};
 
     namespace {
         using TYtTimestamp = ui64;
@@ -643,6 +645,7 @@ namespace NYa {
             : ConnectOptions_{options.ConnectOptions}
             , PyYtStoreObject_{options.Owner}
             , ReadOnly_{options.ReadOnly}
+            , WriteDisabledEventEnabled_{!options.ReadOnly}
             , CheckSize_{options.CheckSize}
             , MaxCacheSize_{options.MaxCacheSize}
             , Ttl_{options.Ttl}
@@ -918,6 +921,7 @@ namespace NYa {
                 Metrics_.CountFailures("put");
                 DEBUG_LOG << logPrefix << "to YT failed: " << CurrentExceptionMessage();
                 if (!ReadOnly_.exchange(true, std::memory_order::relaxed)) {
+                    ReportWriteDisabled("put_error");
                     DEBUG_LOG << "Switched to read only mode";
                 }
             }
@@ -1239,6 +1243,7 @@ namespace NYa {
         }
 
         void Shutdown() noexcept {
+            WriteDisabledEventEnabled_.store(false, std::memory_order::relaxed);
             CancellationSource_.Cancel();
             Disabled_ = true;
         }
@@ -2050,10 +2055,24 @@ namespace NYa {
             }
         }
 
+        void ReportWriteDisabled(const TString& reason) {
+            if (!WriteDisabledEventEnabled_.exchange(false, std::memory_order::relaxed)) {
+                return;
+            }
+            if (WriteDisabledCallbackForTests) {
+                WriteDisabledCallbackForTests(reason);
+            } else if (PyYtStoreObject_) {
+                CallHook(YaYtStoreReportWriteDisabled, PyYtStoreObject_, reason);
+            }
+        }
+
         std::exception_ptr Disable(bool rethrow = false) {
             auto errPtr = std::current_exception();
             if (!Disabled_.exchange(true, std::memory_order::relaxed)) {
                 CancellationSource_.Cancel();
+                if (!ReadOnly()) {
+                    ReportWriteDisabled("cache_error");
+                }
 
                 TString errType{};
                 TString errMessage{};
@@ -2220,7 +2239,9 @@ namespace NYa {
                             ythrow TYtStoreError::Muted() << "Cache size (" << currentSize << ") exceeds limit of " << maxSize;
                         } else {
                             WARNING_LOG << "Cache size (" << currentSize << ") exceeds limit of " << maxSize << " bytes, switch to readonly mode";
-                            ReadOnly_ = true;
+                            if (!ReadOnly_.exchange(true, std::memory_order::relaxed)) {
+                                ReportWriteDisabled("size_limit");
+                            }
                         }
                     }
                 }
@@ -2761,6 +2782,7 @@ namespace NYa {
         TYtConnectOptions ConnectOptions_;
         void* PyYtStoreObject_;
         std::atomic_bool ReadOnly_;
+        std::atomic_bool WriteDisabledEventEnabled_;
         bool CheckSize_;
         TMaxCacheSize MaxCacheSize_;
         TDuration Ttl_;

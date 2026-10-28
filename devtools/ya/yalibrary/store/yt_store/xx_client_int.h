@@ -9,6 +9,8 @@
 
 #include <yt/cpp/mapreduce/interface/client.h>
 
+#include <functional>
+
 
 namespace NYa {
     // Allow to change an implementation in tests
@@ -18,6 +20,9 @@ namespace NYa {
     };
     using IYtClusterConnectorPtr = TIntrusivePtr<IYtClusterConnector>;
     extern IYtClusterConnectorPtr YtClusterConnectorPtr;
+
+    // Observe write-disable events in native tests without calling the Python bridge.
+    extern std::function<void(const TString&)> WriteDisabledCallbackForTests;
 
     struct TYtStore::TInternalState {
         struct TReplica {
