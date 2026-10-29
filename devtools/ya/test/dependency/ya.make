@@ -9,7 +9,6 @@ PY_SRCS(
 )
 
 PEERDIR(
-    devtools/ya/core
     devtools/ya/core/imprint
     devtools/ya/exts
     devtools/ya/test/system/env
