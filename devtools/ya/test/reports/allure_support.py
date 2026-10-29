@@ -53,7 +53,7 @@ class AllureReportGenerator(object):
         logger.debug("Command stdout: %s", out)
         logger.debug("Command stderr: %s", err)
         if p.returncode != 0:
-            if "Could not find any allure results" in err:
+            if b"Could not find any allure results" in err:
                 raise AllureReportNotFoundError()
             else:
                 raise Exception("Could not generate allure report - exit code {}: {} {}".format(p.returncode, out, err))
