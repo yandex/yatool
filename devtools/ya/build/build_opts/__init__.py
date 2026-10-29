@@ -222,12 +222,8 @@ class BuildThreadsOptions(Options):
 
     def postprocess2(self, params):
         if self.lld_threads is not None:
-            if getattr(params, 'larry_addr', None) is not None:
-                raise ArgsValidatingException('--lld-threads is not supported with Larry')
             if getattr(params, 'use_distbuild', False):
                 raise ArgsValidatingException('--lld-threads is not supported with distributed builds')
-        if self._link_threads_counter and getattr(params, 'larry_addr', None) is not None:
-            raise ArgsValidatingException('--link-threads is not supported with Larry')
         if getattr(params, 'lto', False) or getattr(params, 'thinlto', False):
             self.link_threads = self.link_threads or 1
 
@@ -1323,8 +1319,6 @@ class ExecutorOptions(Options):
                 self.memory_limit = {'abs': parse_size(self.memory_limit, binary=True), 'rel': None}
 
     def postprocess2(self, params):
-        if self.memory_limit is not None and getattr(params, 'larry_addr', None) is not None:
-            raise ArgsValidatingException('--memory-limit is not supported with Larry')
         if (
             self.eager_execution
             and getattr(params, 'run_tests', 0) > 0
@@ -3342,7 +3336,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         if params.bazel_remote_warming:
             # Манифест без прогрева также описывает обычную пересборку выбранного подграфа.
             unsupported += ('custom_context', 'custom_json')
-        if getattr(params, 'larry_addr', None) is not None or any(getattr(params, name, False) for name in unsupported):
+        if any(getattr(params, name, False) for name in unsupported):
             raise ArgsValidatingException('Bazel cache warming supports only ordinary local ya make execution')
 
 
