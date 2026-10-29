@@ -4,7 +4,6 @@ PY_SRCS(
     benchmark.py
     boost_test.py
     clang_tidy.py
-    common.py
     cov_test.py
     custom_lint.py
     detekt.py
@@ -35,6 +34,7 @@ PEERDIR(
     devtools/ya/test/system/env
     devtools/ya/test/system/process # TODO get rid off
     devtools/ya/test/test_node/cmdline
+    devtools/ya/test/test_types/common
     devtools/ya/test/tracefile
     devtools/ya/test/util
     devtools/ya/yalibrary/graph
@@ -42,3 +42,7 @@ PEERDIR(
 )
 
 END()
+
+RECURSE(
+    common
+)
