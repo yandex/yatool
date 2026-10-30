@@ -768,6 +768,13 @@ bool TDGIterAddable::ResolvedInputChanged(TYMake& ymake, TModule& module) {
 
 bool TDGIterAddable::ModuleDirsChanged(TYMake& ymake, TModule& module) {
     YDIAG(VV) << "Checking dirs presence for " << module.GetName() << Endl;
+    if (module.CheckedDirs) {
+        for (const auto dir : *module.CheckedDirs) {
+            if (!Graph.Names().FileConf.CheckExistentDirectory(dir)) {
+                return true;
+            }
+        }
+    }
     if (module.MissingDirs) {
         for (auto dir : *module.MissingDirs) {
             if (Graph.Names().FileConf.CheckExistentDirectory(dir)) {

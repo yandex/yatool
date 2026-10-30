@@ -27,6 +27,8 @@
 namespace {
     const ui64 ImageVersion = 62;
     const ui64 DMCacheVersion = 1;
+    // Module records change independently of the reusable filesystem image.
+    constexpr ui64 MODULE_CACHE_FORMAT_VERSION = 1;
 
     template <size_t HashSize>
     class TVersionImpl {
@@ -101,6 +103,13 @@ namespace {
                 auto change = element.GetMapSafe();
                 auto changePath = change.at("path").GetStringSafe();
                 auto changeType = GetChangeType(change.at("status").GetStringSafe());
+                if (const auto kind = change.find("type"); kind != change.end() && changeType == EChangeType::Modify) {
+                    const auto& type = kind->second.GetStringSafe();
+                    if (type == "dir" || type == "directory") {
+                        // A directory tree hash changes when any descendant changes.
+                        continue;
+                    }
+                }
                 Changes.emplace_back(changePath, changeType);
             }
         }
@@ -292,7 +301,13 @@ TFsPath MakeTempFilename(const TString& basePath) {
 }
 
 TMd5Sig DefaultConfHash(const TBuildConfiguration& conf) {
-    return conf.YmakeConfMD5;
+    TMd5Sig result;
+    MD5 md5;
+    md5.Update(TStringBuf(reinterpret_cast<const char*>(conf.YmakeConfMD5.RawData), sizeof(conf.YmakeConfMD5.RawData)));
+    md5.Update("ymake-module-cache-format:");
+    md5.Update(ToString(MODULE_CACHE_FORMAT_VERSION));
+    md5.Final(result.RawData);
+    return result;
 }
 
 TMd5Sig ExtraConfHash(const TBuildConfiguration& conf) {
@@ -818,7 +833,7 @@ bool TYMake::LoadPatch() {
     auto changes = GetChanges(Conf.PatchPath);
     if (changes) {
         AnalyzeGraphChanges(*changes);
-        Names.FileConf.UseExternalChanges(std::move(changes));
+        Names.FileConf.UseExternalChanges(std::move(changes), !Conf.ShouldUseOnlyYmakeCache());
     } else {
         HasGraphStructuralChanges_ = true;
         YDebug() << "Graph has structural changes because we can't get changes" << Endl;

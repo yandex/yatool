@@ -83,6 +83,10 @@ namespace NYndex {
             "@usage: PARTITIONED_RECURSE_ROOT_RELATIVE([BALANCING_CONFIG config] dirlist)  # builtin\n\n"
                 "In comparison with RECURSE(), in dirlist there must be a directory relative to the root (${ARCADIA_ROOT}).\n"
                 "Arguments are processed in chunks"},
+        { NMacro::CHECK_SRCDIR,
+            "@usage: " + TString{NMacro::CHECK_SRCDIR} + "(dirlist)  # builtin\n\n"
+                "Check that source directories exist and track them for cached configuration, "
+                "without adding them to source search paths" },
         { NMacro::SRCDIR,
             "@usage: " + TString{NMacro::SRCDIR} + "(dirlist)  # builtin\n\n"
                 "Add the specified directories to the list of those in which the source files will be searched\n"

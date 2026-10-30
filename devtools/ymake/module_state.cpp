@@ -196,6 +196,11 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
         MissingDirs->RestoreFromsIds(saved.MissingDirsIds, Symbols);
     }
 
+    if (!saved.CheckedDirsIds.empty()) {
+        CheckedDirs = MakeHolder<TDirs>();
+        CheckedDirs->RestoreFromsIds(saved.CheckedDirsIds, Symbols);
+    }
+
     if (!saved.DataPathsIds.empty()) {
         DataPaths = MakeHolder<TDirs>();
         DataPaths->RestoreFromsIds(saved.DataPathsIds, Symbols);
@@ -239,6 +244,9 @@ void TModule::Save(TModuleSavedState& saved) const {
 
     if (MissingDirs) {
         saved.MissingDirsIds = MissingDirs->SaveAsIds();
+    }
+    if (CheckedDirs) {
+        saved.CheckedDirsIds = CheckedDirs->SaveAsIds();
     }
     if (DataPaths) {
         saved.DataPathsIds = DataPaths->SaveAsIds();
@@ -616,6 +624,7 @@ void DumpModuleInfo(IOutputStream& out, const TModule& module) {
     out << "\tSrcDirs: " << JoinStrings(module.SrcDirs.begin(), module.SrcDirs.end(), " ") << Endl;
     out << "\tPeers: " << JoinStrings(module.Peers.begin(), module.Peers.end(), " ") << Endl;
     out << "\tMissingDirs: " << (module.MissingDirs ? JoinStrings(module.MissingDirs->begin(), module.MissingDirs->end(), " ") : TString("<empty>")) << Endl;
+    out << "\tCheckedDirs: " << (module.CheckedDirs ? JoinStrings(module.CheckedDirs->begin(), module.CheckedDirs->end(), " ") : TString("<empty>")) << Endl;
     out << "\tDataPaths: " << (module.DataPaths ? JoinStrings(module.DataPaths->begin(), module.DataPaths->end(), " ") : TString("<empty>")) << Endl;
 
     module.IncDirs.Dump(out);
@@ -693,6 +702,17 @@ void DumpModuleInfoJson(NJsonWriter::TBuf& json, const TModule& module) {
     if (module.MissingDirs) {
         json.BeginList();
         for (const auto dir : *module.MissingDirs) {
+            json.WriteString(dir.GetTargetStr());
+        }
+        json.EndList();
+    } else {
+        json.WriteNull();
+    }
+
+    json.WriteKey("checked-dirs");
+    if (module.CheckedDirs) {
+        json.BeginList();
+        for (const auto dir : *module.CheckedDirs) {
             json.WriteString(dir.GetTargetStr());
         }
         json.EndList();

@@ -496,9 +496,6 @@ void TFileConf::ListDir(TFileElemId dirElemId, bool forceList, bool forceStat) {
 }
 
 TFileConf::EMarkAsChangedResult TFileConf::MarkFileAsChanged(const TString& filename) {
-    if (filename.size() <= NPath::PREFIX_LENGTH) {
-        return EMarkAsChangedResult::DONE;
-    }
     YDIAG(FU) << "Patch content: " << filename << Endl;
 
     auto fileExisted = HasName(filename);
@@ -516,7 +513,8 @@ TFileConf::EMarkAsChangedResult TFileConf::MarkFileAsChanged(const TString& file
 
     data.LastCheckedStamp = TTimeStamps::Never;
 
-    auto needUpdateParent = !fileExisted || fileNotFound || !hasActualCachedData;
+    auto needUpdateParent = filename.size() >= NPath::PREFIX_LENGTH &&
+        (!fileExisted || fileNotFound || !hasActualCachedData);
     return needUpdateParent ? EMarkAsChangedResult::UPDATE_PARENT : EMarkAsChangedResult::DONE;
 }
 
@@ -524,25 +522,52 @@ void TFileConf::MarkAsMakeFile(TFileView view) {
     GetFileDataById(view.GetElemId()).IsMakeFile = true;
 }
 
-void TFileConf::UseExternalChanges(THolder<IChanges> changes) {
+void TFileConf::UseExternalChanges(THolder<IChanges> changes, bool checkParentDirs) {
     UseExternalChangesSource = true;
 
-    auto&& markChanged = [this](const IChanges::TChange& change) {
+    const bool checkParents = checkParentDirs && DebugOptions.CompletelyTrustFSCache;
+    THashSet<TFileElemId> removedParentBoundaries;
+    auto&& markChanged = [this, checkParents, &removedParentBoundaries](const IChanges::TChange& change) {
         auto fileName = ArcPath(change.Name);
         auto type = change.Type;
-
         auto needUpdateParent = MarkFileAsChanged(fileName);
-        if (type == EChangeType::Remove) {
+        if (type == EChangeType::Remove ||
+            (type == EChangeType::Create && NPath::Parent(fileName) == NPath::SrcDir())) {
             needUpdateParent = EMarkAsChangedResult::UPDATE_PARENT;
         }
 
-        while (needUpdateParent == EMarkAsChangedResult::UPDATE_PARENT) {
+        while (needUpdateParent == EMarkAsChangedResult::UPDATE_PARENT && fileName.size() >= NPath::PREFIX_LENGTH) {
             fileName = NPath::Parent(fileName);
+            if (type == EChangeType::Modify && fileName == NPath::SrcDir()) {
+                break;
+            }
             needUpdateParent = MarkFileAsChanged(fileName);
+        }
+        if (checkParents && type == EChangeType::Remove && fileName != NPath::SrcDir()) {
+            removedParentBoundaries.insert(GetStoredName(fileName).GetElemId());
         }
     };
 
     changes->Walk(markChanged);
+
+    // The ordinary walk already invalidated lower parents. Only its stopping
+    // boundary can hide ancestors removed along with the last file.
+    THashSet<TFileElemId> checkedParents;
+    for (const auto boundary : removedParentBoundaries) {
+        TString directory;
+        GetName(boundary).GetStr(directory);
+        for (;;) {
+            const auto id = GetStoredName(directory).GetElemId();
+            if (!checkedParents.insert(id).second) {
+                break;
+            }
+            MarkFileAsChanged(directory);
+            if (directory.size() < NPath::PREFIX_LENGTH || CheckExistentDirectory(directory)) {
+                break;
+            }
+            directory = NPath::Parent(directory);
+        }
+    }
 }
 
 void TFileConf::RecordStats(ui64 size, TInstant start, bool mapped) {

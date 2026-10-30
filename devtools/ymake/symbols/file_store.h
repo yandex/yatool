@@ -520,7 +520,7 @@ public:
         return DirData.at(dirId);
     }
 
-    void UseExternalChanges(THolder<IChanges> changes);
+    void UseExternalChanges(THolder<IChanges> changes, bool checkParentDirs = true);
 
     const NStats::TFileConfStats& StatsRef() const noexcept {
         return Stats;

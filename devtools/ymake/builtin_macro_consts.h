@@ -20,6 +20,7 @@ constexpr TStringBuf _LATE_GLOB = "_LATE_GLOB";
 constexpr TStringBuf _NEVERCACHE = "_NEVERCACHE";
 constexpr TStringBuf PEERDIR = "PEERDIR";
 constexpr TStringBuf SRCDIR = "SRCDIR";
+constexpr TStringBuf CHECK_SRCDIR = "CHECK_SRCDIR";
 constexpr TStringBuf ADDINCL = "ADDINCL";
 constexpr TStringBuf _GHOST_PEERDIR = "_GHOST_PEERDIR";
 constexpr TStringBuf _DATA_FILES = "_DATA_FILES";

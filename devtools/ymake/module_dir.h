@@ -37,6 +37,7 @@ public:
     void AddSrcProperty();
 
     void AddSrcdir(const TStringBuf& dir);
+    void AddCheckedDir(TStringBuf dir);
     void AddIncdir(const TStringBuf& dir, EIncDirScope scope = EIncDirScope::Local, bool checkDir = true, TLangId langId = TModuleIncDirs::C_LANG);
     void AddPeerdir(const TStringBuf& dir, TFlags<EPeerOption> addFlags = {});
     void AddDepends(const TVector<TStringBuf>& args);
@@ -48,6 +49,7 @@ protected:
     TDepGraph& Graph;
 
 private:
+    bool CheckSrcdir(TStringBuf dir);
     void AddMissingDir(TStringBuf dir);
 
     bool ReportMissingAddincls = true;

@@ -164,6 +164,7 @@ private:
     TModuleIncDirs::TSavedState IncDirs;
     TVector<TFileElemId> SrcsDirsIds;
     TVector<TFileElemId> MissingDirsIds;
+    TVector<TFileElemId> CheckedDirsIds;
     TVector<TFileElemId> DataPathsIds;
     TVector<TFileElemId> SelfPeers;
     TVector<TFileElemId> ExtraOuts;
@@ -214,7 +215,8 @@ public:
         PeersRules,
         Transition,
         ModuleGlobsData,
-        QueriedPeers
+        QueriedPeers,
+        CheckedDirsIds
     );
 };
 
@@ -225,6 +227,7 @@ public:
     TDirs SrcDirs, Peers;
     TModuleIncDirs IncDirs;
     THolder<TDirs> MissingDirs;     // Missing addincls and srcdir for proper work from cache
+    THolder<TDirs> CheckedDirs;     // Required directories checked without changing source search paths
     THolder<TDirs> DataPaths;
     TSet<TString> ExternalResources;
     TVars Vars;

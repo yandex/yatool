@@ -75,14 +75,31 @@ void TModuleDirBuilder::AddMissingDir(TStringBuf dir) {
     Module.MissingDirs->Push(dirEnt);
 }
 
+bool TModuleDirBuilder::CheckSrcdir(TStringBuf dir) {
+    if (!Graph.Names().FileConf.IsNonExistedSrcDir(dir)) {
+        return true;
+    }
+    TScopedContext context(Module.GetName());
+    TRACE(P, NEvent::TInvalidSrcDir(TString{dir}));
+    YConfErr(BadDir) << "[[alt1]]SRCDIR[[rst]] to non existent directory " << dir << Endl;
+    AddMissingDir(dir);
+    return false;
+}
+
+void TModuleDirBuilder::AddCheckedDir(TStringBuf dir) {
+    if (!CheckSrcdir(dir)) {
+        return;
+    }
+    if (!Module.CheckedDirs) {
+        Module.CheckedDirs = MakeHolder<TDirs>();
+    }
+    Module.CheckedDirs->Push(Graph.Names().FileConf.GetStoredName(dir));
+}
+
 void TModuleDirBuilder::AddSrcdir(const TStringBuf& dir) {
     YDIAG(DG) << "Srcdir dep for module: " << dir << Endl;
 
-    if (Graph.Names().FileConf.IsNonExistedSrcDir(dir)) {
-        TScopedContext context(Module.GetName());
-        TRACE(P, NEvent::TInvalidSrcDir(TString{dir}));
-        YConfErr(BadDir) << "[[alt1]]SRCDIR[[rst]] to non existent directory " << dir << Endl;
-        AddMissingDir(dir);
+    if (!CheckSrcdir(dir)) {
         return;
     }
     TFileView dirEnt = Graph.Names().FileConf.GetStoredName(dir);

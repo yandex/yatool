@@ -571,6 +571,27 @@ bool TModuleBuilder::DirStatement(const TStringBuf& name, const TVector<TStringB
                 next = normal;
             }
         }
+    } else if (name == NMacro::CHECK_SRCDIR) {
+        for (const auto& arg : args) {
+            TString dir;
+            if (NPath::ToYPath(arg, dir)) {
+                if (NPath::NeedFix(dir)) {
+                    dir = NPath::Reconstruct(dir);
+                }
+            } else {
+                dir = NPath::ConstructYDir(arg, {}, ConstrYDirDiag);
+            }
+            if (dir.empty()) {
+                continue;
+            }
+            if (!NPath::IsType(dir, NPath::Source)) {
+                YConfErr(BadDir) << "Only source directories are allowed in [[alt1]]" << name << "[[rst]]: " << dir << Endl;
+                continue;
+            }
+            if (ValidateNotRelative(dir, name)) {
+                AddCheckedDir(dir);
+            }
+        }
     } else if (name == NMacro::SRCDIR) {
         for (const auto& arg : args) {
             TString dir = NPath::IsExternalPath(arg) ? TString{arg} : NPath::ConstructYDir(arg, {}, ConstrYDirDiag);
