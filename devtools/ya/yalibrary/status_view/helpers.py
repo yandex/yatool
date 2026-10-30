@@ -141,10 +141,16 @@ def format_paths(inputs, outputs, kv):
                 if len(outputs) == 1:
                     naked_output, _ = os.path.splitext(outputs[0])
                     naked_output = naked_output[10:]
+                    # PIC and other object suffixes must not hide the compiled source in build statuses.
+                    # Match the whole filename so foo.cc.pic cannot select foo.cc.picpic.cc.
+                    while True:
+                        for i in srcs:
+                            if i.endswith(naked_output):
+                                return [i]
 
-                    for i in srcs:
-                        if naked_output in i:
-                            return [i]
+                        naked_output, ext = os.path.splitext(naked_output)
+                        if not ext:
+                            break
 
                 return [srcs[-1]]
 
