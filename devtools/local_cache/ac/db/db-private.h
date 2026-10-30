@@ -24,6 +24,11 @@ namespace NACCachePrivate {
 
         i64 GetNextChunk(TListOut& out, i64 StartingRowid);
 
+        TVector<TColdBlob> GetColdBlobs(i64 minSize, i64 lastAccessTime, int limit, const THashSet<TString>& skip);
+        TMaybe<i64> ChangeCodec(const TString& uid, NACCache::ECodec from, NACCache::ECodec to, const std::function<bool(i64& fsSize, i64& mode)>& replace, const std::function<void(i64)>& onChange, TMaybe<i64> coldBefore);
+        bool RemoveUnlessCodec(const TString& uid, NACCache::ECodec keep, const std::function<bool()>& remove);
+        THashSet<TString> GetZstdBlobUids();
+
     private:
         /// Bunch of statements to process tables.
         THolder<TSQLiteStatement> Stmts_[Last + 1];
@@ -111,7 +116,7 @@ namespace NACCachePrivate {
 
         TImpl(TSQLiteDB& db);
 
-        NACCache::TStatus GetStatistics();
+        NACCache::TStatus GetStatistics(const std::function<void(const NACCache::TStatus&)>& underLock);
 
         int GetLastAccessNumber();
 

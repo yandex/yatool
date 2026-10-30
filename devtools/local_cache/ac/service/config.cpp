@@ -12,6 +12,8 @@
 #if defined(_linux_)
 #include <unistd.h>
 #endif
+#include <util/generic/algorithm.h>
+#include <util/generic/vector.h>
 
 bool NACCachePrivate::TConfigOptions::HasParams() const {
     return LockFile != "" || DBPath != "" ||
@@ -19,7 +21,9 @@ bool NACCachePrivate::TConfigOptions::HasParams() const {
            !CasLogging.Empty() || !NoBlobIO.Empty() || !RecreateDB.Empty() ||
            !DiskLimit.Empty() || !QuiescenceTime.Empty() ||
            FsStoreRoot != "" || !DistCacheUrl.empty() ||
-           !DistCacheBatchSize.Empty() || !DistCacheFlushMs.Empty() || !DistCacheQueueItems.Empty() || !DistCacheQueueBytes.Empty() || !DistCacheCooldownMs.Empty() || !DistCacheTimeoutMs.Empty() || !DistCacheDrainMs.Empty();
+           !DistCacheBatchSize.Empty() || !DistCacheFlushMs.Empty() || !DistCacheQueueItems.Empty() || !DistCacheQueueBytes.Empty() || !DistCacheCooldownMs.Empty() || !DistCacheTimeoutMs.Empty() || !DistCacheDrainMs.Empty() ||
+           !Codec.Empty() || !CodecMinSize.Empty() || !CodecResults.Empty() || !CodecOnPut.Empty() || !CodecPromoteOnGet.Empty() || !CodecMaxParallel.Empty() || !DiskLimitKind.Empty() ||
+           !CodecColdAge.Empty() || !CodecColdInterval.Empty() || !CodecColdBatch.Empty();
 }
 
 void NACCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const {
@@ -88,6 +92,36 @@ void NACCachePrivate::TConfigOptions::WriteSection(IOutputStream& out) const {
     }
     if (!FsStoreRoot.empty()) {
         out << ToString(FsStoreStr) << "=" << FsStoreRoot << Endl;
+    }
+    if (auto* val = Codec.Get()) {
+        out << ToString(CodecStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecMinSize.Get()) {
+        out << ToString(CodecMinSizeStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecResults.Get()) {
+        out << ToString(CodecResultsStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecOnPut.Get()) {
+        out << ToString(CodecOnPutStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecPromoteOnGet.Get()) {
+        out << ToString(CodecPromoteOnGetStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecMaxParallel.Get()) {
+        out << ToString(CodecMaxParallelStr) << "=" << *val << Endl;
+    }
+    if (auto* val = DiskLimitKind.Get()) {
+        out << ToString(DiskLimitKindStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecColdAge.Get()) {
+        out << ToString(CodecColdAgeStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecColdInterval.Get()) {
+        out << ToString(CodecColdIntervalStr) << "=" << *val << Endl;
+    }
+    if (auto* val = CodecColdBatch.Get()) {
+        out << ToString(CodecColdBatchStr) << "=" << *val << Endl;
     }
 }
 
@@ -172,6 +206,46 @@ void NACCachePrivate::TConfigOptions::AddOptions(NLastGetopt::TOpts& parser) {
         .Hidden()
         .RequiredArgument()
         .StoreResult(&FsStoreRoot);
+    parser.AddLongOption("ac-codec", "[local_cache.build_cache] codec")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<TString>(&Codec);
+    parser.AddLongOption("ac-codec_min_size", "[local_cache.build_cache] codec_min_size")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&CodecMinSize);
+    parser.AddLongOption("ac-codec_results", "[local_cache.build_cache] codec_results")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<bool>(&CodecResults);
+    parser.AddLongOption("ac-codec_on_put", "[local_cache.build_cache] codec_on_put")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<bool>(&CodecOnPut);
+    parser.AddLongOption("ac-codec_promote_on_get", "[local_cache.build_cache] codec_promote_on_get")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<bool>(&CodecPromoteOnGet);
+    parser.AddLongOption("ac-codec_max_parallel", "[local_cache.build_cache] codec_max_parallel")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&CodecMaxParallel);
+    parser.AddLongOption("ac-disk_limit_kind", "[local_cache.build_cache] disk_limit_kind")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<TString>(&DiskLimitKind);
+    parser.AddLongOption("ac-codec_cold_age", "[local_cache.build_cache] codec_cold_age")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&CodecColdAge);
+    parser.AddLongOption("ac-codec_cold_interval", "[local_cache.build_cache] codec_cold_interval")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&CodecColdInterval);
+    parser.AddLongOption("ac-codec_cold_batch", "[local_cache.build_cache] codec_cold_batch")
+        .Hidden()
+        .RequiredArgument()
+        .StoreResultT<i64>(&CodecColdBatch);
 }
 
 static void MalformedEntryError(NACCachePrivate::EConfigStrings e) {
@@ -261,7 +335,7 @@ void NACCachePrivate::CheckConfig(const NConfig::TConfig& config) {
     }
 
     // i64
-    for (auto e : {GcLimitStr}) {
+    for (auto e : {GcLimitStr, CodecMinSizeStr, CodecColdAgeStr}) {
         try {
             if (acSection.contains(ToString(e))) {
                 auto s = acSection.At(ToString(e)).As<i64>();
@@ -278,8 +352,32 @@ void NACCachePrivate::CheckConfig(const NConfig::TConfig& config) {
         }
     }
 
+    // positive int
+    for (auto e : {CodecMaxParallelStr, CodecColdIntervalStr, CodecColdBatchStr}) {
+        try {
+            if (acSection.contains(ToString(e)) && acSection.At(ToString(e)).As<int>() <= 0) {
+                ythrow TTypeMismatch() << "Positive value is expected";
+            }
+        } catch (const TTypeMismatch&) {
+            MalformedEntryError(e);
+            throw;
+        } catch (const TFromStringException&) {
+            MalformedEntryError(e);
+            throw;
+        }
+    }
+
+    // enumerations
+    const std::pair<EConfigStrings, TVector<TString>> enums[] = {{CodecStr, {"", "zstd"}}, {DiskLimitKindStr, {"fs", "content"}}};
+    for (const auto& [e, allowed] : enums) {
+        if (acSection.contains(ToString(e)) && !IsIn(allowed, acSection.At(ToString(e)).Get<TString>())) {
+            MalformedEntryError(e);
+            ythrow TTypeMismatch() << "Unexpected value of '" << ToString(e) << "'";
+        }
+    }
+
     // bool
-    for (auto e : {MasterModeStr, GraphInfoStr, NoDbStr, NoBlobIOStr, RecreateStr, CasLoggingStr, ForeignKeysStr}) {
+    for (auto e : {MasterModeStr, GraphInfoStr, NoDbStr, NoBlobIOStr, RecreateStr, CasLoggingStr, ForeignKeysStr, CodecResultsStr, CodecOnPutStr, CodecPromoteOnGetStr}) {
         try {
             if (acSection.contains(ToString(e))) {
                 acSection.At(ToString(e)).As<bool>();

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "db-dbbei.h"
 #include "errors.h"
 
 #include "devtools/local_cache/ac/proto/ac.pb.h"
+#include "devtools/local_cache/ac/fs/fs_blobs.h"
 
 #include "devtools/local_cache/common/dbbe-running-procs/running_handler.h"
 
@@ -37,7 +39,7 @@ namespace NACCache {
     /// Derived from NToolsCache::TIntegrityHandler with DB handlers replaced.
     class TIntegrityHandler : TNonCopyable {
     public:
-        TIntegrityHandler(THolder<NSQLite::TSQLiteDB>&& db, bool noBlobIO, ssize_t diskLimit, int maxQueueSize, TStringBuf casStoreDir, const TCriticalErrorHandler& handler, bool casLogging, TLog& log, bool recreate);
+        TIntegrityHandler(THolder<NSQLite::TSQLiteDB>&& db, bool noBlobIO, ssize_t diskLimit, int maxQueueSize, TStringBuf casStoreDir, const TCriticalErrorHandler& handler, bool casLogging, TLog& log, bool recreate, const TCodecConfig& codec = {}, EDiskLimitKind diskLimitKind = EDiskLimitKind::Fs);
         ~TIntegrityHandler();
 
         void SetRunningProcHandler(TRunningProcsHandler* runningHandler);
@@ -110,7 +112,7 @@ namespace NACCache {
     // Wrapper for the classes above to keep fix correct initialization order.
     class TACCacheDBBE {
     public:
-        TACCacheDBBE(TStringBuf dbPath, bool noBlobIO, bool enableForeignKey, ssize_t limit, TLog& log, const TCriticalErrorHandler& handler, TStringBuf casStoreDir, int procMaxSize, int gcMaxSize, int quiescenceTime, bool casLogging, bool recreate);
+        TACCacheDBBE(TStringBuf dbPath, bool noBlobIO, bool enableForeignKey, ssize_t limit, TLog& log, const TCriticalErrorHandler& handler, TStringBuf casStoreDir, int procMaxSize, int gcMaxSize, int quiescenceTime, bool casLogging, bool recreate, const TCodecConfig& codec = {}, EDiskLimitKind diskLimitKind = EDiskLimitKind::Fs);
         ~TACCacheDBBE();
 
         TDBBEReturn PutUid(const NACCache::TPutUid&, NACCache::TPutUid* resolved = nullptr);

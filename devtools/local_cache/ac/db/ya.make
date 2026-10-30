@@ -25,6 +25,7 @@ PEERDIR(
     devtools/local_cache/common/db-running-procs
     devtools/local_cache/ac/fs
     devtools/local_cache/ac/proto
+    library/cpp/threading/cancellation
 )
 
 GENERATE_ENUM_SERIALIZATION(db-public.h)

@@ -74,7 +74,7 @@ class NewStore(object):
     def _count_failure(self, tag):
         self.failures[tag] += 1
 
-    def put(self, uid, root_dir, files, codec=None):
+    def put(self, uid, root_dir, files, codec=None, is_result=False):
         with AccumulateTime(lambda x: self._inc_time(x, 'put')):
             file_map = {}
             try:

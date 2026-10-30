@@ -34,6 +34,16 @@ namespace NACCachePrivate {
         DistCacheCooldownMsStr /* "dist_cache_cooldown_ms" */,
         DistCacheTimeoutMsStr /* "dist_cache_timeout_ms" */,
         DistCacheDrainMsStr /* "dist_cache_drain_ms" */,
+        CodecStr /* "codec" */,
+        CodecMinSizeStr /* "codec_min_size" */,
+        CodecResultsStr /* "codec_results" */,
+        CodecOnPutStr /* "codec_on_put" */,
+        CodecPromoteOnGetStr /* "codec_promote_on_get" */,
+        CodecMaxParallelStr /* "codec_max_parallel" */,
+        CodecColdAgeStr /* "codec_cold_age" */,
+        CodecColdIntervalStr /* "codec_cold_interval" */,
+        CodecColdBatchStr /* "codec_cold_batch" */,
+        DiskLimitKindStr /* "disk_limit_kind" */,
     };
 
     inline TString IniSectionName() {
@@ -73,6 +83,26 @@ namespace NACCachePrivate {
         TMaybe<i64> DistCacheCooldownMs;
         TMaybe<i64> DistCacheTimeoutMs;
         TMaybe<i64> DistCacheDrainMs;
+        /// [local_cache.build_cache] codec: "" or zstd
+        TMaybe<TString> Codec;
+        /// [local_cache.build_cache] codec_min_size
+        TMaybe<i64> CodecMinSize;
+        /// [local_cache.build_cache] codec_results
+        TMaybe<bool> CodecResults;
+        /// [local_cache.build_cache] codec_on_put
+        TMaybe<bool> CodecOnPut;
+        /// [local_cache.build_cache] codec_promote_on_get
+        TMaybe<bool> CodecPromoteOnGet;
+        /// [local_cache.build_cache] codec_max_parallel
+        TMaybe<i64> CodecMaxParallel;
+        /// [local_cache.build_cache] codec_cold_age, seconds
+        TMaybe<i64> CodecColdAge;
+        /// [local_cache.build_cache] codec_cold_interval, seconds
+        TMaybe<i64> CodecColdInterval;
+        /// [local_cache.build_cache] codec_cold_batch
+        TMaybe<i64> CodecColdBatch;
+        /// [local_cache.build_cache] disk_limit_kind: fs or content
+        TMaybe<TString> DiskLimitKind;
 
         bool HasParams() const;
         void WriteSection(IOutputStream& out) const;

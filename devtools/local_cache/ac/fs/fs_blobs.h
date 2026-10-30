@@ -6,17 +6,80 @@
 
 #include <util/folder/path.h>
 #include <util/generic/hash.h>
+#include <util/generic/hash_set.h>
 #include <util/generic/maybe.h>
 #include <util/generic/set.h>
 #include <util/string/hex.h>
+#include <util/datetime/base.h>
+#include <util/system/file.h>
 #include <util/system/fs.h>
+
+#include <atomic>
+#include <functional>
+#include <semaphore>
 
 namespace NACCache {
     void SetSharedMode(bool enabled);
     bool IsSharedMode();
 
     enum ECodec {
-        CodecNone
+        CodecNone,
+        CodecZstd,
+        // Written by a newer server, cannot be read.
+        CodecUnknown
+    };
+
+    /// Value of blobs.codec column.
+    TStringBuf CodecName(ECodec codec);
+    ECodec CodecFromName(TStringBuf name);
+
+    /// [local_cache.build_cache] codec* settings.
+    struct TCodecConfig {
+        ECodec Codec = CodecNone;
+        i64 MinSize = 1 << 20;
+        bool CompressResults = true;
+        bool CompressOnPut = true;
+        /// Get with hardlink optimization of compressed blob makes it plain again.
+        bool PromoteOnGet = true;
+        int MaxParallelEncode = 4;
+        int MaxParallelDecode = 8;
+        /// Background compression of blobs not accessed for ColdAge seconds, 0 disables it.
+        i64 ColdAge = 0;
+        i64 ColdInterval = 600;
+        int ColdBatch = 200;
+    };
+
+    /// Compression limits and counters shared by all processors of a store.
+    struct TCodecState : TNonCopyable {
+        explicit TCodecState(const TCodecConfig& config)
+            : Config(config)
+            , Encode(Max(config.MaxParallelEncode, 0))
+            , Decode(Max(config.MaxParallelDecode, 1))
+        {
+        }
+
+        const TCodecConfig Config;
+        std::counting_semaphore<> Encode;
+        std::counting_semaphore<> Decode;
+
+        std::atomic<i64> Compressed = 0;
+        std::atomic<i64> SyncFallbacks = 0;
+        std::atomic<i64> PoorRatio = 0;
+        std::atomic<i64> FoundInStore = 0;
+        std::atomic<i64> EncodeBusy = 0;
+        std::atomic<i64> Decoded = 0;
+
+        std::atomic<i64> ColdCompressed = 0;
+        std::atomic<i64> ColdSavedBytes = 0;
+        std::atomic<i64> ColdSkippedLinked = 0;
+        std::atomic<i64> ColdPoorRatio = 0;
+        std::atomic<i64> ColdBusy = 0;
+        std::atomic<i64> ColdRaced = 0;
+
+        std::atomic<i64> Promoted = 0;
+        std::atomic<i64> PromotedBytes = 0;
+        std::atomic<i64> PromoteSkipped = 0;
+        std::atomic<i64> PromoteRaced = 0;
     };
 
     constexpr size_t DIGEST_LENGTH = NOpenSsl::NSha1::DIGEST_LENGTH;
@@ -34,6 +97,8 @@ namespace NACCache {
             i64 Size = 0;
             i64 FSSize = 0;
             i64 Mode = 0;
+            // Stored representation, Size and Mode are of the original file.
+            ECodec Codec = CodecNone;
             bool operator==(const TFsInfo& other) const {
                 return Size == other.Size && FSSize == other.FSSize && Mode == other.Mode;
             }
@@ -122,8 +187,9 @@ namespace NACCache {
                 NewGetFiles_.insert(filePath);
             }
 
-            void AddRemoveFile(const TString& fileHash) {
+            void AddRemoveFile(const TString& fileHash, ECodec codec) {
                 RemoveFiles_.insert(fileHash);
+                RemovedCodecs_[fileHash] = codec;
             }
 
             void AddPreprocessPutOrGetResult(const TString& fileHash, const TString& content, EOptim optim, const TFsInfo& info) {
@@ -134,9 +200,19 @@ namespace NACCache {
                 GetResults_[fileHash] = optim;
             }
 
+            void PinFrame(const TString& fileHash, TFile frame) {
+                PinnedFrames_.emplace(fileHash, std::move(frame));
+            }
+
+            const TFile* GetPinnedFrame(const TString& fileHash) const {
+                auto it = PinnedFrames_.find(fileHash);
+                return it == PinnedFrames_.end() ? nullptr : &it->second;
+            }
+
             TString GetStashDir(EFileState state);
 
             TString GetStashedName(const TString& fileName, EFileState state);
+            ECodec GetStashedCodec(const TString& fileHash, EFileState state) const;
 
             void RemoveBlobs(const TSet<TString>& remove, EFileState state);
             void RenameBlobs(const TSet<TString>& rename, EFileState state);
@@ -151,12 +227,15 @@ namespace NACCache {
             TSet<TString> PutFiles_;
             // Files removed
             TSet<TString> RemoveFiles_;
+            THashMap<TString, ECodec> RemovedCodecs_;
 
             // Result returned from TFsBlobProcessor::PreprocessPut or from TFsBlobProcessor::Get
             // The third component is TFsInfo for InStore
             THashMap<TString, std::tuple<TString, EOptim, TFsInfo>> PreprocessPutOrGetResults_;
             // Result returned from TFsBlobProcessor::Get
             THashMap<TString, EOptim> GetResults_;
+            // Frames opened by Get in sync mode, which has no stash to link them to.
+            THashMap<TString, TFile> PinnedFrames_;
 
             // Transactional removal of files
             TString StashDir_;
@@ -170,16 +249,18 @@ namespace NACCache {
         /// rootDir points to parent directory of storage on FS.
         ///
         /// Pointers are to make sure no temporary copies created.
-        TFsBlobProcessor(const TBlobInfo* blobInfo, const TString* rootDir, EOperationMode mode);
+        TFsBlobProcessor(const TBlobInfo* blobInfo, const TString* rootDir, EOperationMode mode, TCodecState* codec = nullptr);
 
         /// Sync part to be performed under DB lock
         std::tuple<TString, EOptim> Put(const TParams& params, TFsInfo& info);
         /// Async part of PUt's IO, copy/hardlink/rename to stash directory, compute hash if needed
+        /// params.Codec requests compression, info.Codec returned from Put tells if it was applied.
         void PreprocessPut(const TParams& params);
 
         /// Sync part to be performed under DB lock
         /// Parameters are unused if params.Mode == OnFS
-        EOptim Get(const TParams& params, TStringBuf content, i64 outStoreMode);
+        /// size is the original size from DB, checked for compressed blobs.
+        EOptim Get(const TParams& params, TStringBuf content, i64 outStoreMode, i64 size = -1);
         /// Async part of Get's IO, copy/hardlink/rename from stash directory
         /// TODO: Get rid of params
         EOptim PostprocessGet(const TParams& params);
@@ -187,7 +268,7 @@ namespace NACCache {
         /// No-op if params.Mode != OnFS
         void RemoveBlob(const TParams& params, TFsInfo& info);
 
-        /// True if blob is expected on FS but neither in store nor put in current transaction (lstat only).
+        /// True if blob is expected on FS but neither in store (plain or zstd) nor put in current transaction (lstat only).
         bool IsMissingInStore(const TParams& params);
 
         /// Get file information in or out of store.
@@ -201,12 +282,33 @@ namespace NACCache {
             return BlobInfo_.GetOptimization();
         }
 
+        /// Link of decompressed Get target to promote, set by PostprocessGet.
+        const TString& GetPromoteFile() const {
+            return PromoteFile_;
+        }
+
         /// Special processing of removal as it is hard to rollback afterward.
         /// Stash removed files in stashDir
         void StartStash(TTransactionLog& transactionLog);
 
         /// Returns TTransactionLog to be used in corresponding (rootDir == RootDir_) StartStash
         static THolder<TTransactionLog> GetTransactionLog(const TString* rootDir, const TString& tid, EOperationMode mode, bool sync);
+
+        struct TOrphanStats {
+            size_t Removed = 0;
+            size_t Fresh = 0;
+            size_t Kept = 0;
+            size_t PlainRemoved = 0;
+        };
+
+        /// Removes <uid>.zst files older than minAge that have neither uid in known nor a row.
+        /// unlessRow(uid, action) runs action, which moves the frame aside, unless a row exists and returns whether it ran:
+        /// the check and the move must be atomic with commits that put a frame in place.
+        /// Plain <uid> files of known uids with a single link and older than minAge are passed to removePlain,
+        /// it returns true if the file was removed.
+        static TOrphanStats RemoveOrphanFrames(const TString& storeRoot, const THashSet<TString>& known,
+                                               const std::function<bool(const TString& uid, const std::function<void()>& action)>& unlessRow, TDuration minAge,
+                                               const std::function<bool(const TString&)>& removePlain = {});
 
     private:
         // Refinement of EOperationMode accounting for EBlobStoreMode
@@ -217,10 +319,23 @@ namespace NACCache {
         };
 
         /// Full path including RootDir_, need computed uid.
-        TString GetStoreFileName();
+        TString GetStoreFileName(ECodec codec = CodecNone);
 
         /// Full path including RootDir_, need computed uid.
-        static TString GetStoreFileName(const TString& storeRoot, const TString& baseBlobName);
+        static TString GetStoreFileName(const TString& storeRoot, const TString& baseBlobName, ECodec codec = CodecNone);
+
+        /// Compresses OutStore file to stash, returns false if the regular path should be used.
+        bool TryCompressForPut(TFsInfo& info);
+
+        /// Compresses from to frame of the original size. Keeps the frame and returns its info if it saves enough.
+        static TMaybe<TFsInfo> CompressToFrame(const TString& from, const TString& frame, i64 size);
+
+        void MakeTargetDir() const;
+
+        /// Decompresses to a temporary file next to target, checks and renames it.
+        void DecompressBlob(const TFile& source, const TString& target, const TFsInfo& dbInfo) const;
+        /// Same without a Decode slot: waiting for one under DB lock would stop the daemon, and the lock serializes these anyway.
+        void DecompressBlobUnderLock(const TFile& source, const TString& target, const TFsInfo& dbInfo) const;
 
         /// InStore placement needs uid.
         TString GetFileName(EFilePlacement placement) {
@@ -275,5 +390,9 @@ namespace NACCache {
 
         // Benchmark mode/regular mode
         EOperationMode Mode_;
+
+        TCodecState* Codec_;
+
+        TString PromoteFile_;
     };
 }

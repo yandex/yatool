@@ -194,7 +194,7 @@ class PutInCacheTask(object):
                 fi = self._FileInfo(output)
                 fi.digest = digests.get(output)
                 file_list.add(fi)
-            put_kwargs = {}
+            put_kwargs = {'is_result': self._node.is_result_node}
             if self._dist_cacheable and getattr(self._cache, 'support_dist_cache', False):
                 from devtools.local_cache.ac.proto.ac_pb2 import TPutUid
 
@@ -202,7 +202,7 @@ class PutInCacheTask(object):
                 put_kwargs['dist_cache_uid_kind'] = TPutUid.ACTION
             self._cache.put(self._node.uid, self._build_root.path, file_list, codec, **put_kwargs)
             if self._node.content_uid is not None and getattr(self._cache, 'support_content_uids', False):
-                if put_kwargs:
+                if 'dist_cacheable' in put_kwargs:
                     put_kwargs['dist_cache_uid_kind'] = TPutUid.CONTENT
                 self._cache.put(self._node.content_uid, self._build_root.path, file_list, codec, **put_kwargs)
             if hasattr(self._cache, 'put_dependencies'):

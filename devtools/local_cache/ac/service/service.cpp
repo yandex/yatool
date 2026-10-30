@@ -93,6 +93,19 @@ namespace NACCache {
             auto gcLimit = acSection.contains(ToString(GcLimitStr)) ? acSection.At(ToString(GcLimitStr)).As<i64>() : 20LL * 1024LL * 1024LL * 1024LL;
             auto casLogging = acSection.contains(ToString(CasLoggingStr)) ? acSection.At(ToString(CasLoggingStr)).As<bool>() : false;
             QuiescenceTime_ = acSection.contains(ToString(QuiescenceStr)) ? acSection.At(ToString(QuiescenceStr)).As<int>() : 10 * 1000;
+            TCodecConfig codec;
+            if (acSection.contains(ToString(CodecStr))) {
+                codec.Codec = CodecFromName(acSection.At(ToString(CodecStr)).Get<TString>());
+            }
+            codec.MinSize = acSection.contains(ToString(CodecMinSizeStr)) ? acSection.At(ToString(CodecMinSizeStr)).As<i64>() : codec.MinSize;
+            codec.CompressResults = acSection.contains(ToString(CodecResultsStr)) ? acSection.At(ToString(CodecResultsStr)).As<bool>() : codec.CompressResults;
+            codec.CompressOnPut = acSection.contains(ToString(CodecOnPutStr)) ? acSection.At(ToString(CodecOnPutStr)).As<bool>() : codec.CompressOnPut;
+            codec.PromoteOnGet = acSection.contains(ToString(CodecPromoteOnGetStr)) ? acSection.At(ToString(CodecPromoteOnGetStr)).As<bool>() : codec.PromoteOnGet;
+            codec.MaxParallelEncode = acSection.contains(ToString(CodecMaxParallelStr)) ? acSection.At(ToString(CodecMaxParallelStr)).As<int>() : codec.MaxParallelEncode;
+            codec.ColdAge = acSection.contains(ToString(CodecColdAgeStr)) ? acSection.At(ToString(CodecColdAgeStr)).As<i64>() : codec.ColdAge;
+            codec.ColdInterval = acSection.contains(ToString(CodecColdIntervalStr)) ? acSection.At(ToString(CodecColdIntervalStr)).As<i64>() : codec.ColdInterval;
+            codec.ColdBatch = acSection.contains(ToString(CodecColdBatchStr)) ? acSection.At(ToString(CodecColdBatchStr)).As<int>() : codec.ColdBatch;
+            auto diskLimitKind = acSection.contains(ToString(DiskLimitKindStr)) ? acSection.At(ToString(DiskLimitKindStr)).Get<TString>() : TString("fs");
 
             auto marker = GetCriticalErrorMarkerFileName(Config_);
             if (NFs::Exists(marker)) {
@@ -102,7 +115,7 @@ namespace NACCache {
             }
 
             Recreate_ = CreateDBIfNeeded(dbPath, Log_, Recreate_);
-            DBBE_.Reset(new TACCacheDBBE(dbPath, NoBlobIO_, ForeignKeys_, gcLimit, Log_, ErrorHandler_, storeDir, procMaxQueue, gcMaxQueue, QuiescenceTime_, casLogging, Recreate_));
+            DBBE_.Reset(new TACCacheDBBE(dbPath, NoBlobIO_, ForeignKeys_, gcLimit, Log_, ErrorHandler_, storeDir, procMaxQueue, gcMaxQueue, QuiescenceTime_, casLogging, Recreate_, codec, diskLimitKind == "content" ? EDiskLimitKind::Content : EDiskLimitKind::Fs));
             LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "BE created for sqlite db: " << dbPath << Endl;
             LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "BE parameters:"
                                                                                              << " DB file - " << dbPath
@@ -117,6 +130,16 @@ namespace NACCache {
                                                                                              << ", cas_logging - " << casLogging
                                                                                              << ", foreign_keys - " << ForeignKeys_
                                                                                              << ", recreate_db - " << Recreate_
+                                                                                             << ", codec - '" << CodecName(codec.Codec) << "'"
+                                                                                             << ", codec_min_size - " << codec.MinSize
+                                                                                             << ", codec_results - " << codec.CompressResults
+                                                                                             << ", codec_on_put - " << codec.CompressOnPut
+                                                                                             << ", codec_promote_on_get - " << codec.PromoteOnGet
+                                                                                             << ", codec_max_parallel - " << codec.MaxParallelEncode
+                                                                                             << ", codec_cold_age - " << codec.ColdAge
+                                                                                             << ", codec_cold_interval - " << codec.ColdInterval
+                                                                                             << ", codec_cold_batch - " << codec.ColdBatch
+                                                                                             << ", disk_limit_kind - " << diskLimitKind
                                                                                              << Endl;
             if (NFs::Exists(marker)) {
                 LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACSERV]") << "Successfully recreated AC cache" << Endl;
@@ -540,7 +563,7 @@ namespace NACCache {
                 }
                 DBBE_->GetStats(&response);
             }
-            if (!sentSomething || response.GetTotalSize() != lastOut.GetTotalSize()) {
+            if (!sentSomething || response.GetTotalSize() != lastOut.GetTotalSize() || response.GetTotalFSSize() != lastOut.GetTotalFSSize()) {
                 writer->Write(response, ::grpc::WriteOptions());
                 sentSomething = true;
             }

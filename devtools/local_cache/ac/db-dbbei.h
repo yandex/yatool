@@ -1,11 +1,23 @@
 #pragma once
 
 #include <util/generic/noncopyable.h>
+#include <util/generic/utility.h>
 #include <library/cpp/deprecated/atomic/atomic.h>
 
 #include <condition_variable>
 
 namespace NACCache {
+    /// disk_limit_kind: what disk_limit is compared with.
+    enum class EDiskLimitKind {
+        Fs,
+        Content,
+    };
+
+    /// Blob size compared with disk_limit: physical, or max(content, physical) for disk_limit_kind=content.
+    inline i64 GetSizeForLimit(i64 fsSize, i64 size, EDiskLimitKind kind) noexcept {
+        return kind == EDiskLimitKind::Content ? Max(fsSize, size) : fsSize;
+    }
+
     struct TGCState {
         TAtomic* TotalFSSizeInOut = nullptr;
         TAtomic* TotalSizeInOut = nullptr;
@@ -14,6 +26,7 @@ namespace NACCache {
         TAtomic* LastAccessTime = nullptr;
         ssize_t DiskLimitIn = 0;
         ssize_t DBSizeIn = 0;
+        EDiskLimitKind LimitKindIn = EDiskLimitKind::Fs;
 
         ssize_t DiskFSSizeDiffOut = 0;
         ssize_t DiskSizeDiffOut = 0;
@@ -32,9 +45,10 @@ namespace NACCache {
         {
         }
 
-        void ResetGC(ssize_t limit, ssize_t dbSize) noexcept {
+        void ResetGC(ssize_t limit, ssize_t dbSize, EDiskLimitKind limitKind = EDiskLimitKind::Fs) noexcept {
             GCState.DiskLimitIn = limit;
             GCState.DBSizeIn = dbSize;
+            GCState.LimitKindIn = limitKind;
             GCState.DiskFSSizeDiffOut = 0;
             GCState.DiskSizeDiffOut = 0;
             AtomicSet(GCState.CompletedOut, 0);
@@ -58,7 +72,8 @@ namespace NACCache {
         }
 
         bool IsLimitReached() const noexcept {
-            return AtomicGet(*GCState.TotalFSSizeInOut) + GCState.DBSizeIn <= GCState.DiskLimitIn;
+            auto size = GetSizeForLimit(AtomicGet(*GCState.TotalFSSizeInOut), AtomicGet(*GCState.TotalSizeInOut), GCState.LimitKindIn);
+            return size + GCState.DBSizeIn <= GCState.DiskLimitIn;
         }
 
         struct TGCState GCState;

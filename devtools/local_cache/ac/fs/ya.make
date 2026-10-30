@@ -1,6 +1,7 @@
 LIBRARY()
 
 PEERDIR(
+    contrib/libs/zstd
     devtools/libs/acdigest
     devtools/local_cache/ac/proto
     devtools/local_cache/common/fs-utils

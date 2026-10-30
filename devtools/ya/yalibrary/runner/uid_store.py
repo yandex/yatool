@@ -47,7 +47,7 @@ class UidStore(object):
         self._file_store = file_store.FileStore(store_path)
         self._lru_store = lru_store.LruStore(store_path)
 
-    def put(self, uid, root_dir, files, codec=None):
+    def put(self, uid, root_dir, files, codec=None, is_result=False):
         root_dir = os.path.abspath(root_dir)
         files = [os.path.abspath(x) for x in files]
 

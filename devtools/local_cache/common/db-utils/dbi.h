@@ -10,6 +10,8 @@
 #include <util/string/cast.h>
 #include <util/system/rwlock.h>
 
+#include <functional>
+
 /// Helper functions to implement internal checks and simplify boiler-plate code.
 namespace NCachesPrivate {
     /// One shot execution of SQLite statements.
@@ -127,8 +129,9 @@ namespace NCachesPrivate {
             Rollback_.Step();
         }
 
+        /// onCommit runs after a successful COMMIT, still under BigDBMutex_; it must not throw.
         template <typename Func>
-        TFunctionResult<Func> WrapInTransaction(Func&& func) {
+        TFunctionResult<Func> WrapInTransaction(Func&& func, const std::function<void()>& onCommit = {}) {
             TWriteGuard lock(BigDBMutex_);
 
             EnforceBeginTransaction();
@@ -136,6 +139,9 @@ namespace NCachesPrivate {
             try {
                 auto res(func());
                 EnforceCommitTransaction();
+                if (onCommit) {
+                    onCommit();
+                }
                 return res;
             } catch (...) {
                 RollbackTransaction();

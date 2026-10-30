@@ -1,8 +1,11 @@
 #include "fs_blobs.h"
 #include <devtools/libs/acdigest/acdigest.h>
 #include "devtools/local_cache/common/fs-utils/stats.h"
+#include "devtools/local_cache/ac/errors.h"
 
 #include <library/cpp/digest/md5/md5.h>
+
+#include <contrib/libs/zstd/include/zstd.h>
 
 #include <util/charset/utf8.h>
 #include <util/generic/scope.h>
@@ -12,12 +15,122 @@
 #include <util/stream/format.h>
 #include <util/system/error.h>
 #include <util/system/fstat.h>
+#include <util/system/tempfile.h>
 
 #include <algorithm>
 #include <array>
 #include <vector>
+#include <memory>
 
 #include <errno.h>
+
+namespace {
+    constexpr TStringBuf ZstdSuffix = ".zst";
+    constexpr TStringBuf OrphanSuffix = ".orphan";
+    constexpr TStringBuf PromoteSuffix = ".promote";
+    // A frame is kept only if it saves both of these, otherwise the blob stays plain.
+    constexpr i64 MinFrameSavingPercent = 5;
+    constexpr i64 MinFrameSavingBytes = 64 << 10;
+    constexpr size_t MaxPinnedFrames = 64;
+
+    size_t CheckZstd(size_t code, TStringBuf op, const TString& fileName) {
+        if (ZSTD_isError(code)) {
+            ythrow TIoException() << "zstd " << op << " failed for " << fileName << ": " << ZSTD_getErrorName(code);
+        }
+        return code;
+    }
+
+    struct TZstdFree {
+        void operator()(ZSTD_CCtx* ctx) const noexcept {
+            ZSTD_freeCCtx(ctx);
+        }
+        void operator()(ZSTD_DCtx* ctx) const noexcept {
+            ZSTD_freeDCtx(ctx);
+        }
+    };
+
+    // Single frame, level 1 with content checksum. Pledged size makes zstd fail if the source changes.
+    void CompressFile(const TString& from, const TString& to, i64 size) {
+        TFile in(from, OpenExisting | RdOnly | Seq);
+        TFile out(to, CreateAlways | WrOnly | AWUser | ARUser);
+        std::unique_ptr<ZSTD_CCtx, TZstdFree> ctx(ZSTD_createCCtx());
+        if (!ctx) {
+            ythrow TIoException() << "zstd context allocation failed for " << from;
+        }
+        CheckZstd(ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_compressionLevel, 1), "setup", from);
+        CheckZstd(ZSTD_CCtx_setParameter(ctx.get(), ZSTD_c_checksumFlag, 1), "setup", from);
+        CheckZstd(ZSTD_CCtx_setPledgedSrcSize(ctx.get(), size), "setup", from);
+
+        TTempBuf inBuf(ZSTD_CStreamInSize());
+        TTempBuf outBuf(ZSTD_CStreamOutSize());
+        for (;;) {
+            size_t read = in.Read(inBuf.Data(), inBuf.Size());
+            auto directive = read == 0 ? ZSTD_e_end : ZSTD_e_continue;
+            ZSTD_inBuffer input = {inBuf.Data(), read, 0};
+            size_t remaining = 0;
+            do {
+                ZSTD_outBuffer output = {outBuf.Data(), outBuf.Size(), 0};
+                remaining = CheckZstd(ZSTD_compressStream2(ctx.get(), &output, &input, directive), "compress", from);
+                out.Write(outBuf.Data(), output.pos);
+            } while (directive == ZSTD_e_end ? remaining != 0 : input.pos != input.size);
+            if (read == 0) {
+                break;
+            }
+        }
+    }
+
+    // Positional reads: a frame pinned for several outputs is decoded from the same descriptor.
+    void DecompressFile(const TFile& in, const TString& to, i64 size) {
+        const auto& from = in.GetName();
+        TFile out(to, OpenExisting | WrOnly | Seq);
+        std::unique_ptr<ZSTD_DCtx, TZstdFree> ctx(ZSTD_createDCtx());
+        if (!ctx) {
+            ythrow TIoException() << "zstd context allocation failed for " << from;
+        }
+
+        TTempBuf inBuf(ZSTD_DStreamInSize());
+        TTempBuf outBuf(ZSTD_DStreamOutSize());
+        i64 total = 0;
+        i64 offset = 0;
+        size_t hint = 1;
+        bool pending = false;
+        for (;;) {
+            size_t read = in.Pread(inBuf.Data(), inBuf.Size(), offset);
+            offset += read;
+            ZSTD_inBuffer input = {inBuf.Data(), read, 0};
+            // Full output buffer may leave decoded data inside the context.
+            while (input.pos != input.size || pending) {
+                ZSTD_outBuffer output = {outBuf.Data(), outBuf.Size(), 0};
+                hint = ZSTD_decompressStream(ctx.get(), &output, &input);
+                if (ZSTD_isError(hint)) {
+                    ythrow NACCache::TCorruptedBlobError() << "zstd decompress failed for " << from << ": " << ZSTD_getErrorName(hint);
+                }
+                total += output.pos;
+                if (total > size || (hint == 0 && input.pos != input.size)) {
+                    ythrow NACCache::TCorruptedBlobError() << "Unexpected data in " << from;
+                }
+                out.Write(outBuf.Data(), output.pos);
+                pending = hint != 0 && output.pos == output.size;
+            }
+            if (read == 0) {
+                break;
+            }
+        }
+        if (hint != 0 || total != size) {
+            ythrow NACCache::TCorruptedBlobError() << "Truncated or size mismatch in " << from << ": " << total << " != " << size;
+        }
+    }
+
+    bool ExistsNoFollow(const TString& path) {
+        stat_struct buf;
+        try {
+            NFsPrivate::LStat(path, &buf);
+        } catch (const TIoException& e) {
+            return e.Status() != ENOENT;
+        }
+        return true;
+    }
+}
 
 namespace NACCache {
     namespace {
@@ -67,11 +180,31 @@ namespace NACCache {
         }
     }
 
-    TFsBlobProcessor::TFsBlobProcessor(const TBlobInfo* blobInfo, const TString* rootDir, EOperationMode mode)
+    TStringBuf CodecName(ECodec codec) {
+        switch (codec) {
+            case CodecNone:
+                return "";
+            case CodecZstd:
+                return "zstd";
+            case CodecUnknown:
+                break;
+        }
+        Y_ABORT("Unknown codec cannot be stored");
+    }
+
+    ECodec CodecFromName(TStringBuf name) {
+        if (name.empty()) {
+            return CodecNone;
+        }
+        return name == "zstd" ? CodecZstd : CodecUnknown;
+    }
+
+    TFsBlobProcessor::TFsBlobProcessor(const TBlobInfo* blobInfo, const TString* rootDir, EOperationMode mode, TCodecState* codec)
         : BlobInfo_(*blobInfo)
         , RootDir_(*rootDir)
         , TransactionLog_(nullptr)
         , Mode_(mode)
+        , Codec_(codec)
     {
     }
 
@@ -106,12 +239,13 @@ namespace NACCache {
         return TFsInfo({size, fsSize, buf.st_mode});
     }
 
-    TString TFsBlobProcessor::GetStoreFileName() {
-        return GetStoreFileName(RootDir_, GetUid());
+    TString TFsBlobProcessor::GetStoreFileName(ECodec codec) {
+        return GetStoreFileName(RootDir_, GetUid(), codec);
     }
 
-    TString TFsBlobProcessor::GetStoreFileName(const TString& storeRoot, const TString& baseBlobName) {
-        return JoinFsPaths(storeRoot, TStringBuf(baseBlobName).SubStr(0, 1), TStringBuf(baseBlobName).SubStr(1, 1), baseBlobName);
+    TString TFsBlobProcessor::GetStoreFileName(const TString& storeRoot, const TString& baseBlobName, ECodec codec) {
+        auto path = JoinFsPaths(storeRoot, TStringBuf(baseBlobName).SubStr(0, 1), TStringBuf(baseBlobName).SubStr(1, 1), baseBlobName);
+        return codec == CodecNone ? path : path + ZstdSuffix;
     }
 
     void TFsBlobProcessor::PreprocessPut(const TParams& params) {
@@ -122,6 +256,10 @@ namespace NACCache {
         }
 
         if (!IsProcessingSplit()) {
+            // Encoding under DB lock is not allowed.
+            if (Codec_ && params.Codec != CodecNone) {
+                ++Codec_->SyncFallbacks;
+            }
             return;
         }
 
@@ -138,8 +276,67 @@ namespace NACCache {
         TString content;
         TFsInfo info = GetInfo(OutStore);
         EOptim optim = BlobInfo_.GetOptimization();
-        std::tie(content, optim) = PutInternal(params, info);
+        if (params.Codec == CodecZstd && GetIOMode(params) == FullIO && TryCompressForPut(info)) {
+            optim = Copy;
+        } else {
+            std::tie(content, optim) = PutInternal(params, info);
+        }
         TransactionLog_->AddPreprocessPutOrGetResult(GetUid(), content, optim, info);
+    }
+
+    bool TFsBlobProcessor::TryCompressForPut(TFsInfo& info) {
+        TFileStat stat;
+        stat.Mode = info.Mode;
+        if (!Codec_ || !stat.IsFile() || info.Size < Codec_->Config.MinSize) {
+            return false;
+        }
+        // Existing file (live or orphan) is reused via the regular path.
+        if (ExistsNoFollow(GetStoreFileName(CodecNone)) || ExistsNoFollow(GetStoreFileName(CodecZstd))) {
+            ++Codec_->FoundInStore;
+            return false;
+        }
+        if (!Codec_->Encode.try_acquire()) {
+            ++Codec_->EncodeBusy;
+            return false;
+        }
+        Y_DEFER {
+            Codec_->Encode.release();
+        };
+
+        auto frameInfo = CompressToFrame(BlobInfo_.GetPath(), TransactionLog_->GetStashedName(GetUid(), TTransactionLog::NewFile), info.Size);
+        if (!frameInfo) {
+            ++Codec_->PoorRatio;
+            return false;
+        }
+        info.FSSize = frameInfo->FSSize;
+        info.Codec = CodecZstd;
+        ++Codec_->Compressed;
+        return true;
+    }
+
+    TMaybe<TFsBlobProcessor::TFsInfo> TFsBlobProcessor::CompressToFrame(const TString& from, const TString& frame, i64 size) {
+#if !defined(_win_)
+        // Sparse or compressed by the file system: StatSize counts it full, but a restore would be dense on disk.
+        stat_struct source;
+        NFsPrivate::LStat(from, &source);
+        if (source.st_blocks * 512 < source.st_size) {
+            return Nothing();
+        }
+#endif
+        bool keep = false;
+        Y_DEFER {
+            if (!keep) {
+                NFs::Remove(frame);
+            }
+        };
+        CompressFile(from, frame, size);
+
+        auto frameInfo = GetStatInfo(frame);
+        if (frameInfo.Size * 100 > size * (100 - MinFrameSavingPercent) || size - frameInfo.Size < MinFrameSavingBytes) {
+            return Nothing();
+        }
+        keep = true;
+        return frameInfo;
     }
 
     std::tuple<TString, EOptim> TFsBlobProcessor::Put(const TParams& params, TFsInfo& info) {
@@ -219,13 +416,46 @@ namespace NACCache {
         return std::make_tuple("", optim);
     }
 
-    EOptim TFsBlobProcessor::Get(const TParams& params, TStringBuf content, i64 outStoreMode) {
+    EOptim TFsBlobProcessor::Get(const TParams& params, TStringBuf content, i64 outStoreMode, i64 size) {
         if (GetIOMode(params) == NoIOOps) {
             return BlobInfo_.GetOptimization();
         }
 
         if (TransactionLog_) {
             TransactionLog_->AddGetFile(BlobInfo_.GetPath());
+        }
+
+        if (params.Codec != CodecNone && GetIOMode(params) == FullIO) {
+            if (params.Codec != CodecZstd) {
+                ythrow TIoException() << "Unknown codec for blob " << GetUid();
+            }
+            TFsInfo dbInfo = {size, 0, outStoreMode, params.Codec};
+            if (!TransactionLog_) {
+                MakeTargetDir();
+                DecompressBlob(TFile(GetStoreFileName(params.Codec), OpenExisting | RdOnly | Seq), BlobInfo_.GetPath(), dbInfo);
+                return Copy;
+            }
+            if (IsProcessingSplit()) {
+                // Pin the frame, decompression is done in PostprocessGet.
+                TransactionLog_->AddPreparedPutFile(GetUid());
+                TransactionLog_->CreateStashDirs();
+                if (!TransactionLog_->HasPreprocesedPutOrGetResult(GetUid())) {
+                    (void)GetInternal(TParams({CodecNone, OnFS}), Hardlink, GetStoreFileName(params.Codec), TransactionLog_->GetStashedName(GetUid(), TTransactionLog::NewFile), "", outStoreMode);
+                }
+            } else if (!TransactionLog_->GetPinnedFrame(GetUid())) {
+                TFile frame(GetStoreFileName(params.Codec), OpenExisting | RdOnly | Seq);
+                if (TransactionLog_->PinnedFrames_.size() >= MaxPinnedFrames) {
+                    // A descriptor per output would exhaust the fd limit on large nodes: decode the rest under DB lock.
+                    MakeTargetDir();
+                    DecompressBlobUnderLock(frame, BlobInfo_.GetPath(), dbInfo);
+                    TransactionLog_->AddGetResult(GetUid(), Copy);
+                    return Copy;
+                }
+                // No stash in sync mode: the open frame outlives promote or GC until PostprocessGet.
+                TransactionLog_->PinFrame(GetUid(), std::move(frame));
+            }
+            TransactionLog_->AddPreprocessPutOrGetResult(GetUid(), "", Copy, dbInfo);
+            return Copy;
         }
 
         auto source = GetIOMode(params) == FullIO ? GetStoreFileName() : TString();
@@ -240,9 +470,7 @@ namespace NACCache {
             return optim;
         }
 
-        if (!MakeOutputDirectories(TFsPath(BlobInfo_.GetPath()).Dirname())) {
-            ythrow TIoException() << "failed to create target dir for " << BlobInfo_.GetPath();
-        }
+        MakeTargetDir();
 
         auto optimOut = GetInternal(params, BlobInfo_.GetOptimization(), source, BlobInfo_.GetPath(), content, outStoreMode);
         if (TransactionLog_) {
@@ -258,10 +486,37 @@ namespace NACCache {
             return BlobInfo_.GetOptimization();
         }
 
-        if (IsProcessingSplit()) {
-            if (!MakeOutputDirectories(TFsPath(BlobInfo_.GetPath()).Dirname())) {
-                ythrow TIoException() << "failed to create target dir for " << BlobInfo_.GetPath();
+        if (TransactionLog_->HasPreprocesedPutOrGetResult(GetUid())) {
+            TFsInfo dbInfo;
+            (void)TransactionLog_->PreprocessPutOrGetResult(GetUid(), dbInfo);
+            if (dbInfo.Codec != CodecNone) {
+                MakeTargetDir();
+                if (IsProcessingSplit()) {
+                    DecompressBlob(TFile(TransactionLog_->GetStashedName(GetUid(), TTransactionLog::NewFile), OpenExisting | RdOnly | Seq), BlobInfo_.GetPath(), dbInfo);
+                } else {
+                    DecompressBlob(*TransactionLog_->GetPinnedFrame(GetUid()), BlobInfo_.GetPath(), dbInfo);
+                }
+                // Only hardlinked target may share inode with the store; shared store never links user outputs.
+                if (Codec_ && Codec_->Config.PromoteOnGet && BlobInfo_.GetOptimization() == Hardlink && !IsSharedMode()) {
+                    // Sync fallback shares its stash with other sync requests of the uid and cleans it outside DB lock.
+                    if (IsProcessingSplit()) {
+                        try {
+                            TransactionLog_->CreateStashDirs();
+                            auto promote = TransactionLog_->GetStashedName(GetUid() + PromoteSuffix, TTransactionLog::NewFile);
+                            if (NFs::HardLink(BlobInfo_.GetPath(), promote)) {
+                                PromoteFile_ = promote;
+                            }
+                        } catch (const yexception&) {
+                        }
+                    }
+                    Codec_->PromoteSkipped += PromoteFile_.empty();
+                }
+                return Copy;
             }
+        }
+
+        if (IsProcessingSplit()) {
+            MakeTargetDir();
 
             auto sourcePath = TransactionLog_->GetStashedName(GetUid(), TTransactionLog::NewFile);
             return GetInternal(TParams({params.Codec, OnFS}), BlobInfo_.GetOptimization(), sourcePath, BlobInfo_.GetPath(), "", GetInfo(InStore).Mode);
@@ -323,6 +578,46 @@ namespace NACCache {
         return optim;
     }
 
+    void TFsBlobProcessor::MakeTargetDir() const {
+        if (!MakeOutputDirectories(TFsPath(BlobInfo_.GetPath()).Dirname())) {
+            ythrow TIoException() << "failed to create target dir for " << BlobInfo_.GetPath();
+        }
+    }
+
+    void TFsBlobProcessor::DecompressBlob(const TFile& source, const TString& target, const TFsInfo& dbInfo) const {
+        if (Codec_) {
+            Codec_->Decode.acquire();
+        }
+        Y_DEFER {
+            if (Codec_) {
+                Codec_->Decode.release();
+            }
+        };
+        DecompressBlobUnderLock(source, target, dbInfo);
+    }
+
+    void TFsBlobProcessor::DecompressBlobUnderLock(const TFile& source, const TString& target, const TFsInfo& dbInfo) const {
+        if (dbInfo.Codec != CodecZstd) {
+            ythrow TIoException() << "Unknown codec for blob " << source.GetName();
+        }
+        auto tmp = MakeTempName(TFsPath(target).Parent().c_str(), ".ac-", "tmp");
+        bool renamed = false;
+        Y_DEFER {
+            if (!renamed) {
+                NFs::Remove(tmp);
+            }
+        };
+        DecompressFile(source, tmp, dbInfo.Size);
+        NFsPrivate::Chmod(tmp, IsSharedMode() ? SharedOutputMode(dbInfo.Mode) : dbInfo.Mode & 0777);
+        if (!NFs::Rename(tmp, target)) {
+            ythrow TIoException() << "Cannot rename " << tmp << " to " << target;
+        }
+        renamed = true;
+        if (Codec_) {
+            ++Codec_->Decoded;
+        }
+    }
+
     void TFsBlobProcessor::RemoveBlob(const TParams& params, TFsInfo& info) {
         if (GetIOMode(params) != FullIO) {
             if (Mode_ == NoIO) {
@@ -330,15 +625,19 @@ namespace NACCache {
             }
             return;
         }
-        auto fileName = GetStoreFileName();
-        info = GetInfo(InStore);
+        if (params.Codec == CodecUnknown) {
+            // Cannot name the file, leave it to a server that knows the codec.
+            return;
+        }
+        auto fileName = GetStoreFileName(params.Codec);
+        info = params.Codec == CodecNone ? GetInfo(InStore) : GetStatInfo(fileName);
         if (!TransactionLog_) {
             if (!NFs::Remove(fileName)) {
                 ythrow TIoException() << "Cannot remove blob: " << fileName;
             }
         } else {
             auto stashedName = TransactionLog_->GetStashedName(GetUid(), TTransactionLog::OldFile);
-            TransactionLog_->AddRemoveFile(GetUid());
+            TransactionLog_->AddRemoveFile(GetUid(), params.Codec);
             TransactionLog_->CreateStashDirs();
             if (!NFs::Rename(fileName, stashedName)) {
                 ythrow TIoException() << "Cannot stash blob " << fileName << " to " << TransactionLog_->StashDir_;
@@ -353,7 +652,8 @@ namespace NACCache {
         if (TransactionLog_ && TransactionLog_->PutFiles_.contains(GetUid())) {
             return false;
         }
-        return TFileStat(GetStoreFileName(), true /* nofollow */).IsNull();
+        return TFileStat(GetStoreFileName(CodecNone), true /* nofollow */).IsNull() &&
+               TFileStat(GetStoreFileName(CodecZstd), true /* nofollow */).IsNull();
     }
 
     std::pair<TString, bool> TFsBlobProcessor::PrepareStashDir(const TString& rootDir, const TString& tid, EOperationMode mode, bool sync) {
@@ -506,10 +806,19 @@ namespace NACCache {
         }
     }
 
+    ECodec TFsBlobProcessor::TTransactionLog::GetStashedCodec(const TString& fileHash, EFileState state) const {
+        if (state == OldFile) {
+            auto it = RemovedCodecs_.find(fileHash);
+            return it == RemovedCodecs_.end() ? CodecNone : it->second;
+        }
+        auto it = PreprocessPutOrGetResults_.find(fileHash);
+        return it == PreprocessPutOrGetResults_.end() ? CodecNone : std::get<2>(it->second).Codec;
+    }
+
     void TFsBlobProcessor::TTransactionLog::RenameBlobs(const TSet<TString>& rename, EFileState state) {
         for (auto& fileHash : rename) {
             auto stashedName = GetStashedName(fileHash, state);
-            if (!NFs::Rename(stashedName, TFsBlobProcessor::GetStoreFileName(StoreRoot_, fileHash))) {
+            if (!NFs::Rename(stashedName, TFsBlobProcessor::GetStoreFileName(StoreRoot_, fileHash, GetStashedCodec(fileHash, state)))) {
                 ythrow TIoException() << "Cannot rename stashed blob: " << fileHash << " from " << StashDir_;
             }
         }
@@ -563,6 +872,7 @@ namespace NACCache {
         PutFiles_.clear();
         PreparedPutFiles_.clear();
         RemoveFiles_.clear();
+        RemovedCodecs_.clear();
         NewGetFiles_.clear();
         PreprocessPutOrGetResults_.clear();
         GetResults_.clear();
@@ -573,6 +883,7 @@ namespace NACCache {
             PutFiles_.clear();
             PreparedPutFiles_.clear();
             RemoveFiles_.clear();
+            RemovedCodecs_.clear();
             NewGetFiles_.clear();
             PreprocessPutOrGetResults_.clear();
             GetResults_.clear();
@@ -595,4 +906,67 @@ namespace NACCache {
             }
         }
     }
-} // namespace NACCache
+
+    TFsBlobProcessor::TOrphanStats TFsBlobProcessor::RemoveOrphanFrames(const TString& storeRoot, const THashSet<TString>& known,
+                                                                        const std::function<bool(const TString& uid, const std::function<void()>& action)>& unlessRow, TDuration minAge,
+                                                                        const std::function<bool(const TString&)>& removePlain) {
+        TOrphanStats stats;
+        const auto now = TInstant::Now();
+        const char digits[] = "0123456789abcdef";
+        // ponytail: lists every store directory in one pass, add cancellation if startup gets slow.
+        for (int i = 0; i < 16; ++i) {
+            for (int j = 0; j < 16; ++j) {
+                TFsPath dir = TFsPath(storeRoot) / TString(1, digits[i]) / TString(1, digits[j]);
+                TVector<TString> names;
+                try {
+                    dir.ListNames(names);
+                } catch (const TIoException&) {
+                    continue;
+                }
+                for (const auto& name : names) {
+                    TStringBuf uid(name);
+                    if (removePlain && known.contains(uid)) {
+                        // Plain copy left by background compression.
+                        TFileStat stat((dir / name).GetPath(), true);
+                        if (stat.IsFile() && stat.NLinks == 1 && TInstant::Seconds(stat.MTime) + minAge <= now && removePlain(name)) {
+                            ++stats.PlainRemoved;
+                        }
+                        continue;
+                    }
+                    bool leftover = uid.ChopSuffix(OrphanSuffix);
+                    if (!uid.ChopSuffix(ZstdSuffix) || (!leftover && known.contains(uid))) {
+                        continue;
+                    }
+                    auto frame = (dir / (TString(uid) + ZstdSuffix)).GetPath();
+                    auto aside = frame + OrphanSuffix;
+                    if (!leftover) {
+                        TFileStat stat(frame, true);
+                        if (TInstant::Seconds(stat.MTime) + minAge > now) {
+                            ++stats.Fresh;
+                            continue;
+                        }
+                    }
+                    // A frame committed by the cold pass after the snapshot already has its row under the lock.
+                    bool moved = false;
+                    bool hasRow = !unlessRow(TString(uid), [&]() {
+                        moved = leftover || NFs::Rename(frame, aside);
+                    });
+                    if (!hasRow) {
+                        if (moved && NFs::Remove(aside)) {
+                            ++stats.Removed;
+                        }
+                    } else if (!leftover) {
+                        ++stats.Kept;
+                    } else if (!ExistsNoFollow(frame)) {
+                        // Moved aside by an interrupted run of an older version.
+                        NFs::Rename(aside, frame);
+                        ++stats.Kept;
+                    } else if (NFs::Remove(aside)) {
+                        ++stats.Removed;
+                    }
+                }
+            }
+        }
+        return stats;
+    }
+}

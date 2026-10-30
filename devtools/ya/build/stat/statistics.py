@@ -740,6 +740,13 @@ def print_disk_usage(task_stats, filename, display):
         'build_cache_disk_usage': cache_disk_usage,
         'build_cache_apparent_disk_usage': apparent_cache_disk_usage,
     }
+    for key in (
+        'build_cache_total_disk_usage',
+        'build_cache_total_apparent_disk_usage',
+        'build_cache_total_blob_count',
+    ):
+        if key in task_stats:
+            js_data[key] = task_stats[key]
 
     if filename is not None:
         with open(filename, 'w') as output_file:

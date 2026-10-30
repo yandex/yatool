@@ -86,7 +86,11 @@ namespace NACCachePrivate {
             GetBlobData,
             UpdateRefCount,
             RemoveBlobData,
-            Last = RemoveBlobData
+            SelectColdBlobs,
+            SelectBlobAccessedSince,
+            UpdateStored,
+            SelectZstdUids,
+            Last = SelectZstdUids
         };
         using TEnum = EStmtName;
 
@@ -103,6 +107,11 @@ namespace NACCachePrivate {
             NACCache::EOptim CopyMode = NACCache::Copy;
         };
 
+        struct TColdBlob {
+            TString Uid;
+            i64 Size;
+        };
+
         /// \arg nested If true then wrap into transaction, otherwise rely on caller
         TCASStmts(NSQLite::TSQLiteDB& db, bool nested = false);
         ~TCASStmts();
@@ -114,6 +123,28 @@ namespace NACCachePrivate {
         /// \param out list with hashes from DB with ROWID > startingRowid
         /// \return max rowid in out
         i64 GetNextChunk(TListOut& out, i64 startingRowid);
+
+        /// Always in own transaction.
+        /// Up to limit plain blobs on FS of at least minSize referenced only by acs accessed before lastAccessTime (ms),
+        /// largest first, except uids in skip.
+        TVector<TColdBlob> GetColdBlobs(i64 minSize, i64 lastAccessTime, int limit, const THashSet<TString>& skip = {});
+
+        /// Always in own transaction.
+        /// For referenced blob on FS stored with codec from calls replace(fsSize, mode) that swaps the file and
+        /// sets its stored size and mode (initially from the row), then sets codec to.
+        /// With coldBefore the blob must not be referenced by acs accessed since then (ms).
+        /// onChange gets the FSSize diff after commit, still under the DB lock, as GetStatistics snapshots do.
+        /// \return FSSize diff, or Nothing if the row changed or replace returned false.
+        TMaybe<i64> ChangeCodec(const TString& uid, NACCache::ECodec from, NACCache::ECodec to, const std::function<bool(i64& fsSize, i64& mode)>& replace,
+                                const std::function<void(i64 fsSizeDiff)>& onChange, TMaybe<i64> coldBefore = Nothing());
+
+        /// Always in own transaction.
+        /// Calls remove unless a blob row with uid and codec keep exists.
+        bool RemoveUnlessCodec(const TString& uid, NACCache::ECodec keep, const std::function<bool()>& remove);
+
+        /// Always in own transaction.
+        /// Uids of blobs stored with zstd codec.
+        THashSet<TString> GetZstdBlobUids();
 
     private:
         class TImpl;
@@ -251,7 +282,8 @@ namespace NACCachePrivate {
         TStatQueriesStmts(NSQLite::TSQLiteDB& db);
         ~TStatQueriesStmts();
 
-        NACCache::TStatus GetStatistics();
+        /// underLock gets the snapshot before the DB lock is released, e.g. to reset counters kept by writers under it.
+        NACCache::TStatus GetStatistics(const std::function<void(const NACCache::TStatus&)>& underLock = {});
 
         /// max of last_access from acs_gc.
         int GetLastAccessNumber();

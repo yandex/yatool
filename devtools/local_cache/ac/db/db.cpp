@@ -19,9 +19,12 @@ namespace NACCachePrivate {
 
 namespace {
     static const char* CAS_QUERIES_NAMES[] = {
+        "@Codec",
         "@Content",
         "@FSSize",
         "@DBStoreMode",
+        "@LastAccessTime",
+        "@Limit",
         "@Mode",
         "@RefCount",
         "@Size",
@@ -39,9 +42,13 @@ namespace NACCachePrivate {
         CheckAndSetSqlStmts<EStmtName>(resources, Stmts_, &CAS_QUERIES_NAMES, db);
         Y_ABORT_UNLESS(Get(GetBlobChunk).BoundParameterCount() == 1);
         Y_ABORT_UNLESS(Get(GetBlobRowid).BoundParameterCount() == 1);
-        Y_ABORT_UNLESS(Get(InsertBlob).BoundParameterCount() == 7);
+        Y_ABORT_UNLESS(Get(InsertBlob).BoundParameterCount() == 8);
         Y_ABORT_UNLESS(Get(RemoveBlobData).BoundParameterCount() == 1);
         Y_ABORT_UNLESS(Get(UpdateRefCount).BoundParameterCount() == 2);
+        Y_ABORT_UNLESS(Get(SelectColdBlobs).BoundParameterCount() == 3);
+        Y_ABORT_UNLESS(Get(SelectBlobAccessedSince).BoundParameterCount() == 2);
+        Y_ABORT_UNLESS(Get(UpdateStored).BoundParameterCount() == 4);
+        Y_ABORT_UNLESS(Get(SelectZstdUids).BoundParameterCount() == 0);
     }
 
     TCASStmts::TReturn TCASStmts::TImpl::PutBlob(const TFsBlobProcessor::TParams& params, TFsBlobProcessor& processor, i32 refCountAdj, TLog& log) {
@@ -79,12 +86,25 @@ namespace NACCachePrivate {
                 return TReturn({rowid, std::make_pair(0, 0), std::make_pair(false, false), 0, 0, copyMode});
             } else if (refCountAdj > -oldRefCount && exists) {
                 TFsBlobProcessor::TParams storeParams{CodecNone, storeMode};
+                ssize_t fsSizeDiff = 0;
                 if (refCountAdj > 0 && processor.IsMissingInStore(storeParams)) {
-                    // Row without file (e.g. lost removal rollback): put the file again, sizes are already accounted.
+                    // Row without file (e.g. lost removal rollback): put the file again.
                     LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_WARNING, "WARN[ACCAS]")
                         << "PB: restore missing file, uid=" << uidStr << Endl;
                     TFsBlobProcessor::TFsInfo meta;
                     std::tie(content, copyMode) = processor.Put(storeParams, meta);
+                    // The file comes back as prepared for this put (plain or a frame), the row follows it.
+                    Get(GetBlobData).Bind("@Uid", uidStr);
+                    Y_ABORT_UNLESS(Get(GetBlobData).Step());
+                    fsSizeDiff = meta.FSSize - GetColumnInt64(GetBlobData, 3, "FSSize");
+                    if (CodecFromName(GetColumnText(GetBlobData, 7, "Codec")) != meta.Codec || fsSizeDiff) {
+                        Get(UpdateStored)
+                            .Bind("@Rowid", rowid)
+                            .Bind("@Codec", CodecName(meta.Codec))
+                            .Bind("@FSSize", meta.FSSize)
+                            .Bind("@Mode", GetColumnInt64(GetBlobData, 6, "Mode"))
+                            .Execute();
+                    }
                 }
                 i64 sum = (i64)oldRefCount;
                 if (refCountAdj) {
@@ -92,16 +112,17 @@ namespace NACCachePrivate {
                     sum = sum > std::numeric_limits<i32>::max() ? std::numeric_limits<i32>::max() : sum;
                     Get(UpdateRefCount).Bind("@Rowid", rowid).Bind("@RefCount", sum).Execute();
                 }
-                return TReturn({rowid, std::make_pair(oldRefCount, sum), std::make_pair(exists, exists), 0, 0, copyMode});
+                return TReturn({rowid, std::make_pair(oldRefCount, sum), std::make_pair(exists, exists), 0, fsSizeDiff, copyMode});
             } else if (refCountAdj <= -oldRefCount && exists) {
                 ssize_t size = 0, fsSize = 0;
                 Get(GetBlobData).Bind("@Uid", uidStr);
                 Y_ABORT_UNLESS(Get(GetBlobData).Step());
                 size = GetColumnInt64(GetBlobData, 2, "Size");
                 fsSize = GetColumnInt64(GetBlobData, 3, "FSSize");
+                auto codec = CodecFromName(GetColumnText(GetBlobData, 7, "Codec"));
 
                 // Remove if refCount reached 0
-                TFsBlobProcessor::TParams params{CodecNone, storeMode};
+                TFsBlobProcessor::TParams params{codec, storeMode};
                 Get(RemoveBlobData)
                     .Bind("@Rowid", rowid)
                     .Execute();
@@ -136,6 +157,7 @@ namespace NACCachePrivate {
                     .Bind("@FSSize", fsSize)
                     .Bind("@Mode", meta.Mode)
                     .Bind("@RefCount", refCountAdj)
+                    .Bind("@Codec", CodecName(params.Mode == OnFS ? meta.Codec : CodecNone))
                     .Execute();
                 // Data WAS put into DB.
                 Get(GetBlobRowid).Step();
@@ -159,17 +181,18 @@ namespace NACCachePrivate {
                     << "GB: no-uid=" << uidStr << Endl;
                 return TReturn({-1, std::make_pair(0, 0), std::make_pair(false, false), NACCache::Copy});
             }
-            Y_ABORT_UNLESS(Get(GetBlobData).ColumnCount() == 7);
+            Y_ABORT_UNLESS(Get(GetBlobData).ColumnCount() == 8);
 
             auto storeMode = static_cast<EBlobStoreMode>(GetColumnInt64(GetBlobData, 0, "DBStoreMode"));
-            TFsBlobProcessor::TParams params{CodecNone, storeMode};
+            TFsBlobProcessor::TParams params{CodecFromName(GetColumnText(GetBlobData, 7, "Codec")), storeMode};
             // Do not copy data around
             TString content(GetColumnBlob(GetBlobData, 1, "Content"));
             auto rowid = GetColumnInt64(GetBlobData, 4, "Rowid");
             i32 oldRefCount = GetColumnInt64(GetBlobData, 5, "RefCount");
             i64 fileMode = GetColumnInt64(GetBlobData, 6, "Mode");
+            i64 size = GetColumnInt64(GetBlobData, 2, "Size");
 
-            auto optim = processor.Get(params, content, fileMode);
+            auto optim = processor.Get(params, content, fileMode, size);
             LOGGER_CHECKED_GENERIC_LOG(log, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACCAS]")
                 << "GB: uid=" << uidStr << Endl;
             return TReturn({rowid, std::make_pair(oldRefCount, oldRefCount),
@@ -196,6 +219,74 @@ namespace NACCachePrivate {
         return Nested_ ? transaction() : TBase::WrapInTransaction(transaction);
     }
 
+    TVector<TCASStmts::TColdBlob> TCASStmts::TImpl::GetColdBlobs(i64 minSize, i64 lastAccessTime, int limit, const THashSet<TString>& skip) {
+        return TBase::WrapInTransaction([this, minSize, lastAccessTime, limit, &skip]() -> TVector<TColdBlob> {
+            THolder<TSelf, TStmtResetter<true>> resetter(this);
+            Get(SelectColdBlobs).Bind("@Size", minSize).Bind("@LastAccessTime", lastAccessTime).Bind("@Limit", limit + (i64)skip.size());
+            TVector<TColdBlob> out;
+            while ((int)out.size() < limit && Get(SelectColdBlobs).Step()) {
+                TString uid(GetColumnText(SelectColdBlobs, 0, "Uid"));
+                if (!skip.contains(uid)) {
+                    out.push_back({std::move(uid), GetColumnInt64(SelectColdBlobs, 1, "Size")});
+                }
+            }
+            return out;
+        });
+    }
+
+    TMaybe<i64> TCASStmts::TImpl::ChangeCodec(const TString& uid, ECodec from, ECodec to, const std::function<bool(i64& fsSize, i64& mode)>& replace, const std::function<void(i64)>& onChange, TMaybe<i64> coldBefore) {
+        TMaybe<i64> diff;
+        auto onCommit = [&diff, &onChange]() {
+            if (diff && onChange) {
+                onChange(*diff);
+            }
+        };
+        return TBase::WrapInTransaction([this, &uid, from, to, &replace, coldBefore, &diff]() -> TMaybe<i64> {
+            THolder<TSelf, TStmtResetter<true>> resetter(this);
+            if (!Get(GetBlobData).Bind("@Uid", uid).Step()) {
+                return Nothing();
+            }
+            if (GetColumnInt64(GetBlobData, 0, "DBStoreMode") != OnFS || GetColumnInt64(GetBlobData, 5, "RefCount") <= 0 || CodecFromName(GetColumnText(GetBlobData, 7, "Codec")) != from) {
+                return Nothing();
+            }
+            i64 oldFsSize = GetColumnInt64(GetBlobData, 3, "FSSize");
+            i64 rowid = GetColumnInt64(GetBlobData, 4, "Rowid");
+            if (coldBefore && Get(SelectBlobAccessedSince).Bind("@Rowid", rowid).Bind("@LastAccessTime", *coldBefore).Step()) {
+                return Nothing();
+            }
+            i64 fsSize = 0;
+            i64 mode = GetColumnInt64(GetBlobData, 6, "Mode");
+            if (!replace(fsSize, mode)) {
+                return Nothing();
+            }
+            Get(UpdateStored).Bind("@Codec", CodecName(to)).Bind("@FSSize", fsSize).Bind("@Mode", mode).Bind("@Rowid", rowid).Execute();
+            diff = fsSize - oldFsSize;
+            return diff;
+        }, onCommit);
+    }
+
+    bool TCASStmts::TImpl::RemoveUnlessCodec(const TString& uid, ECodec keep, const std::function<bool()>& remove) {
+        return TBase::WrapInTransaction([this, &uid, keep, &remove]() -> bool {
+            THolder<TSelf, TStmtResetter<true>> resetter(this);
+            if (Get(GetBlobData).Bind("@Uid", uid).Step() && CodecFromName(GetColumnText(GetBlobData, 7, "Codec")) == keep) {
+                return false;
+            }
+            return remove();
+        });
+    }
+
+    THashSet<TString> TCASStmts::TImpl::GetZstdBlobUids() {
+        THashSet<TString> out;
+        TBase::WrapInTransactionVoid([this, &out]() {
+            THolder<TSelf, TStmtResetter<true>> resetter(this);
+            out.clear();
+            while (Get(SelectZstdUids).Step()) {
+                out.emplace(GetColumnText(SelectZstdUids, 0, "Uid"));
+            }
+        });
+        return out;
+    }
+
     TCASStmts::TCASStmts(TSQLiteDB& db, bool nested) {
         Ref_.Reset(new TImpl(db, nested));
     }
@@ -213,6 +304,22 @@ namespace NACCachePrivate {
 
     TCASStmts::TReturn TCASStmts::GetBlob(TFsBlobProcessor& processor, TLog& log) {
         return Ref_->GetBlob(processor, log);
+    }
+
+    TVector<TCASStmts::TColdBlob> TCASStmts::GetColdBlobs(i64 minSize, i64 lastAccessTime, int limit, const THashSet<TString>& skip) {
+        return Ref_->GetColdBlobs(minSize, lastAccessTime, limit, skip);
+    }
+
+    TMaybe<i64> TCASStmts::ChangeCodec(const TString& uid, ECodec from, ECodec to, const std::function<bool(i64& fsSize, i64& mode)>& replace, const std::function<void(i64)>& onChange, TMaybe<i64> coldBefore) {
+        return Ref_->ChangeCodec(uid, from, to, replace, onChange, coldBefore);
+    }
+
+    bool TCASStmts::RemoveUnlessCodec(const TString& uid, ECodec keep, const std::function<bool()>& remove) {
+        return Ref_->RemoveUnlessCodec(uid, keep, remove);
+    }
+
+    THashSet<TString> TCASStmts::GetZstdBlobUids() {
+        return Ref_->GetZstdBlobUids();
     }
 }
 
@@ -334,7 +441,7 @@ namespace NACCachePrivate {
         TPutUid uid(uidOrig);
         for (int i = 0, s = uid.BlobInfoSize(); i < s; ++i) {
             auto& blobInfo = *uid.MutableBlobInfo(i);
-            cas.PreprocessBlobForPut(blobInfo, casGuard);
+            cas.PreprocessBlobForPut(blobInfo, casGuard, uid.GetResult() ? NACCache::TCASManager::ENodeRole::Result : NACCache::TCASManager::ENodeRole::Intermediate);
         }
 
         LOGGER_CHECKED_GENERIC_LOG(cas.GetLog(), TRTYLogPreprocessor, TLOG_INFO, "INFO[ACST]") << "PU: uid=" << uidStr << Endl;
@@ -501,6 +608,8 @@ namespace NACCachePrivate {
             try {
                 auto optim = cas.PostprocessBlobAfterGet(bi, casGuard);
                 output.CopyMode = Meet(optim, output.CopyMode);
+            } catch (const TCorruptedBlobError&) {
+                throw;
             } catch (const TSystemError& e) {
                 ythrow TRestoreError() << "failed to restore cached output " << bi.GetPath() << ": " << e.what();
             }
@@ -691,10 +800,10 @@ namespace NACCachePrivate {
         Y_ABORT_UNLESS(Get(TotalDiskSize).BoundParameterCount() == 0);
     }
 
-    TStatus TStatQueriesStmts::TImpl::GetStatistics() {
+    TStatus TStatQueriesStmts::TImpl::GetStatistics(const std::function<void(const TStatus&)>& underLock) {
         TStatus out;
 
-        TBase::WrapInTransactionVoid([this, &out]() -> void {
+        TBase::WrapInTransactionVoid([this, &out, &underLock]() -> void {
             THolder<TSelf, TStmtResetter<true>> resetter(this);
 
             Y_ABORT_UNLESS(Get(TotalDiskSize).Step());
@@ -716,6 +825,9 @@ namespace NACCachePrivate {
             out.SetUidCount(GetColumnInt64(ACsCount, 0, "Cnt"));
             Y_ABORT_UNLESS(Get(ProcsCount).Step());
             out.SetProcessesCount(GetColumnInt64(ProcsCount, 0, "Cnt"));
+            if (underLock) {
+                underLock(out);
+            }
         });
         return out;
     }
@@ -788,8 +900,8 @@ namespace NACCachePrivate {
     TStatQueriesStmts::~TStatQueriesStmts() {
     }
 
-    TStatus TStatQueriesStmts::GetStatistics() {
-        return Ref_->GetStatistics();
+    TStatus TStatQueriesStmts::GetStatistics(const std::function<void(const TStatus&)>& underLock) {
+        return Ref_->GetStatistics(underLock);
     }
 
     int TStatQueriesStmts::GetLastAccessNumber() {
@@ -803,6 +915,7 @@ namespace NACCachePrivate {
     void TStatQueriesStmts::AnalyzeDU(NACCache::TDiskUsageSummary* out) {
         Ref_->AnalyzeDU(out);
     }
+
 }
 
 // Instantiate required template

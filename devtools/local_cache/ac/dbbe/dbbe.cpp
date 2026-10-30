@@ -31,10 +31,10 @@ namespace NACCache {
         THolder<NSQLite::TSQLiteDB> DB_;
     };
 
-    TACCacheDBBE::TACCacheDBBE(TStringBuf dbPath, bool noBlobIO, bool enableForeignKeys, ssize_t diskLimit, TLog& log, const TCriticalErrorHandler& handler, TStringBuf casStoreDir, int procMaxSize, int gcMaxSize, int quiescenceTime, bool casLogging, bool recreate)
+    TACCacheDBBE::TACCacheDBBE(TStringBuf dbPath, bool noBlobIO, bool enableForeignKeys, ssize_t diskLimit, TLog& log, const TCriticalErrorHandler& handler, TStringBuf casStoreDir, int procMaxSize, int gcMaxSize, int quiescenceTime, bool casLogging, bool recreate, const TCodecConfig& codec, EDiskLimitKind diskLimitKind)
         : InserterHandlerDB_(new TDB(dbPath, true, enableForeignKeys))
         , RunningHandlerDB_(new TDB(dbPath, false, enableForeignKeys))
-        , Inserter_(THolder<NSQLite::TSQLiteDB>(InserterHandlerDB_->Release()), noBlobIO, diskLimit, gcMaxSize, casStoreDir, handler, casLogging, log, recreate)
+        , Inserter_(THolder<NSQLite::TSQLiteDB>(InserterHandlerDB_->Release()), noBlobIO, diskLimit, gcMaxSize, casStoreDir, handler, casLogging, log, recreate, codec, diskLimitKind)
         , Runnning_(THolder<NSQLite::TSQLiteDB>(RunningHandlerDB_->Release()), Inserter_, log, handler, procMaxSize)
         , Log_(log)
         , PollerConf_(PollAll)

@@ -14,6 +14,8 @@
 #include <util/generic/scope.h>
 #include <util/string/cast.h>
 
+#include <thread>
+
 /// Advanced cleanup wrt to limit
 constexpr float CLEANUP_FACTOR = 0.9;
 
@@ -31,7 +33,9 @@ namespace NACCache {
             PerformGC,
             /// Release ACS used by running procs
             ReleaseACs,
-            MinQueueSize = ReleaseACs + 2
+            /// Remove compressed blobs without DB rows
+            CleanupOrphans,
+            MinQueueSize = CleanupOrphans + 2
         };
 
         /// Work item to process in TRunningProcsHandler
@@ -102,9 +106,9 @@ namespace NACCache {
         using TWalkerType = TWalker<NGCAndFSImpl::TWorkItem, TAux, TProcessor>;
 
     public:
-        TImpl(THolder<TSQLiteDB>&& db, bool noBlobIO, ssize_t limit, int maxSize, TStringBuf casStoreDir, const TCriticalErrorHandler& handler, bool casLogging, TLog& log, bool recreate)
+        TImpl(THolder<TSQLiteDB>&& db, bool noBlobIO, ssize_t limit, int maxSize, TStringBuf casStoreDir, const TCriticalErrorHandler& handler, bool casLogging, TLog& log, bool recreate, const TCodecConfig& codec, EDiskLimitKind diskLimitKind)
             : DB_(std::move(db))
-            , Cas_(new TCASManager(*DB_, ToString(casStoreDir), true, noBlobIO ? TFsBlobProcessor::NoIO : TFsBlobProcessor::Regular, casLogging, "blobs", recreate))
+            , Cas_(new TCASManager(*DB_, ToString(casStoreDir), true, noBlobIO ? TFsBlobProcessor::NoIO : TFsBlobProcessor::Regular, casLogging, "blobs", recreate, codec))
             , DBHandler_(*DB_)
             , GCStmts_(*DB_)
             , StatStmts_(*DB_)
@@ -116,6 +120,7 @@ namespace NACCache {
             , MasterMode_(0)
             , EnforcedSizeLimit_(-1)
             , SizeLimit_(limit)
+            , DiskLimitKind_(diskLimitKind)
             , ReleaseStats_("Release ACs time")
             , RemoveStats_("GC time")
         {
@@ -124,11 +129,37 @@ namespace NACCache {
             } catch (const TSQLiteError& e) {
             }
             AtomicSet(LastAccessTime, MilliSeconds());
+            Cas_->SetFSSizeObserver([](i64 diff) {
+                AtomicAdd(TotalFSSize, diff);
+            });
         }
 
         ~TImpl() {
+            StopColdThread();
             ReleaseStats_.PrintSummary(Log_);
             RemoveStats_.PrintSummary(Log_);
+            const auto& codec = Cas_->GetCodecState();
+            // Frames left by an earlier run are still decoded with codec off.
+            if (codec.Config.Codec == CodecNone && codec.Decoded.load() == 0) {
+                return;
+            }
+            LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACGC]")
+                << "Codec stats: compressed=" << codec.Compressed.load()
+                << ", sync_fallbacks=" << codec.SyncFallbacks.load()
+                << ", poor_ratio=" << codec.PoorRatio.load()
+                << ", found_in_store=" << codec.FoundInStore.load()
+                << ", encode_busy=" << codec.EncodeBusy.load()
+                << ", decoded=" << codec.Decoded.load()
+                << ", cold_compressed=" << codec.ColdCompressed.load()
+                << ", cold_saved_bytes=" << codec.ColdSavedBytes.load()
+                << ", cold_skipped_linked=" << codec.ColdSkippedLinked.load()
+                << ", cold_poor_ratio=" << codec.ColdPoorRatio.load()
+                << ", cold_busy=" << codec.ColdBusy.load()
+                << ", cold_raced=" << codec.ColdRaced.load()
+                << ", promoted=" << codec.Promoted.load()
+                << ", promoted_bytes=" << codec.PromotedBytes.load()
+                << ", promote_skipped=" << codec.PromoteSkipped.load()
+                << ", promote_raced=" << codec.PromoteRaced.load() << Endl;
         }
 
         void SetRunningProcHandler(TRunningProcsHandler* runningHandler) {
@@ -247,8 +278,16 @@ namespace NACCache {
             ProcessingThread_.ResetLostItems();
             ResetStats();
             WakeUpGC();
+            ProcessingThread_.AddItem({CleanupOrphans}, {"cleanup orphans", CleanupOrphans, false}, TWalkerType::NoPositionUpdate);
             ProcessingThread_.Initialize();
             LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACGC]") << "Started GC thread" << Endl;
+
+            if (Cas_->IsColdCompressionEnabled() && !ColdThread_.joinable()) {
+                ColdCancel_ = MakeHolder<NThreading::TCancellationTokenSource>();
+                ColdThread_ = std::thread([this, cancel = ColdCancel_->Token()]() {
+                    ColdLoop(cancel);
+                });
+            }
         }
 
         void Finalize() noexcept {
@@ -258,6 +297,7 @@ namespace NACCache {
             }
             Callback_.WaitFlag.notify_all();
 
+            StopColdThread();
             ResetStats();
             ProcessingThread_.Finalize();
             LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACGC]") << "Stopped GC thread" << Endl;
@@ -335,6 +375,8 @@ namespace NACCache {
                     return DoRefCountUpdate();
                 case PerformGC:
                     return DoGC();
+                case CleanupOrphans:
+                    return DoCleanupOrphans();
 
                 case MinQueueSize: // special value
                     Y_UNREACHABLE();
@@ -366,7 +408,7 @@ namespace NACCache {
         }
 
         bool IsBelowThreshhold(ssize_t& limit) {
-            auto curSize = AtomicGet(TIntegrityHandler::TotalFSSize) + AtomicGet(TIntegrityHandler::TotalDBSize);
+            auto curSize = GetSizeForLimit(AtomicGet(TIntegrityHandler::TotalFSSize), AtomicGet(TIntegrityHandler::TotalSize), DiskLimitKind_) + AtomicGet(TIntegrityHandler::TotalDBSize);
             auto lockedSize = AtomicGet(TIntegrityHandler::TotalDBSize);
             auto enforced = AtomicGet(EnforcedSizeLimit_);
 
@@ -401,13 +443,15 @@ namespace NACCache {
         void ResetStats() {
             using namespace NGCAndFSImpl;
 
-            // Obtain clean statistics.
-            auto out = StatStmts_.GetStatistics();
-            auto fsSize = AtomicSwap(&TotalFSSize, out.GetTotalFSSize());
-            auto size = AtomicSwap(&TotalSize, out.GetTotalSize());
-            auto acs = AtomicSwap(&TotalACs, out.GetUidCount());
-            AtomicSet(TotalDBSize, out.GetTotalDBSize());
-            auto blobs = AtomicSwap(&TotalBlobs, out.GetBlobCount());
+            // Obtain clean statistics, codec changes report their diffs under the same lock.
+            intptr_t fsSize = 0, size = 0, acs = 0, blobs = 0;
+            auto out = StatStmts_.GetStatistics([&](const TStatus& snapshot) {
+                fsSize = AtomicSwap(&TotalFSSize, snapshot.GetTotalFSSize());
+                size = AtomicSwap(&TotalSize, snapshot.GetTotalSize());
+                acs = AtomicSwap(&TotalACs, snapshot.GetUidCount());
+                AtomicSet(TotalDBSize, snapshot.GetTotalDBSize());
+                blobs = AtomicSwap(&TotalBlobs, snapshot.GetBlobCount());
+            });
             if (fsSize != (i64)out.GetTotalFSSize()) {
                 LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACGC]")
                     << "Missed FSSize, diff: " << fsSize - (i64)out.GetTotalFSSize() << ", DB ref FSSize: " << (i64)out.GetTotalFSSize() << Endl;
@@ -479,8 +523,8 @@ namespace NACCache {
 
             // cleanup in advance
             limit = CLEANUP_FACTOR * limit < TIntegrityHandler::TotalDBSize ? limit : CLEANUP_FACTOR * limit;
-            // limit accounts for DB size, Callback_ checks for TotalFSSize only,
-            Callback_.ResetGC(limit, TIntegrityHandler::TotalDBSize);
+            // limit accounts for DB size
+            Callback_.ResetGC(limit, TIntegrityHandler::TotalDBSize, DiskLimitKind_);
 
             try {
                 GCStmts_.CleanSomething(&Callback_, DBHandler_, *Cas_);
@@ -497,6 +541,54 @@ namespace NACCache {
 
             RestartStatisticsAndGC();
             return false;
+        }
+
+        // Never throws: exceptions in the processing thread abort the server.
+        bool DoCleanupOrphans() noexcept {
+            if (!Cas_->IsBlobIOEnabled()) {
+                return true;
+            }
+            try {
+                auto stats = Cas_->CleanupOrphans(TDuration::Hours(1));
+                LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACGC]")
+                    << "Orphan frames: removed=" << stats.Removed << ", fresh=" << stats.Fresh << ", kept=" << stats.Kept
+                    << ", plain_removed=" << stats.PlainRemoved << Endl;
+            } catch (const std::exception& e) {
+                LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_ERR, "ERR[ACGC]") << "Orphan frames cleanup failed: " << e.what() << Endl;
+            }
+            return true;
+        }
+
+        void StopColdThread() noexcept {
+            if (ColdCancel_) {
+                ColdCancel_->Cancel();
+            }
+            if (ColdThread_.joinable()) {
+                ColdThread_.join();
+            }
+        }
+
+        /// Background compression of cold blobs, one pass per codec_cold_interval.
+        /// The first pass comes early: the daemon usually exits on quiescence long before codec_cold_interval.
+        void ColdLoop(const NThreading::TCancellationToken& cancel) noexcept {
+            const auto& codec = Cas_->GetCodecState();
+            auto delay = Min(Cas_->GetColdCompressionInterval(), TDuration::Seconds(30));
+            while (!cancel.Wait(delay)) {
+                delay = Cas_->GetColdCompressionInterval();
+                if (!AtomicGet(MasterMode_)) {
+                    continue;
+                }
+                auto compressed = codec.ColdCompressed.load();
+                try {
+                    Cas_->CompressColdBlobs(cancel);
+                } catch (const std::exception& e) {
+                    LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_ERR, "ERR[ACGC]") << "Cold blobs compression failed: " << e.what() << Endl;
+                }
+                if (codec.ColdCompressed.load() != compressed) {
+                    LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[ACGC]")
+                        << "Cold blobs: compressed=" << codec.ColdCompressed.load() << ", saved_bytes=" << codec.ColdSavedBytes.load() << Endl;
+                }
+            }
         }
 
         /// Single SQLite3 connection.
@@ -521,13 +613,17 @@ namespace NACCache {
         TAtomic MasterMode_;
         ssize_t EnforcedSizeLimit_;
         ssize_t SizeLimit_;
+        EDiskLimitKind DiskLimitKind_;
 
         NCachesPrivate::TSimpleStats ReleaseStats_;
         NCachesPrivate::TSimpleStats RemoveStats_;
+
+        std::thread ColdThread_;
+        THolder<NThreading::TCancellationTokenSource> ColdCancel_;
     };
 
-    TIntegrityHandler::TIntegrityHandler(THolder<TSQLiteDB>&& db, bool noBlobIO, ssize_t diskLimit, int maxQueueSize, TStringBuf casStoreDir, const TCriticalErrorHandler& handler, bool casLogging, TLog& log, bool recreate) {
-        Ref_.Reset(new TImpl(std::move(db), noBlobIO, diskLimit, maxQueueSize <= 0 ? 100000 : Max(maxQueueSize, static_cast<int>(NGCAndFSImpl::MinQueueSize)), casStoreDir, handler, casLogging, log, recreate));
+    TIntegrityHandler::TIntegrityHandler(THolder<TSQLiteDB>&& db, bool noBlobIO, ssize_t diskLimit, int maxQueueSize, TStringBuf casStoreDir, const TCriticalErrorHandler& handler, bool casLogging, TLog& log, bool recreate, const TCodecConfig& codec, EDiskLimitKind diskLimitKind) {
+        Ref_.Reset(new TImpl(std::move(db), noBlobIO, diskLimit, maxQueueSize <= 0 ? 100000 : Max(maxQueueSize, static_cast<int>(NGCAndFSImpl::MinQueueSize)), casStoreDir, handler, casLogging, log, recreate, codec, diskLimitKind));
     }
 
     TIntegrityHandler::~TIntegrityHandler() {

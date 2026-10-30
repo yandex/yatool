@@ -718,6 +718,18 @@ class _Server(object):
         return cls.unary_method(get_task_stats, {}, diag='(request for ac stats)', tc=False, ignore_exception=True)
 
     @classmethod
+    def get_cache_ac_stats(cls):
+        from devtools.local_cache.ac.python.ac import get_cache_stats
+
+        def first_snapshot(paddress, timeout=None):
+            # The stream reports every change until cancelled, one snapshot is enough.
+            return next(iter(get_cache_stats(paddress, timeout=timeout)), None)
+
+        return cls.unary_method(
+            first_snapshot, {}, diag='(request for ac cache stats)', tc=False, ignore_exception=True
+        )
+
+    @classmethod
     def put_dependencies(cls, uid, deps):
         from devtools.local_cache.ac.python.ac import put_dependencies
 
@@ -833,6 +845,12 @@ def get_task_stats():
             out_stats['build_cache_disk_usage'] = out.TotalFSSize
         if hasattr(out, 'TotalSize'):
             out_stats['build_cache_apparent_disk_usage'] = out.TotalSize
+        total = _SERVER.get_cache_ac_stats()
+        logger.debug("ac cache stats: {}".format(total))
+        if total is not None:
+            out_stats['build_cache_total_disk_usage'] = total.TotalFSSize + total.TotalDBSize
+            out_stats['build_cache_total_apparent_disk_usage'] = total.TotalSize
+            out_stats['build_cache_total_blob_count'] = total.BlobCount
 
     return out_stats
 
