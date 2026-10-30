@@ -99,7 +99,7 @@ def requires_graph_statistics(statistics):
 
 def get_statistics(opts, statistics=None):
     statistics = DEFAULT_STATISTICS if statistics is None else tuple(statistics)
-    if opts.only_autocheck_stats:
+    if opts.stat_preset == 'autocheck-minimal':
         statistics = tuple(name for name in statistics if name in AUTOCHECK_STATISTICS)
     return statistics
 

@@ -95,8 +95,8 @@ flowchart LR
 ## Выбор статистик сборки
 
 `DEFAULT_STATISTICS` в `statistics.py` задаёт обычный набор сборщиков.
-`get_statistics(opts, statistics=None)` фильтрует выбранный набор: при включённой
-опции `--only-autocheck-stats` остаются только имена из `AUTOCHECK_STATISTICS`.
+`get_statistics(opts, statistics=None)` фильтрует выбранный набор: при выборе
+`--stat-preset autocheck-minimal` остаются только имена из `AUTOCHECK_STATISTICS`.
 Фильтр не добавляет статистики, которых не было в исходном наборе.
 
 Сейчас разрешены `slot_time` и `cache_hit`. Чтобы сохранить ещё одну статистику,
@@ -107,12 +107,12 @@ flowchart LR
 
 `--stat` управляет выводом выбранных статистик на экран, `--stat-dir` — каталогом
 файлов. Ограничитель действует независимо от порядка аргументов:
-`--stat --only-autocheck-stats` выводит только разрешённые статистики.
+`--stat --stat-preset autocheck-minimal` выводит только разрешённые статистики.
 
-Опция **выключена по умолчанию**: используется полный выбранный набор статистик.
-Ограничитель включается через `--only-autocheck-stats` или настройку
-`only_autocheck_stats = true`. Снять ограничение можно через
-`--no-only-autocheck-stats` или `only_autocheck_stats = false`.
+Пресет **`full` используется по умолчанию** и сохраняет полный выбранный набор статистик.
+Минимальный набор выбирается через `--stat-preset autocheck-minimal` или настройку
+`stat_preset = "autocheck-minimal"`. Вернуть полный набор можно через
+`--stat-preset full` или `stat_preset = "full"`. Другие значения не допускаются.
 
 Имена существующих файлов сохранены:
 
