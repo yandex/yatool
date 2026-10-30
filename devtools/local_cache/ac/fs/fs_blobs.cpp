@@ -33,13 +33,11 @@ namespace NACCache {
     }
 
     namespace {
-        const NFs::EFilePermissions SharedDirectoryPermissions =
-            NFs::FP_OWNER_READ | NFs::FP_OWNER_WRITE | NFs::FP_OWNER_EXEC |
-            NFs::FP_GROUP_READ | NFs::FP_GROUP_WRITE | NFs::FP_GROUP_EXEC;
+        const NFs::EFilePermissions SharedDirectoryPermissions = NFs::FP_COMMON_FILE;
 
         i64 SharedOutputMode(i64 mode) {
             const auto permissions = mode & 0777;
-            return permissions | ((permissions & 0700) >> 3);
+            return permissions | ((permissions & 0700) >> 3) | ((permissions & 0700) >> 6);
         }
 
         bool MakeOutputDirectories(const TFsPath& path) {
@@ -63,7 +61,7 @@ namespace NACCache {
                 if (!NFs::MakeDirectory(dir, SharedDirectoryPermissions) && !dir.IsDirectory()) {
                     return false;
                 }
-                NFsPrivate::Chmod(dir, 0770);
+                NFsPrivate::Chmod(dir, 0777);
             }
             return true;
         }

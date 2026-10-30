@@ -232,7 +232,7 @@ namespace NUserService {
         LOGGER_CHECKED_GENERIC_LOG(Log_, TRTYLogPreprocessor, TLOG_INFO, "INFO[SERV]") << "Starting server at " << MyName_.ToGrpcAddress() << ", pid=" << MyName_.GetPid() << Endl;
         Y_ENSURE_EX(port > 0 || !MyName_.GetLocalSocket().empty(), TWithBackTrace<yexception>());
         if (NUserServicePrivate::IsSharedMode(Config_) && !MyName_.GetLocalSocket().empty()) {
-            NFsPrivate::Chmod(MyName_.GetLocalSocket(), 0660);
+            NFsPrivate::Chmod(MyName_.GetLocalSocket(), 0666);
         }
 
         WaitThread_ = std::thread([this]() {

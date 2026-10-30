@@ -610,9 +610,6 @@ class TaskContext(object):
 
     def _init_build_root_set(self):
         shared_mode = getattr(self.opts, 'build_cache_shared', False)
-        if shared_mode:
-            build_root.prepare_shared_build_root_access(self.opts.bld_root, devtools.ya.core.config.home_dir())
-
         self._build_root_set = self._exit_stack.enter_context(
             build_root.BuildRootSet(
                 self.opts.bld_root,

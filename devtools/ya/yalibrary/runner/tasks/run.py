@@ -491,7 +491,7 @@ class RunNodeTask(object):
                     nice=self._ctx.opts.set_nice_value,
                     executor_address=self._ctx.executor_address,
                     requirements=requirements,
-                    umask=0o007 if getattr(self._ctx.opts, 'build_cache_shared', False) else None,
+                    umask=0o000 if getattr(self._ctx.opts, 'build_cache_shared', False) else None,
                 )
                 self._detailed_timings.start_stage(DetailedStages.POSTPROCESSING_COMMAND, time.time())
 

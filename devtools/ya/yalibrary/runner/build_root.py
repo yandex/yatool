@@ -45,33 +45,6 @@ class OutputsExceedLimitError(BuildRootError):
     pass
 
 
-def prepare_shared_build_root_access(path, access_root):
-    """Make a build root below access_root traversable by its owning group."""
-    if os.name != 'posix':
-        return
-
-    path = os.path.realpath(path)
-    access_root = os.path.realpath(access_root)
-    try:
-        if os.path.commonpath((path, access_root)) != access_root:
-            return
-    except ValueError:
-        return
-
-    dirs = []
-    current = path
-    while True:
-        dirs.append(current)
-        if current == access_root:
-            break
-        current = os.path.dirname(current)
-
-    for directory in reversed(dirs):
-        mode = stat.S_IMODE(os.stat(directory).st_mode)
-        if not mode & stat.S_IXGRP:
-            os.chmod(directory, mode | stat.S_IXGRP)
-
-
 class OutputDigests(object):
     def __init__(self, root_path, version, file_digests, outputs_uid):
         self._root_path = root_path
@@ -383,7 +356,7 @@ class BuildRoot(object):
         self._created = True
         path = fs.create_dirs(self.path)
         if self._shared_mode:
-            os.chmod(path, 0o770)
+            os.chmod(path, 0o777)
         return path
 
     def delete(self):
@@ -493,7 +466,7 @@ class BuildRootSet(object):
             try:
                 os.mkdir(cur_name)
                 if self._shared_mode:
-                    os.chmod(cur_name, 0o770)
+                    os.chmod(cur_name, 0o777)
                 return cur_name
             except OSError:
                 pass

@@ -322,29 +322,15 @@ void NACCachePrivate::PrepareDirs(const NConfig::TConfig& config) {
         const auto& acSection = config.Get<TDict>().At(ToString(LocalCacheStr)).Get<TDict>().At(ToString(BuildCacheStr)).Get<TDict>();
         const TFsPath cacheDir(acSection.At(ToString(FsStoreStr)).Get<TString>());
 
-        auto validateOwnedDirectory = [](const TFsPath& path) {
-            TFileStat stat(path);
-            if (stat.IsNull() || !stat.IsDir()) {
-                ythrow TIoException() << "shared-mode storage directory has an unexpected type: " << path;
-            }
-            if (stat.Uid != static_cast<ui32>(geteuid())) {
-                ythrow TIoException() << "invalid shared-mode storage directory ownership for " << path
-                                      << ": expected uid=" << geteuid()
-                                      << ", got uid=" << stat.Uid
-                                      << ", gid=" << stat.Gid
-                                      << ", mode=" << Sprintf("%04o", stat.Mode & 0777);
-            }
-        };
-
         auto validateLockFile = [](const TFsPath& path) {
             TFileStat stat(path);
             if (stat.IsNull() || !stat.IsFile()) {
                 ythrow TIoException() << "shared-mode lock file has an unexpected type: " << path;
             }
-            if (stat.Uid != static_cast<ui32>(geteuid()) || stat.Gid != static_cast<ui32>(getegid()) || (stat.Mode & 0777) != 0640) {
+            if (stat.Uid != static_cast<ui32>(geteuid()) || stat.Gid != static_cast<ui32>(getegid()) || (stat.Mode & 0777) != 0644) {
                 ythrow TIoException() << "invalid shared-mode lock file ownership or permissions for " << path
                                       << ": expected uid=" << geteuid() << ", gid=" << getegid()
-                                      << ", mode=0640"
+                                      << ", mode=0644"
                                       << ", got uid=" << stat.Uid << ", gid=" << stat.Gid
                                       << ", mode=" << Sprintf("%04o", stat.Mode & 0777);
             }
@@ -355,9 +341,9 @@ void NACCachePrivate::PrepareDirs(const NConfig::TConfig& config) {
             if (stat.IsNull() || !stat.IsDir()) {
                 ythrow TIoException() << "shared-mode lock directory has an unexpected type: " << path;
             }
-            if (stat.Uid != static_cast<ui32>(geteuid()) || !(stat.Mode & S_IRGRP)) {
+            if (stat.Uid != static_cast<ui32>(geteuid()) || stat.Gid != static_cast<ui32>(getegid()) || (stat.Mode & 0777) != 0755) {
                 ythrow TIoException() << "invalid shared-mode lock directory ownership or permissions for " << path
-                                      << ": expected uid=" << geteuid() << " and group read permission"
+                                      << ": expected uid=" << geteuid() << ", gid=" << getegid() << ", mode=0755"
                                       << ", got uid=" << stat.Uid
                                       << ", gid=" << stat.Gid
                                       << ", mode=" << Sprintf("%04o", stat.Mode & 0777);
@@ -370,14 +356,12 @@ void NACCachePrivate::PrepareDirs(const NConfig::TConfig& config) {
             cacheDir.MkDirs(0700);
             NFsPrivate::Chmod(cacheDir, 0700);
         }
-        validateOwnedDirectory(cacheDir.RealPath());
 
         TFsPath dbDir(GetDBDirectory(config));
         if (!dbDir.Exists()) {
             dbDir.MkDirs(0700);
             NFsPrivate::Chmod(dbDir, 0700);
         }
-        validateOwnedDirectory(dbDir.RealPath());
 
         const TString ipc = lockDir.RealPath().GetPath();
         const TString cache = cacheDir.RealPath().GetPath();
@@ -387,10 +371,10 @@ void NACCachePrivate::PrepareDirs(const NConfig::TConfig& config) {
 
         TFsPath lockPath(lockName);
         if (!lockPath.Exists()) {
-            TFile(lockName, CreateNew | RdWr | ARUser | AWUser | ARGroup);
+            TFile(lockName, CreateNew | RdWr | ARUser | AWUser | ARGroup | AROther);
             // The daemon uses umask 0077 in shared mode, so make the
-            // intentionally group-readable lock file explicit.
-            NFsPrivate::Chmod(lockPath, 0640);
+            // intentionally world-readable lock file explicit.
+            NFsPrivate::Chmod(lockPath, 0644);
         }
         validateLockFile(lockPath.RealPath());
         return;
