@@ -26,7 +26,7 @@ namespace NYa {
 
         TShellCommand cmd(bin.GetPath(), TList<TString>{args.begin(), args.end()}, opts, cwd);
         cmd.Run();
-        if (cmd.GetStatus() == TShellCommand::SHELL_ERROR) {
+        if (cmd.GetStatus() == TShellCommand::SHELL_ERROR && !cmd.GetExitCode().Defined()) {
             ythrow yexception() << "Cannot run program " << bin << ": " << cmd.GetError();
         }
         exit(cmd.GetExitCode().GetOrElse(1));
