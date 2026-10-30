@@ -83,13 +83,6 @@ namespace NYa::NYaConfJson {
     using TToolChainParams = TMaybe<NJson::TJsonValue>;
     using TToolChainEnv = TMaybe<THashMap<TString, TVector<TString>>>;
 
-    struct TTool {
-        Y_EDL_MEMBERS(
-            ((TString) Description),
-            ((bool) Visible)
-        )
-    };
-
     using TBottleExecutable = TVector<TString>;
     using TBottleExecutableMap = THashMap<TString, TBottleExecutable>;
     using TBottleExecutables = TMaybe<std::variant<TString, TBottleExecutableMap>>;
@@ -112,25 +105,8 @@ namespace NYa::NYaConfJson {
         )
     };
 
-    using TTools = THashMap<TString, TTool>;
     using TBottles = THashMap<TString, TBottle>;
     using TToolChains = THashMap<TString, TToolChain>;
-
-    struct TYaConf {
-        Y_EDL_MEMBERS(
-            ((TTools) Tools),
-            ((TBottles) Bottles),
-            ((TToolChains) ToolChains, "toolchain")
-        )
-
-        Y_EDL_DEFAULT_MEMBER((NYa::NEdl::TBlackHole) Unknown)
-
-        void Finish() {
-            for (auto& [name, bottle] : Bottles) {
-                bottle.Name = name;
-            }
-        }
-    };
 
     using TSimpleToolExecutable = std::variant<TString, TVector<TString>>;
 

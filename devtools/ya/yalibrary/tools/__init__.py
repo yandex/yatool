@@ -667,7 +667,7 @@ class _ToolConfigReader:
             self._load_toolchains()
             assert self._tool_toolchains is not None
             if not tool_cfg:
-                tool_cfg = self._build_legacy_tool(name_parts)
+                tool_cfg = self._build_toolchain_tool(name_parts)
             tool_data = self._tool_toolchains.get(name_parts, {})
             tool_cfg.toolchains = tool_data.get("toolchains", {})
             tool_cfg.bottles = tool_data.get("bottles", {})
@@ -689,7 +689,6 @@ class _ToolConfigReader:
         return self._toolchain_aliases
 
     def list_tools(self, parent_parts: tuple[str, ...] | None = None) -> list[_ToolConfig]:
-
         parent_parts = parent_parts or ()
         tool_cfgs = {}
         tool_files = devtools.ya.core.config.list_tool_configs(self._make_cfg_path(self._TOOLS_CFG_DIR, parent_parts))
@@ -702,9 +701,6 @@ class _ToolConfigReader:
             raw_tool_cfg = devtools.ya.core.config.get_tool_config(path)["tool"]
             tool_cfg = self._build_simple_tool(raw_tool_cfg, name_parts)
             tool_cfgs[name_parts] = tool_cfg
-
-        if not parent_parts:
-            self._add_legacy_tools(tool_cfgs)
 
         return list(tool_cfgs.values())
 
@@ -732,16 +728,6 @@ class _ToolConfigReader:
                         bottle_name, config[self._BOTTLES_KEY][bottle_name]
                     )
 
-    def _load_legacy_toolchains(
-        self,
-        tool_toolchains: dict[tuple[str, ...], dict[str, typing.Any]],
-        toolchain_aliases: dict[str, str],
-    ) -> None:
-        legacy_config = devtools.ya.core.config.config()
-        for name, alias in legacy_config.get(self._TOOLCHAIN_ALIASES_KEY, {}).items():
-            toolchain_aliases.setdefault(name, alias)
-        self._update_tool_toolchains(tool_toolchains, legacy_config, self._LEGACY_TOOLCHAINS_KEY)
-
     def _load_toolchains(self) -> None:
         if self._tool_toolchains is not None:
             return
@@ -762,8 +748,6 @@ class _ToolConfigReader:
                 cfg = devtools.ya.core.config.get_tool_config(path)
                 self._update_tool_toolchains(tool_toolchains, cfg, self._TOOLCHAINS_KEY)
                 toolchain_aliases.update(cfg.get(self._TOOLCHAIN_ALIASES_KEY, {}))
-
-            self._load_legacy_toolchains(tool_toolchains, toolchain_aliases)
 
             self._toolchain_aliases = toolchain_aliases
             self._tool_toolchains = tool_toolchains
@@ -870,21 +854,14 @@ class _ToolConfigReader:
             **raw_tool_cfg,
         )
 
-    @property
-    def _legacy_tools(self) -> dict[str, typing.Any]:
-        return devtools.ya.core.config.config()[self._LEGACY_TOOLS_KEY]
-
-    def _build_legacy_tool(self, name_parts: tuple[str, ...]) -> _ToolConfig:
+    def _build_toolchain_tool(self, name_parts: tuple[str, ...]) -> _ToolConfig:
         name = _join_tool_name(name_parts)
         if len(name_parts) != 1:
             raise ToolNotFoundException('Cannot find tool: ' + name)
         description = None
         availability = None
-        if legacy_tool := self._legacy_tools.get(name):
-            description = legacy_tool["description"]
-            availability = ToolAvailability.FULL if legacy_tool.get("visible", True) else ToolAvailability.HIDDEN
-        elif self._tool_toolchains is not None and self._tool_toolchains.get(name_parts):
-            # Not all tools are presented in tools section
+        if self._tool_toolchains.get(name_parts):
+            # Not all tools are presented in tool files
             description = name
             availability = ToolAvailability.HIDDEN
         else:
@@ -896,13 +873,6 @@ class _ToolConfigReader:
             availability=availability,
             tier=self._get_tool_tier(name_parts),
         )
-
-    def _add_legacy_tools(self, tool_cfgs: dict[tuple[str, ...], _ToolConfig]) -> None:
-        for name in self._legacy_tools:
-            name_parts = _split_tool_name(name)
-            if name_parts not in tool_cfgs:
-                tool_cfg = self._build_legacy_tool(name_parts)
-                tool_cfgs[name_parts] = tool_cfg
 
 
 # For test purpose

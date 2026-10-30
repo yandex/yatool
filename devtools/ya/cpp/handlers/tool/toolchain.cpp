@@ -22,7 +22,7 @@ namespace NYa::NTool {
     constexpr char PATHSEP = ':';
 #endif
 
-    TTool GetTool(const IConfig& config, const NYaConfJson::TYaConf& yaConf, const TString& toolName, const TCanonizedPlatform& forPlatform) {
+    TTool GetTool(const IConfig& config, const NYaConfJson::TToolchainsConfig& toolConfig, const TString& toolName, const TCanonizedPlatform& forPlatform) {
         TVector<IToolChainPathGetter*> toolChainPathGetters = TSingletonClassFactory<IToolChainPathGetter>::Get()->GetAllObjects();
 
         const TFsPath toolRoot = config.ToolRoot();
@@ -30,23 +30,16 @@ namespace NYa::NTool {
             throw yexception() << "Tool root doesn't exist: " << toolRoot;
         }
 
-        const NYaConfJson::TToolChain& toolChain = NPrivate::ResolveTool(yaConf, toolName);
+        const NYaConfJson::TToolChain& toolChain = NPrivate::ResolveTool(toolConfig, toolName);
 
         const NYaConfJson::TToolChainTool& toolChainTool = toolChain.Tools.at(toolName);
         TString bottleName = toolChainTool.Bottle.GetRef();
-        const NYaConfJson::TBottle& bottle = yaConf.Bottles.at(bottleName);
+        const NYaConfJson::TBottle& bottle = toolConfig.Bottles.at(bottleName);
 
         TFsPath toolChainPath = NPrivate::GetToolChainPath(config, toolRoot, toolChainPathGetters, bottle, forPlatform);
         TFsPath toolPath = NPrivate::GetToolPath(toolChainPath, toolName, bottle, toolChainTool);
 
         return TTool{toolName, toolChainPath, toolPath, toolChain.Env};
-    }
-
-    TTool GetTool(const IConfig& config, const TString& toolName, const TCanonizedPlatform& forPlatform) {
-        if (!config.ToolRoot().Exists()) {
-            throw yexception() << "Tool root doesn't exist: " << config.ToolRoot();
-        }
-        return GetTool(config, config.YaConf(), toolName, forPlatform);
     }
 
     void ExecTool(const IConfig& config, const TTool& tool, TVector<TString> toolOptions, TExecve execve) {

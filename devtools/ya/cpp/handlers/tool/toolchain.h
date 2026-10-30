@@ -21,7 +21,6 @@ namespace NYa::NTool {
         virtual ~IToolChainPathGetter() = default;
     };
 
-    TTool GetTool(const IConfig& config, const NYaConfJson::TYaConf& yaConf, const TString& toolName, const TCanonizedPlatform& forPlatform);
-    TTool GetTool(const IConfig& config, const TString& toolName, const TCanonizedPlatform& forPlatform);
+    TTool GetTool(const IConfig& config, const NYaConfJson::TToolchainsConfig& toolConfig, const TString& toolName, const TCanonizedPlatform& forPlatform);
     void ExecTool(const IConfig& config, const TTool& tool, TVector<TString> toolOptions, TExecve execve = Execve);
 }

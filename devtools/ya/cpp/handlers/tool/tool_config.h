@@ -11,7 +11,7 @@ namespace NYa::NTool {
         TVector<TString> NameParts;
         TString ToolName;
         TVector<TString> ToolOptions;
-        NYaConfJson::TYaConf Config;
+        NYaConfJson::TToolchainsConfig Config;
     };
 
     TToolInvocation LoadToolInvocation(const IConfig& config, const TVector<TString>& args);

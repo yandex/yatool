@@ -20,7 +20,6 @@ namespace NYa {
         virtual int ToolCacheVersion() const = 0;
         // Get arcadia root from a current working dir and only as a last resort use YA_SOURCE_ROOT.
         virtual TFsPath ArcadiaRoot() const = 0;
-        virtual const NYaConfJson::TYaConf& YaConf() const = 0;
         virtual const NYaConfJson::TFormula& YaConfFormula(const TFsPath& arcadiaPath) const = 0;
         virtual TVector<TString> ListToolConfigs(const TFsPath& path) const = 0;
         virtual TMaybe<TString> ReadToolConfig(const TFsPath& path) const = 0;

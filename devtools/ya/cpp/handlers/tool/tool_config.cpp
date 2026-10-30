@@ -33,7 +33,7 @@ namespace NYa::NTool {
         }
 
         void AddToolChain(
-            NYaConfJson::TYaConf& result,
+            NYaConfJson::TToolchainsConfig& result,
             const TString& toolName,
             const TString& toolChainName,
             const NYaConfJson::TToolChain& toolChain,
@@ -54,8 +54,8 @@ namespace NYa::NTool {
             }
         }
 
-        NYaConfJson::TYaConf LoadToolChainConfig(const IConfig& config, const TString& toolName) {
-            NYaConfJson::TYaConf result;
+        NYaConfJson::TToolchainsConfig LoadToolChainConfig(const IConfig& config, const TString& toolName) {
+            NYaConfJson::TToolchainsConfig result;
 
             for (const TString& fileName : config.ListToolConfigs(TOOLCHAIN_CONFIG_ROOT)) {
                 if (!fileName.EndsWith(TOOLCHAIN_CONFIG_SUFFIX)) {
@@ -76,10 +76,6 @@ namespace NYa::NTool {
                 }
             }
 
-            const NYaConfJson::TYaConf& legacy = config.YaConf();
-            for (const auto& [toolChainName, toolChain] : legacy.ToolChains) {
-                AddToolChain(result, toolName, toolChainName, toolChain, legacy.Bottles);
-            }
             result.Finish();
             return result;
         }
@@ -103,7 +99,7 @@ namespace NYa::NTool {
             return result;
         }
 
-        NYaConfJson::TYaConf MakeSimpleToolConfig(
+        NYaConfJson::TToolchainsConfig MakeSimpleToolConfig(
             const IConfig& config,
             const TVector<TString>& nameParts,
             const NYaConfJson::TToolDescription& tool) {
@@ -155,14 +151,7 @@ namespace NYa::NTool {
                 });
             }
 
-            NYaConfJson::TYaConf result{
-                .Bottles = {
-                    {bottleName, {
-                                     .Name = bottleName,
-                                     .Formula = formula,
-                                     .Executable = NYaConfJson::TBottleExecutableMap{{toolName, executable}},
-                                 }},
-                },
+            NYaConfJson::TToolchainsConfig result{
                 .ToolChains = {
                     {toolName, {
                                    .Name = toolName,
@@ -175,6 +164,13 @@ namespace NYa::NTool {
                                    .Platforms = toolChainPlatforms,
                                    .Env = definition.Env,
                                }},
+                },
+                .Bottles = {
+                    {bottleName, {
+                                     .Name = bottleName,
+                                     .Formula = formula,
+                                     .Executable = NYaConfJson::TBottleExecutableMap{{toolName, executable}},
+                                 }},
                 },
             };
             return result;
@@ -197,11 +193,6 @@ namespace NYa::NTool {
 
             const TMaybe<TString> data = config.ReadToolConfig(MakeToolConfigPath(nameParts));
             if (!data) {
-                // In the split tool configuration this tool is missing.
-                // Fallback to the legacy config.
-                if (nameParts.size() == 1) {
-                    break;
-                }
                 throw yexception() << "Cannot find tool '" << JoinSeq(' ', nameParts) << "'";
             }
 
@@ -220,20 +211,15 @@ namespace NYa::NTool {
         }
 
         const TString toolName = JoinSeq(' ', nameParts);
-        NYaConfJson::TYaConf toolConfig;
-        if (!newTool) {
-            toolConfig = config.YaConf();
-        } else {
-            if (newTool->Availability == TOOL_AVAILABILITY_INTERNAL) {
-                throw yexception() << "Tool '" << toolName << "' is for internal use only";
-            }
-            if (newTool->Type == TOOL_TYPE_SIMPLE) {
-                toolConfig = MakeSimpleToolConfig(config, nameParts, newTool.GetRef());
-            } else {
-                toolConfig = LoadToolChainConfig(config, toolName);
-            }
+        NYaConfJson::TToolchainsConfig toolConfig;
+        if (newTool->Availability == TOOL_AVAILABILITY_INTERNAL) {
+            throw yexception() << "Tool '" << toolName << "' is for internal use only";
         }
-
+        if (newTool->Type == TOOL_TYPE_SIMPLE) {
+            toolConfig = MakeSimpleToolConfig(config, nameParts, newTool.GetRef());
+        } else {
+            toolConfig = LoadToolChainConfig(config, toolName);
+        }
 
         return {
             .NameParts = std::move(nameParts),

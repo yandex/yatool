@@ -8,7 +8,7 @@
 namespace NYa::NTool::NPrivate {
     const int CACHE_VERSION = 2;
 
-    const NYaConfJson::TToolChain& ResolveTool(const NYaConfJson::TYaConf& config, TString toolName) {
+    const NYaConfJson::TToolChain& ResolveTool(const NYaConfJson::TToolchainsConfig& config, TString toolName) {
         constexpr int OTHER_TOOL_PRIORITY = 1;
         constexpr int NATIVE_TOOL_PRIORITY = 2;
         int toolChainPriority = 0;  // The more the better

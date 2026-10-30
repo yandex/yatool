@@ -11,7 +11,7 @@
 #include <util/folder/path.h>
 
 namespace NYa::NTool::NPrivate {
-    const NYaConfJson::TToolChain& ResolveTool(const NYaConfJson::TYaConf& config, TString toolName);
+    const NYaConfJson::TToolChain& ResolveTool(const NYaConfJson::TToolchainsConfig& config, TString toolName);
 
     TFsPath GetToolChainPath(
         const IConfig& config,
