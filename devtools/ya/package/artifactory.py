@@ -83,6 +83,7 @@ def get_artifactory_settings(arcadia_root, artifactory_settings):
     if os.path.isabs(artifactory_settings):
         if not os.path.exists(artifactory_settings):
             raise ValueError("Can't find settings path {} on filesystem.".format(artifactory_settings))
+        return artifactory_settings
     else:
         if os.path.exists(artifactory_settings):
             return os.path.abspath(artifactory_settings)
