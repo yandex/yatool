@@ -36,10 +36,14 @@ def load_dir_graph(graph, split_by_types=False):
 
     jgraph = json.loads(graph)
     res = collections.defaultdict(dict)
+    # Shared generated nodes are expanded only once across the forest, so gather
+    # edges from every root before resolving generated nodes to source directories.
+    deps_map = collections.defaultdict(set)
     for subtarget in jgraph['graph']:
-        deps_map = _walk(subtarget)
-        _condense(deps_map)
-        _merge_results(res, _prepare(deps_map, type_miner if split_by_types else None), split_by_types)
+        for node, deps in _walk(subtarget).items():
+            deps_map[node].update(deps)
+    _condense(deps_map)
+    _merge_results(res, _prepare(deps_map, type_miner if split_by_types else None), split_by_types)
 
     return res
 
