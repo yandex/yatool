@@ -2,11 +2,13 @@ PY23_LIBRARY()
 
 PY_SRCS(
     __init__.py
+    compact.pyx
     dumper.pyx
     loader.pyx
 )
 
 SRCS(
+    lib/compact.cpp
     lib/encoder.cpp
     lib/dump.cpp
     lib/load.cpp

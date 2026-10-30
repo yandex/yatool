@@ -17,6 +17,7 @@ from util.system.types cimport i64, ui64
 
 import atexit
 import collections
+from collections.abc import Mapping
 import logging
 import threading
 import time
@@ -408,7 +409,7 @@ cdef class YtStoreImpl:
         return self._store_ptr.ReadOnly()
 
     def fits(self, node):
-        if isinstance(node, dict):
+        if isinstance(node, Mapping):
             outputs = node["outputs"]
             kv = node.get("kv") or {}
         else:

@@ -733,7 +733,8 @@ class _Server(object):
     def put_dependencies(cls, uid, deps):
         from devtools.local_cache.ac.python.ac import put_dependencies
 
-        kwargs = {'uid': uid, 'deps': deps}
+        # The Cython API requires a builtin list, not a compact graph view.
+        kwargs = {'uid': uid, 'deps': list(deps)}
 
         return cls.unary_method(put_dependencies, kwargs, diag='(graph info {})'.format(uid), tc=False, verbose=False)
 

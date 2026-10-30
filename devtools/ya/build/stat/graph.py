@@ -137,6 +137,9 @@ class RunTask(BaseTask):
         self.count: int | None = None
 
     def as_json(self):
+        tags = self.abstract.meta.get('tags')
+        if tags is not None and not isinstance(tags, list):
+            tags = list(tags)
         return {
             'type': self.get_type(cached_mark=True),
             'elapsed': self.get_time_elapsed(),
@@ -144,7 +147,7 @@ class RunTask(BaseTask):
             'end_ts': self.end_time,
             'text': self.abstract.description,
             'platform': self.abstract.meta.get('platform'),
-            'tags': self.abstract.meta.get('tags'),
+            'tags': tags,
             'host': self.host,
             'uid': self.uid,
         }

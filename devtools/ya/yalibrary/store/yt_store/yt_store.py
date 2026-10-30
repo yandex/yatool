@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 import logging
 import os
 
@@ -103,7 +104,7 @@ class YndexerYtStore(YtStore):
         super().__init__(*args, **kwargs)
 
     def fits(self, node):
-        outputs = node["outputs"] if isinstance(node, dict) else node.outputs
+        outputs = node["outputs"] if isinstance(node, Mapping) else node.outputs
         return any(out.endswith(YndexerYtStore.YDX_PB2_EXT) for out in outputs)
 
     def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):

@@ -234,36 +234,43 @@ namespace NSJson {
             }
 
             bool OnNull() override {
+                if (Compact_) return Compact_->OnNull();
                 if (SkipScalar()) return true;
                 return SetValue(MakePyNoneObject());
             }
 
             bool OnBoolean(bool val) override {
+                if (Compact_) return Compact_->OnBoolean(val);
                 if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnInteger(long long val) override {
+                if (Compact_) return Compact_->OnInteger(val);
                 if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnUInteger(unsigned long long val) override {
+                if (Compact_) return Compact_->OnUInteger(val);
                 if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnString(const TStringBuf& val) override {
+                if (Compact_) return Compact_->OnString(val);
                 if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val, InternVals_));
             }
 
             bool OnDouble(double val) override {
+                if (Compact_) return Compact_->OnDouble(val);
                 if (SkipScalar()) return true;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnOpenArray() override {
+                if (Compact_) return Compact_->OnOpenArray();
                 if (Skipping_) {
                     ++SkipDepth_;
                     return true;
@@ -272,6 +279,7 @@ namespace NSJson {
                     return false;
                 }
                 try {
+                    if (StartCompact()) return Compact_->OnOpenArray();
                     switch (StateStack_.back()) {
                         case START:
                         case AFTER_MAP_KEY:
@@ -296,6 +304,7 @@ namespace NSJson {
             }
 
             bool OnCloseArray() override {
+                if (Compact_) return CloseCompact(false);
                 if (Skipping_) return CloseSkippedContainer();
                 if (StateStack_.empty()) {
                     return false;
@@ -317,6 +326,7 @@ namespace NSJson {
             }
 
             bool OnOpenMap() override {
+                if (Compact_) return Compact_->OnOpenMap();
                 if (Skipping_) {
                     ++SkipDepth_;
                     return true;
@@ -325,6 +335,7 @@ namespace NSJson {
                     return false;
                 }
                 try {
+                    if (StartCompact()) return Compact_->OnOpenMap();
                     switch (StateStack_.back()) {
                         case START:
                         case AFTER_MAP_KEY:
@@ -348,6 +359,7 @@ namespace NSJson {
             }
 
             bool OnCloseMap() override {
+                if (Compact_) return CloseCompact(true);
                 if (Skipping_) return CloseSkippedContainer();
                 if (StateStack_.empty()) {
                     return false;
@@ -368,6 +380,7 @@ namespace NSJson {
             }
 
             bool OnMapKey(const TStringBuf& key) override {
+                if (Compact_) return Compact_->OnMapKey(key);
                 if (Skipping_) return true;
                 if (StateStack_.empty()) {
                     return false;
@@ -402,6 +415,36 @@ namespace NSJson {
             }
 
         private:
+            bool PathMatches(const TVector<TString>& path) const {
+                if (path.size() != Path_.size()) return false;
+                for (size_t i = 0; i < path.size(); ++i) {
+                    if (!std::holds_alternative<TString>(Path_[i]) || std::get<TString>(Path_[i]) != path[i]) return false;
+                }
+                return true;
+            }
+
+            bool StartCompact() {
+                if (!Options_.CompactStorage) return false;
+                for (const auto& path : Options_.CompactPaths) {
+                    if (PathMatches(path)) {
+                        const bool project = !Options_.ArrayItemKeyWhiteList.empty() && PathMatches(Options_.ArrayItemPath);
+                        Compact_.Reset(new TCompactBuilder(*Options_.CompactStorage, project, Options_.ArrayItemKeyWhiteList));
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            bool CloseCompact(bool map) {
+                const bool result = map ? Compact_->OnCloseMap() : Compact_->OnCloseArray();
+                if (result && Compact_->Done()) {
+                    const auto value = Compact_->Result();
+                    Compact_.Reset();
+                    return SetValue(CheckNewObject(Options_.CompactFactory(Options_.CompactOwner, value)));
+                }
+                return result;
+            }
+
             bool FilterArrayItem() const {
                 if (Options_.ArrayItemKeyWhiteList.empty() || Path_.size() != Options_.ArrayItemPath.size() + 1 ||
                     !std::holds_alternative<std::size_t>(Path_.back())) {
@@ -500,6 +543,7 @@ namespace NSJson {
             bool Skipping_{};
             std::size_t SkipDepth_{};
             TPyObjectHolder ResultObjHolder_{};
+            THolder<TCompactBuilder> Compact_;
 
             TVector<TState> StateStack_{};
             TVector<TPyObjectHolderPtr> HolderStack_{};
@@ -524,6 +568,7 @@ namespace NSJson {
                 callbacksPtr = rootKeyFilter.get();
             }
             NYa::NJson::ReadJson(*input, callbacksPtr);
+            if (options.CompactStorage) options.CompactStorage->Finish();
             return parserCallbacks.GetResult();
         } catch (TFileError& e) {
             if (!PyErr_Occurred()) PyErr_SetString(PyExc_IOError, e.what());

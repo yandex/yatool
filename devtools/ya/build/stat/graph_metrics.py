@@ -60,7 +60,7 @@ def _add_metric(
 
 
 def make_targets_metrics(
-    graph: typing.List[GraphNode], tasks_metrics: typing.Dict[str, dict], execution_log: dict[str, dict]
+    graph: typing.Sequence[GraphNode], tasks_metrics: typing.Dict[str, dict], execution_log: dict[str, dict]
 ) -> typing.DefaultDict:
     metrics = defaultdict(dict)
 

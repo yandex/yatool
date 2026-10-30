@@ -103,6 +103,7 @@ def load_custom_context(params):
         intern_vals=True,
         array_item_path=('graph', 'graph'),
         array_item_key_white_list=LITE_GRAPH_NODE_KEYS,
+        compact_paths=(('graph', 'graph'), ('graph', 'inputs')),
     )
     with stager.scope('load_custom_context_projection'):
         if native_input:

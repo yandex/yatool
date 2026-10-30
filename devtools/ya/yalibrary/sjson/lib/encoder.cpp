@@ -1,5 +1,6 @@
 #include "encoder.h"
 #include "common.h"
+#include "compact.h"
 
 #include <library/cpp/pybind/ptr.h>
 
@@ -279,6 +280,44 @@ namespace NSJson {
                 Out_.Flush();
             }
 
+            void EncodePacked(const TCompactStorage& store, TIndexType value, PyObject* owner, TCompactOverride resolve) {
+                const auto kind = value & CompactKindMask;
+                if (kind == List || kind == Map) {
+                    if (resolve) {
+                        TPyObjectPtr replacement{resolve(owner, value), BORROW};
+                        Y_ENSURE(replacement.Get(), "Cannot resolve compact graph mutation");
+                        if (replacement.Get() != Py_None) {
+                            DoEncode(replacement.Get());
+                            return;
+                        }
+                    }
+                    const auto size = store.Size(value);
+                    Out_.Write(kind == Map ? '{' : '[');
+                    for (size_t i = 0; i < size; ++i) {
+                        if (i) Out_.Write(',');
+                        if (kind == Map) {
+                            TPyObjectPtr key{store.MapKey(value, i), BORROW};
+                            TPythonString text;
+                            Y_ENSURE(GetUtf8String(key.Get(), text));
+                            WriteEscapedString(text.Str);
+                            Out_.Write(':');
+                        }
+                        EncodePacked(store, kind == Map ? store.MapValue(value, i) : store.Item(value, i), owner, resolve);
+                    }
+                    Out_.Write(kind == Map ? '}' : ']');
+                } else if (kind == UInt64) {
+                    Out_.Write(ToString(store.Unsigned(value)));
+                } else if (kind == Int64) {
+                    Out_.Write(ToString(store.Signed(value)));
+                } else {
+                    TPyObjectPtr scalar{store.Scalar(value), BORROW};
+                    Y_ENSURE(scalar.Get(), "Cannot read compact scalar");
+                    DoEncode(scalar.Get());
+                }
+            }
+
+            void Flush() { Out_.Flush(); }
+
         private:
             void DoEncode(PyObject* obj) {
                 if (TPythonString str; GetUtf8String(obj, str)) {
@@ -401,7 +440,9 @@ namespace NSJson {
                     Out_.Flush();
                     TPyObjectPtr result{PyObject_CallFunctionObjArgs(obj, StreamRef_.Get(), nullptr), BORROW};
                     if (!result.Get()) {
-                        ythrow yexception() << "External serialization method failed: " << GetObjectStr(obj);
+                        // Preserve the Python error. Calling repr() while an
+                        // exception is pending can clear it (notably on cycles).
+                        ythrow yexception() << "External serialization method failed";
                     }
                     return;
                 }
@@ -468,5 +509,13 @@ namespace NSJson {
         TPyObjectPtr objRef{obj};
         NSJson::TJsonEncoder<TJsonOutputStream> encoder(stream);
         encoder.Encode(obj);
+    }
+
+    void EncodeCompact(PyObject* stream, const TCompactStorage& store, TIndexType value,
+                       PyObject* owner, TCompactOverride resolve) {
+        using TJsonOutputStream = TBufferedOutputStream<TPythonOutputStreamWrapper>;
+        TJsonEncoder<TJsonOutputStream> encoder(stream);
+        encoder.EncodePacked(store, value, owner, resolve);
+        encoder.Flush();
     }
 }

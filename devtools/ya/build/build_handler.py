@@ -93,9 +93,9 @@ class YaMakeLock:
 
 
 def _to_json(data):
-    if isinstance(data, dict):
+    if isinstance(data, (dict, sjson.CompactMap)):
         return {str(k): _to_json(v) for k, v in data.items()}
-    if isinstance(data, (set, tuple, list)):
+    if isinstance(data, (set, tuple, list, sjson.CompactList)):
         return [_to_json(v) for v in data]
     return data
 

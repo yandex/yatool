@@ -83,7 +83,9 @@ class NodeFailureListener:
         stderr, links = extract_node_stderr(res, self._opts)
         details = {
             'kind': node.get('kv', {}).get('p'),
-            'outputs': node.get('outputs', []),
+            # Structured events cross a stdlib JSON boundary. The local graph
+            # can supply CompactList, but this event field is a string array.
+            'outputs': list(node.get('outputs', [])),
             'platform': bp.BuildPlan.node_platform(node),
             'exit_code': res.get('status'),
         }

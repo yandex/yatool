@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Mapping
 import json
 import json.decoder as json_decoder
 import logging
@@ -588,7 +589,7 @@ class BazelStore(DistStore):
                     self._disabled = True
 
     def fits(self, node):
-        if isinstance(node, dict):
+        if isinstance(node, Mapping):
             outputs = node["outputs"]
             kv = node.get("kv") or {}
         else:

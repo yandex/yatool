@@ -591,7 +591,7 @@ class CacheFactory:
 
     def _get_fits_filter(self):
         def fits_filter(node):
-            if not isinstance(node, dict):
+            if not isinstance(node, (dict, sjson.CompactMap)):
                 node = node.args
             return is_dist_cache_suitable(node, None, self._opts)
 
@@ -740,19 +740,25 @@ def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Faile
 class BuildContext:
     @classmethod
     def load(cls, params, app_ctx, data):
-        kwargs = {'encoding': 'utf-8'}
+        """Restore a disposable context, consuming its serialized suite dictionaries."""
+
+        def restore_tests(pickled_tests):
+            tests = []
+            for uid in pickled_tests:
+                pickled_test = pickled_tests[uid]
+                # Keep the key order while releasing each payload as it is consumed.
+                # Iterating values() or copying them would retain the serialized suites.
+                pickled_tests[uid] = None
+                tests.append(cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'), encoding='utf-8'))
+            pickled_tests.clear()
+            return tests
+
         builder = YaMake(
             params,
             app_ctx,
             graph=data.get('graph'),
-            tests=[
-                cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'), **kwargs)
-                for pickled_test in data['tests'].values()
-            ],
-            stripped_tests=[
-                cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'), **kwargs)
-                for pickled_test in data.get('stripped_tests', {}).values()
-            ],
+            tests=restore_tests(data['tests']),
+            stripped_tests=restore_tests(data.get('stripped_tests', {})),
             configure_errors=data['configure_errors'],
             make_files=data['make_files'],
         )
@@ -1319,12 +1325,7 @@ class Context:
                 self._full_graph = self.graph
                 self.graph = lg.build_lite_graph(self.graph)
 
-        if app_config.in_house:
-            import yalibrary.diagnostics as diag
-
-            if diag.is_active():
-                diag.save('ya-make-full-graph', graph=json.dumps(self.graph, sort_keys=True, indent=4, default=str))
-                timer.show_step("full graph is dumped")
+        self._dump_graph_diagnostics()
 
         if opts.show_command:
             self.threads = 0
@@ -1498,6 +1499,28 @@ class Context:
             graph_conf['namespace'] = opts.cache_namespace
         if opts.build_execution_time:
             graph_conf['max_execution_time'] = opts.build_execution_time
+
+    def _dump_graph_diagnostics(self):
+        if app_config.in_house:
+            import yalibrary.diagnostics as diag
+
+            if diag.is_active():
+                import json as std_json
+
+                def json_default(value):
+                    # Adapt one container at a time, without copying the whole
+                    # graph. ujson instead treats compact mappings as key arrays.
+                    if isinstance(value, sjson.CompactMap):
+                        return dict(value.items())
+                    if isinstance(value, sjson.CompactList):
+                        return list(value)
+                    return str(value)
+
+                diag.save(
+                    'ya-make-full-graph',
+                    graph=std_json.dumps(self.graph, sort_keys=True, indent=4, default=json_default),
+                )
+                self._timer.show_step("full graph is dumped")
 
     def _dump_graph_if_needed(self):
         if not self.opts.dump_graph:
