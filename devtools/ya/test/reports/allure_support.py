@@ -20,8 +20,11 @@ class AllureReportGenerator(object):
         self._java_path = yalibrary.tools.tool('java')
 
     def create(self, build_dir, output_dir):
+        # type: (str, str) -> None
         exts.fs.create_dirs(output_dir)
         env = os.environ.copy()
+        # Internal test reports must not load Google tags or send generation analytics.
+        env["ALLURE_NO_ANALYTICS"] = "true"
 
         # XXX remove after allure update
         if os.path.exists(os.path.join(os.path.dirname(self._allure_path), "..", "app")):
@@ -35,8 +38,9 @@ class AllureReportGenerator(object):
             for root, dirs, files in os.walk("."):
                 if "allure" in dirs:
                     for _file in os.listdir(os.path.join(root, "allure")):
-                        exts.fs.symlink(
-                            os.path.abspath(os.path.join(root, "allure", _file)), os.path.join(allure_dir, _file)
+                        # Allure rejects symlink attachments; copy files and history directories, following source links.
+                        exts.fs.copy_tree(
+                            os.path.realpath(os.path.join(root, "allure", _file)), os.path.join(allure_dir, _file)
                         )
         else:
             allure_dir = build_dir
