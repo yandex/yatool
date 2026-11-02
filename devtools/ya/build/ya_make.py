@@ -1527,8 +1527,13 @@ class Context:
             return
 
         if self.opts.dump_graph_file:
-            with open(self.opts.dump_graph_file, 'w') as gf:
-                json.dump(self.full_graph, gf, sort_keys=True, indent=4, default=str)
+            try:
+                with open(self.opts.dump_graph_file, 'w') as gf:
+                    json.dump(self.full_graph, gf, sort_keys=True, indent=4, default=str)
+            except OSError as error:
+                if not self.opts.dump_graph_ignore_savefail:
+                    raise
+                logger.warning('Optional build graph dump failed: %s', error)
         else:
             stdout = self.opts.stdout or sys.stdout
             json.dump(self.full_graph, stdout, sort_keys=True, indent=4, default=str)

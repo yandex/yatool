@@ -2029,6 +2029,7 @@ class YMakeDumpGraphOptions(Options):
     def __init__(self):
         self.dump_graph = None
         self.dump_graph_file = None
+        self.dump_graph_ignore_savefail = False
         self.use_json_cache = True
         self.save_context_to = None
         self.save_graph_to = None
@@ -2057,6 +2058,16 @@ class YMakeDumpGraphOptions(Options):
                 group=DEVELOPERS_OPT_GROUP,
                 visible=HelpLevel.INTERNAL,
             ),
+            ArgConsumer(
+                ['--dump-graph-ignore-savefail'],
+                help=(
+                    'Warn instead of failing when the graph dump file cannot be written; '
+                    'requires -G/--dump-graph or --dump-json-graph and --dump-graph-to-file'
+                ),
+                hook=SetConstValueHook('dump_graph_ignore_savefail', True),
+                group=DEVELOPERS_OPT_GROUP,
+                visible=HelpLevel.INTERNAL,
+            ),
             ConfigConsumer(
                 'use_json_cache', help='Use cache for json-graph in ymake (-xs)', group=DEVELOPERS_OPT_GROUP
             ),
@@ -2075,6 +2086,13 @@ class YMakeDumpGraphOptions(Options):
                 visible=HelpLevel.INTERNAL,
             ),
         ]
+
+    def postprocess(self) -> None:
+        if self.dump_graph_ignore_savefail and (not self.dump_graph or not self.dump_graph_file):
+            raise ArgsValidatingException(
+                '--dump-graph-ignore-savefail requires -G/--dump-graph or --dump-json-graph '
+                'together with --dump-graph-to-file pointing to a non-empty path'
+            )
 
 
 class YWarnModeOptions(Options):
