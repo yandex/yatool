@@ -2173,6 +2173,7 @@ class YaMake:
                         environment_whitelist=self.opts.larry_environment_whitelist,
                         test_environment_whitelist=self.opts.larry_test_environment_whitelist,
                         build_threads=self.opts.build_threads,
+                        build_cache_policy='ignore' if self.opts.clear_build else 'use',
                         test_threads=getattr(self.opts, 'test_threads', 0),
                     ).build(self.opts.larry_addr)
                 else:
