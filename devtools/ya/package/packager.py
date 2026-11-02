@@ -1052,6 +1052,7 @@ def create_package(package_context, output_root, builds):
                     rpmbuild_dir,
                     params.publish_to,
                     params.key,
+                    result_dir,
                 )
                 package_version = "{0}-{1}".format(rpm_build_version, rpm_build_release)
 

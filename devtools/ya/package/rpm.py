@@ -74,7 +74,7 @@ def publish_package(path_to_package, publish_to, key_user):
         package.process.run_process(SSH, [key_user + "@" + publish_to.split(':')[0]] + prepare_install_cmd(publish_to))
 
 
-def create_rpm_package(temp_dir, package_context, rpmbuild_dir, publish_to_list, key_user):
+def create_rpm_package(temp_dir, package_context, rpmbuild_dir, publish_to_list, key_user, result_dir):
     package_name = package_context.package_name
     args = [
         '--define',
@@ -84,6 +84,7 @@ def create_rpm_package(temp_dir, package_context, rpmbuild_dir, publish_to_list,
     ]
     package.process.run_process(RPMBUILD_COMMAND, args)
     tar_gz_file = package_context.resolve_filename(extra={"package_ext": "tar.gz"})
+    tar_gz_file = os.path.join(result_dir, tar_gz_file)
     if publish_to_list:
         packages_dir = os.path.join(rpmbuild_dir, "RPMS")
         for publish_to in publish_to_list:
