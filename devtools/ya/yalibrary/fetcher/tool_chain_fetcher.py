@@ -374,7 +374,7 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         failed_queries = []
         for sb_api_query in self._get_sb_api_queries():
             logger.debug('%s: lookup resources with query: %s', self._toolchain_name, sb_api_query)
-            resources = _list_resources(**sb_api_query)
+            resources = _list_resources_no_links(**sb_api_query)
             if resources:
                 assert len(resources) == 1
                 resource = resources[0]
@@ -534,6 +534,13 @@ def _list_resources(**kwargs):
     from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
 
     return _do_sandbox_method(SandboxClient.list_resources, **kwargs)
+
+
+def _list_resources_no_links(**kwargs):
+    # A widely held resource has thousands of host links, and the lookup needs only its id
+    from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
+
+    return _do_sandbox_method(SandboxClient.list_resources_no_links, **kwargs)
 
 
 def _do_sandbox_method(method, **kwargs):
