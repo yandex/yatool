@@ -863,7 +863,7 @@ def is_dist_cache_suitable(node, result, opts):
     if module_tag in ('jar_runable', 'jar_runnable', 'jar_testable'):
         return False
 
-    if opts.dist_cache_evict_test_runs and node.get('kv', {}).get('run_test_node', False):
+    if opts.dist_cache_evict_test_runs and node.get('node-type') == const.NodeType.TEST:
         return False
 
     if get_module_type(node):
