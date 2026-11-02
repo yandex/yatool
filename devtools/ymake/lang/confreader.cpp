@@ -1,11 +1,8 @@
 #include <devtools/ymake/lang/confreader.h>
 
-#include <contrib/libs/antlr4_cpp_runtime/src/antlr4-runtime.h>
+#include "parser_lexer.h"
 
 #include "devtools/ymake/lang/properties.h"
-#include <devtools/ymake/lang/TConfLexer.h>
-#include <devtools/ymake/lang/TConfParser.h>
-#include <devtools/ymake/lang/TConfBaseVisitor.h>
 
 #include <devtools/ymake/common/npath.h>
 
@@ -25,6 +22,7 @@
 #include <util/generic/hash_set.h>
 #include <util/generic/map.h>
 #include <util/generic/noncopyable.h>
+#include <util/generic/scope.h>
 #include <util/generic/strbuf.h>
 #include <util/generic/string.h>
 #include <util/generic/utility.h>
@@ -40,6 +38,7 @@
 
 #include <fmt/format.h>
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -268,119 +267,6 @@ namespace {
         }
         return keywords;
     };
-
-    class TArgsBuilder {
-    public:
-        using TArgsList = std::span<NConfReader::TConfParser::FormalArgContext* const>;
-
-        TArgsBuilder(TArgsList args, TStringBuf fileName, TStringBuf macroName) noexcept
-            : RemainingArgs_{args}
-            , FileName_{fileName}
-            , MacroName_{macroName}
-        {}
-
-        TArgsBuilder& ConsumeSpecArgs() {
-            if (RemainingArgs_.empty())
-                return *this;
-
-            while(auto specArg = RemainingArgs_.front()->specArg()) {
-                Arguments_.emplace_back(TArgDesc{
-                    .Type = EArgType::Specialization,
-                    .Name = TString(specArg->string()->stringContent()->getText()),
-                    .DeepReplace = {},
-                    .InitTrue = {},
-                    .InitFalse = {},
-                });
-                if (Arguments_.back().Name == "*") {
-                    ReportConfigError(fmt::format(
-                        "This value {} is prohibited for use as specialization parameter in the definition of macro [{}]", RemainingArgs_.front()->getText(), MacroName_
-                    ), FileName_);
-                }
-                RemainingArgs_ = RemainingArgs_.subspan(1);
-            }
-            return *this;
-        }
-
-        TArgsBuilder& ConsumeRegularArgs() {
-            const bool specArgSeen = std::ranges::any_of(Arguments_, [](const auto& arg) {return arg.Type == EArgType::Specialization;});
-            while (!RemainingArgs_.empty()) {
-                const auto arg = RemainingArgs_.front();
-                RemainingArgs_ = RemainingArgs_.subspan(1);
-
-                Arguments_.emplace_back(TArgDesc());
-                auto& argDesc = Arguments_.back();
-                argDesc.Name = TString(arg->argName()->getText());
-                if (auto deepReplace = arg->deepReplace()) {
-                    argDesc.DeepReplace = TString(deepReplace->modifiers()->getText());
-                    Y_ASSERT(!argDesc.DeepReplace.empty());
-                    argDesc.DeepReplace += ":";
-                }
-                if (arg->arraySpec()) {
-                    argDesc.Type = EArgType::NamedArray;
-                } else if (arg->boolSpec()) {
-                    argDesc.Type = EArgType::NamedBool;
-                    if (auto boolInit = arg->boolInit()) {
-                        auto initTrue = boolInit->initTrue;
-                        Y_ASSERT(initTrue != nullptr);
-                        argDesc.InitTrue = TString(initTrue->stringContent()->getText());
-                        auto initFalse = boolInit->initFalse;
-                        Y_ASSERT(initFalse != nullptr);
-                        argDesc.InitFalse = TString(initFalse->stringContent()->getText());
-                    }
-                } else if (auto defaultInit = arg->defaultInit()) {
-                    argDesc.Type = EArgType::NamedScalar;
-                    argDesc.InitFalse = TString(defaultInit->string()->stringContent()->getText());
-                } else if (/* auto specArg = */ arg->specArg()) {
-                    ReportConfigError(fmt::format(
-                        "Specialization parameter [{}] must precede all positional and named arguments in the definition of macro [{}]", arg->getText(), MacroName_
-                    ), FileName_);
-                } else {
-                    argDesc.Type = EArgType::Positional;
-                }
-                if (specArgSeen && IsNamedArgType(argDesc.Type)) {
-                    ReportConfigError(fmt::format(
-                        "Named parameter [{}] is prohibited in the definition of partial macro specialization [{}]", argDesc.Name, MacroName_
-                    ), FileName_);
-                }
-            }
-            return *this;
-        }
-
-        TArgsBuilder& ConsumeVarargs(NConfReader::TConfParser::VarargContext* vararg) {
-            if (vararg) {
-                Arguments_.emplace_back(TArgDesc{
-                    .Type = EArgType::Vararg,
-                    .Name = TString{vararg->getText()},
-                    .DeepReplace = {},
-                    .InitTrue = {},
-                    .InitFalse = {},
-                });
-            }
-            return *this;
-        }
-
-        TArgs Build() noexcept {
-            return std::move(Arguments_);
-        }
-
-    private:
-        TArgsList RemainingArgs_;
-        TStringBuf FileName_;
-        TStringBuf MacroName_;
-        TArgs Arguments_;
-    };
-
-    TArgs FillArguments(NConfReader::TConfParser::FormalArgsContext* formalArgs, TStringBuf fileName, TStringBuf macroName) {
-        if (!formalArgs) {
-            return {};
-        }
-
-        return TArgsBuilder{formalArgs->formalArg(), fileName, macroName}
-            .ConsumeSpecArgs()
-            .ConsumeRegularArgs()
-            .ConsumeVarargs(formalArgs->vararg())
-            .Build();
-    }
 
     class TBlockDesc
     {
@@ -1259,432 +1145,765 @@ namespace {
         bool LeftTrim = true;
     };
 
-    class TConfReaderVisitor : public TConfBaseVisitor
-    {
+    class TConfigParser {
+        using EToken = NYMake::NParsing::EToken;
+        using TToken = NYMake::NParsing::TToken;
+        enum class EScope {
+            None,
+            Macro,
+            Module,
+            MultiModule,
+            Foreach
+        };
+
     public:
-        TConfReaderVisitor(TConfBuilder& builder, TStringBuf fileName)
-            : Builder{builder}
-            , FileName{fileName}
+        TConfigParser(TConfBuilder& builder, TStringBuf fileName, TStringBuf content)
+            : Builder(builder)
+            , FileName(fileName)
+            , Lexer(content, NYMake::NParsing::EMode::Config)
         {
         }
 
-        template<typename T, typename Ctx>
-        T visitAs(Ctx* ctx) {
-            return std::any_cast<T>(visit(ctx));
-        }
-
-        antlrcpp::Any visitDocComment(TConfParser::DocCommentContext *ctx) override {
-            YDIAG(Conf) << "DocComment: " << ctx->getText() << Endl;
-            return nullptr;
-        }
-
-        antlrcpp::Any visitImportStmt(TConfParser::ImportStmtContext *ctx) override {
-            Builder.ProcessImport(ctx->string()->stringContent()->getText());
-            return nullptr;
-        }
-
-        antlrcpp::Any visitStmt(TConfParser::StmtContext *ctx) override {
-            if (auto docComment = ctx->docComment()) {
-                DocStream << StripStringRight(StripStringLeft(TString(docComment->getText()), EqualsStripAdapter('#'))) << "\n";
-            } else {
-                DocStream.Clear();
+        void Parse() {
+            for (;;) {
+                Space();
+                if (Peek().Kind == EToken::End) {
+                    return;
+                }
+                ParseEntry(true, false);
+                Space();
+                if (Peek().Kind == EToken::End) {
+                    return;
+                }
+                Expect(EToken::Eol);
             }
-            visitChildren(ctx);
-            return nullptr;
         }
 
-        antlrcpp::Any visitAssignStmt(TConfParser::AssignStmtContext *ctx) override {
-            Builder.AddAssignment(TString(ctx->ident()->getText()),
-                                  TString(ctx->assignOp()->getText()),
-                                  TString(NormalizeRval(ctx->rvalue()->getText(), Builder.GetLeftTrim())));
-            return nullptr;
-        }
-
-        antlrcpp::Any visitCallStmt(TConfParser::CallStmtContext *ctx) override {
-            TString macroName(ctx->macroName()->getText());
-            TString args;
-            if (auto actualArgs = ctx->actualArgs()) {
-                args = actualArgs->getText();
+    private:
+        const TToken& Peek() {
+            if (!Token) {
+                Token = Lexer.Next();
             }
+            return *Token;
+        }
 
-            antlr4::Token* token = ctx->macroName()->getStart();
-            TSourceRange range {
-                token->getLine(),
-                token->getCharPositionInLine() + 1,
-                token->getLine(),
-                token->getCharPositionInLine() + macroName.length()
+        TToken Take() {
+            auto token = Peek();
+            Token.reset();
+            return token;
+        }
+
+        void Space() {
+            if (Peek().Kind == EToken::Space) {
+                Take();
+            }
+        }
+
+        bool At(TStringBuf text) {
+            Space();
+            return Peek().Text == text;
+        }
+
+        bool Accept(TStringBuf text) {
+            if (!At(text)) {
+                return false;
+            }
+            Take();
+            return true;
+        }
+
+        bool AcceptAdjacent(TStringBuf text) {
+            if (Peek().Text != text) {
+                return false;
+            }
+            Take();
+            return true;
+        }
+
+        void ExpectAdjacent(TStringBuf text) {
+            if (!AcceptAdjacent(text)) {
+                Error(TStringBuilder() << "expected '" << text << "' without intervening space");
+            }
+        }
+
+        void Expect(TStringBuf text) {
+            if (!Accept(text)) {
+                Error(TStringBuilder() << "expected '" << text << "'");
+            }
+        }
+
+        void Expect(EToken kind) {
+            Space();
+            if (Peek().Kind != kind) {
+                Error("unexpected token");
+            }
+            Take();
+        }
+        size_t Offset() const {
+            return Token ? Token->Offset : Lexer.Position();
+        }
+
+        [[noreturn]] void Error(TStringBuf message) {
+            auto token = Peek();
+            ReportConfigError(message, FileName, token.Line, token.Column);
+            Y_UNREACHABLE();
+        }
+
+        static TString Clean(TStringBuf text) {
+            if (text.find('\r') == TStringBuf::npos) {
+                return TString(text);
+            }
+            TString result;
+            result.reserve(text.size());
+            for (char c : text) {
+                if (c != '\r') {
+                    result += c;
+                }
+            }
+            return result;
+        }
+
+        static bool ReservedName(TStringBuf name) {
+            for (TStringBuf keyword : {"when", "elsewhen", "otherwise", "select", "default", "foreach", "multimodule", "env"}) {
+                if (name == keyword) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        TToken Name(bool skipSpace = true) {
+            if (skipSpace) {
+                Space();
+            }
+            auto token = Peek();
+            if (token.Kind != EToken::Identifier) {
+                Error("expected an identifier");
+            }
+            if (ReservedName(token.Text)) {
+                Error("reserved word used as an identifier");
+            }
+            Take();
+            return token;
+        }
+
+        TString String(bool unquote = true) {
+            Space();
+            if (Peek().Kind != EToken::String) {
+                Error("expected a string");
+            }
+            auto text = Take().Text;
+            return Clean(unquote ? text.SubStr(1, text.size() - 2) : text);
+        }
+
+        TSourceRange Range(const TToken& token) {
+            return {token.Line, token.Column + 1, token.Line, token.Column + token.Text.size()};
+        }
+
+        bool EntryAhead(TStringBuf source, bool simple) const {
+            NYMake::NParsing::TLexer lexer(source, NYMake::NParsing::EMode::Config);
+            auto next = [&lexer] {
+                auto token = lexer.Next();
+                if (token.Kind == EToken::Space) {
+                    token = lexer.Next();
+                }
+                return token;
             };
-
-            Builder.AddMacroCall(macroName, args, range);
-
-            return nullptr;
+            auto token = next();
+            if (token.Kind == EToken::End || token.Kind == EToken::Eol ||
+                token.Kind == EToken::Comment || token.Kind == EToken::DocComment) {
+                return true;
+            }
+            if (token.Text == "}") {
+                return Depth > 0;
+            }
+            if (token.Text == "@" && Depth == 0) {
+                return lexer.Next().Text == "import";
+            }
+            bool property = false;
+            if (token.Text == "." && !simple &&
+                ((Depth == 1 && (Scope == EScope::Macro || Scope == EScope::Module || Scope == EScope::MultiModule)) ||
+                 (Depth == 2 && InMultiModule && Scope == EScope::Module))) {
+                token = next();
+                property = true;
+            } else if (token.Text == "[" && Scope == EScope::Foreach) {
+                return next().Text == ".";
+            }
+            if (token.Kind != EToken::Identifier) {
+                return false;
+            }
+            auto following = next();
+            if (token.Text == "when" || token.Text == "select") {
+                return following.Text == "(" && Scope != EScope::MultiModule && Scope != EScope::Foreach;
+            }
+            if (token.Text == "foreach") {
+                return following.Text == "(" && !simple && Scope == EScope::Macro;
+            }
+            if (token.Text == "multimodule") {
+                return Depth == 0 && following.Kind == EToken::Identifier;
+            }
+            if (ReservedName(token.Text)) {
+                return false;
+            }
+            if (following.Text == "=" || following.Text == ":=" || following.Text == "+=" || following.Text == "-=") {
+                return property || (Scope != EScope::MultiModule && Scope != EScope::Foreach);
+            }
+            if (following.Text == "(") {
+                // The legacy grammar recognizes calls before checking their scope.
+                return !simple;
+            }
+            return following.Kind == EToken::Identifier &&
+                   ((Depth == 0 && (token.Text == "macro" || token.Text == "module" || token.Text == "multimodule")) ||
+                    (Scope == EScope::MultiModule && token.Text == "module"));
         }
 
-        antlrcpp::Any visitWhenStmt(TConfParser::WhenStmtContext *ctx) override {
-            auto whenClause = ctx->whenClause();
-            Y_ASSERT(whenClause != nullptr);
+        TStringBuf RawValue(bool simple = false) {
+            Y_ASSERT(!Token);
+            const auto source = Lexer.Source();
+            const size_t start = Lexer.Position();
+            size_t end = start;
+            size_t lineStart = start;
+            while (end < source.size()) {
+                if (source[end] == '\n') {
+                    size_t last = end;
+                    while (last > start && source[last - 1] == '\r') {
+                        --last;
+                    }
+                    if (last == start || source[last - 1] != '\\') {
+                        break;
+                    }
+                    // ANTLR prefers a new entry over consuming a continuation.
+                    // A backslash inside a comment is never a continuation token.
+                    if (source.SubStr(lineStart, end - lineStart).find('#') != TStringBuf::npos || EntryAhead(source.SubStr(end + 1), simple)) {
+                        break;
+                    }
+                    lineStart = end + 1;
+                }
+                ++end;
+            }
+            Lexer.Advance(end - start);
+            const auto value = source.SubStr(start, end - start);
+            // Borrow unchanged values; stripping carriage returns needs owned storage.
+            if (value.find('\r') == TStringBuf::npos) {
+                return value;
+            }
+            RawValueStorage = Clean(value);
+            return RawValueStorage;
+        }
 
-            Builder.PushConditionVars();
+        bool DefinitionAhead() {
+            auto lexer = Lexer;
+            auto token = Token;
+            Take();
+            Space();
+            const bool result = Peek().Kind == EToken::Identifier;
+            Lexer = std::move(lexer);
+            Token = token;
+            return result;
+        }
 
+        void ParseEntry(bool top, bool simple) {
+            Space();
+            const auto kind = Peek().Kind;
+            if (kind == EToken::DocComment) {
+                if (simple) {
+                    Error("documentation comment in a conditional block");
+                }
+                Doc += StripStringRight(StripStringLeft(Clean(Take().Text), EqualsStripAdapter('#')));
+                Doc += '\n';
+                return;
+            }
+            if (top && (At("macro") || At("module") || At("multimodule")) && DefinitionAhead()) {
+                ParseDefinition();
+                return;
+            }
+            if (top && Accept("@")) {
+                if (!AcceptAdjacent("import")) {
+                    Error("expected import");
+                }
+                if (Peek().Kind != EToken::Space) {
+                    Error("expected space after @import");
+                }
+                Builder.ProcessImport(String());
+                return;
+            }
+            Doc.clear();
+            if (kind == EToken::Eol || kind == EToken::End) {
+                return;
+            }
+            if (kind == EToken::Comment) {
+                Take();
+                return;
+            }
+            if (!simple && At("module") && Scope == EScope::MultiModule) {
+                ParseDefinition();
+                return;
+            }
+            if (!simple && Accept(".")) {
+                if (!((Depth == 1 && (Scope == EScope::Macro || Scope == EScope::Module || Scope == EScope::MultiModule)) ||
+                      (Depth == 2 && InMultiModule && Scope == EScope::Module))) {
+                    Error("property is not allowed in this block");
+                }
+                auto name = Name(false);
+                AssignmentOperator();
+                auto value = RawValue();
+                Builder.SetProperty(TString(name.Text), TString(NormalizeRval(value, Builder.GetLeftTrim())), Range(name));
+                return;
+            }
+            if (At("when") || At("select")) {
+                if (!simple && (Scope == EScope::MultiModule || Scope == EScope::Foreach)) {
+                    Error("conditional is not allowed in this block");
+                }
+                if (At("when")) {
+                    ParseWhen();
+                } else {
+                    ParseSelect();
+                }
+                return;
+            }
+            if (!simple && At("foreach")) {
+                if (Scope != EScope::Macro) {
+                    Error("foreach is only allowed in a macro");
+                }
+                Take();
+                Expect("(");
+                auto name = Name();
+                Expect(":");
+                Expect("$");
+                auto variable = Name(false);
+                Expect(")");
+                Builder.EnterForeach(TString(name.Text), TString::Join("$", variable.Text));
+                ParseBlock(EScope::Foreach, false);
+                Builder.ExitForeach();
+                return;
+            }
+            if (!simple && At("[")) {
+                if (Scope != EScope::Foreach) {
+                    Error("extension section outside foreach");
+                }
+                Take();
+                TVector<TString> extensions;
+                do {
+                    Expect(".");
+                    extensions.push_back(AcceptAdjacent("*") ? TString("*") : TString(Name(false).Text));
+                } while (Accept(","));
+                Expect("]");
+                Expect("=");
+                Builder.SetExtCommand(extensions, TString(RawValue()));
+                return;
+            }
+            auto name = Name();
+            if (Accept("(")) {
+                if (simple || (Scope != EScope::Macro && Scope != EScope::Module && Scope != EScope::Foreach)) {
+                    Error("macro call is not allowed in this block");
+                }
+                // Do not tokenize opaque arguments: quotes and comments belong to their value.
+                const auto source = Lexer.Source();
+                size_t start = Lexer.Position();
+                while (start < source.size() && (source[start] == ' ' || source[start] == '\t' || source[start] == '\r')) {
+                    ++start;
+                }
+                Lexer.Advance(start - Lexer.Position());
+                size_t end = source.find('\n', start);
+                if (end == TStringBuf::npos) {
+                    end = source.size();
+                }
+                size_t close = end;
+                while (close > start && (source[close - 1] == ' ' || source[close - 1] == '\t' || source[close - 1] == '\r')) {
+                    --close;
+                }
+                if (close == start || source[close - 1] != ')') {
+                    Error("expected ')' at the end of a macro call");
+                }
+                --close;
+                Lexer.Advance(close + 1 - Lexer.Position());
+                Builder.AddMacroCall(name.Text, Clean(source.SubStr(start, close - start)), Range(name));
+                return;
+            }
+            if (!simple && (Scope == EScope::MultiModule || Scope == EScope::Foreach)) {
+                Error("assignment is not allowed in this block");
+            }
+            auto op = AssignmentOperator();
+            auto value = RawValue(simple);
+            Builder.AddAssignment(TString(name.Text), op, TString(NormalizeRval(value, Builder.GetLeftTrim())));
+        }
+
+        TString AssignmentOperator() {
+            Space();
+            auto text = Peek().Text;
+            if (text != "=" && text != ":=" && text != "+=" && text != "-=") {
+                Error("expected an assignment operator");
+            }
+            Take();
+            return TString(text);
+        }
+
+        void ParseBlock(EScope scope, bool simple) {
+            Expect("{");
+            const auto saved = Scope;
+            Scope = scope;
+            if (++Depth > 256) {
+                Error("configuration block nesting limit exceeded");
+            }
+            Expect(EToken::Eol);
+            for (;;) {
+                Space();
+                if (Accept("}")) {
+                    break;
+                }
+                if (Peek().Kind == EToken::End) {
+                    Error("expected '}'");
+                }
+                ParseEntry(false, simple);
+                Expect(EToken::Eol);
+            }
+            --Depth;
+            Scope = saved;
+            Space();
+        }
+
+        TArgs FormalArguments(TStringBuf macroName) {
+            TArgs result;
+            bool specialization = false, regular = false;
+            if (At(")")) {
+                return result;
+            }
+            for (;;) {
+                TArgDesc arg{};
+                if (Peek().Kind == EToken::String) {
+                    arg.Type = EArgType::Specialization;
+                    arg.Name = String();
+                    if (regular) {
+                        Error("specialization parameters must precede regular arguments");
+                    }
+                    if (arg.Name == "*") {
+                        Error("'*' is prohibited as a specialization parameter");
+                    }
+                    specialization = true;
+                } else {
+                    regular = true;
+                    arg.Name = Name().Text;
+                    arg.Type = EArgType::Positional;
+                    if (AcceptAdjacent("...")) {
+                        arg.Type = EArgType::Vararg;
+                        arg.Name += "...";
+                        result.push_back(std::move(arg));
+                        if (!At(")")) {
+                            Error("vararg must be the last parameter");
+                        }
+                        return result;
+                    }
+                    if (AcceptAdjacent("{")) {
+                        do {
+                            auto modifier = Peek().Text;
+                            if (modifier != "input" && modifier != "output" && modifier != "tool" && modifier != "env") {
+                                Error("unknown deep replacement modifier");
+                            }
+                            Take();
+                            if (!arg.DeepReplace.empty()) {
+                                arg.DeepReplace += ';';
+                            }
+                            arg.DeepReplace += modifier;
+                        } while (AcceptAdjacent(";"));
+                        ExpectAdjacent("}");
+                        arg.DeepReplace += ':';
+                    }
+                    if (AcceptAdjacent("[]")) {
+                        arg.Type = EArgType::NamedArray;
+                    } else if (AcceptAdjacent("?")) {
+                        arg.Type = EArgType::NamedBool;
+                        Space();
+                        if (Peek().Kind == EToken::String) {
+                            arg.InitTrue = String();
+                            Expect(":");
+                            arg.InitFalse = String();
+                        }
+                    } else if (Accept("=")) {
+                        arg.Type = EArgType::NamedScalar;
+                        arg.InitFalse = String();
+                    }
+                    if (specialization && IsNamedArgType(arg.Type)) {
+                        ReportConfigError(fmt::format("Named parameter [{}] is prohibited in the definition of partial macro specialization [{}]", arg.Name, macroName), FileName);
+                    }
+                }
+                result.push_back(std::move(arg));
+                if (!Accept(",")) {
+                    return result;
+                }
+                Space();
+            }
+        }
+
+        void ParseDefinition() {
+            auto kind = Take().Text;
+            const auto signatureStart = Offset();
+            auto name = Name();
+            if (kind == "macro") {
+                Expect("(");
+                auto arguments = FormalArguments(name.Text);
+                Expect(")");
+                if (Doc.empty()) {
+                    Doc = TString::Join("@usage: ", Clean(Lexer.Source().SubStr(signatureStart, Offset() - signatureStart)));
+                }
+                Builder.EnterMacro(TString(name.Text), arguments, Range(name), Doc);
+                ParseBlock(EScope::Macro, false);
+                Builder.ExitMacro();
+            } else if (kind == "module") {
+                TString ancestor;
+                if (Accept(":")) {
+                    ancestor = Name().Text;
+                }
+                Space();
+                if (Doc.empty()) {
+                    Doc = TString::Join("@usage: ", Clean(Lexer.Source().SubStr(signatureStart, Offset() - signatureStart)));
+                }
+                Builder.EnterModule(TString(name.Text), ancestor, Range(name), Doc);
+                ParseBlock(EScope::Module, false);
+                Builder.ExitModule();
+            } else {
+                if (Doc.empty()) {
+                    Doc = TString::Join("@usage: ", Clean(Lexer.Source().SubStr(signatureStart, Offset() - signatureStart)));
+                }
+                Builder.EnterMultiModule(TString(name.Text), Range(name), Doc);
+                const bool saved = InMultiModule;
+                InMultiModule = true;
+                ParseBlock(EScope::MultiModule, false);
+                InMultiModule = saved;
+                Builder.ExitMultiModule();
+            }
+        }
+
+        bool BranchAhead() {
+            auto lexer = Lexer;
+            auto token = Token;
+            Space();
+            if (Peek().Kind == EToken::Eol) {
+                do {
+                    Take();
+                    Space();
+                    if (Peek().Kind == EToken::Comment) {
+                        Take();
+                    }
+                } while (Peek().Kind == EToken::Eol);
+                if (At("elsewhen") || At("otherwise")) {
+                    return true;
+                }
+            }
+            Lexer = std::move(lexer);
+            Token = token;
+            return false;
+        }
+
+        TString Condition() {
             Builder.EnterCondition();
-            TString condition = std::any_cast<std::string>(visit(whenClause->logicExpr()));
+            Expect("(");
+            auto result = LogicExpr();
+            Expect(")");
             Builder.ExitCondition();
-            Builder.AppendCondition(condition);
-            visitChildren(whenClause->simpleBlockStmt());
-            const auto& elseWhenClause = ctx->elseWhenClause();
-            for (auto clause : elseWhenClause) {
-                Builder.RemoveLastCondition();
-                Builder.AppendCondition(condition, /* revert */ true);
-                Builder.EnterCondition();
-                condition = visitAs<std::string>(clause->logicExpr());
-                Builder.ExitCondition();
-                Builder.AppendCondition(condition);
-                visitChildren(clause->simpleBlockStmt());
-            }
-            if (auto otherwiseClause = ctx->otherwiseClause()) {
-                Builder.RemoveLastCondition();
-                Builder.AppendCondition(condition, /* revert */ true);
-                visitChildren(otherwiseClause->simpleBlockStmt());
-            }
-            Builder.RemoveLastCondition(1 + elseWhenClause.size());
-
-            Builder.PopConditionVars();
-
-            return nullptr;
+            return result;
         }
 
-        antlrcpp::Any visitSelectStmt(TConfParser::SelectStmtContext *ctx) override {
-            TString selectVar(ctx->varRef()->varName()->getText());
+        void ParseWhen() {
+            Take();
+            Builder.PushConditionVars();
+            auto condition = Condition();
+            Builder.AppendCondition(condition);
+            ParseBlock(Scope, true);
+            size_t clauses = 1;
+            while (BranchAhead()) {
+                const bool otherwise = Take().Text == "otherwise";
+                Builder.RemoveLastCondition();
+                Builder.AppendCondition(condition, true);
+                if (!otherwise) {
+                    condition = Condition();
+                    Builder.AppendCondition(condition);
+                    ++clauses;
+                }
+                ParseBlock(Scope, true);
+                if (otherwise) {
+                    break;
+                }
+            }
+            Builder.RemoveLastCondition(clauses);
+            Builder.PopConditionVars();
+        }
+
+        void ParseSelect() {
+            Take();
+            Expect("(");
+            Expect("$");
+            auto variable = Name(false);
+            Expect(")");
+            Expect("{");
             Builder.PushConditionVars();
             Builder.PushSelect();
             Builder.EnterCondition();
-            Builder.AddConditionVar(selectVar);
+            Builder.AddConditionVar(TString(variable.Text));
             Builder.ExitCondition();
-            for (auto alt : ctx->alternativeClause()) {
-                alt->selectVar = &selectVar;
-                visit(alt);
+            Expect(EToken::Eol);
+            bool any = false, sawDefault = false;
+            for (;;) {
+                Space();
+                if (Accept("}")) {
+                    break;
+                }
+                if (Peek().Kind == EToken::Eol || Peek().Kind == EToken::Comment) {
+                    if (Peek().Kind == EToken::Comment) {
+                        Take();
+                    }
+                    Expect(EToken::Eol);
+                    continue;
+                }
+                if (sawDefault) {
+                    Error("alternative after default");
+                }
+                TString condition;
+                if (Accept("default")) {
+                    if (!any) {
+                        Error("select needs an alternative before default");
+                    }
+                    condition = Builder.ComputeDefaultAlt();
+                    sawDefault = true;
+                } else {
+                    condition = "(";
+                    do {
+                        if (condition.size() > 1) {
+                            condition += "||";
+                        }
+                        condition += TString::Join("$", variable.Text, "==", String(false));
+                    } while (Accept("|"));
+                    condition += ')';
+                    Builder.AddSelectAlt(condition);
+                    any = true;
+                }
+                Expect("?");
+                Builder.AppendCondition(condition);
+                ParseBlock(Scope, true);
+                Builder.RemoveLastCondition();
+                Expect(EToken::Eol);
             }
-            if (auto defaultAlt = ctx->defaultClause()) {
-                auto defaultCondition = Builder.ComputeDefaultAlt();
-                defaultAlt->defaultCondition = &defaultCondition;
-                visit(defaultAlt);
+            if (!any) {
+                Error("select needs at least one alternative");
             }
             Builder.PopSelect();
             Builder.PopConditionVars();
-            return nullptr;
+            Space();
         }
 
-        antlrcpp::Any visitAlternativeClause(TConfParser::AlternativeClauseContext *ctx) override {
-            Y_ASSERT(ctx->selectVar != nullptr);
-
-            TStringStream condition("(");
-            bool firstTime = true;
-            for (auto value : ctx->string()) {
-                if (firstTime) {
-                    firstTime = false;
+        TString LogicExpr() {
+            Space();
+            auto lexer = Lexer;
+            auto token = Token;
+            bool membership = false;
+            if (Peek().Text == "$" || Peek().Kind == EToken::String) {
+                if (Accept("$")) {
+                    Name(false);
                 } else {
-                    condition << "||";
+                    Take();
                 }
-                condition << "$" << *(ctx->selectVar) << "==" << value->getText();
+                if (Peek().Kind == EToken::Space) {
+                    Take();
+                    membership = Peek().Text == "in";
+                }
             }
-            condition << ")";
-
-            auto conditionStr = condition.Str();
-            Builder.AddSelectAlt(conditionStr);
-
-            Builder.AppendCondition(conditionStr);
-            visitChildren(ctx->simpleBlockStmt());
-            Builder.RemoveLastCondition();
-
-            return nullptr;
-        }
-
-        antlrcpp::Any visitDefaultClause(TConfParser::DefaultClauseContext *ctx) override {
-            Y_ASSERT(ctx->defaultCondition != nullptr);
-
-            Builder.AppendCondition(*(ctx->defaultCondition));
-            visitChildren(ctx->simpleBlockStmt());
-            Builder.RemoveLastCondition();
-            return nullptr;
-        }
-
-        antlrcpp::Any visitForeachStmt(TConfParser::ForeachStmtContext *ctx) override {
-            Builder.EnterForeach(TString(ctx->ident()->getText()), TString(ctx->varRef()->getText()));
-            visitChildren(ctx->blockStmt());
-            Builder.ExitForeach();
-            return nullptr;
-        }
-
-        antlrcpp::Any visitExtStmt(TConfParser::ExtStmtContext *ctx) override {
-            TVector<TString> exts;
-            TString command(ctx->rvalue()->getText());
-            for (const auto& ext : ctx->ext()) {
-                exts.emplace_back(TString(ext->extName()->getText()));
-            }
-            Builder.SetExtCommand(exts, command);
-            return nullptr;
-        }
-
-        antlrcpp::Any visitMacroDefSignature(TConfParser::MacroDefSignatureContext *ctx) override {
-            return nullptr;
-        }
-
-        antlrcpp::Any visitMacroDef(TConfParser::MacroDefContext *ctx) override {
-            Y_ASSERT(ScopeKind == EScopeKind::None);
-            ScopeKind = EScopeKind::Macro;
-
-            TString macroName(ctx->macroDefSignature()->macroName()->getText());
-
-            antlr4::Token* token = ctx->macroDefSignature()->macroName()->getStart();
-            TSourceRange range {
-                token->getLine(),
-                token->getCharPositionInLine() + 1,
-                token->getLine(),
-                token->getCharPositionInLine() + macroName.length()
-            };
-
-            if (DocStream.Str().empty()) {
-                DocStream << "@usage: " << ctx->macroDefSignature()->getText();
+            Lexer = std::move(lexer);
+            Token = token;
+            if (!membership) {
+                return LogicOr();
             }
 
-            Builder.EnterMacro(
-                macroName,
-                FillArguments(ctx->macroDefSignature()->formalArgs(), FileName, macroName),
-                range,
-                DocStream.Str()
-            );
-            visitChildren(ctx->block());
-            Builder.ExitMacro();
-
-            ScopeKind = EScopeKind::None;
-            return nullptr;
-        }
-
-        antlrcpp::Any visitModuleDefSignature(TConfParser::ModuleDefSignatureContext *ctx) override {
-            return nullptr;
-        }
-
-        antlrcpp::Any visitModuleDef(TConfParser::ModuleDefContext *ctx) override {
-            Y_ASSERT(ScopeKind == EScopeKind::None || ScopeKind == EScopeKind::MultiModule);
-            auto savedScopeKind = ScopeKind;
-            ScopeKind = EScopeKind::Module;
-
-            TString moduleName(ctx->moduleDefSignature()->moduleName()->getText());
-            TString ancestorName;
-            if (auto ancestor = ctx->moduleDefSignature()->ancestor()) {
-                ancestorName = ancestor->moduleName()->getText();
+            Expect("$");
+            const auto name = Name(false);
+            Builder.AddConditionVar(TString(name.Text));
+            Expect("in");
+            if (Peek().Kind != EToken::Space) {
+                Error("expected space after 'in'");
             }
-
-            antlr4::Token* token = ctx->moduleDefSignature()->moduleName()->getStart();
-            TSourceRange range {
-                token->getLine(),
-                token->getCharPositionInLine() + 1,
-                token->getLine(),
-                token->getCharPositionInLine() + moduleName.length()
-            };
-
-            if (DocStream.Str().empty()) {
-                DocStream << "@usage: " << ctx->moduleDefSignature()->getText();
+            Expect("[");
+            if (At("]")) {
+                Error("empty array in 'in' expression");
             }
-
-            Builder.EnterModule(moduleName, ancestorName, range, DocStream.Str());
-            visitChildren(ctx->block());
-            Builder.ExitModule();
-
-            ScopeKind = savedScopeKind;
-            return nullptr;
-        }
-
-        antlrcpp::Any visitMultiModuleDefSignature(TConfParser::MultiModuleDefSignatureContext *ctx) override {
-            return nullptr;
-        }
-
-        antlrcpp::Any visitMultiModuleDef(TConfParser::MultiModuleDefContext *ctx) override {
-            Y_ASSERT(ScopeKind == EScopeKind::None);
-            ScopeKind = EScopeKind::MultiModule;
-
-            TString name(ctx->multiModuleDefSignature()->moduleName()->getText());
-
-            antlr4::Token* token = ctx->multiModuleDefSignature()->moduleName()->getStart();
-            TSourceRange range {
-                token->getLine(),
-                token->getCharPositionInLine() + 1,
-                token->getLine(),
-                token->getCharPositionInLine() + name.length()
-            };
-
-            if (DocStream.Str().empty()) {
-                DocStream << "@usage: " << ctx->multiModuleDefSignature()->getText();
-            }
-
-            Builder.EnterMultiModule(name, range, DocStream.Str());
-            visitChildren(ctx->block());
-            Builder.ExitMultiModule();
-
-            ScopeKind = EScopeKind::None;
-            return nullptr;
-        }
-
-        antlrcpp::Any visitBlock(TConfParser::BlockContext *ctx) override {
-            Y_ASSERT(BlockLevel >= 0);
-            ++BlockLevel;
-            visitChildren(ctx);
-            Y_ASSERT(BlockLevel > 0);
-            --BlockLevel;
-            return nullptr;
-        }
-
-        antlrcpp::Any visitPropStmt(TConfParser::PropStmtContext *ctx) override {
-            TString propName(ctx->propName()->getText());
-            TString propValue(NormalizeRval(ctx->rvalue()->getText(), Builder.GetLeftTrim()));
-            antlr4::Token* token = ctx->propName()->getStart();
-            TSourceRange range {
-                token->getLine(),
-                token->getCharPositionInLine() + 1,
-                token->getLine(),
-                token->getCharPositionInLine() + propName.length()
-            };
-            Builder.SetProperty(propName, propValue, range);
-            return nullptr;
-        }
-
-        antlrcpp::Any visitLogicVarRef(TConfParser::LogicVarRefContext *ctx) override {
-            auto varRef = ctx->varRef();
-            Y_ASSERT(varRef != nullptr);
-            auto varName = varRef->varName();
-            Y_ASSERT(varName != nullptr);
-            Builder.AddConditionVar(TString(varName->getText()));
-            return varRef->getText();
-        }
-
-        antlrcpp::Any visitLogicTerm(TConfParser::LogicTermContext *ctx) override {
-            if (auto logicVarRef = ctx->logicVarRef()) {
-                return visit(logicVarRef);
-            } else if (ctx->string() != nullptr) {
-                return ctx->getText();
-            } else if (auto logicExpr = ctx->logicExpr()) {
-                std::string result("(");
-                result += visitAs<std::string>(logicExpr);
-                result += ')';
-                return result;
-            } else {
-                Y_ASSERT(false && "Unreachable code");
-            }
-            return nullptr;
-        }
-
-        antlrcpp::Any visitLogicNot(TConfParser::LogicNotContext *ctx) override {
-            std::string result;
-            if (auto negationOp = ctx->negationOp()) {
-                result += negationOp->getText();
-            }
-            result += visitAs<std::string>(ctx->logicTerm());
-            return result;
-        }
-
-        antlrcpp::Any visitLogicRel(TConfParser::LogicRelContext *ctx) override {
-            const auto& opnds = ctx->logicNot();
-            Y_ASSERT(opnds.size() == 1 || opnds.size() == 2);
-            std::string result = visitAs<std::string>(opnds[0]);
-            if (opnds.size() > 1) {
-                auto relationOp = ctx->relationOp();
-                Y_ASSERT(relationOp != nullptr);
-                result += relationOp->getText();
-                result += visitAs<std::string>(opnds[1]);
-            }
-            return result;
-        }
-
-        antlrcpp::Any visitLogicAnd(TConfParser::LogicAndContext *ctx) override {
-            const auto& opnds = ctx->logicRel();
-            Y_ASSERT(!opnds.empty());
-            std::string result = visitAs<std::string>(opnds[0]);
-            for (auto i = opnds.begin() + 1; i != opnds.end(); ++i) {
-                result += "&&";
-                result += visitAs<std::string>(*i);
-            }
-            return result;
-        }
-
-        antlrcpp::Any visitLogicOr(TConfParser::LogicOrContext *ctx) override {
-            const auto& opnds = ctx->logicAnd();
-            Y_ASSERT(!opnds.empty());
-            std::string result = visitAs<std::string>(opnds[0]);
-            for (auto i = opnds.begin() + 1; i != opnds.end(); ++i) {
-                result += "||";
-                result += visitAs<std::string>(*i);
-            }
-            return result;
-        }
-
-        antlrcpp::Any visitLogicIn(TConfParser::LogicInContext *ctx) override {
-            auto logicVarRef = ctx->logicVarRef();
-            Y_ASSERT(logicVarRef != nullptr);
-            auto stringArray = ctx->stringArray();
-            Y_ASSERT(stringArray != nullptr);
-            const auto& values = stringArray->string();
-            Y_ASSERT(!values.empty());
-            std::string result("(");
-            std::string var = visitAs<std::string>(logicVarRef);
-            bool firstTime = true;
-            for (auto& value : values) {
-                if (firstTime) {
-                    firstTime = false;
-                } else {
+            TString result("(");
+            do {
+                if (result.size() > 1) {
                     result += "||";
                 }
-                result += var;
-                result += "==";
-                result += value->getText();
-            }
+                result += TString::Join("$", name.Text, "==", String(false));
+            } while (Accept(","));
+            Expect("]");
             result += ')';
             return result;
         }
 
-        antlrcpp::Any visitLogicExpr(TConfParser::LogicExprContext *ctx) override {
-            return visitChildren(ctx);
+        TString LogicOr() {
+            auto result = LogicAnd();
+            while (Accept("||")) {
+                result += TString::Join("||", LogicAnd());
+            }
+            return result;
         }
 
-    private:
-        int BlockLevel{0};
-        enum class EScopeKind {
-            None = 0,
-            Macro,
-            Module,
-            MultiModule
-        } ScopeKind{EScopeKind::None};
+        TString LogicAnd() {
+            auto result = LogicRel();
+            while (Accept("&&")) {
+                result += TString::Join("&&", LogicRel());
+            }
+            return result;
+        }
+
+        TString LogicRel() {
+            auto result = LogicNot();
+            if (At("==") || At("!=")) {
+                auto op = Take().Text;
+                result += TString::Join(op, LogicNot());
+            }
+            return result;
+        }
+
+        TString LogicNot() {
+            if (Accept("!")) {
+                return TString::Join("!", LogicTerm());
+            }
+            return LogicTerm();
+        }
+
+        TString LogicTerm() {
+            if (++ExpressionDepth > 256) {
+                Error("condition nesting limit exceeded");
+            }
+            Y_DEFER {
+                --ExpressionDepth;
+            };
+            TString result;
+            if (Accept("$")) {
+                auto name = Name(false);
+                Builder.AddConditionVar(TString(name.Text));
+                result = TString::Join("$", name.Text);
+            } else if (At("(")) {
+                Take();
+                result = TString::Join("(", LogicExpr());
+                Expect(")");
+                result += ')';
+            } else {
+                result = String(false);
+            }
+            return result;
+        }
         TConfBuilder& Builder;
         TStringBuf FileName;
-        TStringStream DocStream;
+        NYMake::NParsing::TLexer Lexer;
+        std::optional<TToken> Token;
+        TString Doc;
+        TString RawValueStorage;
+        EScope Scope = EScope::None;
+        size_t Depth = 0;
+        size_t ExpressionDepth = 0;
+        bool InMultiModule = false;
     };
 
     void ParseConfig(TConfBuilder& builder, TStringBuf fileName, TStringBuf content) {
         try {
-            antlr4::ANTLRInputStream input(content);
-            TConfLexer lexer(&input);
-            antlr4::CommonTokenStream tokens(&lexer);
-            tokens.fill();
-            TConfParser parser(&tokens);
-
-            // This dummy error handler just stops parsing the tree when
-            // the first syntax error is encountered
-            struct TConfReaderErrorListener: public antlr4::BaseErrorListener {
-                explicit TConfReaderErrorListener(TStringBuf fileName) : FileName{fileName} {}
-                void syntaxError(antlr4::Recognizer* /* recognizer */,
-                                 antlr4::Token* /* token */,
-                                 size_t line,
-                                 size_t column,
-                                 const std::string& message,
-                                 std::exception_ptr /* e */) override
-                {
-                    ReportConfigError(message, FileName, line, column);
-                }
-                TStringBuf FileName;
-            } errorListener{fileName};
-
-            parser.addErrorListener(&errorListener);
-            TConfReaderVisitor visitor(builder, fileName);
-            visitor.visit(parser.entries());
+            TConfigParser(builder, fileName, content).Parse();
 
             builder.UpdateConfMd5(content);
 

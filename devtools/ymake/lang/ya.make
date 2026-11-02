@@ -17,28 +17,12 @@ PEERDIR(
     library/cpp/case_insensitive_string
     library/cpp/fieldcalc
     library/cpp/eventlog
-    contrib/libs/antlr4_cpp_runtime
     contrib/libs/fmt
-)
-
-RUN_ANTLR4_CPP(
-    TConf.g4
-    -package
-    NConfReader
-    VISITOR
-    OUTPUT_INCLUDES
-    util/generic/string.h
-    util/stream/output.h
-)
-
-RUN_ANTLR4_CPP_SPLIT(
-    CmdLexer.g4
-    CmdParser.g4
-    VISITOR
 )
 
 SRCS(
     cmd_parser.cpp
+    parser_lexer.rl6
     call_args_parser.cpp
     call_signature.cpp
     config_conditions.cpp

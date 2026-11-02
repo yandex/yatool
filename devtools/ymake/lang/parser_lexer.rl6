@@ -1,0 +1,287 @@
+#include <devtools/ymake/lang/parser_lexer.h>
+
+#include <util/charset/utf8.h>
+#include <util/generic/yexception.h>
+
+namespace NYMake::NParsing {
+    namespace {
+        struct TMatch {
+            EToken Kind;
+            size_t Size;
+        };
+
+        TMatch Scan(TStringBuf input, EMode mode) {
+            const auto* begin = reinterpret_cast<const unsigned char*>(input.data());
+            const unsigned char* p = begin;
+            const unsigned char* pe = begin + input.size();
+            const unsigned char* eof = pe;
+            const unsigned char* ts = nullptr;
+            const unsigned char* te = nullptr;
+            int cs, act = 0;
+            EToken kind = EToken::End;
+            %%{
+                machine YMakeLexer;
+                alphtype unsigned char;
+                action emit_raw {
+                    kind = EToken::Raw;
+                    fbreak;
+                }
+                action emit_noop {
+                    kind = EToken::Noop;
+                    fbreak;
+                }
+                action emit_variable {
+                    kind = EToken::Variable;
+                    fbreak;
+                }
+                action emit_xbegin {
+                    kind = EToken::EvaluationBegin;
+                    fbreak;
+                }
+                action emit_lparen {
+                    kind = EToken::LeftParen;
+                    fbreak;
+                }
+                action emit_rparen {
+                    kind = EToken::RightParen;
+                    fbreak;
+                }
+                action emit_singlequote {
+                    kind = EToken::SingleQuote;
+                    fbreak;
+                }
+                action emit_doublequote {
+                    kind = EToken::DoubleQuote;
+                    fbreak;
+                }
+                action emit_cmdsep {
+                    kind = EToken::CommandSeparator;
+                    fbreak;
+                }
+                action emit_spaces {
+                    kind = EToken::Space;
+                    fbreak;
+                }
+                action emit_xend {
+                    kind = EToken::EvaluationEnd;
+                    fbreak;
+                }
+                action emit_modarg {
+                    kind = EToken::ModifierArgument;
+                    fbreak;
+                }
+                action emit_modsep {
+                    kind = EToken::ModifierSeparator;
+                    fbreak;
+                }
+                action emit_modend {
+                    kind = EToken::ModifierEnd;
+                    fbreak;
+                }
+                action emit_identifier {
+                    kind = EToken::Identifier;
+                    fbreak;
+                }
+                action emit_string {
+                    kind = EToken::String;
+                    fbreak;
+                }
+                action emit_modtext {
+                    kind = EToken::ModifierText;
+                    fbreak;
+                }
+                action emit_modvar {
+                    kind = EToken::ModifierVariable;
+                    fbreak;
+                }
+                action emit_modeval {
+                    kind = EToken::ModifierEvaluation;
+                    fbreak;
+                }
+                action emit_eol {
+                    kind = EToken::Eol;
+                    fbreak;
+                }
+                action emit_comment {
+                    kind = EToken::Comment;
+                    fbreak;
+                }
+                action emit_doccomment {
+                    kind = EToken::DocComment;
+                    fbreak;
+                }
+                action emit_symbol {
+                    kind = EToken::Symbol;
+                    fbreak;
+                }
+
+                id = [A-Za-z_] [A-Za-z_0-9]*;
+                utf8 = (0xc2..0xdf) (0x80..0xbf)
+                     | (0xe0..0xef) (0x80..0xbf) (0x80..0xbf)
+                     | (0xf0..0xf4) (0x80..0xbf) (0x80..0xbf) (0x80..0xbf);
+                character = 0x00..0x7f | utf8;
+                unicode_space = 0xc2 (0x85 | 0xa0) | 0xe1 0x9a 0x80
+                              | 0xe2 0x80 (0x80..0x8a | 0xa8 | 0xa9 | 0xaf)
+                              | 0xe2 0x81 0x9f | 0xe3 0x80 0x80;
+                whitespace = [ \t\r\n\v\f] | unicode_space;
+                escaped = '\\' character;
+                raw = escaped | ((character - whitespace) - [&'"\\$()]);
+                noop = '$(' (character - [()])* ')';
+                quoted = '"' (escaped | (character - ["\\]))* '"';
+
+                command := |*
+                    '(' => emit_lparen;
+                    ')' => emit_rparen;
+                    raw+ | '$' => emit_raw;
+                    "'" => emit_singlequote;
+                    '"' => emit_doublequote;
+                    noop => emit_noop;
+                    '$' id => emit_variable;
+                    '${' => emit_xbegin;
+                    '&&' => emit_cmdsep;
+                    whitespace+ => emit_spaces;
+                *|;
+                single_quoted := |*
+                    "'" => emit_singlequote;
+                    (escaped | (character - [$'\\]))+ => emit_raw;
+                    noop => emit_noop;
+                    '$' id => emit_variable;
+                    '${' => emit_xbegin;
+                *|;
+                double_quoted := |*
+                    '"' => emit_doublequote;
+                    (escaped | (character - [$"\\]))+ => emit_raw;
+                    noop => emit_noop;
+                    '$' id => emit_variable;
+                    '${' => emit_xbegin;
+                *|;
+                evaluation := |*
+                    '}' => emit_xend;
+                    '=' => emit_modarg;
+                    ';' => emit_modsep;
+                    ':' => emit_modend;
+                    quoted => emit_string;
+                    id => emit_identifier;
+                *|;
+                modifier_argument := |*
+                    ('\\' [$;:\\] | (character - [$;:\\]))+ => emit_modtext;
+                    '$' id => emit_modvar;
+                    '${' id '}' => emit_modeval;
+                    ';' => emit_modsep;
+                    ':' => emit_modend;
+                *|;
+                config := |*
+                    [A-Za-z_] ('-'* [A-Za-z_0-9]+)* => emit_identifier;
+                    [ \t]+ => emit_spaces;
+                    '\n' => emit_eol;
+                    '###' (any - '\n')* => emit_doccomment;
+                    '#' (any - '\n')* => emit_comment;
+                    '"' ('\\' (any - '\n') | (any - ["\n]))* '"' => emit_string;
+                    '...' | '[]' | ':=' | '+=' | '-=' | '==' | '!=' | '&&' | '||' | any => emit_symbol;
+                *|;
+                main := '';
+            }%%
+            %% write data;
+            %% write init;
+            switch (mode) {
+                case EMode::Command:
+                    cs = YMakeLexer_en_command;
+                    break;
+                case EMode::SingleQuoted:
+                    cs = YMakeLexer_en_single_quoted;
+                    break;
+                case EMode::DoubleQuoted:
+                    cs = YMakeLexer_en_double_quoted;
+                    break;
+                case EMode::Evaluation:
+                    cs = YMakeLexer_en_evaluation;
+                    break;
+                case EMode::ModifierArgument:
+                    cs = YMakeLexer_en_modifier_argument;
+                    break;
+                case EMode::Config:
+                    cs = YMakeLexer_en_config;
+                    break;
+            }
+            %% write exec;
+            Y_UNUSED(act);
+            Y_UNUSED(ts);
+            return {kind, te ? static_cast<size_t>(te - begin) : 0};
+        }
+    } // namespace
+
+    TLexer::TLexer(TStringBuf source, EMode mode)
+        : Source_(source)
+        , Mode_(mode)
+    {
+        if (mode != EMode::Config && !IsUtf(source)) {
+            ythrow yexception() << "UTF-8 string contains an illegal byte sequence";
+        }
+        if (source.StartsWith("\xef\xbb\xbf")) {
+            Position_ = 3;
+        }
+    }
+
+    void TLexer::Advance(size_t size) {
+        for (const unsigned char c : Source_.SubStr(Position_, size)) {
+            if (c == '\n') {
+                ++Line_;
+                Column_ = 0;
+            } else if ((c & 0xc0) != 0x80) {
+                ++Column_;
+            }
+        }
+        Position_ += size;
+    }
+
+    TToken TLexer::Next() {
+        while (Mode_ == EMode::Config && Position_ < Source_.size() && Source_[Position_] == '\r') {
+            Advance(1);
+        }
+        TToken token = Location();
+        if (Position_ == Source_.size()) {
+            return token;
+        }
+        auto match = Scan(Source_.SubStr(Position_), Mode_);
+        if (match.Kind == EToken::End || match.Size == 0) {
+            ythrow TLexerError() << "lexer error at " << Line_ << ':' << Column_;
+        }
+        token.Kind = match.Kind;
+        token.Text = Source_.SubStr(Position_, match.Size);
+        Advance(match.Size);
+        switch (token.Kind) {
+            case EToken::SingleQuote:
+                if (Mode_ == EMode::SingleQuoted) {
+                    PopMode();
+                } else {
+                    PushMode(EMode::SingleQuoted);
+                }
+                break;
+            case EToken::DoubleQuote:
+                if (Mode_ == EMode::DoubleQuoted) {
+                    PopMode();
+                } else {
+                    PushMode(EMode::DoubleQuoted);
+                }
+                break;
+            case EToken::EvaluationBegin:
+                PushMode(EMode::Evaluation);
+                break;
+            case EToken::EvaluationEnd:
+                PopMode();
+                break;
+            case EToken::ModifierArgument:
+                PushMode(EMode::ModifierArgument);
+                break;
+            case EToken::ModifierSeparator:
+            case EToken::ModifierEnd:
+                if (Mode_ == EMode::ModifierArgument) {
+                    PopMode();
+                }
+                break;
+            default:
+                break;
+        }
+        return token;
+    }
+} // namespace NYMake::NParsing
