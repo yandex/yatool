@@ -1,4 +1,5 @@
 #include "cpp_processor.h"
+#include "ros_processor.h"
 
 #include <devtools/ymake/module_wrapper.h>
 
@@ -71,13 +72,23 @@ void TCppIncludeProcessor::ProcessOutputIncludes(TAddDepAdaptor& node,
     ResolveAndAddLocalIncludes(node, module, incFileName, includes, {}, LanguageId);
 }
 
+TVector<TString> TCppIncludeProcessor::MapProps(
+    TSymbols& symbols, TFileView output, TPropertyType type, const TVector<TStringBuf>& props) const {
+    if (type.GetName(symbols) == "ros") {
+        return MapRosOutputIncludes(output, props);
+    }
+    return {};
+}
+
 TCLikeIncludeProcessor::TCLikeIncludeProcessor(TSymbols& symbols) {
     Rule = TIndDepsRule({TPropertyType{symbols, EVI_InducedDeps, "cpp"},
                          TPropertyType{symbols, EVI_InducedDeps, "h+cpp"},
                          TPropertyType{symbols, EVI_InducedDeps, "xscpp"}});
+    Rule.Actions.emplace_back(TPropertyType{symbols, EVI_InducedDeps, "ros"}, TIndDepsRule::Map);
 }
 
 TCHeaderIncludeProcessor::TCHeaderIncludeProcessor(TSymbols& symbols) {
     Rule = TIndDepsRule({TPropertyType{symbols, EVI_InducedDeps, "h"},
                          TPropertyType{symbols, EVI_InducedDeps, "h+cpp"}});
+    Rule.Actions.emplace_back(TPropertyType{symbols, EVI_InducedDeps, "ros"}, TIndDepsRule::Map);
 }

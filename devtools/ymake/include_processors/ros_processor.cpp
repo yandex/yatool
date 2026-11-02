@@ -65,12 +65,16 @@ void TRosIncludeProcessor::ProcessIncludes(
     TFileView incFileName,
     const TVector<TRosDep>& includes) const
 {
-    Y_UNUSED(incFileName);
-
     const auto packages = CollectPackages(module.GetModule().IncDirs.Get(LanguageId));
 
     TVector<TResolveFile> resolvedIncludes;
     TVector<TResolveFile> inducedIncludes;
+    const bool splitGeneration = module.Get("_ROS_SPLIT_GENERATION") == "yes";
+    if (splitGeneration) {
+        // Keep the source name to distinguish e.g. Foo_zero_copy.msg -> Foo_zero_copy.h
+        // from Foo.msg -> Foo_zero_copy.h without guessing from the output suffix.
+        inducedIncludes.push_back(module.MakeUnresolved(incFileName.CutAllTypes()));
+    }
 
     for (const auto& include : includes) {
         auto resolvedInclude = ResolveInclude(module, packages, include);
@@ -90,7 +94,7 @@ void TRosIncludeProcessor::ProcessIncludes(
         AddIncludesToNode(node, resolvedIncludes, module);
     }
 
-    node.AddParsedIncls("h+cpp", inducedIncludes);
+    node.AddParsedIncls(splitGeneration ? "ros" : "h+cpp", inducedIncludes);
 }
 
 void TRosIncludeProcessor::ProcessOutputIncludes(
@@ -105,4 +109,30 @@ void TRosIncludeProcessor::ProcessOutputIncludes(
     Y_UNUSED(includes);
 
     YConfErr(UserErr) << "OUTPUT_INCLUDES are not supported for ROS" << Endl;
+}
+
+TVector<TString> MapRosOutputIncludes(TFileView output, const TVector<TStringBuf>& props) {
+    if (props.empty()) {
+        return {};
+    }
+    TStringBuf suffix = output.Basename();
+    if (!suffix.SkipPrefix(NPath::BasenameWithoutExtension(props.front()))) {
+        return {};
+    }
+    if (NPath::Extension(props.front()) == "srv") {
+        // The service wrapper includes its request/response headers explicitly.
+        if (!suffix.SkipPrefix("Request") && !suffix.SkipPrefix("Response")) {
+            return {};
+        }
+    }
+    if (suffix != ".h" && suffix != "_zero_copy.h" && suffix != "_ros_converter.h") {
+        // Sources include their own header; binding declarations need none.
+        return {};
+    }
+    TVector<TString> includes;
+    includes.reserve(props.size() - 1);
+    for (size_t i = 1; i < props.size(); ++i) {
+        includes.push_back(TString::Join(NPath::NoExtension(props[i]), suffix));
+    }
+    return includes;
 }

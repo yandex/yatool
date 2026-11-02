@@ -6,6 +6,9 @@
 
 class TRosIncludeProcessor: public TIncludeProcessorBase {
 public:
+    ui32 Version() const override {
+        return 1 + CommonVersion;
+    }
     void ProcessIncludes(
         TAddDepAdaptor& node,
         TModuleWrapper& module,
@@ -18,3 +21,5 @@ public:
         TFileView incFileName,
         const TVector<TString>& includes) const override;
 };
+
+TVector<TString> MapRosOutputIncludes(TFileView output, const TVector<TStringBuf>& props);

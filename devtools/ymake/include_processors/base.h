@@ -32,6 +32,9 @@ public:
                                        const TVector<TString>& includes) const = 0;
     virtual ui32 Version() const { return CommonVersion; }
     const TIndDepsRule& DepsTransferRules() const noexcept { return Rule; }
+    TVector<TString> MapProps(TSymbols&, TFileView, TPropertyType, const TVector<TStringBuf>&) const {
+        return {};
+    }
 
 protected:
     template<class TIncl>
@@ -177,6 +180,11 @@ public:
                                const TVector<TString>& includes) const override {
         IncludeProcessor.ProcessOutputIncludes(node, module, incFileName, includes);
         return true;
+    }
+
+    TVector<TString> MapProps(TSymbols& symbols, TFileView output, TPropertyType type,
+                              const TVector<TStringBuf>& props) const override {
+        return IncludeProcessor.MapProps(symbols, output, type, props);
     }
 
     bool ParseIncludes(TAddDepAdaptor& node, TModuleWrapper& module, TFileContentHolder& incFile) override {

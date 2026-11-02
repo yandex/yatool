@@ -5,7 +5,9 @@
 
 class TCppIncludeProcessor: public TIncludeProcessorBase {
 public:
-    ui32 Version() const override { return 2 + CommonVersion; }
+    ui32 Version() const override { return 3 + CommonVersion; }
+    TVector<TString> MapProps(TSymbols& symbols, TFileView output, TPropertyType type,
+                              const TVector<TStringBuf>& props) const;
     void ProcessIncludes(TAddDepAdaptor& node,
                          TModuleWrapper& module,
                          TFileView incFileName,
