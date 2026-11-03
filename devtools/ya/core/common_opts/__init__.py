@@ -387,6 +387,8 @@ class PrintStatisticsOptions(Options):
                 group=PRINT_CONTROL_GROUP,
                 visible=HelpLevel.EXPERT,
             ),
+            # Let Autocheck select its statistics preset through the build environment.
+            EnvConsumer('YA_STAT_PRESET', hook=SetValueHook('stat_preset', values=['full', 'autocheck-minimal'])),
             ConfigConsumer('stat_preset', hook=SetValueHook('stat_preset', values=['full', 'autocheck-minimal'])),
         ]
 

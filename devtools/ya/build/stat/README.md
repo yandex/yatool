@@ -110,9 +110,10 @@ flowchart LR
 `--stat --stat-preset autocheck-minimal` выводит только разрешённые статистики.
 
 Пресет **`full` используется по умолчанию** и сохраняет полный выбранный набор статистик.
-Минимальный набор выбирается через `--stat-preset autocheck-minimal` или настройку
+Минимальный набор выбирается через `--stat-preset autocheck-minimal`, `YA_STAT_PRESET=autocheck-minimal` или настройку
 `stat_preset = "autocheck-minimal"`. Вернуть полный набор можно через
-`--stat-preset full` или `stat_preset = "full"`. Другие значения не допускаются.
+`--stat-preset full`, `YA_STAT_PRESET=full` или `stat_preset = "full"`. Другие значения, включая пустую строку, не допускаются.
+Приоритет: CLI > окружение > конфиг.
 
 Имена существующих файлов сохранены:
 
