@@ -2342,7 +2342,11 @@ class YaMake:
             res, err, exit_code, local_execution_log, _ = self.ctx.runner(
                 self.ctx, self.app_ctx, callback, output_replacements=self.ctx.output_replacements
             )
-        finally:
+        except BaseException:
+            # Keep the runner error: a download failure may require an infrastructure retry.
+            run_db_async(wrapped=True)
+            raise
+        else:
             distbs_result = run_db_async()
 
         result_analyzer = self._make_distbuild_result_analyzer(distbs_result, local_execution_log)
