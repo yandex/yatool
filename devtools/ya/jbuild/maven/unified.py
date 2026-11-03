@@ -152,7 +152,7 @@ def populate_contrib_unified(
         if write_licenses and p.get('licenses', []):
             license_macro = utils.find_or_create(project, md.LicenseMacro)
             for lic in p.get('licenses'):
-                license_macro.add_value(lic)
+                license_macro.add_value(license.license_macro_value(lic, len(p.get('licenses'))))
 
         # REPOSITORY
         if p.get('original_source'):
@@ -393,7 +393,6 @@ def import_unified(
     license_aliases_file,
     trusted_repos_file,
     write_licenses=False,
-    canonize_licenses=False,
     forced_deps=None,
 ):
     import app_ctx  # XXX: use args
@@ -431,7 +430,7 @@ def import_unified(
 
         artifacts = utils.enrich_with_extra_options(arcadia, artifacts)
         artifacts = license.enrich_with_licenses(artifacts)
-        license_aliases = license.build_licenses_aliases(license_aliases_file, artifacts, canonize_licenses)
+        license_aliases = license.build_licenses_aliases(license_aliases_file, artifacts, opts.arc_root)
 
         replace_version = opts.replace_version
         for data in artifacts:
@@ -445,7 +444,11 @@ def import_unified(
                     )
                 )
             else:
-                my_licenses = [license_aliases.get(i, i) for i in data.get('licenses', [])]
+                my_licenses = [
+                    license_aliases[license.normalize_license_name(i)]
+                    for i in data.get('licenses', [])
+                    if i and i.strip()
+                ]
 
             peerdirs = extract_artefacts(data.get('dependencies', []), replace_version)
             nodes[str(key)] = {

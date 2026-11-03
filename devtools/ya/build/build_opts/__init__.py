@@ -1052,7 +1052,7 @@ class MavenImportOptions(SandboxUploadOptions):
             ),
             ArgConsumer(
                 ['--no-canonize-licenses'],
-                help='Canonize contrib licenses names via ya tool license_analyzer',
+                help='No effect in the default mode; kept for compatibility',
                 hook=SetConstValueHook('canonize_licenses', False),
                 group=MAVEN_OPT_GROUP,
             ),

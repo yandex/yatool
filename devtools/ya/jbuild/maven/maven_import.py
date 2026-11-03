@@ -43,7 +43,6 @@ def do_import(opts):
             license_aliases_file,
             trusted_repos_file,
             opts.write_licenses,
-            opts.canonize_licenses,
             forced_deps,
         )
         logger.info('Done')

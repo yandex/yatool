@@ -75,52 +75,133 @@ def fix_licenses(lics):
     return result
 
 
-def build_licenses_aliases(license_aliases_file, meta, canonize_licenses):
+UNKNOWN_LICENSE = 'Unknown'
+LICENSE_CONFIGS = ('build/conf/license.json', 'build/internal/conf/license.json')
+
+STRING_OR_COMMENT = re.compile(r'"(?:[^"\\]|\\.)*"|//[^\n]*')
+
+
+def normalize_license_name(name):
+    return ' '.join(name.split())
+
+
+def load_known_license_ids(arc_root):
     """
-    Build license aliases map with known license and new presented in contrib
+    License ids known to ymake: both license.json files, '//' comments stripped
     """
+    known = set()
+    for cfg in LICENSE_CONFIGS:
+        path = os.path.join(arc_root, cfg)
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            text = STRING_OR_COMMENT.sub(lambda m: '' if m.group().startswith('//') else m.group(), f.read())
+        try:
+            config = json.loads(text)
+        except Exception as e:
+            logger.error("Can't load license ids from {}: {}".format(path, e))
+            continue
+        for group, value in config.items():
+            if group == 'restricted':
+                known.update(value)
+            else:
+                for ids in value.values():
+                    known.update(ids)
+    return known
+
+
+def is_valid_spdx(expr, known):
+    """
+    Same grammar as ymake: expr := term (OR term)*; term := factor (AND factor)*;
+    factor := '(' expr ')' | id [WITH id], where 'id WITH id' is looked up as one id
+    """
+    tokens = re.findall(r'[()]|[^\s()]+', expr)
+    pos = [0]
+
+    def peek():
+        return tokens[pos[0]] if pos[0] < len(tokens) else None
+
+    def take():
+        pos[0] += 1
+        return tokens[pos[0] - 1]
+
+    def factor():
+        if peek() == '(':
+            take()
+            expression()
+            if take() != ')':
+                raise ValueError
+            return
+        lic = take()
+        if lic in ('AND', 'OR', 'WITH', ')'):
+            raise ValueError
+        if peek() == 'WITH':
+            take()
+            lic += ' WITH ' + take()
+        if lic not in known:
+            raise ValueError
+
+    def term():
+        factor()
+        while peek() == 'AND':
+            take()
+            factor()
+
+    def expression():
+        term()
+        while peek() == 'OR':
+            take()
+            term()
+
+    try:
+        expression()
+    except (ValueError, IndexError):
+        return False
+    return pos[0] == len(tokens)
+
+
+def license_macro_value(lic, licenses_count):
+    """
+    LICENSE() joins values with AND and quotes only values wrapped in parentheses as a whole
+    """
+    if '(' in lic or (' OR ' in lic and licenses_count > 1):
+        return '({})'.format(lic)
+    return lic
+
+
+def build_licenses_aliases(license_aliases_file, meta, arc_root):
+    """Use known SPDX expressions or explicit aliases; other names become Unknown."""
     license_aliases = {}
     if license_aliases_file and os.path.exists(license_aliases_file):
-        with open(license_aliases_file) as f:
-            try:
+        try:
+            with open(license_aliases_file) as f:
                 license_aliases = json.loads(f.read())
-            except Exception as e:
-                logger.error("Can't load license aliases file: {} {}".format(license_aliases_file, e))
+        except Exception as e:
+            logger.error("Can't load license aliases file: {} {}".format(license_aliases_file, e))
     else:
         logger.error("License aliases is not available: file {} not found".format(license_aliases_file))
 
-    if canonize_licenses:
-        all_licenses = set()
-        for data in meta:
-            all_licenses |= {license_aliases.get(i, i) for i in data.get("licenses")}
-
-        new_licenses = {i for i in all_licenses if i not in license_aliases}
-        new_licenses_map = collect_licenses_spdx_map(list(new_licenses))
-    else:
-        new_licenses_map = {}
-
-    if os.path.exists(license_aliases_file):
-        try:
-            updated = False
-            with open(license_aliases_file) as f:
-                aliases = json.loads(f.read())
-            for k, v in new_licenses_map.items():
-                if k not in aliases:
-                    aliases[k] = v
-                    updated = True
-            if updated:
-                with open(license_aliases_file, 'w') as f:
-                    f.write(json.dumps(aliases, sort_keys=True, indent=2))
-                logger.info("License aliases file {} are updated".format(license_aliases_file))
-        except Exception as e:
-            logger.warning("Can't update license aliases: {}".format(e))
-
-    license_aliases.update(new_licenses_map)
-    return license_aliases
+    known = load_known_license_ids(arc_root)
+    names = {normalize_license_name(i) for data in meta for i in data.get('licenses', []) if i and i.strip()}
+    result = {}
+    for name in names:
+        if is_valid_spdx(name, known):
+            result[name] = name
+        elif name in license_aliases:
+            result[name] = license_aliases[name]
+        else:
+            result[name] = UNKNOWN_LICENSE
+            logger.warning(
+                "License '{}' could not be resolved; LICENSE({}) is written, consumers with "
+                "LICENSE_RESTRICTION(ALLOW_ONLY ...) cannot depend on it until an alias is added to {}".format(
+                    name, UNKNOWN_LICENSE, license_aliases_file
+                )
+            )
+    return result
 
 
 def collect_licenses_spdx_map(licenses):
-    if not sys.platform.startswith('linux') and sys.platform.startswith('darwin'):
+    if not (sys.platform.startswith('linux') or sys.platform.startswith('darwin')):
         return {}
     if not licenses:
         return {}
