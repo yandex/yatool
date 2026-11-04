@@ -729,7 +729,6 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
      - Macro [USE_ERROR_PRONE](#macro_USE_ERROR_PRONE)
      - Macro [USE_JAVALITE](#macro_USE_JAVALITE)
      - Macro [USE_KTLINT_OLD](#macro_USE_KTLINT_OLD)
-     - Macro [USE_LEGACY_LINKED_PEERS](#macro_USE_LEGACY_LINKED_PEERS)
      - Macro [USE_LEGACY_PNPM_VIRTUAL_STORE](#macro_USE_LEGACY_PNPM_VIRTUAL_STORE)
      - Macro [USE_LINKER_GOLD](#macro_USE_LINKER_GOLD)
      - Macro [USE_LLVM_BC16](#macro_USE_LLVM_BC16)
@@ -7166,14 +7165,6 @@ USE_KTLINT_OLD()
 
 Marks that need use the old version of ktlint
 
-### Macro [USE_LEGACY_LINKED_PEERS](https://a.yandex-team.ru/arcadia/build/conf/ts/node_modules.conf?rev=21579718#L91) <a name="macro_USE_LEGACY_LINKED_PEERS"></a>
-
-```ya.make
-USE_LEGACY_LINKED_PEERS()
-```
-
-_Not documented yet._
-
 ### Macro [USE_LEGACY_PNPM_VIRTUAL_STORE](https://a.yandex-team.ru/arcadia/build/conf/ts/node_modules.conf?rev=21579718#L83) <a name="macro_USE_LEGACY_PNPM_VIRTUAL_STORE"></a>
 
 ```ya.make
@@ -8232,7 +8223,6 @@ _Not documented yet._
 | [`TS_TEST`](#macro_TS_TEST) | Macro | [build/conf/ts/ts_check.conf:8](https://a.yandex-team.ru/arcadia/build/conf/ts/ts_check.conf?rev=21579718#L8) |
 | [`UPDATE_VCS_JAVA_INFO_NODEP`](#macro_UPDATE_VCS_JAVA_INFO_NODEP) | Macro | [build/ymake.core.conf:4264](https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L4264) |
 | [`USE_COMMON_GOOGLE_APIS`](#macro_USE_COMMON_GOOGLE_APIS) | Macro | [build/conf/proto.conf:370](https://a.yandex-team.ru/arcadia/build/conf/proto.conf?rev=21579718#L370) |
-| [`USE_LEGACY_LINKED_PEERS`](#macro_USE_LEGACY_LINKED_PEERS) | Macro | [build/conf/ts/node_modules.conf:91](https://a.yandex-team.ru/arcadia/build/conf/ts/node_modules.conf?rev=21579718#L91) |
 | [`USE_LEGACY_PNPM_VIRTUAL_STORE`](#macro_USE_LEGACY_PNPM_VIRTUAL_STORE) | Macro | [build/conf/ts/node_modules.conf:83](https://a.yandex-team.ru/arcadia/build/conf/ts/node_modules.conf?rev=21579718#L83) |
 | [`USE_LLVM_BC16`](#macro_USE_LLVM_BC16) | Macro | [build/ymake.core.conf:5014](https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L5014) |
 | [`USE_LLVM_BC18`](#macro_USE_LLVM_BC18) | Macro | [build/ymake.core.conf:5019](https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L5019) |
