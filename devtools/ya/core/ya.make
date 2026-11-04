@@ -3,7 +3,6 @@ PY23_LIBRARY()
 PEERDIR(
     contrib/python/pylev
     contrib/python/toml
-    devtools/ya/conf
     devtools/ya/core/config
     devtools/ya/core/error
     devtools/ya/core/event_handling
