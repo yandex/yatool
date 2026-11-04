@@ -7,6 +7,8 @@ import devtools.ya.test.common as test_common
 import devtools.ya.test.const
 import devtools.ya.test.util.tools as util_tools
 
+from . import ts
+
 logger = logging.getLogger(__name__)
 
 
@@ -145,7 +147,7 @@ def inject_inplace_coverage_merger_node(graph, coverage_uids, suites, opts):
         suite_wd_has_resolved_coverage = False
         if suite.get_type() == 'go_test' and getattr(opts, "go_coverage", False):
             suite_wd_has_resolved_coverage = True
-        elif suite.get_type() == 'jest' and getattr(opts, "ts_coverage", False):
+        elif getattr(opts, "ts_coverage", False) and ts.suite_has_coverage(suite):
             suite_wd_has_resolved_coverage = True
         elif suite.get_type() in devtools.ya.test.const.CLANG_COVERAGE_TEST_TYPES and getattr(
             opts, "clang_coverage", False

@@ -61,8 +61,6 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_classpath_clash
     devtools/ya/test/programs/test_tool/run_coverage_extractor
     devtools/ya/test/programs/test_tool/run_custom_lint
-    devtools/ya/test/programs/test_tool/run_eslint
-    devtools/ya/test/programs/test_tool/run_biome
     devtools/ya/test/programs/test_tool/run_exectest
     devtools/ya/test/programs/test_tool/run_fuzz
     devtools/ya/test/programs/test_tool/run_fuzz_result_node
@@ -70,21 +68,14 @@ PEERDIR(
     devtools/ya/test/programs/test_tool/run_go_fmt
     devtools/ya/test/programs/test_tool/run_go_test
     devtools/ya/test/programs/test_tool/run_go_vet
-    devtools/ya/test/programs/test_tool/run_hermione
     devtools/ya/test/programs/test_tool/run_javastyle
-    devtools/ya/test/programs/test_tool/run_jest
     devtools/ya/test/programs/test_tool/run_ktlint_test
-    devtools/ya/test/programs/test_tool/run_playwright
-    devtools/ya/test/programs/test_tool/run_playwright_large
     devtools/ya/test/programs/test_tool/run_pyimports
     devtools/ya/test/programs/test_tool/run_jtest
     devtools/ya/test/programs/test_tool/run_pytest
     devtools/ya/test/programs/test_tool/run_skipped_test
-    devtools/ya/test/programs/test_tool/run_stylelint
     devtools/ya/test/programs/test_tool/run_test
-    devtools/ya/test/programs/test_tool/run_tsc_typecheck
     devtools/ya/test/programs/test_tool/run_ts_check
-    devtools/ya/test/programs/test_tool/run_vitest
     devtools/ya/test/programs/test_tool/run_ut
     devtools/ya/test/programs/test_tool/run_y_benchmark
     devtools/ya/test/programs/test_tool/unify_clang_coverage

@@ -69,8 +69,6 @@ PROJECT_MACROS = {
     'TOOL',
     'TS_LIBRARY',
     'TS_PACKAGE',
-    'TS_TEST_JEST_FOR',
-    'TS_TSC',
     'UDF',
     'UDF_LIB',
     'UNION',

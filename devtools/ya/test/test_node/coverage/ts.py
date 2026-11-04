@@ -12,7 +12,7 @@ COVERAGE_TAR_RESULT = "ts.coverage.tar"
 
 def suite_has_coverage(suite):
     suite_type = suite.get_type()
-    has_type = suite_type == "jest" or suite_type.startswith("ts_test") or suite_type.startswith("ts_lint")
+    has_type = suite_type.startswith("ts_test") or suite_type.startswith("ts_lint")
 
     return has_type and suite.supports_coverage
 
