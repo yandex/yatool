@@ -26,7 +26,12 @@ PEERDIR(
 
 END()
 
+IF (NOT SANITIZER_TYPE)
+    RECURSE_FOR_TESTS(
+        fat
+    )
+ENDIF()
+
 RECURSE_FOR_TESTS(
-    fat
     tests
 )
