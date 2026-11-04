@@ -114,6 +114,7 @@ RECURSE(
     gen_plan
     genconf
     larry_client
+    larry_service
     makelist
     owners
     prefetch
