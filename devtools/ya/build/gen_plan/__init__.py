@@ -409,6 +409,7 @@ def gen_dummy_graph(
     tags=None,
     repository_type=None,
     distbuild_pool=None,
+    cmds_for_uid=None,
 ):
     node_type = 'GG_GRAPH'
     dep, dep_no_uid = deps or ([], [])
@@ -422,12 +423,14 @@ def gen_dummy_graph(
         return result
 
     def get_node(for_uid=False):
+        commands = cmds_for_uid if for_uid and cmds_for_uid is not None else cmds
         node = {
             'type': 2,
             'uid': None,
             'priority': 0,
             'cmds': [
-                {'cwd': '$(BUILD_ROOT)', 'cmd_args': (cmd if for_uid else cmd + cmd_no_uid)} for cmd, cmd_no_uid in cmds
+                {'cwd': '$(BUILD_ROOT)', 'cmd_args': (cmd if for_uid else cmd + cmd_no_uid)}
+                for cmd, cmd_no_uid in commands
             ],
             'deps': dep if for_uid else dep + dep_no_uid,
             'inputs': [],
