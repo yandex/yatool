@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 TS_PREFIX = "ts"
 COVERAGE_TAR_RESULT = "ts.coverage.tar"
+ISTANBUL_COVERAGE_RESULT = "ts.coverage.json"
 
 
 def suite_has_coverage(suite):
@@ -71,9 +72,12 @@ def inject_create_ts_coverage_report_node(graph, suites, resolve_uids, opts=None
     ]
     inputs_for_node = []
     for suite in suites:
-        coverage_tar_path = suite.work_dir(COVERAGE_TAR_RESULT)
-        cmd += ["--coverage-tars", coverage_tar_path]
-        inputs_for_node.append(coverage_tar_path)
+        coverage_json_path = suite.work_dir(ISTANBUL_COVERAGE_RESULT)
+        cmd += ["--coverage-json", coverage_json_path]
+        inputs_for_node.append(coverage_json_path)
+        # NYC needs the source text as well as counters. Reuse the suite's
+        # declared inputs so report nodes also work without the test build root.
+        inputs_for_node.extend(suite.get_test_related_paths("$(SOURCE_ROOT)", opts))
 
     deps = uid_gen.get_test_result_uids(suites)
     uid = uid_gen.get_uid(deps, "tscov-report")
@@ -81,7 +85,7 @@ def inject_create_ts_coverage_report_node(graph, suites, resolve_uids, opts=None
     node = {
         "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
         "cache": False,
-        "inputs": inputs_for_node,
+        "inputs": testdeps.unique(inputs_for_node),
         "uid": uid,
         "cwd": "$(BUILD_ROOT)",
         "priority": 0,
@@ -109,6 +113,7 @@ def inject_create_ts_coverage_report_node(graph, suites, resolve_uids, opts=None
 
 def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_filename, opts=None):
     output_path = suite.work_dir(resolved_filename)
+    istanbul_output_path = suite.work_dir(ISTANBUL_COVERAGE_RESULT)
     log_path = suite.work_dir("ts_coverage_resolve.log")
 
     cmd = util_tools.get_test_tool_cmd(opts, "resolve_ts_coverage", suite.global_resources) + [
@@ -118,6 +123,8 @@ def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_fi
         coverage_tar_path,
         "--output",
         output_path,
+        "--output-istanbul",
+        istanbul_output_path,
         "--log-path",
         log_path,
     ]
@@ -137,8 +144,8 @@ def inject_ts_coverage_resolve_node(graph, suite, coverage_tar_path, resolved_fi
         "target_properties": {
             "module_lang": suite.meta.module_lang,
         },
-        # Keep coverage_tar_path as could use it when building overall html report
-        "outputs": [coverage_tar_path, output_path, log_path],
+        # Preserve raw and unified coverage for their existing consumers.
+        "outputs": [coverage_tar_path, output_path, istanbul_output_path, log_path],
         "kv": {
             # Resolve TypeScript coverage
             "p": "RT",

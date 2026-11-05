@@ -16,6 +16,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-path")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--output-istanbul")
     parser.add_argument("--coverage-path", required=True)
     parser.add_argument("--log-path", required=True)
     parser.add_argument("--log-level", default="INFO")
@@ -38,14 +39,14 @@ def extract(archive_filename):
     return tmpdir
 
 
-def extract_coverage_file(arch_path):
+def extract_coverage_file(arch_path: str) -> str | None:
     logger.debug("Extracting archived data " + arch_path)
     datadir = extract(arch_path)
     cov_files = [filename for filename in os.listdir(datadir) if filename.startswith("coverage-final")]
 
     assert len(cov_files) <= 1, "Found several coverage input files: {}".format(cov_files)
 
-    return os.path.join(datadir, cov_files[0])
+    return os.path.join(datadir, cov_files[0]) if cov_files else None
 
 
 def setup_env(params):
@@ -87,7 +88,7 @@ def file_coverage_to_unified_format(filename, file_cov_info):
     return res_file_cov_info
 
 
-def resolve_coverage(input_cov_data_filename, args):
+def resolve_coverage(input_cov_data_filename: str, args: argparse.Namespace) -> None:
     logger.debug("Resolving coverage for" + input_cov_data_filename)
     with open(input_cov_data_filename, "r") as input_cov_data_file:
         coverage_data = json.load(input_cov_data_file)
@@ -108,8 +109,10 @@ def resolve_coverage(input_cov_data_filename, args):
         res_jest_cov_info[local_filename] = file_cov_info
         logger.debug("Adding data for " + local_filename + ", cov_info: " + str(file_cov_info))
 
-    # Update src file paths in the jest results file
-    with open(input_cov_data_filename, "w") as jest_results_file:
+    # HTML runs in a separate build root and must consume the normalized data,
+    # rather than the original archive containing obsolete absolute source paths.
+    istanbul_output = args.output_istanbul or input_cov_data_filename
+    with open(istanbul_output, "w") as jest_results_file:
         json.dump(res_jest_cov_info, jest_results_file)
 
     # Dump arc coverage results
@@ -129,6 +132,9 @@ def main():
         logger.debug("No cov data available")
         with open(args.output, "w") as res_cov_file:
             json.dump({}, res_cov_file)
+        if args.output_istanbul:
+            with open(args.output_istanbul, "w") as istanbul_file:
+                json.dump({}, istanbul_file)
         return
 
     resolve_coverage(data_file, args)
