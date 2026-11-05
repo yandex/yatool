@@ -2,6 +2,7 @@ import logging
 import os
 import stat
 
+from library.python import windows
 from library.python.fs import *  # noqa
 
 if supports_clone():  # noqa F405
@@ -11,37 +12,47 @@ logger = logging.getLogger(__name__)
 
 
 def remove_tree_with_perm_update(dir):
-    def remove(safe):
+    def remove():
         try:
-            if safe:
-                remove_tree_safe(dir)  # noqa
-            else:
-                ensure_removed(dir)  # noqa
-            return True
-        except OSError as e:
-            logger.debug('Error while removing dir: %s', e)
+            ensure_removed(dir)  # noqa
+            return None
+        except OSError as error:
+            logger.debug('Error while removing dir: %s', error)
+            return error
 
-        return False
-
-    if remove(safe=False):
+    if remove() is None:
         return
 
     logger.debug('Trying to change permissions while removing dir: %s', dir)
+    on_windows = windows.on_win()
+
+    # On POSIX only directories need write permission for unlink. Files may be
+    # hardlinked to cached outputs, and symlink targets must stay untouched.
+    def make_writable(path):
+        metadata = os.lstat(path)
+        mode = stat.S_IMODE(metadata.st_mode)
+        if stat.S_ISDIR(metadata.st_mode):
+            os.chmod(path, mode | stat.S_IRWXU)
+            return True
+        if on_windows and stat.S_ISREG(metadata.st_mode):
+            # Windows needs the read-only file attribute cleared before unlink.
+            os.chmod(path, mode | stat.S_IWRITE)
+        return False
 
     try:
-        os.chmod(dir, os.stat(dir).st_mode | stat.S_IWRITE)
-        for root, dirs, files in os.walk(dir):
-            for file_name in files:
-                extracted_path = os.path.join(root, file_name)
-                # For Windows read-only files.
-                os.chmod(extracted_path, os.stat(extracted_path).st_mode | stat.S_IWRITE)
-            for dir_name in dirs:
-                extracted_dir = os.path.join(root, dir_name)
-                os.chmod(extracted_dir, os.stat(extracted_dir).st_mode | stat.S_IWRITE)
-    except Exception as e:
-        logger.debug('Error while changing permissions: %s', e)
+        if make_writable(dir):
+            for root, dirs, files in os.walk(dir, followlinks=False):
+                for name in dirs:
+                    make_writable(os.path.join(root, name))
+                if on_windows:
+                    for name in files:
+                        make_writable(os.path.join(root, name))
+    except Exception as error:
+        logger.debug('Error while changing permissions: %s', error)
 
-    remove(safe=True)
+    error = remove()
+    if error is not None:
+        logger.warning('Failed to remove %s after updating permissions: %s', dir, error)
 
 
 def fast_relpath(path, start):

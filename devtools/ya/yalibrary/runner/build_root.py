@@ -540,9 +540,10 @@ class BuildRootSet(object):
         except ImportError:
             pdeath = None
 
-        subprocess.call(
+        return subprocess.call(
             ["rm", "-rf", fs.fix_path_encoding(path)],
             preexec_fn=pdeath,
+            stderr=subprocess.DEVNULL,
         )
 
     def _remove_tree(self, path):
@@ -551,9 +552,14 @@ class BuildRootSet(object):
             return
 
         try:
-            self._rm_rf(path)
-        except OSError:
-            fs.remove_tree_safe(path)
+            return_code = self._rm_rf(path)
+            if return_code == 0:
+                return
+            logger.debug('rm failed for %s with exit code %s', path, return_code)
+        except OSError as error:
+            logger.debug('Cannot run rm for %s: %s', path, error)
+
+        fs.remove_tree_with_perm_update(path)
 
     def cleanup(self):
         if self._keep:
