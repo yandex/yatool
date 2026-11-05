@@ -52,6 +52,9 @@ namespace NCommonDisplay{
     }
 
     void TLockedStream::Emit(const TStringBuf& str) {
+        if (auto* context = CurrentContext<TExecContext>; context && context->OnConfigureStderr) {
+            context->OnConfigureStderr(TString{str});
+        }
         with_lock (Lock) {
             (*Output << str).Flush();
         }

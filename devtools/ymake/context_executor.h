@@ -3,6 +3,9 @@
 #include <devtools/ymake/diag/common_display/display.h>
 
 #include <util/generic/fwd.h>
+#include <util/generic/string.h>
+
+#include <functional>
 
 #include <asio/any_io_executor.hpp>
 
@@ -23,6 +26,7 @@ struct TExecContext: TNonCopyable {
     std::shared_ptr<TModuleStagesStatsManager> ModStatsManager;
     std::shared_ptr<TDiagCtrl> DiagCtrl;
     unsigned int DisplayCutoff = 4;
+    std::function<void(const TString&)> OnConfigureStderr;
 
     TExecContext(
         std::shared_ptr<NCommonDisplay::TLockedStream> lockedStream,

@@ -188,47 +188,59 @@ void TMakeNode::WriteTaredOutputsArr(TJsonWriterFuncArgs&& funcArgs) const {
 }
 
 TMakePlan::TMakePlan(NYMake::TJsonWriter& writer)
-    : Writer(writer) {
+    : Writer(&writer)
+{
+}
+
+TMakePlan::TMakePlan(IMakePlanSink& sink)
+    : Sink(&sink)
+{
 }
 
 TMakePlan::~TMakePlan() {
-    Writer.CloseArray(NodesArr);
+    if (!Writer) {
+        return;
+    }
+    Writer->CloseArray(NodesArr);
 
-    Writer.WriteMapKeyValue(Map, "result", this->Results);
+    Writer->WriteMapKeyValue(Map, "result", this->Results);
 
     {
-        Writer.WriteMapKey(Map, "inputs");
-        auto inputsMap = Writer.OpenMap();
+        Writer->WriteMapKey(Map, "inputs");
+        auto inputsMap = Writer->OpenMap();
         for (const auto& input : Inputs) {
-            Writer.WriteMapKey(inputsMap, input.first);
-            auto inputArr = Writer.OpenArray();
-            Writer.WriteArrayValue(inputArr, input.second.D0);
-            Writer.WriteArrayValue(inputArr, input.second.D1);
-            Writer.CloseArray(inputArr);
+            Writer->WriteMapKey(inputsMap, input.first);
+            auto inputArr = Writer->OpenArray();
+            Writer->WriteArrayValue(inputArr, input.second.D0);
+            Writer->WriteArrayValue(inputArr, input.second.D1);
+            Writer->CloseArray(inputArr);
         }
-        Writer.CloseMap(inputsMap);
+        Writer->CloseMap(inputsMap);
     }
 
-    Writer.CloseMap(Map);
-    Writer.Flush();
+    Writer->CloseMap(Map);
+    Writer->Flush();
 }
 
 void TMakePlan::WriteConf() {
-    Map = Writer.OpenMap();
+    if (!Writer) {
+        return;
+    }
+    Map = Writer->OpenMap();
 
-    Writer.WriteMapKey(Map, "conf");
-    auto confMap = Writer.OpenMap();
-    Writer.WriteMapKey(confMap, "resources");
-    auto resArr = Writer.OpenArray();
+    Writer->WriteMapKey(Map, "conf");
+    auto confMap = Writer->OpenMap();
+    Writer->WriteMapKey(confMap, "resources");
+    auto resArr = Writer->OpenArray();
     for (const auto& kv : this->Resources) {
-        Writer.WriteArrayJsonValue(resArr, kv.second);
+        Writer->WriteArrayJsonValue(resArr, kv.second);
     }
     for (const auto& resJson : this->HostResources) {
-        Writer.WriteArrayJsonValue(resArr, resJson);
+        Writer->WriteArrayJsonValue(resArr, resJson);
     }
-    Writer.CloseArray(resArr);
-    Writer.CloseMap(confMap);
+    Writer->CloseArray(resArr);
+    Writer->CloseMap(confMap);
 
-    Writer.WriteMapKey(Map, "graph");
-    NodesArr = Writer.OpenArray();
+    Writer->WriteMapKey(Map, "graph");
+    NodesArr = Writer->OpenArray();
 }

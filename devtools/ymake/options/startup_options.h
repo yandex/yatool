@@ -10,6 +10,8 @@
 #include <util/folder/path.h>
 #include <util/system/pipe.h>
 
+#include <functional>
+
 // configuration operates local-formatted paths
 struct TStartUpOptions: public TRootsOptions {
     TFsPath YmakeConf;
@@ -49,5 +51,6 @@ struct TStartUpOptions: public TRootsOptions {
 
     void AddTarget(const TFsPath& target);
 
+    std::function<void()> DepsCacheSavedCallback;
     void OnDepsCacheSaved() const;
 };

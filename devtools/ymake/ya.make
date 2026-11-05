@@ -107,6 +107,7 @@ SRCS(
     export_json_debug.cpp
     export_json.cpp
     flat_json_graph.cpp
+    foreign_platforms/cancellable_pipeline.cpp
     foreign_platforms/pipeline.cpp
     frozen_module_store.cpp
     general_parser.cpp

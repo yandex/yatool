@@ -11,6 +11,7 @@
 #include <util/system/yassert.h>
 
 #include <optional>
+#include <functional>
 
 #include <Python.h>
 
@@ -52,6 +53,27 @@ namespace NYMake {
     public:
         void Initialize(size_t count) {
             SubinterpretersCount_ = count;
+        }
+
+        // Call on the runtime owner thread, with configuration workers joined.
+        void WithMainInterpreter(const std::function<void()>& callback) {
+            if (!Initialized_) {
+                Initialize_();
+            }
+            PyEval_RestoreThread(SavedState_);
+            try {
+                callback();
+            } catch (...) {
+                SavedState_ = PyEval_SaveThread();
+                throw;
+            }
+            SavedState_ = PyEval_SaveThread();
+        }
+
+        void ReleaseSubinterpreters() {
+            if (Initialized_) {
+                WithMainInterpreter([this] { Subinterpreters_.clear(); });
+            }
         }
 
         void Finalize() {

@@ -175,4 +175,7 @@ void TStartUpOptions::AddTarget(const TFsPath& target) {
 
 void TStartUpOptions::OnDepsCacheSaved() const {
     FORCE_TRACE(C, NEvent::TReadyForUpdateCacheInfo{});
+    if (DepsCacheSavedCallback) {
+        DepsCacheSavedCallback();
+    }
 }

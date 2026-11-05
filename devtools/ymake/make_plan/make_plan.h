@@ -166,8 +166,20 @@ struct TMakeNodeDescription : public TNodeJsonWriter<TMakeNodeDescription<T, TJo
 
 using TMakeNode = TMakeNodeDescription<NCache::TOriginal, NCache::TJoinedOriginal, NCache::TJoinedCommand>;
 
+struct TMakePlan;
+
+class IMakePlanSink {
+public:
+    virtual ~IMakePlanSink() = default;
+    // Parallel rendering may call OnNode concurrently. The sink must own all
+    // retained values. OnFinish runs once after all OnNode calls have joined.
+    virtual void OnNode(TMakeNode node) = 0;
+    virtual void OnFinish(const TMakePlan& plan) = 0;
+};
+
 struct TMakePlan {
-    NYMake::TJsonWriter& Writer;
+    NYMake::TJsonWriter* Writer = nullptr;
+    IMakePlanSink* Sink = nullptr;
     mutable NYMake::TJsonWriter::TOpenedMap Map;
     mutable NYMake::TJsonWriter::TOpenedArray NodesArr;
     THashMap<TString, TMd5Sig> Inputs;
@@ -177,6 +189,7 @@ struct TMakePlan {
 
 public:
     explicit TMakePlan(NYMake::TJsonWriter& writer);
+    explicit TMakePlan(IMakePlanSink& sink);
     ~TMakePlan();
 
     void WriteConf();

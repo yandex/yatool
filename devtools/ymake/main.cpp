@@ -6,6 +6,7 @@
 #include "diag_reporter.h"
 #include "export_json.h"
 #include "managed_deps_iter.h"
+#include "make_plan/make_plan.h"
 #include "node_printer.h"
 #include "prop_names.h"
 #include "propagate_change_flags.h"
@@ -626,6 +627,10 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
             conf.ConfigureCachePolicy.ConfirmInternalCachesNotApplicable();
             conf.ForeignTargetWriter->WriteLine(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
             FORCE_TRACE(U,  NEvent::TCacheIsExpectedToBeEmpty{conf.YmakeCache.GetPath()});
+            if (conf.MakePlanSink) {
+                TMakePlan emptyPlan{*conf.MakePlanSink};
+                conf.MakePlanSink->OnFinish(emptyPlan);
+            }
             co_return BR_OK;
         }
     }
@@ -862,7 +867,7 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
         co_return BR_OK;
     }
 
-    if (!conf.WriteJSON.empty()) {
+    if (conf.MakePlanSink || !conf.WriteJSON.empty()) {
         co_await ExportJSON(*yMake, exec);
     }
 
@@ -948,7 +953,7 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
             co_return BR_CONFIGURE_FAILED;
         }
 
-        if (!conf.RenderSemantics && !conf.WriteJSON.empty()) {
+        if (!conf.RenderSemantics && (conf.MakePlanSink || !conf.WriteJSON.empty())) {
             testDartDone = co_await ExportJSONAndTestDart(*yMake, exec, [&]() -> asio::awaitable<void> {
                 co_await SaveCoreCaches(conf, yMake);
             });

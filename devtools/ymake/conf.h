@@ -35,6 +35,7 @@
 constexpr TStringBuf MODULE_MANGLING_DELIM = "__from__";
 
 class TFileConf;
+class IMakePlanSink;
 struct IMemoryPool;
 struct _is;
 typedef struct _is PyInterpreterState;
@@ -43,6 +44,7 @@ typedef struct _is PyInterpreterState;
 // build configuration operates local-formatted paths
 class TBuildConfiguration: public TStartUpOptions, public TYmakeConfig, public TDebugOptions, public TCommandLineOptions {
 public:
+    IMakePlanSink* MakePlanSink = nullptr; // Borrowed for the complete configure operation.
     TString CustomData;
     TVector<TFsPath> PluginsRoots;
     TVector<TString> WarnFlags;

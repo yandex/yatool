@@ -130,6 +130,7 @@ public:
     TMakeNodeSavedState() = default;
     TMakeNodeSavedState(const TMakeNode& node, const TStringBuf& nodeName, const TStringBuf& nodeCacheUid, const TStringBuf& nodeRenderId, const TBuildConfiguration& conf, NCache::TConversionContext& context);
     void Restore(NCache::TConversionContext& context, TMakeNode* result) const;
+    TMakeNode RestoreForExecution(NCache::TConversionContext& context) const;
     TVector<NCache::TOriginal> RestoreLateOuts(NCache::TConversionContext& context) const;
     void WriteAsJson(NYMake::TJsonWriter& writer, const NCache::TConversionContext* conversionContext) const;
 

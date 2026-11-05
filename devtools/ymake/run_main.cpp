@@ -7,10 +7,13 @@
 #include "context_executor.h"
 
 #include <asio/use_future.hpp>
+
+#include <future>
 #include <devtools/ymake/diag/mod_stats_manager.h>
 #include <devtools/ymake/diag/progress_manager.h>
 #include <devtools/ymake/diag/stats.h>
 #include <devtools/ymake/diag/trace.h>
+#include <devtools/ymake/foreign_platforms/cancellable_pipeline.h>
 #include <devtools/ymake/foreign_platforms/pipeline.h>
 #include <devtools/ymake/python_runtime.h>
 #include <devtools/ymake/symbols/reclaim.h>
@@ -172,8 +175,10 @@ namespace {
     // logger initialization and it's failure is reported later. This var keeps mlock call result.
     bool MLOCK_FAILED = false;
 
-    asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyInterpreterState*()> subinterpreterStateGetter, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline) {
+    asio::awaitable<int> RunConfigure(TVector<const char*> value, std::function<PyInterpreterState*()> subinterpreterStateGetter, TExecutorWithContext<TExecContext> exec, NForeignTargetPipeline::TForeignTargetPipeline& pipeline, IMakePlanSink* sink = nullptr, std::function<void()> onCacheSaved = {}) {
         TBuildConfiguration conf;
+        conf.MakePlanSink = sink;
+        conf.DepsCacheSavedCallback = std::move(onCacheSaved);
         conf.SubinterpreterStateGetter = subinterpreterStateGetter;
         TMaybe<EBuildResult> result{};
         {
@@ -328,4 +333,145 @@ int YMakeMain(int argc, char** argv) {
 #endif
 
     return main_ret_code;
+}
+
+NYMake::TConfigureResult NYMake::Configure(TConfigureRequest request) {
+    TPythonRuntimeScope pythonRuntime(request.Configurations.size());
+    return Configure(std::move(request), pythonRuntime);
+}
+
+NYMake::TConfigureResult NYMake::Configure(TConfigureRequest request, TPythonRuntime& pythonRuntime) {
+    Y_ENSURE(request.Configurations.size() > 1, "Native configuration requires multiconfig");
+    TVector<TVector<const char*>> commandLines;
+    commandLines.reserve(request.Configurations.size());
+    int threads = request.Threads;
+    for (auto& config : request.Configurations) {
+        Y_ENSURE(config.Sink, "Native configuration requires an executable graph sink");
+        Y_ENSURE(!config.Arguments.empty(), "Missing configuration arguments");
+        TVector<char*> args;
+        for (auto& argument : config.Arguments) {
+            args.push_back(argument.begin());
+        }
+        int argc = args.size();
+        InitGlobalOpts(argc, args.data(), threads);
+        commandLines.emplace_back(args.begin(), args.begin() + argc);
+    }
+
+    // Validate the complete registration order before starting any coroutine.
+    // The internal pipeline wires subscriptions as configurations register.
+    THashMap<TString, ETransition> targetRoles;
+    bool haveTools = false;
+    for (std::size_t index = 0; index != commandLines.size(); ++index) {
+        const auto& commandLine = commandLines[index];
+        TBuildConfiguration conf;
+        NLastGetopt::TOpts opts;
+        opts.ArgPermutation_ = NLastGetopt::REQUIRE_ORDER;
+        conf.AddOptions(opts);
+        const NLastGetopt::TOptsParseResult parsed(
+            &opts, commandLine.size(), const_cast<const char**>(commandLine.data()));
+        if (request.Configurations[index].Mode == EConfigurationMode::Independent) {
+            Y_ENSURE(conf.TransitionSource == ETransition::None,
+                     "Independent configuration cannot declare a platform transition");
+            Y_ENSURE(!conf.ReadStartTargetsFromEvlog,
+                     "Independent configuration cannot read targets from an event log");
+            continue;
+        }
+        Y_ENSURE(!conf.TargetPlatformId.empty(), "Native configuration requires a platform id");
+        Y_ENSURE(!haveTools, "Host tools must be registered exactly once, after all target configurations");
+        switch (conf.TransitionSource) {
+            case ETransition::NoPic:
+                Y_ENSURE(targetRoles.emplace(conf.TargetPlatformId, ETransition::NoPic).second,
+                         "Duplicate target configuration");
+                break;
+            case ETransition::Pic: {
+                const auto it = targetRoles.find(conf.TargetPlatformId);
+                if (it == targetRoles.end()) {
+                    Y_ENSURE(!conf.ReadStartTargetsFromEvlog, "PIC-only configuration requires explicit targets");
+                    targetRoles.emplace(conf.TargetPlatformId, ETransition::Pic);
+                } else {
+                    Y_ENSURE(it->second == ETransition::NoPic, "Duplicate PIC configuration");
+                    it->second = ETransition::Pic;
+                }
+                break;
+            }
+            case ETransition::Tool:
+                haveTools = true;
+                break;
+            case ETransition::None:
+                ythrow yexception() << "Native configuration requires explicit internal servermode roles";
+        }
+    }
+    Y_ENSURE(haveTools && !targetRoles.empty(), "Native configuration requires target and host tool configurations");
+
+    if (threads <= 0) {
+        threads = request.Configurations.size() + 1;
+    }
+    asio::thread_pool workers(threads);
+    TVector<TVector<const char*>> transitionConfigs;
+    for (std::size_t index = 0; index != commandLines.size(); ++index) {
+        if (request.Configurations[index].Mode != EConfigurationMode::Independent) {
+            transitionConfigs.push_back(commandLines[index]);
+        }
+    }
+    auto pipeline = CreatePipeline(transitionConfigs, workers.get_executor());
+    NForeignTargetPipeline::TCancellableForeignTargetPipeline cancellablePipeline(*pipeline, workers.get_executor());
+    NForeignTargetPipeline::TForeignTargetPipelineInternal independentPipeline(workers.get_executor());
+    TConfigureResult result;
+    result.ExitCodes.resize(commandLines.size());
+    TVector<TExecutorWithContext<TExecContext>> executors;
+    for (auto& invocation : request.Configurations) {
+        auto ctx = std::make_shared<TExecContext>(
+            std::make_shared<NCommonDisplay::TLockedStream>(),
+            std::make_shared<TConfMsgManager>(),
+            std::make_shared<TProgressManager>(),
+            std::make_shared<TModuleStagesStatsManager>(),
+            std::make_shared<TDiagCtrl>());
+        ctx->OnConfigureStderr = std::move(invocation.OnConfigureStderr);
+        executors.emplace_back(workers.executor(), std::move(ctx));
+    }
+    TAdaptiveLock lock;
+    size_t next = 0;
+    size_t active = 0;
+    std::exception_ptr failure;
+    std::promise<void> completed;
+    std::function<void()> submitNext;
+    submitNext = [&] {
+        with_lock (lock) {
+            if (failure || next == commandLines.size()) {
+                return;
+            }
+            const auto index = next++;
+            ++active;
+            auto& invocation = request.Configurations[index];
+            NForeignTargetPipeline::TForeignTargetPipeline& selectedPipeline =
+                invocation.Mode == EConfigurationMode::Independent ? independentPipeline : static_cast<NForeignTargetPipeline::TForeignTargetPipeline&>(cancellablePipeline);
+            auto onComplete = [&, index](std::exception_ptr ptr, int rc) {
+                with_lock (lock) {
+                    if (ptr && !failure) {
+                        failure = ptr;
+                        cancellablePipeline.CancelReaders();
+                    }
+                    result.ExitCodes[index] = rc;
+                    --active;
+                    if (active == 0 && (failure || next == commandLines.size())) {
+                        completed.set_value();
+                    }
+                }
+                submitNext();
+            };
+            asio::co_spawn(executors[index],
+                           RunConfigure(commandLines[index], pythonRuntime.GetSubinterpreterStateGetter(index),
+                                        executors[index], selectedPipeline, invocation.Sink, std::move(invocation.OnCacheSaved)),
+                           std::move(onComplete));
+        }
+    };
+    for (int index = 0; index < threads; ++index) {
+        submitNext();
+    }
+    completed.get_future().get();
+    workers.wait();
+    if (failure) {
+        std::rethrow_exception(failure);
+    }
+    return result;
 }

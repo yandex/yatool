@@ -325,14 +325,18 @@ namespace {
         }
     };
 
-    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, NYMake::TJsonWriter::TOpenedArray& nodesArr, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter& jsonWriter, TMakeModuleStates& modulesStatesCache) {
+    void RenderOrRestoreJSONNode(TYMake& yMake, TJSONVisitor& cmdbuilder, NYMake::TJsonWriter::TOpenedArray& nodesArr, TMakePlanCache& cache, const TNodeId nodeId, const TJSONEntryStats& nodeInfo, NYMake::TJsonWriter* jsonWriter, TMakeModuleStates& modulesStatesCache, IMakePlanSink* sink = nullptr) {
         TMakeNode node;
         TJSONRenderer renderer(yMake, cmdbuilder, nodeId, nodeInfo, &node, modulesStatesCache);
 
         if (!yMake.Conf.ReadJsonCache && !yMake.Conf.WriteJsonCache) {
             renderer.RenderNodeDelayed();
             renderer.CompleteRendering();
-            jsonWriter.WriteArrayValue(nodesArr, node, nullptr);
+            if (sink) {
+                sink->OnNode(std::move(node));
+            } else {
+                jsonWriter->WriteArrayValue(nodesArr, node, nullptr);
+            }
             return;
         }
 
@@ -346,7 +350,11 @@ namespace {
                 auto lock = cache.LockContextIfNeeded();
                 auto context = cache.GetConstConversionContext(&node);
                 renderer.RefreshEmptyMakeNode(node, cachedNode, context);
-                jsonWriter.WriteArrayValue(nodesArr, cachedNode, &context);
+                if (sink) {
+                    sink->OnNode(cachedNode.RestoreForExecution(context));
+                } else {
+                    jsonWriter->WriteArrayValue(nodesArr, cachedNode, &context);
+                }
                 return;
             }
         }
@@ -360,7 +368,11 @@ namespace {
         const auto nodeName = yMake.Graph.ToTargetStringBuf(nodeId);
         cache.AddRenderedNode(node, nodeName, cacheUid, TString{});
         cache.Stats.Inc(NStats::EJsonCacheStats::FullyRendered);
-        jsonWriter.WriteArrayValue(nodesArr, node, nullptr);
+        if (sink) {
+            sink->OnNode(std::move(node));
+        } else {
+            jsonWriter->WriteArrayValue(nodesArr, node, nullptr);
+        }
     }
 
     void ComputeFullUID(const TDepGraph& graph, TJSONVisitor& cmdBuilder, TNodeId nodeId) {
@@ -558,7 +570,7 @@ namespace {
                                 for (const auto& [modId, nodeIds] : chunk) {
                                     for (const auto& nodeId : nodeIds) {
                                         const auto& node = cmdbuilder.Nodes.at(nodeId);
-                                        RenderOrRestoreJSONNode(yMake, cmdbuilder, nodesArr, cache, nodeId, node, writer, modulesStatesCache);
+                                        RenderOrRestoreJSONNode(yMake, cmdbuilder, nodesArr, cache, nodeId, node, &writer, modulesStatesCache, plan.Sink);
                                         if (IsModuleType(graph[nodeId]->NodeType)) {
                                             // remove state from cache to free the memory
                                             modulesStatesCache.ClearState(nodeId);
@@ -566,10 +578,13 @@ namespace {
                                         }
                                     }
                                 }
+                                if (plan.Sink) {
+                                    co_return;
+                                }
                                 writer.Flush();
                                 // Join the write as part of the render task, including write errors.
                                 co_await asio::co_spawn(strand, [&plan, jsonString = std::move(jsonString)]() -> asio::awaitable<void> {
-                                    plan.Writer.WriteArrayJsonValue(plan.NodesArr, std::move(jsonString));
+                                    plan.Writer->WriteArrayJsonValue(plan.NodesArr, std::move(jsonString));
                                     co_return;
                                 }, asio::use_awaitable);
                             });
@@ -584,7 +599,7 @@ namespace {
                         UpdateUids(yMake.Graph, cmdbuilder, nodeId);
 
                         const auto& node = cmdbuilder.Nodes.at(nodeId);
-                        RenderOrRestoreJSONNode(yMake, cmdbuilder, plan.NodesArr, cache, nodeId, node, plan.Writer, modulesStatesCache);
+                        RenderOrRestoreJSONNode(yMake, cmdbuilder, plan.NodesArr, cache, nodeId, node, plan.Writer, modulesStatesCache, plan.Sink);
                         if (IsModuleType(graph[nodeId]->NodeType)) {
                             TProgressManager::Instance()->IncRenderModulesDone();
                         }
@@ -653,23 +668,32 @@ static asio::awaitable<void> ExportJSONWithPaths(TYMake& yMake, asio::any_io_exe
         auto& conf = yMake.Conf;
         NYMake::TTraceStageWithTimer writeJsonTimer("Write JSON", MON_NAME(EYmakeStats::WriteJSONTime));
 
-        TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, conf.OutputStream.Get()};
-        NYMake::TJsonWriter jsonWriter(*output.Get());
-        TMakePlan plan(jsonWriter);
-        TJSONGraphState state;
-        co_await VisitJSONGraph(yMake, state, exec);
-        if (afterVisit) {
-            co_await afterVisit();
-        }
-        if (alongsideTail) {
-            std::vector<std::function<asio::awaitable<void>()>> tasks;
-            tasks.emplace_back([&]() -> asio::awaitable<void> {
+        const auto render = [&](TMakePlan& plan) -> asio::awaitable<void> {
+            TJSONGraphState state;
+            co_await VisitJSONGraph(yMake, state, exec);
+            if (afterVisit) {
+                co_await afterVisit();
+            }
+            if (alongsideTail) {
+                std::vector<std::function<asio::awaitable<void>()>> tasks;
+                tasks.emplace_back([&]() -> asio::awaitable<void> {
+                    co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
+                });
+                tasks.emplace_back(std::move(alongsideTail));
+                co_await NYMake::RunAll(exec, std::move(tasks));
+            } else {
                 co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
-            });
-            tasks.emplace_back(std::move(alongsideTail));
-            co_await NYMake::RunAll(exec, std::move(tasks));
+            }
+        };
+        if (conf.MakePlanSink) {
+            TMakePlan plan(*conf.MakePlanSink);
+            co_await render(plan);
+            conf.MakePlanSink->OnFinish(plan);
         } else {
-            co_await RenderJSONGraph(yMake, plan, *state.Visitor, exec);
+            TOutputStreamWrapper output{conf.WriteJSON, conf.JsonCompressionCodec, conf.OutputStream.Get()};
+            NYMake::TJsonWriter jsonWriter(*output.Get());
+            TMakePlan plan(jsonWriter);
+            co_await render(plan);
         }
     }
 

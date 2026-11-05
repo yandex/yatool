@@ -276,6 +276,25 @@ void TMakeNodeSavedState::Restore(NCache::TConversionContext& context, TMakeNode
     context.Convert(CachedNode, *result);
 }
 
+TMakeNode TMakeNodeSavedState::RestoreForExecution(NCache::TConversionContext& context) const {
+    TMakeNode node;
+    Restore(context, &node);
+    if (const auto* refreshed = context.GetRefreshedMakeNode()) {
+        node.Uid = refreshed->Uid;
+        node.SelfUid = refreshed->SelfUid;
+        node.Deps = refreshed->Deps;
+        // Match the cached JSON writer: foreign_deps exists only if the
+        // cached node had tool dependencies.
+        if (!node.ToolDeps.empty()) {
+            node.ToolDeps = refreshed->ToolDeps;
+        }
+        if (!context.GetStoreInputs()) {
+            node.Inputs = refreshed->Inputs;
+        }
+    }
+    return node;
+}
+
 TVector<NCache::TOriginal> TMakeNodeSavedState::RestoreLateOuts(NCache::TConversionContext& context) const {
     TVector<NCache::TOriginal> lateOuts;
     context.Convert(CachedNode.LateOuts, lateOuts);
