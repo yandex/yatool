@@ -12,6 +12,28 @@ ENDIF()
 
 PY_MAIN(entry.main)
 
+IF (AUTOCHECK)
+    SET(AUTOCHECK_TOOL_LIST
+        ag  # devtools/ya/handlers/grep/tests/acceptance, devtools/ya/handlers/tool/tests/acceptance
+        arc  # devtools/autocheck/libs/platform_miner/tests/large
+        black  # devtools/ya/cpp/entry/tests
+        c++
+        clang-format  # devtools/ya/handlers/style/tests/acceptance
+        jstyle  # devtools/ya/handlers/jstyle/tests/acceptance
+        print_args  # devtools/ya/yalibrary/tools/tests/acceptance
+        python
+        python3
+        run_python_udf  # devtools/ya/handlers/nile/tests/acceptance
+        tofu  # devtools/ya/handlers/style/tests/acceptance
+        ya-tc
+        yamlfmt  # devtools/ya/handlers/style/tests/acceptance
+        ymake  # yabs/server/cs/internal_ver/cs_import/test
+        yoimports  # devtools/ya/handlers/style/tests/acceptance
+        yql-format  # devtools/ya/handlers/style/tests/acceptance
+    )
+    INCLUDE(${ARCADIA_ROOT}/devtools/ya/conf/ya.make.inc)
+ENDIF()
+
 PEERDIR(
     contrib/deprecated/python/ujson
     devtools/ya/cpp/entry

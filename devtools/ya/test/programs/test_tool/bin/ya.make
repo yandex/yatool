@@ -11,4 +11,12 @@ PEERDIR(
 
 WINDOWS_LONG_PATH_MANIFEST()
 
+IF (AUTOCHECK)
+    SET(AUTOCHECK_TOOL_LIST
+        arc
+    )
+    INCLUDE(${ARCADIA_ROOT}/devtools/ya/conf/ya.make.inc)
+ENDIF()
+
+
 END()

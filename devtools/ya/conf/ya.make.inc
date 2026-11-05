@@ -1,0 +1,5 @@
+IF (YA_OPENSOURCE)
+    YA_TOOLS_CONF(devtools/ya/opensource)
+ELSE()
+    YA_TOOLS_CONF(build TOOLS ${AUTOCHECK_TOOL_LIST})
+ENDIF()

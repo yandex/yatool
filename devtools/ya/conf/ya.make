@@ -1,9 +1,7 @@
 LIBRARY()
 
-IF (YA_OPENSOURCE)
-    YA_TOOLS_CONF(devtools/ya/opensource)
-ELSE()
-    YA_TOOLS_CONF(build)
+IF (NOT AUTOCHECK)
+    INCLUDE(ya.make.inc)
 ENDIF()
 
 END()
