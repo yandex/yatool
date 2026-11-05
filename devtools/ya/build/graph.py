@@ -3,7 +3,6 @@ import collections
 from concurrent.futures import ThreadPoolExecutor
 import contextlib2
 import copy
-from enum import Enum
 import logging
 import os
 import re2
@@ -41,23 +40,26 @@ import yalibrary.platform_matcher as pm
 import yalibrary.graph.commands as graph_cmd
 import yalibrary.graph.const as graph_const
 import yalibrary.graph.node as graph_node
-from devtools.ya.yalibrary.yandex.distbuild import distbs_consts
 from yalibrary.toolscache import toolscache_version
 import yalibrary.debug_store
 from yalibrary.monitoring import YaMonEvent
 
 import devtools.ya.build.makelist as bml
+from devtools.ya.build.result_renaming import rename_conflicting_results
 import devtools.ya.build.node_checks as node_checks
+from devtools.ya.build import configuration
+from devtools.ya.build.configuration import (
+    ConfigurationKind as _GraphKind,
+    should_run_tests as _should_run_tests,
+)
 import devtools.ya.build.gen_plan as gen_plan
 import devtools.ya.build.ymake2 as ymake2
 import devtools.ya.build.graph_description as graph_descr
 from devtools.ya.build.ymake2.consts import YmakeEvents
 import devtools.ya.build.genconf as bg
-from devtools.ya.build.build_graph_cache import layout as bg_cache_layout
 from devtools.ya.build.build_graph_cache import target_tc as bg_cache_target_tc
 from devtools.ya.build.evlog.progress import get_print_status_func
 import devtools.ya.build.ccgraph as ccgraph
-from devtools.ya.test.test_types.common import SemanticLinterSuite
 from devtools.ya.test.common import set_python_pattern
 
 if tp.TYPE_CHECKING:
@@ -158,88 +160,6 @@ class _OptimizableGraph(dict):
             logger.error(err, exc_info=True)
         finally:
             reduce_graph_resources_stage.finish()
-
-
-class _NodeGen:
-    def __init__(self, python3_pattern: str):
-        self.extra_nodes: list[graph_descr.GraphNode] = []
-        self._md5_cache = {}
-        self._python3_pattern = python3_pattern
-
-    def resolve_file_md5(self, path):
-        if path not in self._md5_cache:
-            self._md5_cache[path] = hashing.md5_path(path)
-
-        return self._md5_cache[path]
-
-    @staticmethod
-    def is_cacheable_node(node):
-        return node.get('cache', not node.get('kv', {}).get('disable_cache', False))
-
-    def gen_rename_node(self, node: graph_descr.GraphNode, suffix) -> graph_descr.GraphNodeUid:
-        import devtools.ya.test.test_node.cmdline as cmdline
-
-        inputs = node['outputs']
-        outputs = [inp + suffix for inp in inputs]
-
-        tared_outputs = [inp + suffix for inp in node.get('tared_outputs', [])]
-        cmd_args = sum([[fr, to] for fr, to in zip(inputs, outputs)], [])
-
-        ret = {
-            'uid': hashing.md5_value(node['uid'] + '-' + suffix),
-            'cmds': [
-                {
-                    'cmd_args': [
-                        "$({})/bin/python3".format(self._python3_pattern),
-                        '$(SOURCE_ROOT)/build/scripts/move.py',
-                    ]
-                    + cmdline.wrap_with_cmd_file_markers(cmd_args)
-                }
-            ],
-            'deps': [node['uid']],
-            'inputs': inputs,
-            'kv': {'p': 'CP', 'pc': 'light-blue'},
-            'outputs': outputs,
-            'priority': 0,
-            'env': {},
-            'cache': _NodeGen.is_cacheable_node(node),
-            "type": 2,
-        }
-        if tared_outputs:
-            ret['tared_outputs'] = tared_outputs
-        self.extra_nodes.append(self.copy_platform_and_tags(node, ret))
-        return ret['uid']
-
-    def copy_platform_and_tags(self, fr, to):
-        if tags := fr.get('tags', None):
-            to['tags'] = tags
-        if platform := fr.get('platform'):
-            to['platform'] = platform
-        if platform_id := fr.get('platform_id'):
-            to['platform_id'] = platform_id
-        return to
-
-    def gen_and_save_graph_node(self, uid, deps, inputs, outputs, cmd, tags):
-        ret = {
-            'uid': uid,
-            'deps': deps,
-            'inputs': inputs,
-            'outputs': outputs,
-            'priority': 0,
-            'cmds': [{'cmd_args': cmd}],
-            'kv': {'p': 'UB', 'pc': 'light-magenta'},
-            'cwd': '$(BUILD_ROOT)',
-            'env': {},
-            'cache': True,
-            'type': 2,
-        }
-
-        if tags:
-            ret['tags'] = tags
-
-        self.extra_nodes.append(ret)
-
-        return ret['uid']
 
 
 def union_inputs(inputs1, inputs2):
@@ -351,38 +271,7 @@ def _add_json_prefix(graph, tests, prefix):
 
 
 def _gen_rename_nodes(graph: graph_descr.DictGraph, host_tool_resolver: "_HostToolResolver", uid_map, src_dir):
-    node_gen = _NodeGen(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern'])
-    by_output = collections.defaultdict(list)
-
-    for uid in graph['result']:
-        n = uid_map[uid]
-
-        for out in n['outputs']:
-            by_output[out].append(n)
-
-    def iter_results():
-        uids_to_rename = set()
-        for out, lst in by_output.items():
-            if len(lst) > 1:
-                uids_to_rename |= {n['uid'] for n in lst}
-            else:
-                yield lst[0]['uid']
-
-        for u in uids_to_rename:
-            node = uid_map[u]
-
-            prefix = node.get('platform_id')
-            if not prefix:
-                # We would like to preserve resaonably-sized prefixes, but trim longer ones
-                prefix = '-'.join(node.get('tags', [u]))
-                if len(prefix) > 64:
-                    prefix = '{}..{}'.format(prefix[:54], hashing.md5_value(prefix)[:8])
-
-            yield node_gen.gen_rename_node(node, '.' + prefix)
-
-    graph['result'] = [x for x in iter_results()]
-    graph['graph'].extend(node_gen.extra_nodes)
-    return graph
+    return rename_conflicting_results(graph, host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3')['pattern'], uid_map)
 
 
 def _iter_extra_resources(g):
@@ -590,12 +479,6 @@ def _resolve_tool(tool: tools.ToolInfo, res_dir) -> graph_descr.GraphConfResourc
             'pattern': tool['params']['match_root'],
             'name': tool.get('name', 'nameless tool'),
         }
-
-
-def _extend_build_type(build_type):
-    if build_type.startswith('dist-'):
-        return build_type
-    return 'dist-' + build_type
 
 
 def _split_gcc_node(n):
@@ -1296,12 +1179,6 @@ def should_use_servermode_for_pic(opts):
     return opts.ymake_pic_servermode
 
 
-class _GraphKind(Enum):
-    TARGET = 0
-    TOOLS = 1
-    GLOBAL_TOOLS = 2
-
-
 class _ForeignEventListener:
     TOOL_PLATFORM = 0
     PIC_PLATFORM = 1
@@ -1408,38 +1285,9 @@ def build_graph_and_tests(opts, check, event_queue=None, display=None):
 
 
 def _static_analysis_strip_deps(plan, suites):
-    def get_diff(lhs, rhs):
-        return list(sorted(set(lhs) - set(rhs)))
+    from devtools.ya.test.test_node.semantic import strip_dependencies
 
-    seen_uids = {}
-
-    for suite in suites:
-        if not isinstance(suite, SemanticLinterSuite):
-            continue
-        for out in suite.semantic_linter_inputs:
-            uid = plan.get_uids_by_outputs(out)
-            if not uid:
-                continue
-
-            node = plan.get_node_by_uid(uid[0])
-            uids_to_remove = set()
-            inputs_to_remove = set()
-            for dep in node["deps"]:
-                if dep in seen_uids:
-                    inputs = seen_uids[dep]
-                else:
-                    dep_node = plan.get_node_by_uid(dep)
-                    if dep_node["kv"].get("p") != "CC":
-                        inputs = dep_node["outputs"]
-                    else:
-                        inputs = []
-                    seen_uids[dep] = inputs
-                if inputs:
-                    inputs_to_remove.update(inputs)
-                    uids_to_remove.add(dep)
-
-            node["inputs"] = get_diff(node["inputs"], inputs_to_remove)
-            node["deps"] = get_diff(node["deps"], uids_to_remove)
+    strip_dependencies(plan, suites)
 
 
 def _shorten_debug_id(debug_id, limit=64):
@@ -1469,7 +1317,7 @@ class _ConfErrorReporter:
         self.__ev_listener(event)
 
 
-class _GraphMaker:
+class _GraphMaker(configuration.ConfigurationPreparation):
     def __init__(
         self,
         opts,
@@ -1485,7 +1333,13 @@ class _GraphMaker:
         print_status,
         cl_generator,
     ):
-        self._opts = opts
+        super().__init__(
+            opts=opts,
+            source_root=src_dir,
+            conf_dir=os.path.join(bld_dir, 'conf'),
+            ymake_identity=ymake_bin,
+            changelist_generator=cl_generator,
+        )
         # In multiconfig mode, each task simply adds its options to a common list
         # and then waits for one multiconfig ymake to process all configurations at once.
         # For the large ymake to run at all, we first need to collect options from all configurations,
@@ -1493,19 +1347,13 @@ class _GraphMaker:
         # We're safe to set high limit since threads are spawned lazily and reused if able.
         max_workers = 1000 if opts.ymake_multiconfig else getattr(opts, 'ya_threads')
         self._platform_threadpool = ThreadPoolExecutor(max_workers=max_workers)
-        self._ymake_bin = ymake_bin
         self._real_ymake_bin = real_ymake_bin
-        self._src_dir = src_dir
-        self._conf_dir = os.path.join(bld_dir, 'conf')
         self._res_dir = res_dir
         self._event_queue = event_queue
         self._test_target_platforms = test_target_platforms
         self._check = check
         self._exit_stack = exit_stack
         self._print_status = print_status
-        self._heater = self._opts.build_graph_cache_heater
-        self._allow_changelist = True
-        self._cl_generator = cl_generator
         self.ymakes_scheduled = 0
         self.cmdline_generation_error = None
 
@@ -1523,15 +1371,9 @@ class _GraphMaker:
         tool_targets_queue=None,
         ymake_opts=None,
     ):
-        is_cross_tools = graph_kind == _GraphKind.TOOLS or graph_kind == _GraphKind.GLOBAL_TOOLS
         is_global_tools = graph_kind == _GraphKind.GLOBAL_TOOLS
 
-        if is_cross_tools:
-            flags = self._opts.host_flags.copy()
-            flags.update(self._opts.host_platform_flags)
-            flags['IS_CROSS_TOOLS'] = 'yes'
-        else:
-            flags = self._opts.flags.copy()
+        flags = configuration.configuration_base_flags(self._opts, graph_kind)
 
         platform_name_override = None
         if node_checks.is_tools_tc(target_tc):
@@ -1547,20 +1389,9 @@ class _GraphMaker:
 
         self._print_status("Configuring dependencies for platform {}".format(self._make_debug_id(debug_id, None)))
 
-        # Choose what platform to build
-        to_build_pic = False
-        to_build_no_pic = False
-        if self._non_pic_only(target_tc):
-            to_build_no_pic = True
-        elif self._opts.force_pic or self._pic_only(flags, target_tc):
-            to_build_pic = True
-        elif graph_kind == _GraphKind.TOOLS:
-            to_build_pic = True
-        elif graph_kind == _GraphKind.GLOBAL_TOOLS:
-            to_build_no_pic = True
-        else:
-            to_build_pic = True
-            to_build_no_pic = True
+        variants = configuration.configuration_variants(self._opts, target_tc, flags, graph_kind)
+        to_build_pic = 'pic' in variants
+        to_build_no_pic = 'nopic' in variants
 
         if to_build_pic and not to_build_no_pic:
             logger.debug('Configuring only PIC for %s', self._make_debug_id(debug_id, None))
@@ -1597,9 +1428,9 @@ class _GraphMaker:
                 report_pic_nopic=to_build_pic,
             )
             if should_use_internal_servermode(self._opts):
-                # tool options are different and set in _get_tools()
-                if graph_kind == _GraphKind.TARGET:
-                    ymake_opts_nopic.update(platform_id=platform_id, **nopic_servermode_opts)
+                ymake_opts_nopic.update(
+                    configuration.internal_transition_options(graph_kind, 'nopic', platform_id, variants)
+                )
             elif to_build_pic and should_use_servermode_for_pic(self._opts):
                 pic_queue = _ToolEventsQueueServerMode('pic')
                 no_pic_func, no_pic_queue_putter = pic_queue.add_source(
@@ -1658,13 +1489,12 @@ class _GraphMaker:
 
             abs_targets_pic = abs_targets
             if should_use_internal_servermode(self._opts):
-                ymake_opts_pic['platform_id'] = platform_id
-                # tool options are different and set in _get_tools()
-                if graph_kind == _GraphKind.TARGET:
-                    ymake_opts_pic['transition_source'] = 'pic'
-                    if to_build_no_pic:
-                        ymake_opts_pic.update(**pic_servermode_opts)
-                        abs_targets_pic = []
+                ymake_opts_pic.update(
+                    configuration.internal_transition_options(graph_kind, 'pic', platform_id, variants)
+                )
+                if graph_kind == _GraphKind.TARGET and to_build_no_pic:
+                    ymake_opts_pic['source_root'] = self._opts.arc_root
+                    abs_targets_pic = []
             elif pic_queue is not None:
 
                 def stdin_line_provider():
@@ -1711,16 +1541,6 @@ class _GraphMaker:
             no_pic = pic
 
         return _TargetGraphsResult(pic, no_pic, target_tc)
-
-    @staticmethod
-    def _non_pic_only(target_tc):
-        # Windows builds are always relocatable, but not PIC
-        return target_tc['platform']['target']['os'] == "WIN"
-
-    @staticmethod
-    def _pic_only(flags, target_tc):
-        # Honor -DPIC and --target-platlform-flag=PIC as force_pic
-        return bg_cache_layout.is_pic_only(flags, target_tc)
 
     def _build_pic(
         self,
@@ -1771,8 +1591,7 @@ class _GraphMaker:
         pic_queue_putter=None,
         ymake_opts=None,
     ):
-        flags = copy.deepcopy(flags)
-        flags['FORCE_NO_PIC'] = 'yes'
+        flags = configuration.variant_flags(flags, 'nopic')
         return self._prepare_graph(
             flags,
             target_tc,
@@ -1812,7 +1631,7 @@ class _GraphMaker:
         if cache_dir:
             cache_subdir = cache_dir if extra_tag is None else os.path.join(cache_dir, extra_tag)
             exts.fs.ensure_dir(cache_subdir)
-        tags, platform, platform_id_base = gen_plan.prepare_tags(target_tc, flags, self._opts)
+        metadata = configuration.configuration_metadata(self._opts, target_tc, flags, extra_tag, pic_only)
         with stager.scope("gen-graph-{}".format(_shorten_debug_id(debug_id))):
             result = self._gen_graph(
                 flags,
@@ -1829,13 +1648,10 @@ class _GraphMaker:
                 pic_queue_putter=pic_queue_putter,
                 ymake_opts=ymake_opts,
             )
-        result.graph.set_tags(tags + ([extra_tag] if extra_tag else []))
-        result.graph.set_platform(platform)
-        if platform_id := platform_id_base:
-            # don't apply pic tag in pic-only cases
-            if extra_tag and (extra_tag != 'pic' or not pic_only):
-                platform_id = f"{platform_id}-{extra_tag}"
-            result.graph.set_platform_id(platform_id)
+        result.graph.set_tags(metadata['tags'])
+        result.graph.set_platform(metadata['platform'])
+        if 'platform_id' in metadata:
+            result.graph.set_platform_id(metadata['platform_id'])
         return result
 
     def _gen_graph(
@@ -1855,7 +1671,6 @@ class _GraphMaker:
         ymake_opts=None,
     ) -> _GenGraphResult:
         flags = copy.deepcopy(flags)
-        flags['IS_CROSS_SANITIZE'] = 'yes'
         tc_tests = []
         should_run_tc_tests = _should_run_tests(self._opts, tc)
 
@@ -1879,7 +1694,7 @@ class _GraphMaker:
 
         with stager.scope("gen-graph-gen-opts-{}".format(_shorten_debug_id(debug_id))):
             ymake_opts = dict(
-                self._gen_opts(
+                self.prepare(
                     flags,
                     tc,
                     test_dart_path,
@@ -1937,191 +1752,11 @@ class _GraphMaker:
             make_files_map = bml.parse_make_files_dart(dart)
 
         if should_run_tc_tests:
-            platform = tc.get('platform', {})
-            target_os = platform.get('target', {}).get('os')
-            target_arch = platform.get('target', {}).get('arch')
+            from devtools.ya.test.explore import configure_platform_runners
 
-            if target_os == 'IOS':
-                for test in tc_tests:
-                    if (test.binary_path('') or '').endswith('.ios.tar'):
-                        if not test.get_ios_device_type():
-                            continue
-                        if target_arch == 'x86_64':
-                            test.special_runner = 'ios.simctl.x86_64'
-                        elif target_arch == 'i386':
-                            test.special_runner = 'ios.simctl.i386'
-                    elif target_arch == 'x86_64':
-                        test.special_runner = 'ios'
-            elif target_os == 'IOSSIM':
-                for test in tc_tests:
-                    if (test.binary_path('') or '').endswith('.ios.tar'):
-                        if not test.get_ios_device_type():
-                            continue
-                        if target_arch == 'arm64':
-                            test.special_runner = 'ios.simctl.arm64'
-            elif target_os == 'ANDROID':
-                for test in tc_tests:
-                    if not test.get_android_apk_activity():
-                        continue
-                    if target_arch == 'x86_64':
-                        test.special_runner = 'android.x86_64'
-                    elif target_arch == 'i686':
-                        test.special_runner = 'android.i686'
-                    elif target_arch == 'armv8a':
-                        test.special_runner = 'android.armv8a'
+            configure_platform_runners(tc_tests, tc)
 
         return _GenGraphResult(graph=graph, tc_tests=tc_tests, java_darts=java_darts, make_files_map=make_files_map)
-
-    def _gen_opts(
-        self,
-        extra_flags,
-        tc,
-        test_dart,
-        java_dart,
-        make_files_dart,
-        ev_listener,
-        abs_targets,
-        debug_id=None,
-        enabled_events=YmakeEvents.DEFAULT.value,
-        cache_dir=None,
-        change_list=None,
-        extra_conf=None,
-        no_caches_on_retry=False,
-        no_ymake_retry=False,
-    ):
-        flags = {}
-
-        flags.update(extra_flags)
-        flags.update(tc.get('params', {}).get('extra_flags', {}))
-        flags.update(tc.get('flags', {}))
-        flags[tc['name'].upper()] = 'yes'
-        flags['YA'] = 'yes'
-
-        if not node_checks.is_tools_tc(tc) and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends):
-            flags['TRAVERSE_RECURSE_FOR_TESTS'] = 'yes'
-            flags['TRAVERSE_DEPENDS'] = 'yes'
-        if self._opts.ignore_recurses or tc.get('ignore_recurses'):
-            flags['TRAVERSE_RECURSE'] = 'no'
-            flags['TRAVERSE_RECURSE_FOR_TESTS'] = 'no'
-
-        build_type = gen_plan.real_build_type(tc, self._opts)
-        conf_path, _ = bg.gen_conf(
-            self._src_dir,
-            self._conf_dir,
-            _extend_build_type(build_type),
-            self._opts.use_local_conf,
-            self._opts.local_conf_path,
-            flags,
-            tc,
-            not self._opts.use_distbuild,
-            conf_debug=self._opts.conf_debug_options,
-            debug_id=debug_id,
-            extra_conf=extra_conf,
-        )
-
-        uniq_id = hashing.md5_value(str([2, self._ymake_bin]))
-
-        ya_cache_dir = cache_dir or os.path.dirname(conf_path) + '_' + uniq_id
-
-        if not self._heater and cache_dir and not os.path.isfile(os.path.join(ya_cache_dir, 'ymake.cache')):
-            logger.debug("Cannot find ymake.cache in %s, ignore if there is no target built", ya_cache_dir)
-
-        o = dict(
-            custom_build_directory=ya_cache_dir,
-            build_type=build_type,
-            abs_targets=abs_targets,
-            debug_options=self._opts.debug_options,
-            custom_conf=conf_path,
-            continue_on_fail=self._opts.continue_on_fail,
-            ymake_bin=self._opts.ymake_bin,
-            warn_mode=self._opts.warn_mode,
-            build_depends=(
-                not node_checks.is_tools_tc(tc)
-                and (_should_run_tests(self._opts, tc) or self._opts.force_build_depends)
-            ),
-            checkout_data_by_ya=getattr(self._opts, "checkout_data_by_ya", False),
-            strict_inputs=self._need_strict_inputs(flags),
-            dump_inputs_map=self._is_inputs_map_required(),
-            ev_listener=self._get_event_listener_debug_id_wrapper(ev_listener, debug_id, tc),
-            enabled_events=enabled_events,
-            no_caches_on_retry=no_caches_on_retry,
-            no_ymake_retry=no_ymake_retry or self._opts.ymake_multiconfig,
-            fail_on_no_configure_cache=self._opts.fail_on_no_configure_cache,
-            disable_customization=strtobool(flags.get('DISABLE_YMAKE_CONF_CUSTOMIZATION', 'no')),
-            parallel_rendering=self._opts.ymake_parallel_rendering,
-            use_subinterpreters=self._opts.ymake_use_subinterpreters,
-        )
-
-        if test_dart:
-            o["dump_tests"] = test_dart
-
-        if java_dart:
-            o['dump_java'] = java_dart
-
-        if make_files_dart:
-            o['dump_make_files'] = make_files_dart
-
-        if change_list is None:
-            if getattr(self._opts, "build_graph_cache_force_local_cl", False) and self._allow_changelist:
-                if self._cl_generator is not None:
-                    o['changelist_generator'] = (
-                        self._cl_generator
-                    )  # TODO: think of a proper way to pass it closer to ymake launch
-                    o['patch_path'] = self._cl_generator.get_changelist(ya_cache_dir)
-                    if o['patch_path'] is not None and 'completely-trust-fs-cache' not in o['debug_options']:
-                        o['debug_options'] = o['debug_options'] + ['completely-trust-fs-cache']
-        else:
-            o['patch_path'] = change_list
-
-        if self._opts.dump_file_path:
-            assert debug_id
-            exts.fs.ensure_dir(self._opts.dump_file_path)
-            # Truncate filename to be sure it can be created on the FS
-            if len(debug_id) > 150:
-                suffix = "-{md5}".format(md5=hashing.md5_value(debug_id))
-                filename = debug_id[: 150 - len(suffix)] + suffix + '.txt'
-            else:
-                filename = debug_id + '.txt'
-            o['dump_file'] = os.path.join(self._opts.dump_file_path, filename)
-
-        if self._opts.compress_ymake_output:
-            assert self._opts.compress_ymake_output_codec, "Compress codec must be defined"
-            o['compress_ymake_output_codec'] = self._opts.compress_ymake_output_codec
-
-        return o
-
-    def _need_strict_inputs(self, flags):
-        return self._opts.strict_inputs or flags.get('SANDBOXING') == 'yes'
-
-    def _is_inputs_map_required(self):
-        return (
-            self._opts.use_distbuild and self._opts.repository_type == distbs_consts.DistbuildRepoType.TARED
-        ) or self._opts.run_tagged_tests_on_sandbox
-
-    def _event_listener_invalid_recurses_wrapper(self, ev_listener, tc):
-        if self._opts.dump_platform_to_evlog:
-
-            def enrich_invalid_recurses_listener(event):
-                if event['_typename'] in ('NEvent.TInvalidRecurse', 'NEvent.TDisplayMessage', 'NEvent.TFailOnRecurse'):
-                    event['Platform'] = pm.stringize_toolchain(tc)
-                ev_listener(event)
-
-            return enrich_invalid_recurses_listener
-        else:
-            return ev_listener
-
-    def _get_event_listener_debug_id_wrapper(self, ev_listener, debug_id, tc):
-        event_listener_invalid_recurses_wrapper_func = self._event_listener_invalid_recurses_wrapper(ev_listener, tc)
-
-        def event_listener_debug_id_wrapper(event):
-            if (
-                event['_typename'] in ("NEvent.TStageStarted", "NEvent.TStageFinished")
-                and event["StageName"] == "ymake run"
-            ):
-                event["debug_id"] = debug_id
-            event_listener_invalid_recurses_wrapper_func(event)
-
-        return event_listener_debug_id_wrapper
 
     def _gen_tests(self, dart, tc):
         import devtools.ya.test.explore as te
@@ -2231,86 +1866,11 @@ def _build_graph_and_tests(
         )
     )
 
-    host = opts.host_platform
-    target_platforms = opts.target_platforms
-
-    if host:
-        host = bg.mine_platform_name(host)
-
-    if target_platforms:
-        target_platforms = [x.copy() for x in target_platforms]
-        for platform in target_platforms:
-            platform['platform_name'] = bg_cache_target_tc.normalize_target_platform_name(
-                platform.get('platform_name'),
-                host or bg.host_platform_name(),
-            )
-
-    if opts.use_distbuild:
-        if not host:
-            host = bg.mine_platform_name('default-linux-x86_64')
-        if not target_platforms:
-            target_platforms = [{'platform_name': bg.host_platform_name()}]
-    else:
-        if pm.is_darwin_rosetta() and not opts.hide_arm64_host_warning and not host and not target_platforms:
-            try:
-                import app_ctx
-
-                app_ctx.display.emit_message(
-                    "Current target architecture is x86_64. Specify \"--target-platform\" flag to build for native arm64."
-                )
-            except Exception as e:
-                logger.error("Can't print arm64 warning message: {}".format(e))
-        if not host:
-            host = bg.host_platform_name()
-        if not target_platforms:
-            target_platforms = [{'platform_name': host}]
-
-    parsed_host_p = pm.parse_platform(host)
-    host_os = parsed_host_p['os']
-    # https://st.yandex-team.ru/DTCC-277
-    # host_platform = 'darwin-arm64' if host_os.lower() == 'darwin' and parsed_host_p.get('arch') == 'arm64' else host_os
-    host_platform = host_os
-
-    target_flags = dict(_iter_target_flags(opts))
-
-    if target_flags:
-        for t in target_platforms:
-            t['flags'] = dict(target_flags, **t.get('flags', {}))
-    # done propagate
-
-    # add salt for target platforms in sandboxing mode
-    sandboxing_salt = 'sandboxing'
-    for t in target_platforms:
-        if t.get('flags', {}).get('SANDBOXING') == 'yes':
-            t['flags']['FAKEID'] = t['flags'].get('FAKEID', '') + sandboxing_salt
-
-    if len(target_platforms) > 1 and opts.canonize_tests:
-        raise devtools.ya.core.yarg.ArgsBindingException(
-            'Canonization is not supported for more than one target platform'
-        )
-
-    host_tc = bg.gen_tc(
-        host, opts.c_compiler, opts.cxx_compiler, opts.flags.get('IGNORE_MISMATCHED_XCODE_VERSION') == 'yes'
+    host, host_tc, target_tcs = configuration.resolve_toolchains(
+        opts, report_warning=display.emit_message if display is not None else None
     )
-    host_tc['build_type'] = opts.host_build_type
-    host_tc['flags'] = {
-        'NO_DEBUGINFO': 'yes',
-        'TOOL_BUILD_MODE': 'yes',
-        'CLANG_COVERAGE': 'no',
-        'TRAVERSE_RECURSE': 'no',
-        'CONSISTENT_DEBUG': 'yes',
-        "TIDY": 'no',
-    }
-    if opts.host_platform_flags:
-        host_tc['flags'].update(opts.host_platform_flags)
-    if opts.preset_mapsmobi:
-        host_tc['flags']['MAPSMOBI_BUILD_HOST'] = 'yes'
-    if opts.sandboxing:
-        host_tc['flags']['SANDBOXING'] = 'yes'
-    if host_tc['flags'].get('SANDBOXING') == 'yes':
-        host_tc['flags']['FAKEID'] = host_tc['flags'].get('FAKEID', '') + sandboxing_salt
-
-    target_tcs = [bg_cache_target_tc.resolve_target_tc(host, p, opts) for p in target_platforms]
+    parsed_host_p = pm.parse_platform(host)
+    host_platform = parsed_host_p['os']
     test_target_platforms = [tpc for tpc in target_tcs if _should_run_tests(opts, tpc)]
 
     logger.debug('flags: %s', json.dumps(opts.flags, indent=4, sort_keys=True))
@@ -2476,8 +2036,7 @@ def _build_graph_and_tests(
 
     graph['result'] = list(sorted(set(graph['result'])))
 
-    graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
-    graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
+    graph['conf']['resources'].extend(configuration.runtime_resources(host_tool_resolver))
 
     if not opts.ymake_bin:
         graph['conf']['resources'].append(host_tool_resolver.resolve('ymake', 'YMAKE'))
@@ -2592,12 +2151,6 @@ def _build_graph_and_tests(
     return graph, tests, stripped_tests, ctx, make_files
 
 
-def _should_run_tests(opts, target_tc):
-    return not node_checks.is_tools_tc(target_tc) and (
-        opts.run_tests or target_tc.get('run_tests') or opts.list_tests or opts.canonize_tests
-    )
-
-
 def _enable_imprint_fs_cache(opts):
     if opts.cache_fs_read or opts.cache_fs_write:
         imprint_enable_fs_cache_stage = stager.start('imprint_enable_fs_cache')
@@ -2621,66 +2174,6 @@ def _enable_imprint_fs_cache(opts):
 
 
 # propagate some flags to all target platforms...
-def _iter_target_flags(opts):
-    for opt_val, flag in [
-        (opts.sanitize, 'SANITIZER_TYPE'),
-        (opts.sanitize_coverage, 'SANITIZE_COVERAGE'),
-    ]:
-        if not opt_val:
-            opt_val = opts.flags.get(flag, None)
-            if opt_val and flag in opts.flags:
-                del opts.flags[flag]
-
-        if opt_val:
-            yield flag, opt_val
-
-    if opts.yndexing:
-        yield 'CODENAVIGATION', 'yes'
-
-    if opts.sanitizer_flags:
-        yield 'SANITIZER_CFLAGS', ' '.join(opts.sanitizer_flags)
-
-    if opts.lto:
-        yield 'USE_LTO', 'yes'
-
-    if opts.thinlto:
-        yield 'USE_THINLTO', 'yes'
-
-    if opts.musl:
-        yield 'MUSL', 'yes'
-
-    if opts.use_afl:
-        yield 'USE_AFL', 'yes'
-
-    if opts.pgo_add:
-        yield 'PGO_ADD', 'yes'
-
-    if opts.pgo_path:
-        yield 'PGO_PATH', '$(PGO_PATH)'
-
-    if opts.javac_flags:
-        yield 'JAVAC_OPTS', ' '.join(['-{} {}'.format(k, v or '') for k, v in opts.javac_flags.items()])
-
-    if opts.hardening:
-        yield 'HARDENING', 'yes'
-
-    if opts.sandboxing:
-        yield 'SANDBOXING', 'yes'
-
-    if opts.race:
-        yield 'RACE', 'yes'
-
-    if opts.cuda_platform == 'disabled':
-        yield 'CUDA_DISABLED', 'yes'
-        yield 'HAVE_CUDA', 'no'
-    if opts.cuda_platform == 'required':
-        yield 'CUDA_REQUIRED', 'yes'
-
-    if opts.preset_mapsmobi:
-        yield 'MAPSMOBI_BUILD_TARGET', 'yes'
-
-    if opts.preset_with_credits:
-        yield 'WITH_CREDITS', 'yes'
 
 
 def _needs_wine_for_tests(test_target_platforms, archs=None):
@@ -2805,8 +2298,7 @@ def _make_yndexing_graph(graph: graph_descr.DictGraph, opts, ymake_bin, host_too
     py3_yndexing = opts.py3_yndexing
 
     graph['conf']['resources'].append(host_tool_resolver.resolve('ytyndexer', 'YTYNDEXER'))
-    graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
-    graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
+    graph['conf']['resources'].extend(configuration.runtime_resources(host_tool_resolver))
 
     if opts.flags.get('YMAKE_YNDEXING', 'no') == 'yes':
         _gen_ymake_yndex_node(graph, opts, ymake_bin, host_tool_resolver)
@@ -3169,22 +2661,9 @@ class _HostToolResolver:
 
 
 def _resolve_test_tools(graph_maker, toolchain, debug_id, opts):
-    targets = [
-        os.path.join('build', 'platform', 'test_tool'),
-        os.path.join('build', 'external_resources', 'go_tools'),
-        os.path.join('build', 'external_resources', 'flake8_py2'),
-        os.path.join('build', 'external_resources', 'flake8_py3'),
-        os.path.join('build', 'platform', 'java', 'jstyle_lib'),
-    ]
-    resources = [
-        tconst.TEST_TOOL_HOST,
-        tconst.TEST_TOOL_TARGET,
-        tconst.XCODE_TOOLS_RESOURCE,
-        tconst.GO_TOOLS_RESOURCE,
-        tconst.FLAKE8_PY2_RESOURCE,
-        tconst.FLAKE8_PY3_RESOURCE,
-        tconst.JSTYLE_RUNNER_LIB,
-    ]
+    from devtools.ya.test.util.tools import get_test_resource_requirements
+
+    targets, resources = get_test_resource_requirements(opts)
 
     if _needs_wine_for_tests([toolchain]):
         targets += [os.path.join('build', 'platform', 'wine')]
@@ -3192,12 +2671,6 @@ def _resolve_test_tools(graph_maker, toolchain, debug_id, opts):
             tconst.WINE_TOOL,
             tconst.WINE32_TOOL,
         ]
-
-    if getattr(opts, 'ts_coverage', None):
-        targets.append(os.path.join('build', 'platform', 'nodejs'))
-        resources.append(tconst.NODEJS_RESOURCE)
-        targets.append(os.path.join('build', 'external_resources', 'nyc'))
-        resources.append(tconst.NYC_RESOURCE)
 
     return _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debug_id)
 
@@ -3370,28 +2843,9 @@ def _build_merged_graph(
         _inject_tests_result_node(src_dir, merged_graph, test_scope, test_opts)
 
         tools_from_suites = _get_tools_from_suites(injected_tests, ytexec_required)
-        resources = [host_tool_resolver.resolve(tool, tool.upper()) for tool in tools_from_suites]
-        merged_graph['conf']['resources'].extend(resources)
-
-        merged_graph['conf']['resources'].append(host_tool_resolver.resolve('python', 'PYTHON'))
-        merged_graph['conf']['resources'].append(host_tool_resolver.resolve('python3', 'YMAKE_PYTHON3'))
-        try:
-            merged_graph['conf']['resources'].append(host_tool_resolver.resolve('gdb', 'GDB'))
-        except Exception as e:
-            logger.debug("Gdb will not be available for tests: %s", e)
-
-        if getattr(opts, 'dlv'):
-            try:
-                merged_graph['conf']['resources'].append(host_tool_resolver.resolve('dlv', 'DLV'))
-            # XXX
-            except Exception as e:
-                logger.debug("Dlv will not be available for tests: %s", e)
-
-        if any(tc for tc in target_tcs if 'valgrind' in gen_plan.real_build_type(tc, opts)):
-            try:
-                merged_graph['conf']['resources'].append(host_tool_resolver.resolve('valgrind', 'VALGRIND'))
-            except Exception as e:
-                logger.debug("Valgrind will not be available for tests: %s", e)
+        merged_graph['conf']['resources'].extend(
+            configuration.test_runtime_resources(host_tool_resolver, opts, target_tcs, suite_tools=tools_from_suites)
+        )
 
     # TODO: mark node as sandboxing node during its creation
     if sandboxing_test_uids:
@@ -3442,11 +2896,7 @@ def _inject_tests(
                 'uniq_recipes': list(uniq_recipes),
             },
         )
-    if not test_opts.tests_filters:
-        if test_opts.last_failed_tests:
-            tests = devtools.ya.test.test_node.filter_last_failed(tests, opts)
-        tests = devtools.ya.test.test_node.filter_whitelist(tests, opts)
-        tests = devtools.ya.test.test_node.filter_blacklist(tests, opts)
+    tests = devtools.ya.test.test_node.filter_test_cases(tests, opts, test_opts)
 
     logger.debug("Generating build plan")
     plan = devtools.ya.build.build_plan.BuildPlan(graph)

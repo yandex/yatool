@@ -671,28 +671,13 @@ def _run_ymake(**kwargs):
     events = []
     app_ctx = sys.modules.get("app_ctx")
 
-    def stderr_listener(line):
-        configure_cache_failure_detector.consume_stderr_line(line)
-        if not line.startswith('{'):
-            logger.warning(line)
-            return
-        try:
-            j = json.loads(line)
-        except ValueError:
-            logger.warning(line)
-            return
-        if not isinstance(j, dict):
-            # XXX: yjson parses any JSON value as valid JSON, while ymake events are objects.
-            logger.warning(line)
-            return
-
-        j['ymake_run_uid'] = _ymake_unique_run_id
-        events.append(j)
-        configure_cache_failure_detector.consume_event(j)
-        ev_listener(j)
-        stages_listener(j)
-        if app_ctx:
-            app_ctx.state.check_cancel_state()
+    stderr_listener = make_stderr_listener(
+        ev_listener,
+        run_uid=_ymake_unique_run_id,
+        failure_detector=configure_cache_failure_detector,
+        events=events,
+        stages_listener=stages_listener,
+    )
 
     def raise_configure_cache_failure(failure):
         if isinstance(failure, configure_cache.UnparsedRequiredCacheFailure):
@@ -709,10 +694,7 @@ def _run_ymake(**kwargs):
         kwargs.get('abs_targets', None)
     )
     if arc_root:
-        plugins_roots = [os.path.join(arc_root, genconf.ymake_build_dir())]
-        if not kwargs.pop('disable_customization', False):
-            plugins_roots.append(os.path.join(arc_root, genconf.ymake_build_internal_dir()))
-        kwargs['plugins_dir'] = ','.join(os.path.join(x, 'plugins') for x in plugins_roots)
+        kwargs['plugins_dir'] = plugins_directory(arc_root, kwargs.pop('disable_customization', False))
 
     if not kwargs.get('custom_build_directory'):
         kwargs['custom_build_directory'] = tempfile.mkdtemp('yatmpbld')  # XXX: always define from outside
@@ -893,3 +875,47 @@ def run_ymake_scheduled(count, threads, check_error_fn):
 def _mine_ymake_binary():
     suffix = '_dev' if devtools.ya.core.config.is_dev_mode() else ''
     return tools.tool('ymake' + suffix)
+
+
+def plugins_directory(arc_root, disable_customization=False):
+    plugins_roots = [os.path.join(arc_root, genconf.ymake_build_dir())]
+    if not disable_customization:
+        plugins_roots.append(os.path.join(arc_root, genconf.ymake_build_internal_dir()))
+    return ','.join(os.path.join(x, 'plugins') for x in plugins_roots)
+
+
+def make_stderr_listener(
+    ev_listener, *, run_uid=None, failure_detector=None, events=None, stages_listener=lambda event: None
+):
+    """Consume one invocation's diagnostics independently of its transport."""
+    if run_uid is None:
+        run_uid = _gen_ymake_uid()
+    if failure_detector is None:
+        failure_detector = _ConfigureCacheFailureDetector()
+    app_ctx = sys.modules.get('app_ctx')
+
+    def consume(line):
+        failure_detector.consume_stderr_line(line)
+        if not line.startswith('{'):
+            logger.warning(line)
+            return
+        try:
+            j = json.loads(line)
+        except ValueError:
+            logger.warning(line)
+            return
+        if not isinstance(j, dict):
+            # XXX: yjson parses any JSON value as valid JSON, while ymake events are objects.
+            logger.warning(line)
+            return
+
+        j['ymake_run_uid'] = run_uid
+        if events is not None:
+            events.append(j)
+        failure_detector.consume_event(j)
+        ev_listener(j)
+        stages_listener(j)
+        if app_ctx:
+            app_ctx.state.check_cancel_state()
+
+    return consume

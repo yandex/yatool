@@ -3,6 +3,7 @@ PY3_LIBRARY()
 PY_SRCS(
     build_handler.py
     compilation_database.py
+    configuration.py
     dir_graph.py
     disk_graph.py
     frepkage.py
@@ -36,6 +37,7 @@ PEERDIR(
     devtools/ya/build/owners
     devtools/ya/build/prefetch
     devtools/ya/build/reports
+    devtools/ya/build/result_renaming
     devtools/ya/build/sem_graph
     devtools/ya/build/stat
     devtools/ya/build/targets

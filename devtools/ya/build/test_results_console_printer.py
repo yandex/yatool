@@ -43,42 +43,42 @@ def get_suites_to_show(suites, fail_fast=False, report_skipped_suites=False):
     return suites_to_show
 
 
-def _make_reporter(builder, display):
+def _make_reporter(opts, display):
     if getattr(display, 'structured', False):
         return devtools.ya.test.reports.JsonlReporter(
             display,
-            omitted_test_statuses=builder.opts.omitted_test_statuses,
-            show_deselected=builder.opts.show_deselected_tests,
-            show_skipped=builder.opts.show_skipped_tests,
-            truncate=not builder.opts.inline_diff,
-            arc_root=builder.opts.arc_root,
-            fail_fast=builder.opts.fail_fast,
-            last_failed_tests=builder.opts.last_failed_tests,
-            show_slowest=builder.opts.show_slowest_tests,
+            omitted_test_statuses=opts.omitted_test_statuses,
+            show_deselected=opts.show_deselected_tests,
+            show_skipped=opts.show_skipped_tests,
+            truncate=not opts.inline_diff,
+            arc_root=opts.arc_root,
+            fail_fast=opts.fail_fast,
+            last_failed_tests=opts.last_failed_tests,
+            show_slowest=opts.show_slowest_tests,
         )
     return devtools.ya.test.reports.ConsoleReporter(
-        show_passed=builder.opts.show_passed_tests,
-        show_deselected=builder.opts.show_deselected_tests,
-        show_skipped=builder.opts.show_skipped_tests,
-        show_test_cwd=builder.opts.keep_temps,
-        show_metrics=builder.opts.show_metrics,
-        truncate=not builder.opts.inline_diff,
-        omitted_test_statuses=builder.opts.omitted_test_statuses,
+        show_passed=opts.show_passed_tests,
+        show_deselected=opts.show_deselected_tests,
+        show_skipped=opts.show_skipped_tests,
+        show_test_cwd=opts.keep_temps,
+        show_metrics=opts.show_metrics,
+        truncate=not opts.inline_diff,
+        omitted_test_statuses=opts.omitted_test_statuses,
         show_suite_logs_for_tags=(
-            [devtools.ya.test.const.YaTestTags.ForceSandbox] if builder.opts.run_tagged_tests_on_sandbox else []
+            [devtools.ya.test.const.YaTestTags.ForceSandbox] if opts.run_tagged_tests_on_sandbox else []
         ),
         display=display,
-        show_slowest=builder.opts.show_slowest_tests,
+        show_slowest=opts.show_slowest_tests,
     )
 
 
-def print_tests_results_to_console(builder, suites):
+def print_tests_results_to_console(opts, display, suites):
     filter_description = ", ".join(get_skipped_tests_annotations(suites))
-    suites_to_show = get_suites_to_show(suites, builder.opts.fail_fast, builder.opts.report_skipped_suites)
-    reporter = _make_reporter(builder, builder.app_ctx.display)
+    suites_to_show = get_suites_to_show(suites, opts.fail_fast, opts.report_skipped_suites)
+    reporter = _make_reporter(opts, display)
 
     filter_message = build_filter_message(
-        filter_description, builder.opts.tests_filters, get_number_of_empty_suites(suites_to_show)
+        filter_description, opts.tests_filters, get_number_of_empty_suites(suites_to_show)
     )
 
     if filter_message:

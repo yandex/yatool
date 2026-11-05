@@ -126,3 +126,38 @@ def generate_diff_tests(opts, target_platform_descriptor):
     revision = opts.test_diff or "HEAD"
     project_path = os.path.relpath(opts.abs_targets[0], opts.arc_root)
     return [types_common.DiffTestSuite(project_path, revision, target_platform_descriptor=target_platform_descriptor)]
+
+
+def configure_platform_runners(suites, tc):
+    platform = tc.get('platform', {})
+    target_os = platform.get('target', {}).get('os')
+    target_arch = platform.get('target', {}).get('arch')
+
+    if target_os == 'IOS':
+        for test in suites:
+            if (test.binary_path('') or '').endswith('.ios.tar'):
+                if not test.get_ios_device_type():
+                    continue
+                if target_arch == 'x86_64':
+                    test.special_runner = 'ios.simctl.x86_64'
+                elif target_arch == 'i386':
+                    test.special_runner = 'ios.simctl.i386'
+            elif target_arch == 'x86_64':
+                test.special_runner = 'ios'
+    elif target_os == 'IOSSIM':
+        for test in suites:
+            if (test.binary_path('') or '').endswith('.ios.tar'):
+                if not test.get_ios_device_type():
+                    continue
+                if target_arch == 'arm64':
+                    test.special_runner = 'ios.simctl.arm64'
+    elif target_os == 'ANDROID':
+        for test in suites:
+            if not test.get_android_apk_activity():
+                continue
+            if target_arch == 'x86_64':
+                test.special_runner = 'android.x86_64'
+            elif target_arch == 'i686':
+                test.special_runner = 'android.i686'
+            elif target_arch == 'armv8a':
+                test.special_runner = 'android.armv8a'

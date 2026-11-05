@@ -188,3 +188,12 @@ def get_corpus_data_path(project_path, root=None):
     if root:
         return os.path.join(root, target)
     return target
+
+
+def get_test_resource_requirements(opts):
+    targets = list(const.TEST_RESOURCE_TARGETS)
+    names = list(const.TEST_RESOURCE_NAMES)
+    if getattr(opts, 'ts_coverage', False):
+        targets.extend(('build/platform/nodejs', 'build/external_resources/nyc'))
+        names.extend((const.NODEJS_RESOURCE, const.NYC_RESOURCE))
+    return targets, names

@@ -3043,3 +3043,13 @@ def split_stripped_tests(tests, opts):
         else:
             injected_tests.append(t)
     return injected_tests, skipped_tests
+
+
+def filter_test_cases(tests, opts, test_opts=None):
+    test_opts = test_opts if test_opts is not None else opts
+    if not test_opts.tests_filters:
+        if getattr(test_opts, 'last_failed_tests', False):
+            tests = filter_last_failed(tests, opts)
+        tests = filter_whitelist(tests, opts)
+        tests = filter_blacklist(tests, opts)
+    return tests

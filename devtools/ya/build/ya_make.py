@@ -1,4 +1,5 @@
 import collections
+import contextlib
 import copy
 import glob
 import logging
@@ -362,16 +363,13 @@ def _checkout(opts, display=None):
         break
 
 
-def _build_graph_and_tests(opts, app_ctx, ymake_stats):
-    # type: (tp.Any, tp.Any, YmakeTimeStatistic) -> tuple(tp.Any, tp.Any, tp.Any, tp.Any, tp.Any)
-    display = getattr(app_ctx, 'display', None)
-    _checkout(opts, display)
-
+@contextlib.contextmanager
+def configuration_reporting(opts, app_ctx, ymake_stats, event_queue=None):
     printed = set()
     errors_collector = PrintMessageSubscriber()
 
     configure_time_subscribers = [
-        DisplayMessageSubscriber(opts, display, printed),
+        DisplayMessageSubscriber(opts, getattr(app_ctx, 'display', None), printed),
         ymake_stats,
         errors_collector,
     ]
@@ -381,7 +379,17 @@ def _build_graph_and_tests(opts, app_ctx, ymake_stats):
             YmakeEvlogSubscriber(app_ctx.evlog.get_writer('ymake')),
         )
 
-    with app_ctx.event_queue.subscription_scope(*configure_time_subscribers):
+    queue = event_queue if event_queue is not None else app_ctx.event_queue
+    with queue.subscription_scope(*configure_time_subscribers):
+        yield errors_collector
+
+
+def _build_graph_and_tests(opts, app_ctx, ymake_stats):
+    # type: (tp.Any, tp.Any, YmakeTimeStatistic) -> tuple(tp.Any, tp.Any, tp.Any, tp.Any, tp.Any)
+    display = getattr(app_ctx, 'display', None)
+    _checkout(opts, display)
+
+    with configuration_reporting(opts, app_ctx, ymake_stats) as errors_collector:
         graph, tests, stripped_tests, _, make_files = lg.build_graph_and_tests(opts, check=True, display=display)
 
     errors = {fix_dir(k): sorted(list(v)) for k, v in errors_collector.errors.items()}
@@ -1948,7 +1956,7 @@ class YaMake:
             # Build is failed - search for broken deps for tests
             broken_deps = self.set_skipped_status_for_broken_suites(suites)
 
-        test_results_console_printer.print_tests_results_to_console(self, suites)
+        test_results_console_printer.print_tests_results_to_console(self.opts, self.app_ctx.display, suites)
         # Information about the error in the suite may be too high and not visible - dump explicit message after the report
         if broken_deps and not self._structured:
             self.app_ctx.display.emit_message("[[alt3]]SOME TESTS DIDN'T RUN DUE TO BUILD ERRORS[[rst]]")
