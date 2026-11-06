@@ -262,7 +262,12 @@ class TaskContext(object):
     @property
     def async_yt_put(self) -> bool:
         # Heaters reuse the upload queue to keep slow YT writes from holding download workers.
-        return self.opts.yt_store_async_put and self._dist_cache is not None and self._dist_cache.tag() == 'YT'
+        return (
+            self.opts.yt_store_async_put
+            and self._dist_cache is not None
+            and self._dist_cache.tag() == 'YT'
+            and not self._dist_cache.readonly()
+        )
 
     def put_in_dist_cache(self, node: "Node", build_root: build_root.BuildRoot) -> "PutInDistCacheTask":
         import yalibrary.runner.tasks.dist_cache

@@ -313,6 +313,8 @@ class RestoreFromCacheTask(DistCacheMixin):
         return self._node.max_dist
 
     def res(self):
+        if self._ctx.async_yt_put:
+            return worker_threads.ResInfo(cpu=1, upload=1)
         return worker_threads.ResInfo(cpu=1)
 
     def short_name(self):
@@ -354,10 +356,13 @@ class WriteThroughCachesTask(DistCacheMixin):
         return 'WriteThroughCaches({})'.format(self._node.uid)
 
     def res(self):
+        if self._ctx.async_yt_put:
+            return worker_threads.ResInfo(upload=1)
         return worker_threads.ResInfo()
 
     def prio(self):
-        return 0
+        # Hand the upload slot to PUT before admitting another producer.
+        return int(self._ctx.async_yt_put)
 
     @property
     def max_dist(self):

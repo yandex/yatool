@@ -349,6 +349,9 @@ class RunNodeTask(object):
         dist_cache,
         fuse_manager,
     ):
+        if ctx.async_yt_put and node.cacheable:
+            # Pool preference must not let local builds bypass queued WriteThrough/PUT.
+            self.worker_pool_type = WorkerPoolType.SERVICE
         self._node = node
         self._build_root = build_root
         self._ctx = ctx
@@ -725,6 +728,12 @@ class RunNodeTask(object):
         return self._node.max_dist
 
     def res(self):
+        resources = self._execution_resources()
+        if self._ctx.async_yt_put and self._node.cacheable:
+            return resources.copy(upload=1)
+        return resources
+
+    def _execution_resources(self):
         p = self._node.kv.get('p')
         if p == 'CU' and self._node.kv.get('local_ram_limiter', False):
             ram = self._node.requirements.get('ram', 1)  # 1 Gb

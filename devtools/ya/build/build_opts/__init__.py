@@ -3049,7 +3049,7 @@ class DistCacheOptions(DistCacheSetupOptions):
                 ),
                 EnvConsumer(
                     'YA_YT_STORE_ASYNC_PUT',
-                    help='Queue and prioritize YT uploads without blocking downloads',
+                    help='Queue and prioritize YT uploads with bounded pending results',
                     hook=SetValueHook('yt_store_async_put', transform=return_true_if_enabled),
                 ),
                 EnvConsumer(
