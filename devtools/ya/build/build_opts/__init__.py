@@ -2805,6 +2805,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_store_exclusive = False
         self.yt_store_threads = max(get_cpu_count() // 2, 1)
         self.yt_store_wt = True
+        self.yt_store_async_put = False
         self.yt_store_refresh_on_read = False
         self.yt_store_allow_go = False
         self.yt_store_cpp_client = True
@@ -3045,6 +3046,11 @@ class DistCacheOptions(DistCacheSetupOptions):
                     'YA_YT_STORE4',
                     help='Use YT storage',
                     hook=SetValueHook('yt_store', transform=return_true_if_enabled),
+                ),
+                EnvConsumer(
+                    'YA_YT_STORE_ASYNC_PUT',
+                    help='Queue and prioritize YT uploads without blocking downloads',
+                    hook=SetValueHook('yt_store_async_put', transform=return_true_if_enabled),
                 ),
                 EnvConsumer(
                     'YA_YT_WT',

@@ -14,11 +14,12 @@ class PutInDistCacheTask(object):
     node_type = 'PutInDistCache'
     worker_pool_type = WorkerPoolType.SERVICE
 
-    def __init__(self, node, build_root, dist_cache, dist_cache_codec, execution_log):
+    def __init__(self, node, build_root, dist_cache, dist_cache_codec, execution_log, *, priority: int = 0):
         self._node = node
         self._build_root = build_root
         self._dist_cache = dist_cache
         self._dist_cache_codec = dist_cache_codec
+        self._priority = priority
         self._ok = True
         self._skipped = False
         self._execution_log = execution_log
@@ -53,7 +54,7 @@ class PutInDistCacheTask(object):
         return worker_threads.ResInfo(upload=1)
 
     def prio(self):
-        return 0
+        return self._priority
 
     @property
     def max_dist(self):

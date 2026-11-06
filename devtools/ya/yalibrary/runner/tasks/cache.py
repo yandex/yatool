@@ -290,7 +290,7 @@ class RestoreFromCacheTask(DistCacheMixin):
                 self._ctx.runq.add(
                     self._ctx.put_in_dist_cache(self._node, self._build_root),
                     deps=[],
-                    inplace_execution=self._ctx.opts.eager_execution,
+                    inplace_execution=self._ctx.opts.eager_execution and not self._ctx.async_yt_put,
                 )
 
             self._ctx.eager_result(self)
@@ -345,7 +345,7 @@ class WriteThroughCachesTask(DistCacheMixin):
             self._ctx.runq.add(
                 self._ctx.put_in_dist_cache(self._node, self._build_root),
                 deps=[],
-                inplace_execution=self._ctx.opts.eager_execution,
+                inplace_execution=self._ctx.opts.eager_execution and not self._ctx.async_yt_put,
             )
         else:
             self._build_root.dec()

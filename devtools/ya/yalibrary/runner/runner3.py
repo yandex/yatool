@@ -259,11 +259,21 @@ class TaskContext(object):
             node, self._build_root_set, self, self._dist_cache, self._execution_log, self.save_links_regex
         )
 
+    @property
+    def async_yt_put(self) -> bool:
+        # Heaters reuse the upload queue to keep slow YT writes from holding download workers.
+        return self.opts.yt_store_async_put and self._dist_cache is not None and self._dist_cache.tag() == 'YT'
+
     def put_in_dist_cache(self, node: "Node", build_root: build_root.BuildRoot) -> "PutInDistCacheTask":
         import yalibrary.runner.tasks.dist_cache
 
         return yalibrary.runner.tasks.dist_cache.PutInDistCacheTask(
-            node, build_root, self._dist_cache, self.opts.yt_store_codec, self._execution_log
+            node,
+            build_root,
+            self._dist_cache,
+            self.opts.yt_store_codec,
+            self._execution_log,
+            priority=int(self.async_yt_put),
         )
 
     def restore_from_cache(self, node: "Node") -> "RestoreFromCacheTask":
