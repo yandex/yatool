@@ -1932,7 +1932,7 @@ namespace {
 }
 
 namespace NDetail {
-    void TPeersClosure::Merge(TNodeId node, const TPeersClosure& closure, ui32 pathsCount) {
+    void TPeersClosure::Merge(TNodeId node, const TPeersClosure& closure, ui64 pathsCount) {
         for (const auto* peerStat : closure.TopSort) {
             auto mergedStats = peerStat->second;
             mergedStats.PathCount *= pathsCount;
@@ -1962,7 +1962,7 @@ namespace NDetail {
         TPeersClosure res;
         res.TopSort.reserve(TopSort.size());
 
-        THashMap<TNodeId, ui32> excludedPaths;
+        THashMap<TNodeId, ui64> excludedPaths;
         for (auto srcIt = TopSort.rbegin(); srcIt != TopSort.rend(); ++srcIt) {
             auto [it, _] = res.Stats.insert(*(*srcIt));
             res.TopSort.push_back(&(*it));
@@ -1973,8 +1973,8 @@ namespace NDetail {
             }
 
             stat.Excluded = true;
-            auto [idExcludes, inserted] = excludedPaths.emplace(id, static_cast<ui32>(stat.PathCount));
-            const ui32 newExcludes = inserted ? stat.PathCount : stat.PathCount - idExcludes->second;
+            auto [idExcludes, inserted] = excludedPaths.emplace(id, static_cast<ui64>(stat.PathCount));
+            const ui64 newExcludes = inserted ? stat.PathCount : stat.PathCount - idExcludes->second;
             if (newExcludes == 0) {
                 continue;
             }

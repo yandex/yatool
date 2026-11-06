@@ -30,13 +30,13 @@ void DumpFDM(const TVars& globalVars, bool asJson);
 // Exposed for unit tests
 namespace NDetail {
     struct TClosureStats {
-        TClosureStats(ui32 pathCount) noexcept: Excluded{false}, PathCount{pathCount} {}
+        TClosureStats(ui64 pathCount) noexcept: Excluded{false}, PathCount{pathCount} {}
 
         union {
-            ui32 AllBits = 0;
+            ui64 AllBits = 0;
             struct {
-                ui32 Excluded:   1;
-                ui32 PathCount: 31;
+                ui64 Excluded:   1;
+                ui64 PathCount: 63;
             };
         };
     };
@@ -53,7 +53,7 @@ namespace NDetail {
         TPeersClosure(TPeersClosure&&) = default;
         TPeersClosure& operator=(TPeersClosure&&) = default;
 
-        void Merge(TNodeId node, const TPeersClosure& closure, ui32 pathsCount = 1);
+        void Merge(TNodeId node, const TPeersClosure& closure, ui64 pathsCount = 1);
         TPeersClosure Exclude(
             const std::function<bool(TNodeId)>& predicate,
             const std::function<const TPeersClosure&(TNodeId)>& nodeClosure,
