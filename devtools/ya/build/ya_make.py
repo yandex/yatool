@@ -4,6 +4,7 @@ import copy
 import glob
 import logging
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -88,6 +89,21 @@ ARC_PREFIX = 'arcadia/'
 
 logger = logging.getLogger(__name__)
 stager = stage_tracer.get_tracer("ya_make")
+
+
+def _optional_graph_dump_mode(path: str) -> int | None:
+    """Validate an optional atomic destination and return its existing permissions."""
+    if not os.path.basename(path):
+        raise OSError('Optional graph dump requires a file path without a trailing separator')
+    try:
+        target = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(target.st_mode) or target.st_nlink != 1:
+        raise OSError(
+            'Optional graph dump requires a regular file with one hard link; links and special files are skipped'
+        )
+    return stat.S_IMODE(target.st_mode)
 
 
 class ConfigurationError(Exception):
@@ -1536,13 +1552,28 @@ class Context:
             return
 
         if self.opts.dump_graph_file:
-            try:
-                with open(self.opts.dump_graph_file, 'w') as gf:
+            graph_path = self.opts.dump_graph_file
+            if not self.opts.dump_graph_ignore_savefail:
+                # Keep the existing open() contract, including links, devices and file metadata.
+                with open(graph_path, 'w') as gf:
                     json.dump(self.full_graph, gf, sort_keys=True, indent=4, default=str)
-            except OSError as error:
-                if not self.opts.dump_graph_ignore_savefail:
-                    raise
-                logger.warning('Optional build graph dump failed: %s', error)
+            else:
+                try:
+                    # Optional dumps use atomic publication only for ordinary, unaliased files.
+                    _optional_graph_dump_mode(graph_path)
+                    with tempfile.TemporaryDirectory(
+                        prefix='.graph.', dir=os.path.dirname(os.path.abspath(graph_path))
+                    ) as graph_dir:
+                        temp_path = os.path.join(graph_dir, 'graph.json')
+                        with open(temp_path, 'w') as gf:
+                            json.dump(self.full_graph, gf, sort_keys=True, indent=4, default=str)
+                        # Another writer may have published a new destination while we serialized.
+                        graph_mode = _optional_graph_dump_mode(graph_path)
+                        if graph_mode is not None:
+                            os.chmod(temp_path, graph_mode)
+                        exts.fs.replace_file(temp_path, graph_path)
+                except OSError as error:
+                    logger.warning('Optional build graph dump failed: %s: %s', graph_path, error)
         else:
             stdout = self.opts.stdout or sys.stdout
             json.dump(self.full_graph, stdout, sort_keys=True, indent=4, default=str)
