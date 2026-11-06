@@ -104,6 +104,13 @@ class Status(object):
                 iter_over = self._active
             return [(task, now - tm) for task, tm in iter_over]
 
+    def stop_activity(self, task):
+        # type: (object) -> None
+        # Cache retrieval attempts use the node display but are not completed
+        # commands: a failed attempt may still be followed by local execution.
+        with self._lock:
+            del self._active[task]
+
     def start_auxiliary(self, task):
         with self._lock:
             self._auxiliary[task] = time.time()
