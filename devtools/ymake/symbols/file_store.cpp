@@ -314,10 +314,13 @@ void TFileConf::ReadContent(TFileView view, TString&& realPath, TFileContentHold
 
     try {
         const auto read = [&]() {
+            if (data.Size < MaxReadFileSize && !PrefetchExts_.empty() && Prefetcher.Take(realPath, blob)) {
+                return;
+            }
             auto wrapped = Reclaim::Instance().OpenFile(realPath, RdOnly | Seq);
             TFile& f = wrapped.GetFile();
 
-            if (data.Size < (64 << 10)) {
+            if (data.Size < MaxReadFileSize) {
                 blob = TBlob::FromFileContentSingleThreaded(f);
             } else {
                 // Read 1 byte before mapping to detect access problems for encrypted and banned files in arc
@@ -481,6 +484,18 @@ void TFileConf::ListDir(TFileElemId dirElemId, bool forceList, bool forceStat) {
         }
     }
 
+    if (forceStat && !PrefetchExts_.empty() && SortedReadDir_.IsStatSlow()) {
+        const auto isPrefetched = [this](TStringBuf basename) {
+            return AnyOf(PrefetchExts_, [basename](const TString& ext) { return basename.EndsWith(ext); });
+        };
+        for (const auto& dirItem: dirItems) {
+            if (!dirItem.IsDir && dirItem.Stat && dirItem.Stat->Size > 0 && dirItem.Stat->Size < MaxReadFileSize &&
+                GetFileDataById(dirItem.ElemId).Changed && isPrefetched(SortedReadDir_.GetBasename(dirItem))) {
+                Prefetcher.Prefetch(TString::Join(fullPath, "/", SortedReadDir_.GetBasename(dirItem)), dirItem.Stat->Size);
+            }
+        }
+    }
+
     MD5 dirHash;
     auto& dirData = DirData[dirElemId] = {};
     for (const auto& dirItem: dirItems) {
@@ -636,6 +651,15 @@ void TFileConf::ReportStats() const {
     if (Stats.Get(NStats::EFileConfStats::ReaddirMinUs) == Max<ui64>()) {
         Stats.Set(NStats::EFileConfStats::ReaddirMinUs, 0);
     }
+    const auto prefetch = Prefetcher.Stats();
+    Stats.Set(NStats::EFileConfStats::PrefetchStarted, prefetch.Started);
+    Stats.Set(NStats::EFileConfStats::PrefetchStartedBytes, prefetch.StartedBytes);
+    Stats.Set(NStats::EFileConfStats::PrefetchReads, prefetch.Reads);
+    Stats.Set(NStats::EFileConfStats::PrefetchHits, prefetch.Hits);
+    Stats.Set(NStats::EFileConfStats::PrefetchMisses, prefetch.Misses);
+    Stats.Set(NStats::EFileConfStats::PrefetchUnused, prefetch.Unused);
+    Stats.Set(NStats::EFileConfStats::PrefetchUnusedBytes, prefetch.UnusedBytes);
+    Stats.Set(NStats::EFileConfStats::PrefetchOverLimit, prefetch.OverLimit);
     auto listdirSumUs = Stats.Get(NStats::EFileConfStats::OpendirSumUs) + Stats.Get(NStats::EFileConfStats::ReaddirSumUs);
     Stats.Set(NStats::EFileConfStats::ListDirSumUs, listdirSumUs);
     Stats.Set(NStats::EFileConfStats::LstatListDirSumUs, listdirSumUs + Stats.Get(NStats::EFileConfStats::LstatSumUs));

@@ -10,6 +10,7 @@
 #include <devtools/ymake/common/content_holder.h>
 #include <devtools/ymake/common/md5sig.h>
 #include <devtools/ymake/diag/stats.h>
+#include <devtools/ymake/symbols/fuse_prefetch.h>
 
 #include <util/generic/hash_set.h>
 #include <util/datetime/base.h>
@@ -447,6 +448,11 @@ public:
     TTimeStamps& TimeStamps;
     /// ATTN: this does not necessarily equals to ModTime field
 
+    // Smaller files are read into memory, larger ones are mmapped; only the former are prefetched.
+    static constexpr size_t MaxReadFileSize = 64 << 10;
+
+    NFusePrefetch::TPrefetcher Prefetcher;
+
     void InitAfterCacheLoading();
     TFileElemId Add(TStringBuf name);
     TStringBuf RetBuf(TFileElemId targetId) const {
@@ -515,6 +521,14 @@ public:
 
     // ATTN! Will invalidate any other TFileData refs and pointers
     void ListDir(TFileElemId dirElemId, bool forceList = false, bool forceStat = false);
+    // Parallel lstat and background reads of small files whose names end with one of exts.
+    void SetFusePrefetch(bool enabled, const TVector<TString>& exts) {
+        SortedReadDir_.SetParallelStat(enabled);
+        PrefetchExts_ = enabled ? exts : TVector<TString>{};
+    }
+    void SetSlowStatThreshold(std::chrono::microseconds threshold) {
+        SortedReadDir_.SetSlowStatThreshold(threshold);
+    }
 
     const TVector<TFileElemId>& GetCachedDirContent(TFileElemId dirId) const {
         return DirData.at(dirId);
@@ -558,6 +572,7 @@ public:
 private:
     TSortedReadDir SortedReadDir_;
     TBase2FullNamer Base2FullNamer_;
+    TVector<TString> PrefetchExts_;
 };
 
 

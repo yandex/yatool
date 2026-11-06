@@ -165,6 +165,14 @@ namespace NStats {
         event.SetReaddirMaxUs(Get(EFileConfStats::ReaddirMaxUs));
         event.SetListDirSumUs(Get(EFileConfStats::ListDirSumUs));
         event.SetLstatListDirSumUs(Get(EFileConfStats::LstatListDirSumUs));
+        event.SetPrefetchStarted(Get(EFileConfStats::PrefetchStarted));
+        event.SetPrefetchStartedBytes(Get(EFileConfStats::PrefetchStartedBytes));
+        event.SetPrefetchReads(Get(EFileConfStats::PrefetchReads));
+        event.SetPrefetchHits(Get(EFileConfStats::PrefetchHits));
+        event.SetPrefetchMisses(Get(EFileConfStats::PrefetchMisses));
+        event.SetPrefetchUnused(Get(EFileConfStats::PrefetchUnused));
+        event.SetPrefetchUnusedBytes(Get(EFileConfStats::PrefetchUnusedBytes));
+        event.SetPrefetchOverLimit(Get(EFileConfStats::PrefetchOverLimit));
         FORCE_TRACE(U, event);
 
         INT_MON_EVENT(EFileConfStats::LoadedSize);

@@ -71,6 +71,8 @@ public:
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
     THashSet<TStringBuf> GlobRestrictionExtends{};
     bool FillModule2Nodes{false}; // fill module_dir/module_tag in target_properties
+    bool FusePrefetch{false}; // parallel lstat and background reads where lstat is slow (arc FUSE)
+    TVector<TString> FusePrefetchExts; // name suffixes of files to read in background
 
     PyInterpreterState* SubState = nullptr;
     std::function<PyInterpreterState*()> SubinterpreterStateGetter;

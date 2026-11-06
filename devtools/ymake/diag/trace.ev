@@ -205,6 +205,14 @@ message TFileConfStats {
     optional uint64 ReaddirMaxUs = 29;
     optional uint64 ListDirSumUs = 30;
     optional uint64 LstatListDirSumUs = 31;
+    optional uint64 PrefetchStarted = 32;
+    optional uint64 PrefetchStartedBytes = 33;
+    optional uint64 PrefetchReads = 34;
+    optional uint64 PrefetchHits = 35;
+    optional uint64 PrefetchMisses = 36;
+    optional uint64 PrefetchUnused = 37;
+    optional uint64 PrefetchUnusedBytes = 38;
+    optional uint64 PrefetchOverLimit = 39;
 };
 
 message TFileConfSubStats {

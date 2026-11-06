@@ -65,6 +65,14 @@ namespace NStats {
         ReaddirMaxUs /* "readdir max us" */,
         ListDirSumUs /* "(opendir + readdir) sum us" */,
         LstatListDirSumUs /* "(lstat + opendir + readdir) sum us" */,
+        PrefetchStarted /* "prefetch started" */,
+        PrefetchStartedBytes /* "prefetch started bytes" */,
+        PrefetchReads /* "prefetch reads" */,
+        PrefetchHits /* "prefetch hits" */,
+        PrefetchMisses /* "prefetch misses" */,
+        PrefetchUnused /* "prefetch unused" */,
+        PrefetchUnusedBytes /* "prefetch unused bytes" */,
+        PrefetchOverLimit /* "prefetch over limit" */,
     };
 
     enum class EFileConfSubStats {

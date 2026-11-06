@@ -101,6 +101,7 @@ void TYMake::TransferStartDirs() {
 
 void TYMake::PostInit() {
     IncParserManager.InitManager(Conf.ParserPlugins);
+    Names.FileConf.SetFusePrefetch(Conf.FusePrefetch, Conf.FusePrefetchExts);
     LoadPatch();
     Names.FileConf.InitAfterCacheLoading();
     FSCacheMonEvent();
@@ -151,6 +152,7 @@ TFileProcessContext TYMake::GetFileProcessContext(TModule* module, TAddDepAdapto
 }
 
 void TYMake::ReportGraphBuildStats() {
+    Names.FileConf.Prefetcher.Finish();
     Names.FileConf.ReportStats();
     IncParserManager.Stats().Report();
     Parser->ReportStats();

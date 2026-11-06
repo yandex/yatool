@@ -9,6 +9,7 @@ SRCS(
     readdir.cpp
     base2fullnamer.cpp
     sortedreaddir.cpp
+    fuse_prefetch.cpp
     reclaim.cpp
 )
 

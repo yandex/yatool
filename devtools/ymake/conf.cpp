@@ -125,6 +125,8 @@ namespace {
 
     void ReadFeatureFlags(TBuildConfiguration& conf) {
         conf.FillModule2Nodes = NYMake::IsTrue(conf.CommandConf.EvalValue("FILL_MODULE2NODES"));
+        conf.FusePrefetch = NYMake::IsTrue(conf.CommandConf.EvalValue("FUSE_PREFETCH"));
+        conf.FusePrefetchExts = StringSplitter(conf.CommandConf.EvalValue("FUSE_PREFETCH_EXTS")).Split(' ').SkipEmpty().ToList<TString>();
     }
 }
 
