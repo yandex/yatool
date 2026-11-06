@@ -976,7 +976,7 @@ bool TCommandInfo::IsReservedVar(const TStringBuf& cur, const TVars& vars) {
 bool TCommandInfo::IsGlobalReservedVar(const TStringBuf& cur, const TVars& vars) {
     using namespace NVariableDefs;
     return vars.IsReservedName(cur) || NYMake::IsGlobalResource(cur) || IsIncludeVar(cur) ||
-        EqualToOneOf(cur, VAR_MANAGED_PEERS_CLOSURE, VAR_MANAGED_PEERS, VAR_APPLIED_EXCLUDES);
+        EqualToOneOf(cur, VAR_PEERS, VAR_MANAGED_PEERS_CLOSURE, VAR_MANAGED_PEERS, VAR_APPLIED_EXCLUDES);
 }
 
 bool TCommandInfo::IsReservedVar(const TStringBuf& cur) const {

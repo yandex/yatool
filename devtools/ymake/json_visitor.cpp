@@ -4,6 +4,7 @@
 #include "json_saveload.h"
 #include "module_restorer.h"
 #include "prop_names.h"
+#include "vardefs.h"
 #include "vars.h"
 
 #include <devtools/ymake/common/md5sig.h>
@@ -13,6 +14,7 @@
 #include <devtools/ymake/compact_graph/iter.h>
 #include <devtools/ymake/compact_graph/loops.h>
 #include <devtools/ymake/compact_graph/query.h>
+#include <devtools/ymake/context_executor.h>
 #include <devtools/ymake/dependency_management.h>
 #include <devtools/ymake/diag/manager.h>
 #include <devtools/ymake/parser_manager.h>
@@ -1056,6 +1058,8 @@ void TJSONVisitor::FinishCurrent(TState& state) {
 
         AddGlobalVars(state);
 
+        AddPeerContext(state);
+
         AddGlobalSrcs();
 
         // include main output name to cur entry
@@ -1257,8 +1261,17 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
         Y_ASSERT(!urvTotal);
         if (urvLocal.FromCmd)
             GetOrInit(urvTotal) = *urvLocal.FromCmd;
-        if (urvTotal && urvGlobal.FromVars)
+        if (urvTotal && urvLocal.FromVars) {
+            // Compatibility bindings attached to this node can reference module globals and vice versa.
+            // Local names shadow module bindings; expand the combined dependency closure.
+            auto fromVars = urvGlobal.FromVars ? *urvGlobal.FromVars : TUsedReservedVars::TMap{};
+            for (const auto& [name, usedVars] : *urvLocal.FromVars) {
+                fromVars[name] = usedVars;
+            }
+            TUsedReservedVars::Expand(*urvTotal, fromVars);
+        } else if (urvTotal && urvGlobal.FromVars) {
             TUsedReservedVars::Expand(*urvTotal, *urvGlobal.FromVars);
+        }
     }
     if (!CurrData->UsedReservedVarsTotal) {
         return;
@@ -1356,6 +1369,35 @@ void TJSONVisitor::AddGlobalVars(TState& state) {
             addVarsFromModule(peerModuleElemId);
         }
     }
+}
+
+void TJSONVisitor::AddPeerContext(TState& state) {
+    if (IsModuleType(CurrType) || !CurrData->UsedReservedVarsTotal ||
+        !CurrData->UsedReservedVarsTotal->contains(NVariableDefs::VAR_PEERS)) {
+        return;
+    }
+
+    const auto moduleIt = FindModule(state);
+    if (moduleIt == state.end() || !moduleIt->Module) {
+        return;
+    }
+
+    // Internal reserved PEERS expands late and is tracked independently of global vars.
+    // Its value must affect StructureUID, used by artifact UIDs and rendered JSON commands.
+    // Use the rendering path and tag/order rules, without depending on archive contents.
+    TRenderPathContext normalizedPaths(RestoreContext.Conf, true);
+    TCurrentContextScope<TRenderPathContext> pathScope(&normalizedPaths);
+    TModuleRestorer restorer(RestoreContext, moduleIt->Node());
+    restorer.RestoreModule();
+    const auto peers = restorer.MakePeersVar(
+        RestoreContext.Conf, moduleIt->Module->GetAttrs().UsePeers);
+
+    TStringBuilder fingerprint;
+    fingerprint << TStringBuf(NVariableDefs::VAR_PEERS) << ':' << peers.size() << ':';
+    for (const auto& peer : peers) {
+        fingerprint << peer.Name.size() << ':' << peer.Name;
+    }
+    UpdateCurrent(state, fingerprint, "Include used peer names and tags in command structure hash");
 }
 
 void TJSONVisitor::AddGlobalSrcs() {

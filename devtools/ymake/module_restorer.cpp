@@ -1,4 +1,5 @@
 #include "module_restorer.h"
+#include "vardefs.h"
 #include "ymake.h"
 #include "mine_variables.h"
 #include "macro_processor.h"
@@ -472,8 +473,52 @@ void NModuleVars::AppendGlobals(TVars& vars, const TVars& globals, bool unique) 
     }
 }
 
-void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfiguration& conf, bool moduleUsesPeers) {
+TYVar TModuleRestorer::MakePeersVar(const TBuildConfiguration& conf, bool moduleUsesPeers) {
+    Y_ASSERT(Module);
     MinePeers();
+    // Module variables can be trimmed or restored from cache without group overrides.
+    // Mine them once before checking whether a file group replaces PEERS, even with an empty value.
+    MineGlobVars();
+    const auto overrideIt = Module->Vars.find(NVariableDefs::VAR_PEERS);
+    if (overrideIt != Module->Vars.end() && overrideIt->second.IsReservedName) {
+        return Module->Vars[NVariableDefs::VAR_PEERS];
+    }
+
+    TYVar peers;
+    if (!moduleUsesPeers) {
+        return peers;
+    }
+    const auto modLists = Context.Modules.GetModuleNodeLists(Module->GetId());
+    TString prefix(NDetail::TReserveTag{32});
+    for (const auto peer : modLists.UniqPeers()) {
+        const auto peerRef = Context.Graph[peer];
+        const TFileElemId elemId = AssumeFile(peerRef->ElemId);
+        if (IsFakeModule(elemId)) {
+            continue;
+        }
+        const auto peerPath = conf.RealPath(Context.Graph.GetFileName(peerRef));
+
+        prefix.clear();
+        const auto peerModule = Context.Modules.Get(elemId);
+        if (peerModule->IsCompleteTarget()) {
+            prefix += ",complete";
+        }
+        if (peerModule->IsFinalTarget()) {
+            prefix += ",final";
+        }
+        if (modLists.LocalPeers().contains(peer)) {
+            prefix += ",local";
+        }
+        (prefix += ",") += peerModule->GetTag();
+
+        auto& value = NModuleVars::AddResolvedPath(peers, prefix + peerPath);
+        value.HasPeerDirTags = true;
+    }
+    return peers;
+}
+
+void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfiguration& conf, bool moduleUsesPeers) {
+    const auto peers = MakePeersVar(conf, moduleUsesPeers);
     MineGlobVars();
 
     NModuleVars::FillIncludes(vars, conf, *Module);
@@ -505,47 +550,23 @@ void TModuleRestorer::UpdateLocalVarsFromModule(TVars& vars, const TBuildConfigu
     }
 
     if (moduleUsesPeers) {
-        TString prefix(NDetail::TReserveTag{32});
-        auto modLists = Context.Modules.GetModuleNodeLists(Module->GetId());
-
-        for (const auto& glSrcId : modLists.GlobalSrcsIds()) {
+        const auto modLists = Context.Modules.GetModuleNodeLists(Module->GetId());
+        for (const auto glSrcId : modLists.GlobalSrcsIds()) {
             NModuleVars::AddResolvedPath(vars["SRCS_GLOBAL"], conf.RealPath(Context.Graph.GetFileName(Context.Graph.Get(glSrcId))));
         }
-        TUniqVector<TString> lateOuts;
-        bool usePeersLateOuts = Module->GetAttrs().UsePeersLateOuts;
-        for (const auto& peer : modLists.UniqPeers()) {
-            const auto peerRef = Context.Graph[peer];
-            TFileElemId elemId = AssumeFile(peerRef->ElemId);
-            if (usePeersLateOuts) {
+        if (!peers.empty()) {
+            vars[NVariableDefs::VAR_PEERS].Append(peers);
+        }
+        if (Module->GetAttrs().UsePeersLateOuts) {
+            TUniqVector<TString> lateOuts;
+            for (const auto peer : modLists.UniqPeers()) {
+                const auto elemId = AssumeFile(Context.Graph[peer]->ElemId);
                 for (const auto& lateOut : Context.Modules.GetModuleLateOuts(elemId)) {
                     lateOuts.Push(lateOut);
                 }
             }
-
-            if (IsFakeModule(elemId)) {
-                continue;
-            }
-            const auto peerPath = conf.RealPath(Context.Graph.GetFileName(peerRef));
-
-            prefix.clear();
-            const auto peerModule = Context.Modules.Get(elemId);
-            if (peerModule->IsCompleteTarget()) {
-                prefix += ",complete";
-            }
-            if (peerModule->IsFinalTarget()) {
-                prefix += ",final";
-            }
-            if (modLists.LocalPeers().contains(peer)) {
-                prefix += ",local";
-            }
-            (prefix += ",") += peerModule->GetTag();
-
-            auto& varStr = NModuleVars::AddResolvedPath(vars["PEERS"], prefix + peerPath);
-            varStr.HasPeerDirTags = true;
-        }
-        if (usePeersLateOuts) {
             vars["PEERS_LATE_OUTS"];
-            for (auto& lateOut : lateOuts) {
+            for (const auto& lateOut : lateOuts) {
                 NModuleVars::AddResolvedPath(vars["PEERS_LATE_OUTS"], lateOut);
             }
         }

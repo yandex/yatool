@@ -35,6 +35,9 @@ public:
     /// Call module initialization and mining local vars
     TModule* RestoreModule();
 
+    /// Build ordered, tagged peer paths using the current render roots and module overrides.
+    TYVar MakePeersVar(const TBuildConfiguration& conf, bool moduleUsesPeers);
+
     /// Append module variables (INCLUDE, PEERS, GLOBAL_SRCS) to vars
     void UpdateLocalVarsFromModule(TVars& vars, const TBuildConfiguration& conf, bool moduleUsesPeers);
 
