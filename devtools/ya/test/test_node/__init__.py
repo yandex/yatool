@@ -804,7 +804,6 @@ def create_test_node(
         runner_cmd += ['--use-persistent-recipes']
         if getattr(suite, 'persistent_recipes', None) and not getattr(opts, 'use_distbuild', False):
             runner_cmd += ['--require-recipe-context']
-        runner_cmd += ['--shallow-root', '$(SHALLOW_ROOT)']
         if getattr(opts, 'force_restart_recipes', False):
             runner_cmd += ['--force-restart-recipes']
         if getattr(opts, 'prepare_with_persistent', False):

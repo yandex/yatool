@@ -32,9 +32,6 @@ class Patterns(object):
     def resource_root(self):
         return self['RESOURCE_ROOT']  # XXX
 
-    def shallow_root(self):
-        return self['SHALLOW_ROOT']
-
     def __getitem__(self, key):
         try:
             return self._map[key]

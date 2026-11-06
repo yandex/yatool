@@ -517,12 +517,6 @@ def parse_args(args=None):
     parser.add_argument("--tests-limit-in-chunk", action='store', type=int, default=0)
     parser.add_argument("--create-root-guidance-file", action='store_true')
     parser.add_argument("--pycache-prefix")
-    parser.add_argument(
-        "--shallow-root",
-        dest="shallow_root",
-        default=None,
-        help="path to shallow root directory for persistent recipes",
-    )
     parser.add_argument('--recipe-manager-root', default=os.environ.get('_YA_RECIPE_MANAGER_ROOT'))
     parser.add_argument('--require-recipe-context', action='store_true')
     parser.add_argument(
@@ -1711,7 +1705,6 @@ def main():
             (options.prepare_with_persistent or not options.prepare_only)
             and options.use_persistent_recipes
             and options.persistent_recipes
-            and (options.recipe_manager_root or options.shallow_root)
         ):
             from devtools.ya.test.programs.test_tool.run_test.recipe import (
                 run_all_persistent_recipes,

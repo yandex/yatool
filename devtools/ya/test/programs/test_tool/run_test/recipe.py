@@ -3,9 +3,9 @@
 
 Каждый чанк независимо опрашивает RM для каждого рецепта.
 Все рецепты независимы и не видят env друг друга.
-Единственный канал коммуникации рецепт → тест: env.json.txt в shallow root рецепта.
+Единственный канал коммуникации рецепт → тест: env.json.txt в каталоге persistent-рецепта.
 
-Защита от гонок: неблокирующий FileLock на shallow dir рецепта.
+Защита от гонок: неблокирующий FileLock на каталоге persistent-рецепта.
 Под локом вызывается GetRecipe и принимается решение о запуске/ассоциации.
 """
 
@@ -143,24 +143,24 @@ def _make_recipe_uid(package_path: str) -> str:
     return md5_value(package_path)
 
 
-def _shallow_recipe_dir(
-    shallow_root: str, source_root: str, package_path: str, *, manager_root: str | None = None
-) -> str:
-    """Каталог рецепта в data/ внутри shallow root.
+def _persistent_recipe_dir(manager_root: str, package_path: str) -> str:
+    """Каталог persistent рецепта в data/ выбранного RM.
 
     Recipe working dirs live in data/ — the subdirectory that gets cleaned on
     RM restart. run_test never touches meta/.
     """
-    from devtools.recipe_manager.client.client import get_recipes_shallow_root_path, get_shallow_root_data_path
+    from devtools.recipe_manager.client.client import get_shallow_root_data_path
 
-    data_path = get_shallow_root_data_path(manager_root or get_recipes_shallow_root_path(shallow_root, source_root))
+    data_path = get_shallow_root_data_path(manager_root)
     safe_path = package_path.replace('/', '__')
     return os.path.join(data_path, safe_path, 'persistent')
 
 
 def validate_recipe_context(options: object) -> None:
     root = getattr(options, 'recipe_manager_root', None)
-    required = getattr(options, 'require_recipe_context', False)
+    required = getattr(options, 'require_recipe_context', False) or (
+        getattr(options, 'use_persistent_recipes', False) and options.persistent_recipes
+    )
     if required or root:
         if not (options.invocation_id and options.build_id and root and os.path.isabs(root)):
             raise RecipeConflictError(
@@ -170,7 +170,7 @@ def validate_recipe_context(options: object) -> None:
 
 
 def _get_build_root_tmp_recipe_dir(package_path: str) -> str:
-    """Путь к 'фейковому shallow root' рецепта в TMPDIR чанка (embedded fallback)."""
+    """Каталог persistent-рецепта в TMPDIR чанка (embedded fallback)."""
     safe_path = package_path.replace('/', '__')
     return os.path.join(tempfile.gettempdir(), 'persistent_recipe', safe_path)
 
@@ -182,9 +182,9 @@ def _read_recipe_cmd(build_root: str, package_path: str) -> str:
         return f.read().strip()
 
 
-def _read_recipe_cmd_from_shallow(shallow_dir: str) -> str:
-    """Прочитать команду из shallow_dir/package/recipe_cmd (сохранённую при последнем старте)."""
-    cmd_file = os.path.join(shallow_dir, 'package', RECIPE_CMD_FILE)
+def _read_stored_recipe_cmd(persistent_recipe_dir: str) -> str:
+    """Прочитать команду из persistent_recipe_dir/package/recipe_cmd (сохранённую при последнем старте)."""
+    cmd_file = os.path.join(persistent_recipe_dir, 'package', RECIPE_CMD_FILE)
     with open(cmd_file) as f:
         return f.read().strip()
 
@@ -195,18 +195,18 @@ def _compute_hash(build_root: str, package_path: str, recipe_cmd: str) -> str:
     return md5_value(md5_path(pkg_dir) + recipe_cmd)
 
 
-def _read_stored_hash(shallow_dir: str) -> str:
-    """Прочитать сохранённый хэш из shallow root.
+def _read_stored_hash(persistent_recipe_dir: str) -> str:
+    """Прочитать сохранённый хэш из каталога persistent-рецепта.
 
     Поднимает FileNotFoundError если файл отсутствует — это внештатная ситуация
     (например, пользователь удалил ~/.ya пока watchdog ещё не среагировал).
     """
-    with open(os.path.join(shallow_dir, RECIPE_HASH_FILE)) as f:
+    with open(os.path.join(persistent_recipe_dir, RECIPE_HASH_FILE)) as f:
         return f.read().strip()
 
 
-def _write_stored_hash(shallow_dir: str, content_hash: str) -> None:
-    with open(os.path.join(shallow_dir, RECIPE_HASH_FILE), 'w') as f:
+def _write_stored_hash(persistent_recipe_dir: str, content_hash: str) -> None:
+    with open(os.path.join(persistent_recipe_dir, RECIPE_HASH_FILE), 'w') as f:
         f.write(content_hash)
 
 
@@ -244,20 +244,20 @@ def _read_env_file(env_file: str) -> dict[str, str | None]:
 
 
 @functools.cache
-def _get_rm_client(shallow_root: str, source_root: str, manager_root: str | None = None) -> object:
-    """Создать RM клиент по recipes_shallow_root (кэшируется на процесс run_test)."""
-    from devtools.recipe_manager.client.client import RecipeManagerClient, get_recipes_shallow_root_path
+def _get_rm_client(manager_root: str) -> object:
+    """Создать RM клиент по готовому manager root (кэшируется на процесс run_test)."""
+    from devtools.recipe_manager.client.client import RecipeManagerClient
 
-    return RecipeManagerClient(manager_root or get_recipes_shallow_root_path(shallow_root, source_root))
+    return RecipeManagerClient(manager_root)
 
 
-def _build_recipe_cmd(shallow_dir: str, extra_args: list[str], action: str) -> list[str]:
+def _build_recipe_cmd(persistent_recipe_dir: str, extra_args: list[str], action: str) -> list[str]:
     """Собрать команду запуска/остановки рецепта (start или stop).
 
     --build-root, --source-root, --env-file не передаются явно — рецепт
     читает их из контекстного файла (YA_TEST_CONTEXT_FILE).
     """
-    bin_path = os.path.join(shallow_dir, 'package', RECIPE_BIN_NAME)
+    bin_path = os.path.join(persistent_recipe_dir, 'package', RECIPE_BIN_NAME)
     return [bin_path] + [action] + extra_args
 
 
@@ -340,23 +340,23 @@ def _copy_recipe_logs(
 def _do_stop_and_start(
     recipe_uid: str,
     package_path: str,
-    shallow_dir: str,
+    persistent_recipe_dir: str,
     rm: object,
     options: object,
     rm_timeout: float = 0,
 ) -> None:
     """Остановить существующий рецепт (если есть) и запустить новый."""
-    # Читаем команду из shallow_dir/package/ — там артефакты от предыдущего старта.
+    # Читаем команду из persistent_recipe_dir/package/ — там артефакты от предыдущего старта.
     # Не используем build_root: он мог измениться относительно того, чем рецепт был запущен.
-    old_recipe_cmd = _read_recipe_cmd_from_shallow(shallow_dir)
+    old_recipe_cmd = _read_stored_recipe_cmd(persistent_recipe_dir)
     extra_args = shlex.split(old_recipe_cmd)[1:]
 
-    stop_err = os.path.join(shallow_dir, 'recipe_stop.err')
-    stop_out = os.path.join(shallow_dir, 'recipe_stop.out')
+    stop_err = os.path.join(persistent_recipe_dir, 'recipe_stop.err')
+    stop_out = os.path.join(persistent_recipe_dir, 'recipe_stop.out')
 
     logger.debug("Stopping recipe %s before restart", package_path)
-    stop_cmd = _build_recipe_cmd(shallow_dir, extra_args, 'stop')
-    ctx_path = os.path.join(shallow_dir, RECIPE_CONTEXT_FILE)
+    stop_cmd = _build_recipe_cmd(persistent_recipe_dir, extra_args, 'stop')
+    ctx_path = os.path.join(persistent_recipe_dir, RECIPE_CONTEXT_FILE)
     try:
         rm.stop_recipe(
             recipe_uid=recipe_uid,
@@ -372,49 +372,49 @@ def _do_stop_and_start(
             raise RecipeTimeoutError(package_path, stop_err, stop_out) from exc
         raise RecipeTearDownError(package_path, stop_err, stop_out) from exc
 
-    _do_start(recipe_uid, package_path, shallow_dir, rm, options, rm_timeout=rm_timeout)
+    _do_start(recipe_uid, package_path, persistent_recipe_dir, rm, options, rm_timeout=rm_timeout)
 
 
 def _do_start(
     recipe_uid: str,
     package_path: str,
-    shallow_dir: str,
+    persistent_recipe_dir: str,
     rm: object,
     options: object,
     rm_timeout: float = 0,
 ) -> None:
-    """Подготовить shallow dir и запустить рецепт через RM.
+    """Подготовить каталог persistent-рецепта и запустить рецепт через RM.
 
     Любая ошибка (файловая, grpc, ...) конвертируется в RecipeStartUpError
-    с путями к логам в shallow_dir. Обогащение путями до out_dir происходит
+    с путями к логам в persistent_recipe_dir. Обогащение путями до out_dir происходит
     в run_all_persistent_recipes.
 
     DEADLINE_EXCEEDED от RM конвертируется в RecipeTimeoutError.
     """
     from devtools.recipe_manager.client.client import Lifetime
 
-    start_err = os.path.join(shallow_dir, 'recipe_start.err')
-    start_out = os.path.join(shallow_dir, 'recipe_start.out')
+    start_err = os.path.join(persistent_recipe_dir, 'recipe_start.err')
+    start_out = os.path.join(persistent_recipe_dir, 'recipe_start.out')
     try:
         recipe_cmd = _read_recipe_cmd(options.build_root, package_path)
         current_hash = _compute_hash(options.build_root, package_path, recipe_cmd)
         extra_args = shlex.split(recipe_cmd)[1:]
 
-        # Очистить shallow dir (кроме lock-файла)
-        _clean_dir(shallow_dir, keep=['.lock'])
+        # Очистить каталог persistent-рецепта (кроме lock-файла)
+        _clean_dir(persistent_recipe_dir, keep=['.lock'])
 
-        # Скопировать артефакты из build root в shallow root
+        # Скопировать артефакты из build root в каталог persistent-рецепта
         pkg_src = os.path.join(options.build_root, package_path)
-        pkg_dst = os.path.join(shallow_dir, 'package')
+        pkg_dst = os.path.join(persistent_recipe_dir, 'package')
         shutil.copytree(pkg_src, pkg_dst)
 
         # Подготовить recipe context — рецепт читает его через YA_TEST_CONTEXT_FILE
-        ctx_path = write_recipe_context(shallow_dir, options)
+        ctx_path = write_recipe_context(persistent_recipe_dir, options)
 
         # Записать хэш
-        _write_stored_hash(shallow_dir, current_hash)
+        _write_stored_hash(persistent_recipe_dir, current_hash)
 
-        full_cmd = _build_recipe_cmd(shallow_dir, extra_args, 'start')
+        full_cmd = _build_recipe_cmd(persistent_recipe_dir, extra_args, 'start')
 
         logger.debug("Starting persistent recipe %s", package_path)
 
@@ -429,7 +429,7 @@ def _do_start(
             recipe_uid=recipe_uid,
             command=full_cmd,
             lifetime=Lifetime.PERSISTENT,
-            working_dir=shallow_dir,
+            working_dir=persistent_recipe_dir,
             out_filename=start_out,
             err_filename=start_err,
             retry_count=1,
@@ -439,7 +439,9 @@ def _do_start(
         import app_ctx
 
         app_ctx.display.emit_message(
-            "Persistent recipe [[imp]]{}[[rst]] launched in [[path]]{}[[rst]]\n".format(package_path, shallow_dir)
+            "Persistent recipe [[imp]]{}[[rst]] launched in [[path]]{}[[rst]]\n".format(
+                package_path, persistent_recipe_dir
+            )
         )
     except Exception as exc:
         append_traceback_to_file(start_err)
@@ -452,7 +454,7 @@ def _start_one_recipe(package_path: str, options: object, rm_timeout: float = 0)
     """
     Запустить или переиспользовать один persistent рецепт.
 
-    Вызывается уже под FileLock на shallow dir рецепта.
+    Вызывается уже под FileLock на каталоге persistent-рецепта.
     Опрашивает RM через GetRecipe и принимает решение о запуске/ассоциации.
 
     Пользователи рецепта в RM хранятся как кортежи (invocation_id, build_id).
@@ -483,15 +485,10 @@ def _start_one_recipe(package_path: str, options: object, rm_timeout: float = 0)
     import grpc
 
     recipe_uid = _make_recipe_uid(package_path)
-    shallow_dir = _shallow_recipe_dir(
-        options.shallow_root,
-        options.source_root,
-        package_path,
-        manager_root=getattr(options, 'recipe_manager_root', None),
-    )
-    os.makedirs(shallow_dir, exist_ok=True)
+    persistent_recipe_dir = _persistent_recipe_dir(options.recipe_manager_root, package_path)
+    os.makedirs(persistent_recipe_dir, exist_ok=True)
 
-    rm = _get_rm_client(options.shallow_root, options.source_root, getattr(options, 'recipe_manager_root', None))
+    rm = _get_rm_client(options.recipe_manager_root)
     force = options.force_restart_recipes
     current_invocation_id = options.invocation_id
     current_build_id = options.build_id
@@ -511,7 +508,7 @@ def _start_one_recipe(package_path: str, options: object, rm_timeout: float = 0)
     if not recipe_found:
         # Рецепт не запущен — запускаем
         logger.debug("Recipe %s not found in RM, starting fresh", package_path)
-        _do_start(recipe_uid, package_path, shallow_dir, rm, options, rm_timeout=rm_timeout)
+        _do_start(recipe_uid, package_path, persistent_recipe_dir, rm, options, rm_timeout=rm_timeout)
         return
 
     # Рецепт запущен — классифицируем пользователей
@@ -524,20 +521,20 @@ def _start_one_recipe(package_path: str, options: object, rm_timeout: float = 0)
     # Хэш нужен во всех ветках кроме NOT_FOUND
     recipe_cmd = _read_recipe_cmd(options.build_root, package_path)
     current_hash = _compute_hash(options.build_root, package_path, recipe_cmd)
-    stored_hash = _read_stored_hash(shallow_dir)
+    stored_hash = _read_stored_hash(persistent_recipe_dir)
 
     if no_users:
         # Нет пользователей — все умерли (heartbeat timeout или FinishBuild)
         if current_hash == stored_hash:
             if force:
                 logger.debug("Recipe %s: no users, hash matches, force=True → restart", package_path)
-                _do_stop_and_start(recipe_uid, package_path, shallow_dir, rm, options, rm_timeout=rm_timeout)
+                _do_stop_and_start(recipe_uid, package_path, persistent_recipe_dir, rm, options, rm_timeout=rm_timeout)
             else:
                 logger.debug("Recipe %s: no users, hash matches → associate", package_path)
                 rm.associate_recipe(current_invocation_id, current_build_id, recipe_uid)
         else:
             logger.debug("Recipe %s: no users, hash changed → restart", package_path)
-            _do_stop_and_start(recipe_uid, package_path, shallow_dir, rm, options, rm_timeout=rm_timeout)
+            _do_stop_and_start(recipe_uid, package_path, persistent_recipe_dir, rm, options, rm_timeout=rm_timeout)
 
     elif same_build and not same_invocation and not other_invocation:
         # Только чанки той же сборки — другой чанк уже запустил рецепт
@@ -603,7 +600,7 @@ def run_all_persistent_recipes(
     """
     Запустить все persistent рецепты сьюты через Recipe Manager.
 
-    Для каждого рецепта пытается взять неблокирующий FileLock на его shallow dir
+    Для каждого рецепта пытается взять неблокирующий FileLock на его каталог
     и под локом вызывает _start_one_recipe, которая через GetRecipe решает:
     запустить новый рецепт, перезапустить изменившийся или ассоциироваться
     с уже работающим. Рецепты, лок на которые не удалось взять (другой чанк
@@ -650,14 +647,9 @@ def run_all_persistent_recipes(
             if uid in done_uids:
                 continue
 
-            shallow_dir = _shallow_recipe_dir(
-                options.shallow_root,
-                options.source_root,
-                pkg,
-                manager_root=getattr(options, 'recipe_manager_root', None),
-            )
-            os.makedirs(shallow_dir, exist_ok=True)
-            lock = FileLock(os.path.join(shallow_dir, '.lock'))
+            persistent_recipe_dir = _persistent_recipe_dir(options.recipe_manager_root, pkg)
+            os.makedirs(persistent_recipe_dir, exist_ok=True)
+            lock = FileLock(os.path.join(persistent_recipe_dir, '.lock'))
             safe_name = _make_log_safe_name(pkg, uid[:8])
 
             if lock.acquire(blocking=False):
@@ -667,16 +659,16 @@ def run_all_persistent_recipes(
                     done_uids.add(uid)
                     made_progress = True
                     # Успех — копируем start-логи и output/ в out_dir
-                    _copy_recipe_logs(shallow_dir, out_dir, safe_name, action='start')
+                    _copy_recipe_logs(persistent_recipe_dir, out_dir, safe_name, action='start')
                 except RecipeConflictError:
                     # Нет err/out файлов рецепта — пробрасываем как есть
                     raise
                 except RecipeError as e:
                     # RecipeStartUpError или RecipeTearDownError из _do_start/_do_stop_and_start.
-                    # e.err_filename/out_filename указывают на shallow_dir — копируем логи
+                    # e.err_filename/out_filename указывают на persistent_recipe_dir — копируем логи
                     # в out_dir и пересоздаём исключение того же типа с правильными путями.
                     action = 'stop' if isinstance(e, RecipeTearDownError) else 'start'
-                    out_dst, err_dst = _copy_recipe_logs(shallow_dir, out_dir, safe_name, action=action)
+                    out_dst, err_dst = _copy_recipe_logs(persistent_recipe_dir, out_dir, safe_name, action=action)
                     raise type(e)(pkg, err_dst, out_dst) from None
                 finally:
                     lock.release()
@@ -687,10 +679,8 @@ def run_all_persistent_recipes(
     # Все рецепты "осознаны" чанком как работающие — собираем их env
     result_env: dict[str, str | None] = {}
     for pkg in packages:
-        shallow_dir = _shallow_recipe_dir(
-            options.shallow_root, options.source_root, pkg, manager_root=getattr(options, 'recipe_manager_root', None)
-        )
-        recipe_env = _read_env_file(os.path.join(shallow_dir, RECIPE_ENV_FILE))
+        persistent_recipe_dir = _persistent_recipe_dir(options.recipe_manager_root, pkg)
+        recipe_env = _read_env_file(os.path.join(persistent_recipe_dir, RECIPE_ENV_FILE))
         result_env.update(recipe_env)
         logger.debug("Recipe %s is done, collected env keys: %s", pkg, list(recipe_env.keys()))
 
@@ -866,7 +856,7 @@ def stop_persistent_recipes_embedded(
         tmp_dir = _get_build_root_tmp_recipe_dir(package_path)
         ctx_path = os.path.join(tmp_dir, RECIPE_CONTEXT_FILE)
 
-        recipe_cmd_str = _read_recipe_cmd_from_shallow(tmp_dir)
+        recipe_cmd_str = _read_stored_recipe_cmd(tmp_dir)
         extra_args = shlex.split(recipe_cmd_str)[1:]
         stop_cmd = _build_recipe_cmd(tmp_dir, extra_args, 'stop')
 
