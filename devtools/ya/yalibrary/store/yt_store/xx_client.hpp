@@ -43,6 +43,7 @@ namespace NYa {
         size_t ProbeBeforePutMinSize{};
         ECritLevel CritLevel{ECritLevel::NONE};
         TString GSID{};
+        bool CleanupPutArchive{};
     };
 
     struct TYtStoreError : public yexception {

@@ -170,6 +170,7 @@ cdef extern from "devtools/ya/yalibrary/store/yt_store/xx_client.hpp" namespace 
         size_t ProbeBeforePutMinSize
         ECritLevel CritLevel
         TString GSID
+        bool CleanupPutArchive
 
     cdef cppclass TYtStore nogil:
         ctypedef TVector[TString] TUidList
@@ -340,6 +341,7 @@ cdef class YtStoreImpl:
         stager: stage_tracer.StageTracer.GroupStageTracer | None,
         allow_tar: bool,
         allow_go: bool,
+        cleanup_put_archive: bool = False,
     ):
         self._proxy = proxy
         self._data_dir = data_dir
@@ -354,6 +356,7 @@ cdef class YtStoreImpl:
         options.ConnectOptions = YtStoreImpl._get_connect_options(token, proxy_role)
         options.Owner = <void*> self
         options.ReadOnly = readonly
+        options.CleanupPutArchive = cleanup_put_archive
         options.CheckSize = check_size
         if max_cache_size:
             if isinstance(max_cache_size, int):

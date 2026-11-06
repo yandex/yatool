@@ -657,6 +657,7 @@ namespace NYa {
             , ProbeBeforePutMinSize_{options.ProbeBeforePutMinSize}
             , CritLevel_{options.CritLevel}
             , GSID_{options.GSID}
+            , CleanupPutArchive_{options.CleanupPutArchive}
         {
             ThreadPool_.Start();
             ThreadPool_.SetMaxIdleTime(TDuration::Seconds(2));
@@ -876,6 +877,12 @@ namespace NYa {
                 }
 
                 TFsPath archivePath{MakeTempName()};
+                // Async uploads must release each archive before more outputs arrive.
+                Y_DEFER {
+                    if (CleanupPutArchive_) {
+                        NFs::Remove(archivePath);
+                    }
+                };
                 PrepareData(archivePath, options.RootDir, options.Files, options.Codec);
                 auto archiveData = TBlob::FromFile(archivePath);
 
@@ -2794,6 +2801,7 @@ namespace NYa {
         size_t ProbeBeforePutMinSize_;
         ECritLevel CritLevel_;
         TString GSID_;
+        bool CleanupPutArchive_;
 
         std::atomic_bool Disabled_{};
         NThreading::TCancellationTokenSource CancellationSource_{};

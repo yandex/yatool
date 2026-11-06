@@ -39,6 +39,7 @@ class YtStore(xx_client.YtStoreImpl, DistStore):
         stager: stage_tracer.StageTracer.GroupStageTracer | None = None,
         allow_tar=False,
         allow_go=False,
+        cleanup_put_archive: bool = False,
         **kwargs
     ):
         xx_client.YtStoreImpl.__init__(
@@ -63,6 +64,7 @@ class YtStore(xx_client.YtStoreImpl, DistStore):
             stager=stager,
             allow_tar=allow_tar,
             allow_go=allow_go,
+            cleanup_put_archive=cleanup_put_archive,
         )
         DistStore.__init__(
             self,

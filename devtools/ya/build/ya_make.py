@@ -555,6 +555,7 @@ class CacheFactory:
             stager=stager,
             allow_tar=('.tar' in self._opts.add_result),
             allow_go=self._opts.yt_store_allow_go,
+            cleanup_put_archive=getattr(self._opts, 'yt_store_async_put', False),
         )
 
     def _can_use_bazel_remote_cache(self):
