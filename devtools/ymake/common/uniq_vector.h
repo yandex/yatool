@@ -368,7 +368,7 @@ private:
             } else {
                 UniqMap = MakeHolder<TUniqMap>(size(), THash<TRef>(Container), TEqualTo<TRef>(Container));
                 for (size_t i = 0; i < size(); ++i) {
-                    UniqMap->emplace(i, i);
+                    UniqMap->emplace(TRef(i), i);
                 }
             }
         } else {
