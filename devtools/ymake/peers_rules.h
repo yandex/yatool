@@ -13,7 +13,13 @@
 #include <util/stream/input.h>
 #include <util/stream/file.h>
 
+#include <memory>
+
 class TPeersRules {
+private:
+    struct TLocalMatcherCache;
+    std::shared_ptr<TLocalMatcherCache> LocalMatchers;
+
 public:
     enum class EPolicy {
         ALLOW,
@@ -30,6 +36,7 @@ public:
         TWildcard From;
         TWildcard To;
         EPolicy Policy = EPolicy::DENY;
+        bool Priority = true;
     };
 
     const static constexpr EPolicy Default = EPolicy::ALLOW;
@@ -39,14 +46,19 @@ protected:
 
     TVector<size_t> GlobalRulesFrom;
     TVector<size_t> GlobalRulesTo;
+    bool HasPriorityRules = false;
+
+    IPathMatcher::TRef GetLocalMatcher(TStringBuf pattern) const;
 
     friend class TAppliedPeersRules;
 
 public:
-    TPeersRules() = default;
+    TPeersRules();
     TPeersRules(TVector<TRule>&& rules)
-        : Rules(std::move(rules))
-    {}
+        : TPeersRules()
+    {
+        Rules = std::move(rules);
+    }
 
     TPeersRules& operator+=(TPeersRules&& other);
 
@@ -74,9 +86,20 @@ public:
 
 class TAppliedPeersRules {
 private:
+    struct TLocalRule {
+        IPathMatcher::TRef Matcher;
+        TPeersRules::EPolicy Policy;
+    };
+
     const TPeersRules& Rules;
     TVector<size_t> MatchesTo;
     TVector<size_t> MatchesFrom;
+    // Rebuilt from the module's saved configuration variables.
+    TVector<TLocalRule> FromRules;
+    TVector<TLocalRule> ToRuleOverrides;
+
+    TVector<TLocalRule> LoadLocalRules(TStringBuf value) const;
+    TMaybe<TPeersRules::EPolicy> MatchGlobal(const TAppliedPeersRules& child, bool priority) const;
 
 public:
     TAppliedPeersRules(const TPeersRules& rules, TStringBuf dirName);
@@ -90,6 +113,9 @@ public:
     }
 
     TPeersRules::EPolicy operator()(const TAppliedPeersRules& child) const;
+    TMaybe<TPeersRules::EPolicy> MatchPriority(const TAppliedPeersRules& child) const;
+    void SetLocalRules(TStringBuf fromRules, TStringBuf toRuleOverrides);
+    TPeersRules::EPolicy CheckDirectPeer(const TAppliedPeersRules& child, TStringBuf fromDir, TStringBuf toDir) const;
 };
 
 // $S/build/peerdirs.policy syntax:
@@ -97,6 +123,10 @@ public:
 // # This is a comment
 // DENY .* -> .*boost.*
 // ALLOW sth -> .*boost.*
+//
+// # Fallback rules are checked after module-local rules
+// FALLBACK_DENY .* -> .*legacy.*
+// FALLBACK_ALLOW sth -> .*legacy.*
 //
 // # Default policy: DENY
 // .* -> .*deprecated.*

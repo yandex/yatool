@@ -12,6 +12,7 @@ class TBuildConfiguration;
 struct TVars;
 
 void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets);
+void CheckDirectPeerPolicies(const TRestoreContext& restoreContext);
 
 struct TTransitiveCheckRegistryItem {
     using TRequirementsLoader = std::function<TTransitiveRequirement(TDepGraph&, const TBuildConfiguration&, const TModule&)>;

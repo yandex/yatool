@@ -440,6 +440,7 @@ public:
     }
 
     EPeerSearchStatus MatchPeer(const TModule& peer, const TMatchPeerRequest& request) const;
+    bool IsDirectPeerAllowed(const TModule& peer) const;
 
     bool PassPeers() const {
         return Attrs.PassPeers;

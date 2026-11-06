@@ -77,6 +77,8 @@ VARIABLE(PASS_PEERS, "@usage: PASS_PEERS=yes/no\n\n"
 ""
 "If set, module peers are passed to it's dependendants.")
 VARIABLE(PEERDIR_TAGS, "")
+VARIABLE(PEERDIR_FROM_POLICY, "Ordered provider-local peer policy rules")
+VARIABLE(_PEERDIR_TO_POLICY_OVERRIDE, "Ordered consumer-local peer policy overrides")
 VARIABLE(CHECK_IMPLICIT_PEERDIR_TAGS, "Report incompatible multimodule tags for implicit peers instead of silently skipping them")
 VARIABLE(PEERS_LATE_OUTS, "")
 VARIABLE(PEERS, "a list of module dependencies for the module")
@@ -162,6 +164,8 @@ constexpr TVariableDefiniton ALL_VARIABLES[]{
     VAR_OUTPUT,
     VAR_PASS_PEERS,
     VAR_PEERDIR_TAGS,
+    VAR_PEERDIR_FROM_POLICY,
+    VAR__PEERDIR_TO_POLICY_OVERRIDE,
     VAR_CHECK_IMPLICIT_PEERDIR_TAGS,
     VAR_PEERS_LATE_OUTS,
     VAR_PEERS,

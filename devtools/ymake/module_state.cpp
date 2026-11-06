@@ -33,6 +33,8 @@ namespace {
     const TStringBuf PROP_PROVIDES = TStringBuf("PROVIDES");
     const TStringBuf CONFIG_VAR_NAMES[] = {
         NVariableDefs::VAR_PEERDIR_TAGS,
+        NVariableDefs::VAR_PEERDIR_FROM_POLICY,
+        NVariableDefs::VAR__PEERDIR_TO_POLICY_OVERRIDE,
         NVariableDefs::VAR_CHECK_IMPLICIT_PEERDIR_TAGS,
         NVariableDefs::VAR_MANGLED_MODULE_TYPE,
         NVariableDefs::VAR_MODULE_LANG,
@@ -433,7 +435,14 @@ EPeerSearchStatus TModule::MatchPeer(const TModule& peer, const TMatchPeerReques
     return PeersRestrictions.Match(peer, request);
 }
 
+bool TModule::IsDirectPeerAllowed(const TModule& peer) const {
+    return PeersRules.CheckDirectPeer(peer.PeersRules, GetDir().GetTargetStr(), peer.GetDir().GetTargetStr()) == TPeersRules::EPolicy::ALLOW;
+}
+
 void TModule::SetupPeerdirRestrictions() {
+    if (!Vars.IsTrue("OPENSOURCE")) {
+        PeersRules.SetLocalRules(Get(NVariableDefs::VAR_PEERDIR_FROM_POLICY), Get(NVariableDefs::VAR__PEERDIR_TO_POLICY_OVERRIDE));
+    }
     ImportPeerdirTags();
     ImportPeerdirRules();
     ImportPeerdirPolicy();
@@ -460,7 +469,8 @@ void TModule::ImportPeerdirTags() {
 
 void TModule::ImportPeerdirRules() {
     auto match = [this](const TModule& peer) {
-        return PeersRules(peer.PeersRules) != TPeersRules::EPolicy::ALLOW;
+        const auto policy = PeersRules.MatchPriority(peer.PeersRules);
+        return policy && *policy == TPeersRules::EPolicy::DENY;
     };
 
     PeersRestrictions.Add({EPeerSearchStatus::DeprecatedByRules, std::move(match)});

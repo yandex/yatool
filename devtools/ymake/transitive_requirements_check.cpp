@@ -867,6 +867,58 @@ void CheckGoTestIncorrectDep(TModule* module,const TRestoreContext& restoreConte
     }
 }
 
+void CheckDirectPeerPolicies(const TRestoreContext& restoreContext) {
+    NYMake::TTraceStage stage("Check Direct Peer Policies");
+    for (auto node : restoreContext.Graph.Nodes()) {
+        if (!node.IsValid() || !node->State.GetReachable() || !IsModuleType(node->NodeType)) {
+            continue;
+        }
+        const auto* module = restoreContext.Modules.Get(AssumeFile(node->ElemId));
+        if (!module) {
+            continue;
+        }
+        // Recompute after dependency management, including on unchanged cache
+        // hits. Provider-local edits can change an unchanged consumer's verdict.
+        TScopedContext context(module->GetName(), false);
+        const auto checkPeer = [&](const TModule& peer) {
+            // PEERDIRSELF links artifacts of one multimodule, not directories.
+            if (peer.GetDirId() == module->GetDirId()) {
+                return;
+            }
+            if (!module->IsDirectPeerAllowed(peer)) {
+                YConfErr(BadDir) << "[[alt1]]PEERDIR[[rst]] from [[imp]]" << module->GetDir()
+                                 << "[[rst]] to [[imp]]" << peer.GetDir()
+                                 << "[[rst]] is prohibited by peerdir policy." << Endl;
+            }
+        };
+        const bool managed = module->GetAttrs().RequireDepManagement;
+        if (managed) {
+            // Raw edges include management declarations and unresolved version
+            // proxies. Check the direct peers selected by dependency management.
+            for (TNodeId peerId : restoreContext.Modules.GetModuleNodeLists(module->GetId()).ManagedDirectPeers()) {
+                const auto* peer = restoreContext.Modules.Get(AssumeFile(restoreContext.Graph[peerId]->ElemId));
+                // A selected version may also have a ghost edge from its
+                // DEPENDENCY_MANAGEMENT declaration. It is a real peer here.
+                if (peer && (peer->GetAttrs().RequireDepManagement || !module->GhostPeers.contains(peer->GetDirId()))) {
+                    checkPeer(*peer);
+                }
+            }
+        }
+        for (const auto& edge : node.Edges()) {
+            if (!edge.IsValid() || !IsDirectPeerdirDep(edge)) {
+                continue;
+            }
+            const auto* peer = restoreContext.Modules.Get(AssumeFile(edge.To()->ElemId));
+            // ManagedDirectPeers includes native peers only for modules that
+            // consume them; other managed modules still have real native deps.
+            if (peer && !module->GhostPeers.contains(peer->GetDirId()) &&
+                (!managed || (!peer->GetAttrs().RequireDepManagement && !module->GetAttrs().ConsumeNonManageablePeers))) {
+                checkPeer(*peer);
+            }
+        }
+    }
+}
+
 void CheckTransitiveRequirements(const TRestoreContext& restoreContext, const TVector<TTarget>& startTargets) {
     NYMake::TTraceStage stage("Check Transitive Requirements");
     TConstraintsChecker checker{restoreContext};

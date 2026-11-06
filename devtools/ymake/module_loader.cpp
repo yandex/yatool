@@ -19,6 +19,8 @@
 
 #include <library/cpp/iterator/mapped.h>
 
+#include <algorithm>
+
 TModuleDef::TMakeFileMap::TMakeFileMap()
     : Pool_{IMemoryPool::Construct()}
 {}
@@ -168,6 +170,21 @@ bool TModuleDef::ProcessSetAppendWithGlobal(TStringBuf macroName, const TVector<
 }
 
 bool TModuleDef::ProcessBaseMacro(TStringBuf macroName, const TVector<TStringBuf>& args, TStringBuf name) {
+    if (macroName == "_PEERDIR_POLICY") {
+        // Public macros have named ALLOW/DENY flags. Keep mode/pattern
+        // pairs in invocation order so mixed repeated calls survive cache loads.
+        if (args.size() < 3 || (args[0] != "FROM" && args[0] != "TO") ||
+            (args[1] != "ALLOW" && args[1] != "DENY") ||
+            std::any_of(args.begin() + 2, args.end(), [](TStringBuf arg) { return arg == "ALLOW" || arg == "DENY"; })) {
+            YConfErr(UserErr) << name << " requires exactly one ALLOW or DENY mode and at least one pattern per invocation" << Endl;
+            return true;
+        }
+        const TStringBuf variable = args[0] == "FROM" ? TStringBuf{NVariableDefs::VAR_PEERDIR_FROM_POLICY} : TStringBuf{NVariableDefs::VAR__PEERDIR_TO_POLICY_OVERRIDE};
+        for (auto pattern = args.begin() + 2; pattern != args.end(); ++pattern) {
+            Vars.SetAppendStoreOriginals(variable, TString::Join(args[1], " ", *pattern), OrigVars);
+        }
+        return true;
+    }
     if (TDirParser::SetStatement(macroName, args, Vars, OrigVars) ||
         ProcessSetAppendWithGlobal(macroName, args) ||
         ProcessGlobStatement(macroName, args, Vars, OrigVars)

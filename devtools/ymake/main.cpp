@@ -782,6 +782,8 @@ namespace {
             CheckTransitiveRequirements(yMake.GetRestoreContext(), yMake.StartTargets);
         }
 
+        CheckDirectPeerPolicies(yMake.GetRestoreContext());
+
         if (!hasBadLoops && Diag()->ChkPeers && !ConfMsgManager()->IsChkPeersCompleted()) {
             yMake.FindMissingPeerdirs();
             ConfMsgManager()->MarkChkPeersCompleted();
