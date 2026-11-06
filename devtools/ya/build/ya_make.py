@@ -2167,11 +2167,23 @@ class YaMake:
                     except ImportError:
                         raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
 
+                    service_recovery = None
+                    if self.opts.larry_addr == 'local:':
+                        from devtools.ya.build.larry_service import recovery, credentials, paths
+                        from devtools.ya.build.larry_client import release_info
+
+                        service_paths = paths.default_service_paths()
+                        if sys.platform.startswith('linux'):
+                            credentials.prepare_credentials(service_paths, self.opts, token_resolver=get_yt_token)
+                        service_recovery = recovery.ServiceRecovery(
+                            service_paths, client_date=release_info.get_release_date
+                        )
                     sandbox_token = self.app_ctx.fetcher_params[2] or ''
                     return LarryClient(
                         callback,
                         self.ctx.graph,
                         self.ctx.src_dir,
+                        service_recovery=service_recovery,
                         display=self.app_ctx.display,
                         output_replacements=self.ctx.output_replacements,
                         sandbox_token=sandbox_token,
