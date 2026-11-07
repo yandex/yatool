@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 TOOL_REAL_AND_SUPPOSED_PATHS_ARE_MISSMATCHED_MSG = """Executable for tool `{tool_name}` is not found at {tool_path}.
 You can run ya tool {tool_name} --print-path to check where tool is located on FS.
-Check the tool's path in build/ya.conf.json or build/tools/tools/{tool_name}.tool.json since there is mismatch in real and supposed paths.
+Check the tool's path in build/tools/tools/{tool_name}.tool.json since there is mismatch in real and supposed paths.
 Please contact owners of the tool to fix that issue."""
 
 TOOL_TIER_HEADERS = {
@@ -435,7 +435,7 @@ def do_tool(params: Params) -> None:
     # Do it in an async thread to allow break the program with Ctrl-C
     tool_path = exts.asyncthread.future(tool.executable)()
 
-    if windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
+    if windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack
         logger.debug('Rename tool for win: %s', tool_path)
         tool_path += '.exe'
 

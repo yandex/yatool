@@ -6,9 +6,7 @@ import typing as tp  # noqa
 
 
 def is_root(path):
-    return os.path.exists(os.path.join(path, ".arcadia.root")) or os.path.exists(
-        os.path.join(path, 'build', 'ya.conf.json')
-    )
+    return os.path.exists(os.path.join(path, ".arcadia.root"))
 
 
 def detect_root(path, detector=is_root):

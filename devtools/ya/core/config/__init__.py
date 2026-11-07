@@ -181,7 +181,7 @@ def supports_tool_tiers():
     return getattr(app_config, 'supports_tool_tiers', False)
 
 
-def _get_config(name="ya.conf.json", try_resource=True):
+def _get_config(name, try_resource=True):
     try:
         root = find_root()
         for path in _get_config_dirs():
@@ -232,42 +232,10 @@ def _try_read_from_resource(path):
         return json.loads(conf_res)
 
 
-def _add_simple_tool(cfg, name, info):
-    cfg['tools'][name] = info
-    cfg['toolchain'][name] = {
-        "tools": {
-            name: {
-                "bottle": name,
-                "executable": name,
-            },
-        },
-        "platforms": [
-            {
-                "host": {"os": x},
-                "default": True,
-            }
-            for x in info.get('platforms', ['LINUX', 'DARWIN', 'WIN'])
-        ],
-    }
-    cfg['bottles'][name] = {
-        "formula": "build/external_resources/" + info.get('resource', name) + "/resources.json",
-        "executable": {
-            name: info.get('executable', ['bin', name]),
-        },
-    }
-
-
-def _preprocess(cfg):
-    if 'simple_tools' in cfg:
-        for k, v in cfg['simple_tools'].items():
-            _add_simple_tool(cfg, k, v)
-
-    return cfg
-
-
+# deprecated
 @func.lazy
 def config():
-    return _preprocess(_get_config())
+    return {"tools": {}, "toolchain": {}, "bottles": {}, "toolchain_aliases": {}}
 
 
 def list_tool_configs(path):

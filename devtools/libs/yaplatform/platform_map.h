@@ -27,7 +27,7 @@ namespace NYa {
     using TTempPlatformMap = TMap<TStringBuf, TResourceDesc, std::less<>>;
 
     /// Create owning platform map from `resource.json` format, that is used
-    /// in ya.conf.json and ymake's `DECLARE_EXTERNAL_HOST_RESOURCES_BUNDLE_BY_JSON` macro
+    /// in tool configurations and ymake's `DECLARE_EXTERNAL_HOST_RESOURCES_BUNDLE_BY_JSON` macro
     /// Expected JSON is:
     /// ```
     /// { "by_platform" : {

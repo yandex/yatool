@@ -574,7 +574,7 @@ def get_tool_path(name, tool_platform=None):
         )
         return name
 
-    if windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack. Think about ya.conf.json format
+    if windows.on_win() and not tool_path.endswith('.exe'):  # XXX: hack
         logger.debug('Rename tool for win: %s', tool_path)
         tool_path += '.exe'
     return tool_path

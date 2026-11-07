@@ -202,7 +202,6 @@ def parse_platform(s):
     return {'toolchain': toolchain.lower(), 'os': os.upper(), 'arch': arch.lower()}
 
 
-# XXX: mine from ya.conf.json
 def guess_os(s):
     s = s.upper()
 
