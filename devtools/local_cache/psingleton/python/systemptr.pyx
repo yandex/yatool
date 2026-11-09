@@ -68,3 +68,12 @@ def get_my_name():
 def get_proc_uniq_suffix():
     cdef TString suff = GetMyUniqueSuffix()
     return suff
+
+
+cdef extern from "devtools/local_cache/psingleton/systemptr-impl.h" namespace "NSystemWideName":
+    i64 GetProcessCtime(i32) noexcept
+
+
+def get_process_start_time(i32 pid):
+    """Return native process identity units, or zero for a non-live process."""
+    return GetProcessCtime(pid) if pid > 0 else 0

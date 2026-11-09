@@ -2205,7 +2205,7 @@ class YaMake:
                         from devtools.ya.build.larry_client import release_info
 
                         service_paths = paths.default_service_paths()
-                        if sys.platform.startswith('linux'):
+                        if sys.platform.startswith('linux') or sys.platform == 'darwin':
                             credentials.prepare_credentials(service_paths, self.opts, token_resolver=get_yt_token)
                         service_recovery = recovery.ServiceRecovery(
                             service_paths, client_date=release_info.get_release_date
