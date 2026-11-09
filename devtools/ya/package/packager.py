@@ -1577,10 +1577,12 @@ def do_package(params):
                                 if platform_run_resource_url:
                                     package_context.set_context("platform_run_resource_url", platform_run_resource_url)
                             else:
-                                package_resource_id, platform_run_resource_id = upload_package(
-                                    path, package_file, params
+                                package_resource_id, platform_run_resource_id, package_attrs = upload_package(
+                                    path, package_file, params, package_context.package_path
                                 )
                                 package_context.set_context("package_resource_id", package_resource_id)
+                                package_context.set_context("package_resource_type", params.resource_type)
+                                package_context.set_context("package_resource_attrs", package_attrs)
                                 if platform_run_resource_id:
                                     package_context.set_context("platform_run_resource_id", platform_run_resource_id)
                         if params.store_debian:
@@ -1631,17 +1633,13 @@ def do_package(params):
     )
 
 
-def upload_package(built_package_file, package_json, opts):
+def upload_package(built_package_file, package_json, opts, package_path):
     built_package_file_name = os.path.basename(built_package_file)
     fix_logging()
     platform_run_resource_id = None
 
-    package_attrs = opts.resource_attrs
-    package_attrs.update(
-        {
-            'build_type': opts.build_type,
-        }
-    )
+    common_attrs = dict(opts.resource_attrs, build_type=opts.build_type)
+    package_attrs = dict(common_attrs, package_path=package_path)
 
     logging.info("Uploading %s", built_package_file_name)
     logging.debug("Uploading file full path: %s", built_package_file)
@@ -1672,7 +1670,7 @@ def upload_package(built_package_file, package_json, opts):
             resource_type="PLATFORM_RUN",
             resource_description="platform.run for {}({})".format(package_resource_id, package_json),
             resource_owner=opts.resource_owner,
-            resource_attrs=package_attrs,
+            resource_attrs=common_attrs,
             ttl=opts.ttl,
             sandbox_url=opts.sandbox_url,
             sandbox_token=opts.sandbox_oauth_token,
@@ -1687,7 +1685,11 @@ def upload_package(built_package_file, package_json, opts):
             platform_run_resource_id,
         )
 
-    return package_resource_id, platform_run_resource_id
+    return (
+        package_resource_id,
+        platform_run_resource_id,
+        uploader.Uploader.create_resource_attrs(opts.ttl, package_attrs),
+    )
 
 
 def upload_package_to_mds(built_package_file, package_json, opts):
