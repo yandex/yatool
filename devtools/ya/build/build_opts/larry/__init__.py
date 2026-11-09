@@ -15,13 +15,12 @@ class LarryOptions(yarg.Options):
         return [
             yarg.ArgConsumer(
                 ['--larry-runner'],
-                help='Use experimental LARRY server to execute the build',
+                help='Use beta Larry (compatible within beta; beta-to-stable protocol may change)',
                 hook=yarg.SetValueHook('larry_addr'),
                 group=groups.LARRY_OPT_GROUP,
                 visible=False,
             ),
-            yarg.EnvConsumer('YA_LARRY_ADDR', hook=yarg.SetValueHook('larry_addr')),
-            yarg.ConfigConsumer('larry_addr'),
+            yarg.ConfigConsumer('larry_betta_addr', hook=yarg.SetValueHook('larry_addr')),
             yarg.ConfigConsumer('larry_environment_whitelist'),
             yarg.ConfigConsumer('larry_test_environment_whitelist'),
         ]
