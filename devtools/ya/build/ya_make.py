@@ -2204,7 +2204,8 @@ class YaMake:
             with recipe_build_context(manager, gsid.uid()) as recipe_context:
                 if self.opts.larry_addr is not None:
                     try:
-                        from devtools.ya.build.larry_client import LarryClient
+                        from devtools.ya.build.larry_client import DiagnosticOptions, FailureOutput, LarryClient
+                        from yalibrary.runner import called_by_agent
                         from devtools.ya.build.larry_client.build_variables import collect_build_variables
                     except ImportError:
                         raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
@@ -2221,7 +2222,8 @@ class YaMake:
                             service_paths, client_date=release_info.get_release_date
                         )
                     sandbox_token = self.app_ctx.fetcher_params[2] or ''
-                    return LarryClient(
+                    diagnostics = DiagnosticOptions.from_build_options(self.opts)
+                    result = LarryClient(
                         callback,
                         self.ctx.graph,
                         self.ctx.src_dir,
@@ -2242,7 +2244,20 @@ class YaMake:
                         build_threads=self.opts.build_threads,
                         build_cache_policy='ignore' if self.opts.clear_build else 'use',
                         test_threads=getattr(self.opts, 'test_threads', 0),
+                        diagnostics=diagnostics,
+                        view_options={
+                            'style': getattr(self.opts, 'output_style', None),
+                            'extra_progress': getattr(self.opts, 'ext_progress', False),
+                            'use_roman_numerals': getattr(self.opts, 'use_roman_numerals', False),
+                        },
+                        failure_output=(
+                            FailureOutput.DIAGNOSTIC if called_by_agent(self.app_ctx) else FailureOutput.COMMAND
+                        ),
                     ).build(self.opts.larry_addr)
+                    result_analyzer = (
+                        self._make_local_result_analyzer(result[8], result[1]) if diagnostics.timings != 'off' else None
+                    )
+                    return result[:7] + (result_analyzer, result[8])
                 else:
                     return self._build_local(callback, recipe_context=recipe_context)
 
@@ -2442,23 +2457,7 @@ class YaMake:
 
         return result_analyzer
 
-    def _build_local(self, callback, recipe_context=None):
-        res, errors, exit_code, execution_log, exit_code_map = self.ctx.runner(
-            self.ctx,
-            self.app_ctx,
-            callback,
-            output_replacements=self.ctx.output_replacements,
-            recipe_context=recipe_context,
-        )
-
-        def extract_tasks_metrics():
-            metrics = {}
-            for u, data in execution_log.items():
-                if 'timing' in data and data['timing']:
-                    elapsed = data['timing'][1] - data['timing'][0]
-                    metrics[u] = {'elapsed': elapsed}
-            return metrics
-
+    def _make_local_result_analyzer(self, execution_log, errors):
         def result_analyzer():
             statistics = bs.get_statistics(self.opts)
             return bs.analyze_local_result(
@@ -2472,6 +2471,19 @@ class YaMake:
                 ymake_stats=self.ctx.ymake_stats,
             )
 
+        return result_analyzer
+
+    def _build_local(self, callback, recipe_context=None):
+        res, errors, exit_code, execution_log, exit_code_map = self.ctx.runner(
+            self.ctx,
+            self.app_ctx,
+            callback,
+            output_replacements=self.ctx.output_replacements,
+            recipe_context=recipe_context,
+        )
+
+        result_analyzer = self._make_local_result_analyzer(execution_log, errors)
+
         if not self.opts.random_build_root:
             latest_path = os.path.join(self.opts.bld_dir, 'latest')
             if os.path.islink(latest_path):
@@ -2479,7 +2491,17 @@ class YaMake:
             if not os.path.exists(latest_path):
                 exts.fs.symlink(self.opts.bld_root, latest_path)
 
-        return res, errors, None, extract_tasks_metrics(), exit_code, {}, exit_code_map, result_analyzer, execution_log
+        return (
+            res,
+            errors,
+            None,
+            st.make_task_metrics(execution_log),
+            exit_code,
+            {},
+            exit_code_map,
+            result_analyzer,
+            execution_log,
+        )
 
     @property
     def targets(self):

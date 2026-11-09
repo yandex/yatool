@@ -109,7 +109,9 @@ SummaryResult = collections.namedtuple('SummaryResult', 'time_by_type task_execu
 
 def _determine_task_type(task):
     if hasattr(task, 'abstract'):
-        if task.abstract.meta.get('node-type', None) == 'test':
+        if getattr(task, 'cache_origin', None) is not None:
+            return TaskType.DOWNLOAD
+        if task.abstract.meta.get('node-type', None) == 'test' or task.is_test():
             return TaskType.TEST
         elif task.abstract.meta.get('node-type', None) == 'download':
             return TaskType.DOWNLOAD
@@ -223,9 +225,9 @@ def _task_details(task):
 
 
 def print_all_tasks(graph, filename, display):
-    max_critical_time, critical_path = graph.get_critical_path()
+    max_critical_time, critical_path = graph.get_report_critical_path()
 
-    tasks = [task for task in graph.get_all_nodes() if task.get_time_elapsed() is not None]
+    tasks = [task for task in graph.get_report_tasks() if task.get_time_elapsed() is not None]
     if tasks:
         tasks.sort(key=lambda x: (x.start_time, x.end_time))
         initial_time = tasks[0].start_time
@@ -472,8 +474,9 @@ def print_cache_statistics(graph, filename, display):
             if x.is_test():
                 tests_task_count += 1
 
-    local_cached_task_count = 0
-    dist_cached_task_count = 0
+    local_cached_task_count = sum(task.cache_origin == 'local_cache' for task in graph.run_tasks.values())
+    dist_cached_task_count = sum(task.cache_origin == 'yt_cache' for task in graph.run_tasks.values())
+    # Count origins or legacy records, not the derived presentation of an origin.
     for x in graph.prepare_tasks.values():
         task_type = x.get_type()
         if task_type == 'prepare:get from local cache':
@@ -641,7 +644,7 @@ def print_distbuild_download_statistics(graph, filename, display):
     finished = float('-inf')
 
     try:
-        for task in graph.prepare_tasks.values():
+        for task in graph.get_report_prepare_tasks():
             if task.get_type() != 'prepare:download from DistBuild':
                 continue
 
@@ -708,7 +711,7 @@ def print_distbuild_download_statistics(graph, filename, display):
 
 def add_external_program_fetcher_metrics(graph):
     total_time = 0
-    for task in graph.prepare_tasks.values():
+    for task in graph.get_report_prepare_tasks():
         if getattr(task, 'transport', None) is None or task.transport != "external_program_fetcher":
             continue
         total_time += task.get_time_elapsed() or 0
@@ -771,7 +774,7 @@ def print_summary_times(tasks, display, ctx_stages=None):
     count_by_type = collections.Counter()
 
     def setup_time(task):
-        type_ = task.get_type()
+        type_ = task.get_type(cached_mark=True) if getattr(task, 'cache_origin', None) is not None else task.get_type()
         time = task.get_time_elapsed()
         download_time_ms = getattr(task, "download_time_ms", None) or 0
 
@@ -819,11 +822,11 @@ def print_summary_times(tasks, display, ctx_stages=None):
             continue
 
         # Total times are collected over run tasks only ('abstract' is the RunTask marker)
-        if hasattr(task, 'abstract'):
+        if hasattr(task, 'abstract') and not task.from_cache:
             total_run_task_time += elapsed
             if task.abstract.status == AbstractTask.Status.FAILED:
                 total_failed_run_task_time += elapsed
-            if 'test' == task.abstract.meta.get('node-type', None):
+            if 'test' == task.abstract.meta.get('node-type', None) or task.is_test():
                 total_tests_task_time += elapsed
 
         if elapsed > 0:

@@ -53,6 +53,7 @@ def collect_cache_statistics(graph, distbuild_result=None, local_result=None):
 
     # The same prepare key may be updated more than once; count its final type.
     prepare_types = {}
+    restore_origins = {}
     for uid, info in (local_result or {}).items():
         if not info:
             continue
@@ -62,7 +63,7 @@ def collect_cache_statistics(graph, distbuild_result=None, local_result=None):
                 prepare_types[key] = info['type']
             elif key not in prepare_types:
                 prepare_types[key] = key
-        elif info.get('timing') or info.get('cached'):
+        elif info.get('timing') or info.get('cached') or info.get('larry_avoided'):
             index = task_index(uid)
             flags[index] &= ~_DYNAMIC
             if info.get('dynamically_resolved_cache'):
@@ -71,6 +72,7 @@ def collect_cache_statistics(graph, distbuild_result=None, local_result=None):
                 starts[index] = int(info['timing'][0] * 1000)
                 ends[index] = int(info['timing'][1] * 1000)
             if info.get('cached'):
+                restore_origins[uid] = info.get('larry_origin')
                 flags[index] |= _CACHED
                 starts[index] = ends[index] = _NO_TIME
 
@@ -95,8 +97,10 @@ def collect_cache_statistics(graph, distbuild_result=None, local_result=None):
         failed_task_count=0,
         not_cached_task_count=0,
         tests_task_count=0,
-        local_cached_task_count=sum(t == 'get from local cache' for t in prepare_types.values()),
-        dist_cached_task_count=sum(t == 'get from dist cache' for t in prepare_types.values()),
+        local_cached_task_count=sum(t == 'get from local cache' for t in prepare_types.values())
+        + sum(origin == 'local_cache' for origin in restore_origins.values()),
+        dist_cached_task_count=sum(t == 'get from dist cache' for t in prepare_types.values())
+        + sum(origin == 'yt_cache' for origin in restore_origins.values()),
     )
     for index, flag in enumerate(flags):
         if flag & _DYNAMIC:

@@ -54,6 +54,7 @@ ENDIF()
 END()
 
 RECURSE(
+    diagnostics
     command_file
     fs
     sandboxing

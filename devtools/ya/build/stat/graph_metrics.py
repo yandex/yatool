@@ -10,6 +10,15 @@ from devtools.ya.build.graph_description import GraphNodeUid, GraphNode
 logger = logging.getLogger(__name__)
 
 
+def make_task_metrics(execution_log: dict[str, dict]) -> dict[str, dict]:
+    """Project measured task intervals into the common local runner metrics."""
+    return {
+        uid: {'elapsed': info['timing'][1] - info['timing'][0]}
+        for uid, info in execution_log.items()
+        if info.get('timing')
+    }
+
+
 def _collect_module_deps_stats(
     start_uid: GraphNodeUid,
     nodes: dict[GraphNodeUid, GraphNode],

@@ -30,6 +30,7 @@ PEERDIR(
     devtools/ya/exts
     devtools/ya/test/const
     devtools/ya/yalibrary/active_state
+    devtools/ya/yalibrary/runner/diagnostics
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/fetcher/uri_parser
     devtools/ya/yalibrary/fetcher/progress_info
@@ -42,4 +43,5 @@ END()
 
 RECURSE_FOR_TESTS(
     tests
+    ut
 )

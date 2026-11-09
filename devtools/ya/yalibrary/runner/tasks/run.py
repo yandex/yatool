@@ -8,7 +8,6 @@ import time
 import typing as tp
 
 import exts.process
-import exts.shlex2
 import six
 
 import devtools.libs.acdigest.python as acdigest
@@ -21,6 +20,13 @@ from devtools.libs.parse_number.python import parse_number
 from library.python import strings, windows
 from exts.fs import create_dirs, ensure_removed, hardlink_tree, remove_tree_with_perm_update
 from yalibrary import formatter
+from devtools.ya.yalibrary.runner.diagnostics import (
+    StderrControlKind,
+    stderr_control,
+    format_command,
+    format_command_failure,
+    format_launch_error,
+)
 from yalibrary.runner.build_root import BuildRootError
 
 if tp.TYPE_CHECKING:
@@ -152,18 +158,23 @@ class ExecutorBase(object):
     text_file_busy_retries = 10
     text_file_busy_retry_delay = 0.1
 
-    prefix = "##"
-    status_prefix = "##status##"
-    append_prefix = '##append_tag##'
-    prefix_len = len(prefix)
-    status_prefix_len = len(status_prefix)
-    append_prefix_len = len(append_prefix)
-
     def __init__(self, state, display_func, set_status_func, append_tag_func):
         self._state = state
         self._display_func = display_func
         self._set_status_func = set_status_func
         self._append_tag_func = append_tag_func
+
+    def _process_stderr_line(self, line: str) -> bool:
+        record = stderr_control(line, line_ending=os.linesep)
+        if record is None:
+            return False
+        if record.kind is StderrControlKind.STATUS:
+            self._set_status_func(record.text)
+        elif record.kind is StderrControlKind.TAG:
+            self._append_tag_func(record.text)
+        else:
+            self._display_func(record.text)
+        return True
 
     def run(self, **kwargs):
         raise NotImplementedError()
@@ -250,14 +261,7 @@ class PopenExecutor(ExecutorBase):
                         if not line:
                             queue = None
 
-                        if line.startswith(self.status_prefix):
-                            status = line[self.status_prefix_len :].rstrip(os.linesep)
-                            self._set_status_func(status)
-                        elif line.startswith(self.append_prefix):
-                            self._append_tag_func(line[self.append_prefix_len :].strip())
-                        elif line.startswith(self.prefix):
-                            self._display_func(line[self.prefix_len :].replace("|n", "\n"))
-                        else:
+                        if not self._process_stderr_line(line):
                             stderr += line
                     except Queue.Empty:
                         pass
@@ -315,14 +319,7 @@ class LocalExecutor(ExecutorBase):
                 **nice_arg
             ) as res:
                 for line in res.iter_stderr():
-                    if line.startswith(self.status_prefix):
-                        status = line[self.status_prefix_len :].rstrip(os.linesep)
-                        self._set_status_func(status)
-                    elif line.startswith(self.append_prefix):
-                        self._append_tag_func(line[self.append_prefix_len :].strip())
-                    elif line.startswith(self.prefix):
-                        self._display_func(line[self.prefix_len :].replace("|n", "\n"))
-                    else:
+                    if not self._process_stderr_line(line):
                         stderr += line
                 return stderr, res.returncode, res.pid
         except executor.ShutdownException:
@@ -461,8 +458,7 @@ class RunNodeTask(object):
                 this_env.update(self._ctx.recipe_context.environment())
 
             if self._ctx.opts.be_verbose:
-                env_vars = ['{}={}'.format(k, v) for k, v in env.items()]
-                full_cmd = ' '.join(map(six.ensure_str, list(map(exts.shlex2.quote, env_vars + args))))
+                full_cmd = format_command(args, env)
                 errs.append(full_cmd)  # TODO: not the best way to show command
 
             def prepare_tmp_dir():
@@ -497,7 +493,7 @@ class RunNodeTask(object):
                 self._detailed_timings.start_stage(DetailedStages.POSTPROCESSING_COMMAND, time.time())
 
             except OSError as e:
-                stderr = 'Process run failed: {}'.format(e)
+                stderr = format_launch_error(e)
                 exit_code = 1
             finally:
                 stdout.close()
@@ -508,10 +504,7 @@ class RunNodeTask(object):
                 # An agent needs the diagnosis, not the full command line: the
                 # command only burns its context. It is still reported when
                 # there is no stderr to show, so the failure never goes silent.
-                c = ' '.join(map(six.ensure_str, args))
-                errs.append(
-                    'command (pid: {}) {} failed with exit code [[imp]]{}[[rst]] in {}'.format(pid, c, exit_code, cwd)
-                )
+                errs.append(format_command_failure(args, process_id=pid, exit_code=exit_code, cwd=cwd))
 
             if stderr:
                 self.raw_stderr = stderr

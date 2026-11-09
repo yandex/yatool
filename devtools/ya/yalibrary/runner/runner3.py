@@ -26,6 +26,7 @@ from devtools.ya.build.graph_description import GraphNode, GraphNodeUid, SelfUid
 from yalibrary import status_view
 from devtools.ya.yalibrary.active_state import Cancelled
 from yalibrary.fetcher.resource_fetcher import fetch_resource_if_need
+from yalibrary.runner import called_by_agent as _called_by_agent
 from yalibrary.runner import build_root
 from yalibrary.runner import patterns as ptn
 from yalibrary.runner import runqueue
@@ -111,23 +112,6 @@ class CapCalculator:
                 logger.warning("Memory limit is reached. Build may be slower.")
             return self._max_cap.copy(mem=1)
         return self._max_cap
-
-
-def _called_by_agent(app_ctx) -> bool:
-    """Tell whether ya was launched by a coding agent.
-
-    Reads the caller_info app module through getattr (yalibrary must not
-    import app.modules): the provider detects the caller in a background
-    thread, so an unfinished detection reads as "not an agent".
-    """
-    provider = getattr(app_ctx, 'caller_info', None)
-    if provider is None:
-        return False
-    data = provider.get_nowait() if hasattr(provider, 'get_nowait') else provider
-    try:
-        return bool(data and data.get('agent'))
-    except Exception:
-        return False
 
 
 class TaskContext(object):

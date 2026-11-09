@@ -121,6 +121,7 @@ class RunTask(BaseTask):
     __slots__ = (
         'abstract',
         'dynamically_resolved_cache',
+        'cache_origin',
         'detailed_timings',
         'failures',
         'total_time',
@@ -131,6 +132,7 @@ class RunTask(BaseTask):
         super().__init__(uid, host)
         self.abstract = abstract_task
         self.dynamically_resolved_cache = False
+        self.cache_origin = None
         self.detailed_timings = None
         self.failures = None
         self.total_time = False
@@ -198,6 +200,7 @@ class RunTask(BaseTask):
 class PrepareTask(BaseTask):
     __slots__ = (
         'prepare_type',
+        'description',
         'user_type',
         'detailed_timings',
         'failures',
@@ -211,6 +214,7 @@ class PrepareTask(BaseTask):
     def __init__(self, prepare_type: _PrepareType, host: _Hostname) -> None:
         super().__init__(prepare_type, host)
         self.prepare_type = prepare_type
+        self.description: str | None = None
         self.user_type: str | None = None
         self.detailed_timings = None
         self.failures = None
@@ -231,8 +235,7 @@ class PrepareTask(BaseTask):
 
     def name(self) -> str:
         elapsed = '[{} ms] '.format(self.get_time_elapsed()) if self.get_time_elapsed() else ''
-        result = '[{}] {}'.format(self._get_long_name(), self.host)
-        return elapsed + result
+        return elapsed + self.get_colored_name()
 
     def get_type(self) -> str:
         if self.user_type is not None:
@@ -243,6 +246,8 @@ class PrepareTask(BaseTask):
         self.user_type = str_type
 
     def get_colored_name(self) -> str:
+        if self.description is not None:
+            return '[{}] {} {}'.format(self.get_type(), self.description, self.host)
         return '[{}] {}'.format(self._get_long_name(), self.host)
 
     def get_type_color(self) -> str:
@@ -323,6 +328,7 @@ class GraphStats:
         self.time_elapsed: _TimeElapsed = None
         self._incomplete_copy_tasks: dict[tuple[GraphNodeUid, GraphNodeUid], CopyTask] = {}
         self._critical_path_candidates: list[BaseTask] = []
+        self._node_preparation_tasks: set[BaseTask] = set()
 
         # loading abstract dependency graph
         for node in self.graph_json['graph']:
@@ -371,6 +377,83 @@ class GraphStats:
 
     def get_all_nodes(self) -> "Iterator[BaseTask]":
         return itertools.chain(self.prepare_tasks.values(), self.copy_tasks, self.run_tasks.values())
+
+    def get_report_tasks(self) -> "Iterator[BaseTask]":
+        for task in self.get_all_nodes():
+            if task in self._node_preparation_tasks:
+                continue
+            if isinstance(task, RunTask) and task.cache_origin in ('local_cache', 'yt_cache'):
+                restore = 'FromCache' if task.cache_origin == 'local_cache' else 'FromDistCache'
+                outputs = list(task.abstract.meta.get('outputs', ()))
+                if len(outputs) >= 6:
+                    outputs = outputs[:6] + ['<{} more outputs>'.format(len(outputs) - 6)]
+                restored = PrepareTask('{}({}{})'.format(restore, task.uid, ' '.join(outputs)), task.host)
+                restored.set_type(
+                    'get from local cache' if task.cache_origin == 'local_cache' else 'get from dist cache'
+                )
+                restored.start_time, restored.end_time = task.start_time, task.end_time
+                restored.detailed_timings = task.detailed_timings
+                yield restored
+            else:
+                yield task
+
+    def get_report_prepare_tasks(self) -> 'Iterator[PrepareTask]':
+        return (task for task in self.get_report_tasks() if isinstance(task, PrepareTask))
+
+    def get_report_critical_path(self) -> 'tuple[_Time, list[BaseTask]]':
+        def visible(task):
+            return task not in self._node_preparation_tasks and not (
+                isinstance(task, RunTask) and task.cache_origin in ('local_cache', 'yt_cache')
+            )
+
+        if not self._node_preparation_tasks and all(visible(task) for task in self.run_tasks.values()):
+            return self.get_critical_path()
+        # The public path has zero weight for hidden phases. Selecting the
+        # internal maximum first could hide an independent execution branch.
+        costs = {}
+        parents = {}
+        visiting = set()
+        candidates = [
+            task
+            for task in itertools.chain(self.run_tasks.values(), self._critical_path_candidates)
+            if visible(task) and task.get_time_elapsed() is not None
+        ]
+        for candidate in candidates:
+            stack = [candidate]
+            while stack:
+                task = stack[-1]
+                if task in costs:
+                    stack.pop()
+                    continue
+                if task not in visiting:
+                    visiting.add(task)
+                    for dependency in task.depends_on_ref:
+                        if dependency not in costs:
+                            if dependency in visiting:
+                                raise Exception('cyclic dependency detected')
+                            stack.append(dependency)
+                    if stack[-1] is not task:
+                        continue
+                parent = max(task.depends_on_ref, key=lambda dep: costs[dep], default=None)
+                own_time = (task.get_time_elapsed() or 0) if visible(task) else 0
+                costs[task] = own_time + (costs[parent] if parent is not None else 0)
+                parents[task] = parent
+                visiting.remove(task)
+                stack.pop()
+        if not candidates:
+            return 0, []
+        best = max(candidates, key=lambda task: costs[task])
+        path = []
+        task = best
+        for node in self.get_all_nodes():
+            node.critical = False
+        while task is not None:
+            if visible(task):
+                task.critical = True
+                path.append(task)
+            task = parents[task]
+        path.reverse()
+        return costs[best], path
 
     def add_critical_path_candidates(self, nodes: 'Iterable[BaseTask]') -> None:
         self._critical_path_candidates.extend(nodes)
@@ -696,7 +779,7 @@ def create_graph_with_local_log(
                 prepare_task.set_type(info['type'])
 
             task = prepare_task
-        elif info and (info.get('timing') or info.get('cached')):
+        elif info and (info.get('timing') or info.get('cached') or info.get('larry_avoided')):
             run_task = graph.get_run_task(uid)
             run_task.dynamically_resolved_cache = info.get('dynamically_resolved_cache', False)
 
@@ -722,8 +805,11 @@ def create_graph_with_local_log(
 
             if info.get('cached'):
                 task.from_cache = True
-                task.start_time = None
-                task.end_time = None
+                if isinstance(task, RunTask):
+                    task.cache_origin = info.get('larry_origin')
+                if not info.get('measured_cache_restore'):
+                    task.start_time = None
+                    task.end_time = None
 
             if info.get('download_time_ms'):
                 task.download_time_ms = info['download_time_ms']
@@ -735,14 +821,71 @@ def create_graph_with_local_log(
                 task.transport = info['transport']
 
     dependency_count = 0
+    for uid, info in execution_log.items():
+        if not info or info.get('larry_preparation_uid') is None:
+            continue
+        preparation = graph.prepare_tasks.get((info['larry_preparation_uid'], LOCAL_HOST))
+        abstract = graph.abstract_tasks.get(uid)
+        if preparation is not None:
+            preparation.description = '[{}]: {}'.format(uid, abstract.description if abstract else uid)
+
+    def dependency_endpoints(uid):
+        # Missing execution is not a zero-duration task. Traverse only observed
+        # dependency evaluations and connect all remaining measured phases.
+        pending = [uid]
+        visited = set()
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            run = graph.run_tasks.get(current)
+            if run is not None:
+                yield run
+                continue
+            info = execution_log.get(current) or {}
+            preparation = graph.prepare_tasks.get((info.get('larry_preparation_uid'), LOCAL_HOST))
+            if preparation is not None:
+                yield preparation
+            abstract = graph.abstract_tasks.get(current)
+            if info.get('larry_dependencies_evaluated') is True and abstract is not None:
+                pending.extend(abstract.depends_on)
+
     for run_task in graph.run_tasks.values():
+        info = execution_log.get(run_task.uid) or {}
+        preparation = graph.prepare_tasks.get((info.get('larry_preparation_uid'), LOCAL_HOST))
+        dependency_count += graph.add_dependency_reference_safe(run_task, preparation)
+        if info.get('larry_dependencies_evaluated') is False:
+            continue
         for dependency_uid in run_task.abstract.depends_on:
-            dep_run_task = graph.get_run_task(dependency_uid, create=False)
-            dependency_count += graph.add_dependency_reference_safe(run_task, dep_run_task)
+            for endpoint in dependency_endpoints(dependency_uid):
+                dependency_count += graph.add_dependency_reference_safe(run_task, endpoint)
+
+    # Only the evaluator that actually started a dependency reports this edge.
+    # A memoized/already-running dependency must not wait for a later parent's prep.
+    for uid, info in execution_log.items():
+        if not info or info.get('larry_preparation_parent_uid') is None:
+            continue
+        parent = execution_log.get(info['larry_preparation_parent_uid']) or {}
+        parent_key = parent.get('larry_preparation_uid')
+        own_key = info.get('larry_preparation_uid')
+        child = graph.prepare_tasks.get((own_key, LOCAL_HOST)) if own_key else graph.run_tasks.get(uid)
+        dependency_count += graph.add_dependency_reference_safe(
+            child, graph.prepare_tasks.get((parent_key, LOCAL_HOST))
+        )
 
     min_time: _OptionalTime = None
     max_time: _OptionalTime = None
-    for run_task in graph.run_tasks.values():
+    preparation_nodes = [
+        graph.prepare_tasks[(info['larry_preparation_uid'], LOCAL_HOST)]
+        for info in execution_log.values()
+        if info
+        and info.get('larry_preparation_uid') is not None
+        and (info['larry_preparation_uid'], LOCAL_HOST) in graph.prepare_tasks
+    ]
+    graph._node_preparation_tasks.update(preparation_nodes)
+    graph.add_critical_path_candidates(preparation_nodes)
+    for run_task in itertools.chain(graph.run_tasks.values(), preparation_nodes):
         if run_task.start_time is not None and run_task.end_time is not None:
             if min_time is None or min_time > run_task.start_time:
                 min_time = run_task.start_time
