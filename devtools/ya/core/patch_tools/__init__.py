@@ -5,7 +5,6 @@ import re
 import base64
 import zlib
 import logging
-import zipfile
 
 import six
 
@@ -22,7 +21,6 @@ def read_file(path, _=None):
 # * decode_base64 - decode 'patch' as base64
 # * decompress_zlib - decompress using zlib
 # * apply_unified_diff - apply as unified diff
-# * apply_zipatch - apply as zipatch
 
 
 TRANSFORMATION_HANDLERS = [
@@ -32,7 +30,6 @@ TRANSFORMATION_HANDLERS = [
     'decode_base64',
     'decompress_zlib',
     'apply_unified_diff',
-    'apply_zipatch',
 ]
 
 TRANSFORMATIONS_SEPARATOR = ','
@@ -102,14 +99,7 @@ def convert_patch_spec(spec):
 
         return (trs, data)
 
-    zipatch = False
     trs = ['apply_unified_diff']
-    needs_compression = True
-    if spec.startswith('zipatch:'):
-        zipatch = True
-        trs = ['apply_zipatch']
-        needs_compression = False
-        spec = spec[len('zipatch:') :]
 
     if is_url(spec):
         trs = ['download_url'] + trs
@@ -120,46 +110,20 @@ def convert_patch_spec(spec):
         return (trs, spec)
 
     if is_file(spec):
-        if zipatch:
-            z = zipfile.ZipFile(spec, 'r')
-            assert z.testzip() is None
         data = read_file(spec)
     else:
-        if zipatch:
-            raise Exception("you can not embed zipatch data into command line argument")
         data = spec
 
-    if not zipatch:
-        if not is_valid_unified_diff(data):
-            raise Exception("diff is invalid")
+    if not is_valid_unified_diff(data):
+        raise Exception("diff is invalid")
 
-    if needs_compression:
-        data = zlib.compress(six.ensure_binary(data), 9)
-        trs = ['decompress_zlib'] + trs
+    data = zlib.compress(six.ensure_binary(data), 9)
+    trs = ['decompress_zlib'] + trs
 
     data = six.ensure_str(base64.b64encode(six.ensure_binary(data)))
     trs = ['decode_base64'] + trs
 
     return (trs, data)
-
-
-def generate_universal_spec(zipatch_path, separate_transformations=False):
-    patch_transformations = ['apply_zipatch']
-    patch_data = open(zipatch_path).read()
-
-    zlib_patch_data = zlib.compress(patch_data, 9)
-    if len(zlib_patch_data) < len(patch_data):
-        patch_transformations = ['decompress_zlib'] + patch_transformations
-        patch_data = zlib_patch_data
-
-    patch_transformations = ['decode_base64'] + patch_transformations
-    patch_data = six.ensure_str(base64.b64encode(six.ensure_binary(patch_data)))
-
-    transformations = TRANSFORMATIONS_SEPARATOR.join(patch_transformations)
-    if separate_transformations:
-        return (transformations, patch_data)
-    else:
-        return combine_transformations_with_patch(transformations, patch_data)
 
 
 def combine_transformations(transformations):
