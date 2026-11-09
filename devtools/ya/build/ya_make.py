@@ -1717,7 +1717,6 @@ class YaMake:
         self.exit_code = 0
         self._build_results_listener = None
         self._output_root = None
-        self._report = None
         self._reports_generator = None
         self._slot_time_listener = None
 
@@ -1906,8 +1905,7 @@ class YaMake:
         tests = (
             [t for t in self.ctx.tests if t.is_skipped()] if self.opts.report_skipped_suites_only else self.ctx.tests
         )
-        self._report = results_report.StoredReport()
-        report_list = [self._report]
+        report_list = []
 
         if self.opts.json_line_report_file:
             report_list.append(results_report.JsonLineReport(self.opts.json_line_report_file))
@@ -2040,9 +2038,6 @@ class YaMake:
         self._reports_generator.finish()
         if self._build_results_listener:
             logger.debug("Build results listener statistics: %s", self._build_results_listener.stat)
-
-    def make_report(self):
-        return self._report.make_report() if self._report is not None else None
 
     def go(self):
         self._setup_build_root(self.opts.bld_root)

@@ -105,7 +105,7 @@ def _dump_json(root, filename, content):
         sjson.dump(content, fp)
 
 
-def _dump_results(builder, owners, dump_results2_json):
+def _dump_results(builder, owners):
     build_result = builder.build_result
 
     exts.fs.ensure_dir(builder.misc_build_info_dir)
@@ -116,8 +116,6 @@ def _dump_results(builder, owners, dump_results2_json):
     _dump_json(builder.misc_build_info_dir, 'ok_nodes.json', build_result.ok_nodes)
     _dump_json(builder.misc_build_info_dir, 'owners_list.json', owners)
     _dump_json(builder.misc_build_info_dir, 'targets.json', _to_json(builder.targets))
-    if dump_results2_json:
-        _dump_json(builder.misc_build_info_dir, 'results2.json', builder.make_report())
 
 
 def monitoring_stage_started(stage_name):
@@ -225,7 +223,7 @@ def _do_ya_make(params, app_ctx):
         if builder.misc_build_info_dir:
             with stager.scope('dump_results'):
                 context = context or ya_make.BuildContext(builder)
-                _dump_results(builder, context.owners, params.dump_results2_json)
+                _dump_results(builder, context.owners)
     else:
         stager.start('save_context')
         with stager.scope('create_build_context'):
