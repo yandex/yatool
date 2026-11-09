@@ -990,7 +990,7 @@ def compute_predictive_build_statistics(graph, dist_cache, opts, local_cache=Non
 
 
 # XXX see YA-1354
-def replace_yt_results(graph, opts, dist_cache):
+def replace_yt_results(graph, opts, dist_cache, *, evlog_writer: tp.Callable[..., None] | None = None):
     assert 'result' in graph
 
     if not dist_cache:
@@ -1041,6 +1041,16 @@ def replace_yt_results(graph, opts, dist_cache):
             new_results.append(uid)
         else:
             cached_results.append(uid)
+
+    if evlog_writer and dist_cache.tag() == 'YT':
+        # Heater hit rate needs the final selection; prepare() probes the entire graph.
+        evlog_writer(
+            'result-selection',
+            cached=len(cached_results),
+            missing=len(new_results),
+            graph_nodes=len(graph['graph']),
+            candidates=len(first_pass),
+        )
 
     return new_results, cached_results
 
@@ -1227,7 +1237,12 @@ class Context:
             self.tests = [x for x in self.tests if x.uid in results]
         # XXX see YA-1354
         elif opts.yt_replace_result or opts.dist_cache_evict_cached:
-            new_results, cached_results = replace_yt_results(self.graph, opts, self.dist_cache)
+            new_results, cached_results = replace_yt_results(
+                self.graph,
+                opts,
+                self.dist_cache,
+                evlog_writer=app_ctx.evlog.get_writer('yt_store') if getattr(app_ctx, 'evlog', None) else None,
+            )
             self.graph['result'] = new_results
             logger.debug("Strip graph due yt_replace_result mode")
             self.graph = lg.strip_graph(self.graph)
