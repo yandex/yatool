@@ -730,7 +730,6 @@ General info: [How to write ya.make files](https://docs.yandex-team.ru/ya-make/m
      - Macro [USE_JAVALITE](#macro_USE_JAVALITE)
      - Macro [USE_KTLINT_OLD](#macro_USE_KTLINT_OLD)
      - Macro [USE_LEGACY_PNPM_VIRTUAL_STORE](#macro_USE_LEGACY_PNPM_VIRTUAL_STORE)
-     - Macro [USE_LINKER_GOLD](#macro_USE_LINKER_GOLD)
      - Macro [USE_LLVM_BC16](#macro_USE_LLVM_BC16)
      - Macro [USE_LLVM_BC18](#macro_USE_LLVM_BC18)
      - Macro [USE_LLVM_BC20](#macro_USE_LLVM_BC20)
@@ -7173,14 +7172,6 @@ USE_LEGACY_PNPM_VIRTUAL_STORE()
 
 _Not documented yet._
 
-### Macro [USE_LINKER_GOLD](https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L909) <a name="macro_USE_LINKER_GOLD"></a>
-
-```ya.make
-USE_LINKER_GOLD()
-```
-
-Use gold linker for a program. This doesn't work in libraries
-
 ### Macro [USE_LLVM_BC16](https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L5014) <a name="macro_USE_LLVM_BC16"></a>
 
 ```ya.make
@@ -8937,7 +8928,6 @@ _Not documented yet._
  [USE\_KTLINT\_OLD]: https://a.yandex-team.ru/arcadia/build/conf/java.conf?rev=21579718#L2915
  [USE\_LEGACY\_LINKED\_PEERS]: https://a.yandex-team.ru/arcadia/build/conf/ts/node_modules.conf?rev=21579718#L91
  [USE\_LEGACY\_PNPM\_VIRTUAL\_STORE]: https://a.yandex-team.ru/arcadia/build/conf/ts/node_modules.conf?rev=21579718#L83
- [USE\_LINKER\_GOLD]: https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L909
  [USE\_LLVM\_BC16]: https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L5014
  [USE\_LLVM\_BC18]: https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L5019
  [USE\_LLVM\_BC20]: https://a.yandex-team.ru/arcadia/build/ymake.core.conf?rev=21579718#L5024
