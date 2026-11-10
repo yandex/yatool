@@ -6,6 +6,7 @@ class LarryOptions(yarg.Options):
     def __init__(self):
         super().__init__()
         self.larry_addr = None
+        self.larry_local_cache = True
         # Additional exact names; the adapter retains its built-in defaults.
         self.larry_environment_whitelist = []
         self.larry_test_environment_whitelist = []
@@ -20,6 +21,14 @@ class LarryOptions(yarg.Options):
                 group=groups.LARRY_OPT_GROUP,
                 visible=False,
             ),
+            yarg.ArgConsumer(
+                ['--larry-no-local-cache'],
+                help='Omit local artifact caching in Larry; retain configured remote caches',
+                hook=yarg.SetConstValueHook('larry_local_cache', False),
+                group=groups.LARRY_OPT_GROUP,
+                visible=False,
+            ),
+            yarg.ConfigConsumer('larry_local_cache'),
             yarg.ConfigConsumer('larry_betta_addr', hook=yarg.SetValueHook('larry_addr')),
             yarg.ConfigConsumer('larry_environment_whitelist'),
             yarg.ConfigConsumer('larry_test_environment_whitelist'),
@@ -51,6 +60,7 @@ class LarryOptions(yarg.Options):
             ('--memory-limit', getattr(params, 'memory_limit', None) is not None),
             ('--bazel-remote-warming', bool(getattr(params, 'bazel_remote_warming', False))),
             ('--bazel-remote-warming-manifest', getattr(params, 'bazel_remote_warming_manifest', None) is not None),
+            ('--bazel-remote-put', not getattr(params, 'bazel_remote_readonly', True)),
         )
         for option, requested in unsupported:
             if requested:

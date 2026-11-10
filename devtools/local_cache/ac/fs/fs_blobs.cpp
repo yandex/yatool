@@ -130,12 +130,12 @@ namespace {
         }
         return true;
     }
-}
+} // namespace
 
 namespace NACCache {
     namespace {
         bool SharedMode = false;
-    }
+    } // namespace
 
     void SetSharedMode(bool enabled) {
         SharedMode = enabled;
@@ -178,7 +178,7 @@ namespace NACCache {
             }
             return true;
         }
-    }
+    } // namespace
 
     TStringBuf CodecName(ECodec codec) {
         switch (codec) {
@@ -401,7 +401,9 @@ namespace NACCache {
             }
 
             if (optim == Hardlink) {
-                if (NFs::HardLink(source, target)) {
+                // Darwin link(2) follows a symlink source. Recreate links
+                // literally so cache ingestion preserves the output kind.
+                if (!NFsPrivate::IsLink(info.Mode) && NFs::HardLink(source, target)) {
                     noRemove = true;
                     return std::make_tuple("", optim);
                 }
@@ -563,7 +565,9 @@ namespace NACCache {
 
         try {
             if (optim == Hardlink) {
-                if (NFs::HardLink(source, target)) {
+                // A link target may happen to exist beside the CAS blob.
+                // Do not let platform hardlink semantics dereference it.
+                if (!NFsPrivate::IsLink(outStoreMode) && NFs::HardLink(source, target)) {
                     noRemove = true;
                     return optim;
                 }
@@ -969,4 +973,4 @@ namespace NACCache {
         }
         return stats;
     }
-}
+} // namespace NACCache

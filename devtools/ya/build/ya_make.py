@@ -2205,6 +2205,7 @@ class YaMake:
                 if self.opts.larry_addr is not None:
                     try:
                         from devtools.ya.build.larry_client import DiagnosticOptions, FailureOutput, LarryClient
+                        from devtools.ya.build.larry_client.cache_options import from_build_options
                         from yalibrary.runner import called_by_agent
                         from devtools.ya.build.larry_client.build_variables import collect_build_variables
                     except ImportError:
@@ -2217,7 +2218,8 @@ class YaMake:
 
                         service_paths = paths.default_service_paths()
                         if sys.platform.startswith('linux') or sys.platform == 'darwin':
-                            credentials.prepare_credentials(service_paths, self.opts, token_resolver=get_yt_token)
+                            if self.opts.yt_store:
+                                credentials.prepare_credentials(service_paths, self.opts, token_resolver=get_yt_token)
                         service_recovery = recovery.ServiceRecovery(
                             service_paths, client_date=release_info.get_release_date
                         )
@@ -2231,7 +2233,7 @@ class YaMake:
                         display=self.app_ctx.display,
                         output_replacements=self.ctx.output_replacements,
                         sandbox_token=sandbox_token,
-                        yt_cache_mode=None if self.opts.yt_store else 'off',
+                        cache_layers=from_build_options(self.opts, CacheFactory._read_bazel_password),
                         yt_token=(
                             get_yt_token(self.opts)
                             if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
