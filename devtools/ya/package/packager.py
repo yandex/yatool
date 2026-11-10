@@ -1578,7 +1578,12 @@ def do_package(params):
                                     package_context.set_context("platform_run_resource_url", platform_run_resource_url)
                             else:
                                 package_resource_id, platform_run_resource_id, package_attrs = upload_package(
-                                    path, package_file, params, package_context.package_path
+                                    path,
+                                    package_file,
+                                    params,
+                                    package_path=package_context.package_path,
+                                    resource_name=name,
+                                    resource_version=version,
                                 )
                                 package_context.set_context("package_resource_id", package_resource_id)
                                 package_context.set_context("package_resource_type", params.resource_type)
@@ -1633,13 +1638,15 @@ def do_package(params):
     )
 
 
-def upload_package(built_package_file, package_json, opts, package_path):
+def upload_package(built_package_file, package_json, opts, package_path, resource_name, resource_version):
     built_package_file_name = os.path.basename(built_package_file)
     fix_logging()
     platform_run_resource_id = None
 
     common_attrs = dict(opts.resource_attrs, build_type=opts.build_type)
-    package_attrs = dict(common_attrs, package_path=package_path)
+    package_attrs = dict(
+        common_attrs, package_path=package_path, resource_name=resource_name, resource_version=resource_version
+    )
 
     logging.info("Uploading %s", built_package_file_name)
     logging.debug("Uploading file full path: %s", built_package_file)
