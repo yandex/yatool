@@ -99,6 +99,7 @@ def _fix_output(out, rmap, mask_roots=False):
     build_root = rmap.build_root()
     tool_root = rmap.tool_root()
     resource_root = rmap.resource_root()
+    shallow_root = rmap.shallow_root()
 
     def valid_line(line):
         if any(line.endswith(suffix) for suffix in STOP_SUFFIXES):
@@ -113,6 +114,7 @@ def _fix_output(out, rmap, mask_roots=False):
             line = line.replace(resource_root, '$(RESOURCE_ROOT)')
             line = line.replace(build_root, '$(BUILD_ROOT)')
             line = line.replace(tool_root, '$(TOOL_ROOT)')
+            line = line.replace(shallow_root, '$(SHALLOW_ROOT)')
 
         return line
 

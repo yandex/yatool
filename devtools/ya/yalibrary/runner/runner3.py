@@ -629,6 +629,7 @@ class TaskContext(object):
         patterns['SOURCE_ROOT'] = windows.win_path_fix(self._ctx.src_dir)
         patterns['TOOL_ROOT'] = windows.win_path_fix(self._ctx.res_dir)
         patterns['RESOURCE_ROOT'] = windows.win_path_fix(self._transient_resource_dir)
+        patterns['SHALLOW_ROOT'] = windows.win_path_fix(self._ctx.shallow_dir)
 
         if self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path:
             token_path = self.opts.oauth_token_path or self.opts.sandbox_oauth_token_path
