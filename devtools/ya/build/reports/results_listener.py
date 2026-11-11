@@ -1,5 +1,8 @@
+import abc
 import collections
+import contextlib
 import copy
+import itertools
 import json
 import logging
 import os
@@ -22,7 +25,74 @@ import yalibrary.display
 import typing as tp
 
 if tp.TYPE_CHECKING:
+    import devtools.ya.build.build_result as build_result
     import devtools.ya.test.test_types.common as tt_common  # noqa
+
+
+class ResultsListener(abc.ABC):
+    """Handle node events, then EOF, and release resources independently of EOF.
+
+    A common lifecycle lets disposable CI results and resident test models share
+    YaMake finalization. The caller joins event producers before EOF or close;
+    close must also work after partial setup, cancellation, or failed EOF.
+    """
+
+    @abc.abstractmethod
+    def __call__(self, res: dict | None = None, build_stage: dict | None = None) -> None:
+        pass
+
+    def on_build_finished(self, result: 'build_result.BuildResult') -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+
+class CallbackResultsListener(ResultsListener):
+    """Explicitly adapt event-only callbacks to the listener lifecycle."""
+
+    def __init__(self, callback: tp.Callable[..., None]) -> None:
+        self._callback = callback
+
+    def __call__(self, res: dict | None = None, build_stage: dict | None = None) -> None:
+        self._callback(res=res, build_stage=build_stage)
+
+
+class TestSummary(tp.NamedTuple):
+    suite_count: int
+    failed: bool
+    internal_error: bool
+
+    def exit_code(self, test_fail_exit_code: int = test_const.TestRunExitCode.Failed) -> int:
+        if self.internal_error:
+            return test_const.TestRunExitCode.InfrastructureError
+        return int(test_fail_exit_code) if self.failed else 0
+
+
+def summarize_suites(suites: tp.Iterable['tt_common.AbstractTestSuite']) -> TestSummary:
+    suite_count = 0
+    failed = False
+    internal_error = False
+    for suite in suites:
+        suite_count += 1
+        if not suite.is_skipped():
+            status = suite.get_status()
+            failed |= status != test_const.Status.GOOD
+            internal_error |= status == test_const.Status.INTERNAL
+    return TestSummary(suite_count, failed, internal_error)
+
+
+class TestResultsListener(ResultsListener):
+    @abc.abstractmethod
+    def summary(self) -> TestSummary:
+        """Return the current outcome without requiring resident suite models."""
+
+
+class TestReportContext(tp.NamedTuple):
+    output_root: str
+    skipped_suites: tp.Sequence['tt_common.AbstractTestSuite'] = ()
+    skipped_only: bool = False
+    list_tests: bool = False
 
 
 def extract_node_stderr(res, opts) -> tuple[str, list]:
@@ -42,7 +112,7 @@ def extract_node_stderr(res, opts) -> tuple[str, list]:
     return '\n'.join(stderrs), []
 
 
-class NodeFailureListener:
+class NodeFailureListener(ResultsListener):
     """Publish a ``fail`` event of a structured display for every failed build or test node.
 
     A test node exits non-zero only when the test tool itself fails (e.g. it
@@ -124,7 +194,7 @@ class NodeFailureListener:
             stack.extend(self._reversed_deps.get(dependent, ()))
 
 
-class BuildResultsListener:
+class BuildResultsListener(ResultsListener):
     _logger = logging.getLogger('BuildResultsListener')
 
     def __init__(self, graph, report_generator, build_root, opts):
@@ -229,20 +299,26 @@ class BuildResultsListener:
                 self._notified.add(uid)
 
 
-class TestNodeListener:
+class TestNodeListener(TestResultsListener):
     _logger = logging.getLogger('TestNodeListener')
 
-    def __init__(self, tests, output_root, report_generator):
+    def __init__(self, tests, output_root, report_generator, *, stream_results=True, report_context=None):
         self._lock = threading.Lock()
         self._output_root = output_root
         self._tests = {}  # type: dict[str, tt_common.AbstractTestSuite]
         self._seen = set()
         self._report_generator = report_generator
+        self._suites = tests
+        self._stream_results = stream_results
+        self._report_context = report_context or TestReportContext(output_root)
 
-        for tst in tests:
-            self._tests[tst.uid] = tst
+        if stream_results:
+            for tst in tests:
+                self._tests[tst.uid] = tst
 
     def __call__(self, res=None, build_stage=None):
+        if not self._stream_results:
+            return
         if res is None:
             res = {}
         if 'status' in res or res.get('files'):
@@ -254,8 +330,27 @@ class TestNodeListener:
                 else:
                     self._on_test_node_failed(uid, status)
 
-    def set_report_generator(self, report_generator):
-        self._report_generator = report_generator
+    def on_build_finished(self, result: 'build_result.BuildResult') -> None:
+        if self._report_generator is None:
+            return
+        context = self._report_context
+        # Do not extend Context.stripped_tests in place: later full reports and
+        # console output reuse that selection independently of JSONL reporting.
+        suites = context.skipped_suites
+        if not context.skipped_only and not context.list_tests:
+            resolver = test_reports.TextTransformer(
+                [("$(BUILD_ROOT)", context.output_root), ("$(SOURCE_ROOT)", "arcadia")]
+            )
+            test_result.fill_suites_results_from_build_result(self._suites, result, context.output_root, resolver)
+            suites = itertools.chain(suites, self._suites)
+        self._report_generator.add_tests_results(
+            suites, result.build_errors, result.node_build_errors_links, defaultdict(list)
+        )
+
+    def summary(self) -> TestSummary:
+        # Full reports and console preparation may still update these models
+        # after EOF. Unlike CI's compact summary this view must remain live.
+        return summarize_suites(self._suites)
 
     def _on_test_node_failed(self, uid, status):
         self._logger.debug('Test node %s is failed. Status: %s', uid, status)
@@ -300,7 +395,7 @@ class TestNodeListener:
             self._report_generator.add_tests_results([suite], None, {}, defaultdict(list))
 
 
-class SlotListener:
+class SlotListener(ResultsListener):
     _logger = logging.getLogger('SlotListener')
     SLOT_TIME_FILE = 'slot_time.json'  # XXX: need for autocheck branch compatibility, remove after 13.04.2025
     SLOT_TIME_JSONL = 'slot_data.jsonl'
@@ -320,6 +415,7 @@ class SlotListener:
         if self._output_jsonl:
             self._output_jsonl.write(json.dumps({'total_slot_time': self._slot_time}) + '\n')
             self._output_jsonl.close()
+            self._output_jsonl = None
 
         if not self._output_file:
             return
@@ -329,6 +425,14 @@ class SlotListener:
                 f.write(json.dumps({'slot_time': self._slot_time}))
         except Exception as e:
             self._logger.error('Fail to save slot time: %s', e)
+
+    def on_build_finished(self, result: 'build_result.BuildResult') -> None:
+        self.finish()
+
+    def close(self) -> None:
+        if self._output_jsonl:
+            self._output_jsonl.close()
+            self._output_jsonl = None
 
     def __call__(self, res=None, build_stage=None):
         if not res:
@@ -348,16 +452,19 @@ class SlotListener:
             self._logger.exception('Fail to save slot time by uid from %s', res)
 
 
-class CompositeResultsListener:
+class CompositeResultsListener(ResultsListener):
     def __init__(self, listeners=None):
-        self._listeners = []
-        self._listeners.extend(listeners)
+        self._listeners: list[ResultsListener] = list(listeners or ())
         self._duration = collections.defaultdict(float)
+        self._finished = False
+        self._closed = False
 
-    def add(self, listener):
+    def add(self, listener: ResultsListener) -> None:
         self._listeners.append(listener)
 
     def __call__(self, *args, **kwargs):
+        if self._finished or self._closed:
+            return
         for listener in self._listeners:
             ts = time.time()
             try:
@@ -365,12 +472,28 @@ class CompositeResultsListener:
             finally:
                 self._duration[type(listener).__name__] += time.time() - ts
 
+    def on_build_finished(self, result: 'build_result.BuildResult') -> None:
+        if self._finished or self._closed:
+            return
+        self._finished = True
+        for listener in self._listeners:
+            listener.on_build_finished(result)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        # All listeners must release their resources even if one close fails.
+        with contextlib.ExitStack() as cleanup:
+            for listener in self._listeners:
+                cleanup.callback(listener.close)
+
     @property
     def stat(self):
         return {name: {"duration_sec": x} for name, x in self._duration.items()}
 
 
-class FailedNodeListener:
+class FailedNodeListener(ResultsListener):
     NAMESPACE = 'devtools.ya.build.reports.failed_node_info'
     EVENT = 'node-failed'
 

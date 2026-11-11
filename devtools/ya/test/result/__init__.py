@@ -6,6 +6,7 @@ import math
 import os
 import re
 import traceback
+import typing as tp
 
 import devtools.ya.core.error
 import exts.archive
@@ -18,6 +19,9 @@ from library.python import strings
 from library.python import func
 
 import app_config
+
+if tp.TYPE_CHECKING:
+    import devtools.ya.build.build_result as br
 
 if app_config.in_house:
     from devtools.distbuild.libs.node_status.python import node_status
@@ -218,6 +222,19 @@ def record_test_preparation(suite, build_result=None):
 def fill_suites_results(suites, builder, results_root, resolver=None):
     if not suites:
         return
+    return fill_suites_results_from_build_result(suites, builder.build_result, results_root, resolver)
+
+
+def fill_suites_results_from_build_result(
+    suites: tp.Iterable, build_result: 'br.BuildResult', results_root: str, resolver=None
+) -> None:
+    """Fill suite models using execution facts, without retaining a YaMake owner.
+
+    Both resident listeners and disposable CI workers need the same failure and
+    trace interpretation; only the legacy adapter above needs a builder.
+    """
+    if not suites:
+        return
 
     def get_errors(target):
         TARGET_LIMIT = 2
@@ -225,18 +242,16 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         errs = []
 
         # search for errors in broken dependencies
-        if target in builder.build_result.failed_deps:
-            failed_deps = builder.build_result.failed_deps[target]
+        if target in build_result.failed_deps:
+            failed_deps = build_result.failed_deps[target]
 
-            target_failed_deps = (
-                failed_dep for failed_dep in failed_deps if failed_dep in builder.build_result.build_errors
-            )
+            target_failed_deps = (failed_dep for failed_dep in failed_deps if failed_dep in build_result.build_errors)
             target_failed_deps_limiter = Limiter(target_failed_deps, TARGET_LIMIT)
             for failed_dep in target_failed_deps_limiter:
                 project_path, platform, uid = failed_dep
                 errs.append("Broken target [[imp]]{}[[rst]]:".format(project_path))
 
-                build_errs = builder.build_result.build_errors[failed_dep]
+                build_errs = build_result.build_errors[failed_dep]
                 error_lines = (x.group() for s in build_errs for x in re.finditer(r"[^\n]+", s))
                 error_lines_limiter = Limiter(error_lines, BUILD_ERROR_LIMIT)
                 limited_errs = list(error_lines_limiter)
@@ -249,10 +264,10 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
 
         # specified target is broken directly, there are no broken deps
         else:
-            errs.append("\n".join(builder.build_result.build_errors[target]))
+            errs.append("\n".join(build_result.build_errors[target]))
         return errs
 
-    build_errors_map = {uid: (path, platform, uid) for path, platform, uid in builder.build_result.build_errors}
+    build_errors_map = {uid: (path, platform, uid) for path, platform, uid in build_result.build_errors}
 
     def collect_errors_for_suite(suite):
         DEP_LIMIT = 2
@@ -279,7 +294,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
                 ),
             )
 
-        statuses = list(filter(None, [builder.build_result.node_status_map.get(u) for u, _ in node_errors]))
+        statuses = list(filter(None, [build_result.node_status_map.get(u) for u, _ in node_errors]))
         if statuses:
             # Status code are provided by distbuild
             derived_status = node_status.derive_status(statuses)
@@ -288,7 +303,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         else:
             derived_status = None
             # Exit codes are provided by local runner
-            exit_codes = [1] + [builder.build_result.exit_code_map.get(u, 1) for u, _ in node_errors]
+            exit_codes = [1] + [build_result.exit_code_map.get(u, 1) for u, _ in node_errors]
             exit_code = devtools.ya.core.error.merge_exit_codes(exit_codes)
             if exit_code == devtools.ya.test.const.TestRunExitCode.InfrastructureError:
                 test_status = devtools.ya.test.const.Status.INTERNAL
@@ -325,15 +340,15 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
 
         node_errors_limiter = Limiter(node_errors, limit)
         for uid, err_msg in node_errors_limiter:
-            st = builder.build_result.node_status_map.get(uid)
+            st = build_result.node_status_map.get(uid)
             if app_config.in_house and st:
                 error_reason = node_status.get_human_readable_message(st)
             else:
                 error_reason = "failed"
             lines.append(f"[[imp]]* {uid}[[rst]]: {error_reason}")
 
-            if uid in builder.build_result.node_build_errors_links:
-                logs = [x for u, urls in builder.build_result.node_build_errors_links[uid] for x in urls]
+            if uid in build_result.node_build_errors_links:
+                logs = [x for u, urls in build_result.node_build_errors_links[uid] for x in urls]
                 ellipsis_text = "\n..[truncated] Full logs: [[warn]]{}[[rst]]".format(logs)
             else:
                 ellipsis_text = "\n..[truncated]"
@@ -344,7 +359,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
 
         return test_status, "\n".join(x.strip() for x in lines)
 
-    ok_tests = builder.build_result.ok_nodes
+    ok_tests = build_result.ok_nodes
 
     for suite in suites:
         work_dir = test_common.get_test_suite_work_dir(
@@ -360,7 +375,7 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
         if uid in ok_tests:
             # XXX suite has already been loaded
             if suite.chunks:
-                record_test_preparation(suite, builder.build_result)
+                record_test_preparation(suite, build_result)
                 continue
 
             result = TestPackedResultView(work_dir)
@@ -378,13 +393,13 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
                 suite.add_suite_error(
                     "Depends on broken: {}".format("\n".join(errs)), devtools.ya.test.const.Status.MISSING
                 )
-            elif uid in builder.build_result.node_build_errors:
+            elif uid in build_result.node_build_errors:
                 # TODO
                 # Successful chunk run and tests within it should be fully reported,
                 # broken chunks should be reported separately as well.
                 # For more info see https://st.yandex-team.ru/YA-417
-                node_errors = builder.build_result.node_build_errors[uid]
-                status_node = builder.build_result.node_status_map.get(uid)
+                node_errors = build_result.node_build_errors[uid]
+                status_node = build_result.node_status_map.get(uid)
 
                 # Node might be broken and still not presented in the node_status_map.
                 # It can happen if node wasn't executed due broken dependencies.
@@ -404,9 +419,9 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
             else:
                 target_platform = suite.target_platform_descriptor or platform_matcher.my_platform()
                 key = (suite.project_path, target_platform, suite.uid)
-                node_errors = builder.build_result.build_errors.get(key)
+                node_errors = build_result.build_errors.get(key)
 
-                if builder.build_result.build_errors and not node_errors:
+                if build_result.build_errors and not node_errors:
                     # The build failed and the suite dependencies were cancelled
                     # by the early stopping: the suite was skipped as a
                     # consequence of the build failure. INTERNAL is reserved for
@@ -429,4 +444,4 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
             if resolver:
                 suite.fix_roots(resolver)
 
-        record_test_preparation(suite, builder.build_result)
+        record_test_preparation(suite, build_result)

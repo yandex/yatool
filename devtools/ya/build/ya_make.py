@@ -760,14 +760,7 @@ def configure_build_graph_cache_dir(app_ctx, opts):
 
 
 def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Failed):
-    statuses = {suite.get_status() for suite in suites if not suite.is_skipped()}
-    if not statuses or statuses == {const.Status.GOOD}:
-        exit_code = 0
-    elif const.Status.INTERNAL in statuses:
-        exit_code = const.TestRunExitCode.InfrastructureError
-    else:
-        exit_code = int(test_fail_exit_code)
-    return exit_code
+    return pr.summarize_suites(suites).exit_code(test_fail_exit_code)
 
 
 # TODO: Merge to Context
@@ -1724,10 +1717,11 @@ class YaMake:
         self._post_clean_setup(opts)
         self.build_result = br.BuildResult({}, {}, {})
         self.exit_code = 0
-        self._build_results_listener = None
+        self._build_results_listener = pr.CompositeResultsListener()
+        self._test_results: pr.TestResultsListener
         self._output_root = None
         self._reports_generator = None
-        self._slot_time_listener = None
+        self._reports_closed = False
 
     def _setup(self, opts):
         self.opts = opts
@@ -1895,17 +1889,15 @@ class YaMake:
                 os.unlink(test_results)
 
     def _setup_reports(self):
-        self._build_results_listener = pr.CompositeResultsListener([])
         test_results_path = self._get_results_root()
-        test_node_listener = pr.TestNodeListener(self.ctx.tests, test_results_path, None)
         if getattr(self.app_ctx, 'evlog', None) is not None:
             self._build_results_listener.add(pr.FailedNodeListener(self.app_ctx.evlog))
         if self._structured:
             self._build_results_listener.add(pr.NodeFailureListener(self.ctx.graph, self.app_ctx.display, self.opts))
 
         if self.opts.json_line_report_file is None and self.opts.build_results_report_file is None:
-            if self.opts.print_test_console_report:
-                self._build_results_listener.add(test_node_listener)
+            self._test_results = self._create_test_results_listener(test_results_path)
+            self._build_results_listener.add(self._test_results)
             return
 
         results_dir = self.opts.misc_build_info_dir or self.opts.testenv_report_dir or tempfile.mkdtemp()
@@ -1929,8 +1921,8 @@ class YaMake:
             self._output_root,
             report_list,
         )
-        test_node_listener.set_report_generator(self._reports_generator)
-        self._build_results_listener.add(test_node_listener)
+        self._test_results = self._create_test_results_listener(test_results_path, self._reports_generator)
+        self._build_results_listener.add(self._test_results)
         self._build_results_listener.add(
             pr.BuildResultsListener(
                 self.ctx.graph,
@@ -1940,8 +1932,7 @@ class YaMake:
             )
         )
         if self.opts.use_distbuild and 'slot_time' in bs.get_statistics(self.opts):
-            self._slot_time_listener = pr.SlotListener(self.opts.statistics_out_dir)
-            self._build_results_listener.add(self._slot_time_listener)
+            self._build_results_listener.add(pr.SlotListener(self.opts.statistics_out_dir))
 
         if not self.opts.report_skipped_suites_only:
             self._reports_generator.add_configure_results(self.ctx.configure_errors)
@@ -1957,6 +1948,26 @@ class YaMake:
 
         self._reports_generator.finish_configure_report()
 
+    def _create_test_results_listener(
+        self, results_root: str | None, generator: ar.ReportGenerator | None = None
+    ) -> pr.TestResultsListener:
+        # Keep implementation selection here so a streaming CI listener can
+        # replace the resident listener without adding mode checks at EOF/exit.
+        streaming = bool(
+            self.opts.print_test_console_report
+            or self.opts.json_line_report_file is not None
+            or self.opts.build_results_report_file is not None
+        )
+        context = pr.TestReportContext(
+            self._output_root,
+            self.ctx.stripped_tests if self.opts.report_skipped_suites or self.opts.report_skipped_suites_only else (),
+            self.opts.report_skipped_suites_only,
+            self.opts.list_tests,
+        )
+        return pr.TestNodeListener(
+            self.ctx.tests, results_root, generator, stream_results=streaming, report_context=context
+        )
+
     def _calc_exit_code(self):
         # Configuration errors result in an exit with error code 8
         # Test execution errors result in an exit with error code 10
@@ -1966,12 +1977,16 @@ class YaMake:
         if not self.opts.ignore_configure_errors and self.ctx.configure_errors:
             return self.exit_code or devtools.ya.core.error.ExitCodes.CONFIGURE_ERROR
 
+        if self.exit_code:
+            return self.exit_code
+
         if self.ctx.threads:
             # XXX Don't try to inspect test statuses in listing mode.
             # Listing mode uses different test's info data channel and doesn't set proper test status
             if self.opts.run_tests and not self.opts.list_tests:
-                if self.ctx.tests:
-                    return self.exit_code or get_suites_exit_code(self.ctx.tests, self.opts.test_fail_exit_code)
+                summary = self._test_results.summary()
+                if summary.suite_count:
+                    return self.exit_code or summary.exit_code(self.opts.test_fail_exit_code)
                 else:
                     # TODO Remove --no-tests-is-error option and fail with NO_TESTS_COLLECTED exit code by default. For more info see YA-1087
                     # Return a special exit code if tests were requested, but no tests were run.
@@ -2020,37 +2035,36 @@ class YaMake:
         return results_root and results_root.replace("$(SOURCE_ROOT)", self.ctx.src_dir)
 
     def _finish_reports(self):
-        if self._slot_time_listener:
-            self._slot_time_listener.finish()
-
-        if self._reports_generator is None:
-            return
-
         logger.debug('Build is finished, process results')
-        if not self.opts.report_skipped_suites_only:
-            self._reports_generator.add_build_results(self.build_result)
-        self._reports_generator.finish_build_report()
+        if self._reports_generator is not None:
+            if not self.opts.report_skipped_suites_only:
+                self._reports_generator.add_build_results(self.build_result)
+            self._reports_generator.finish_build_report()
+        self._build_results_listener.on_build_finished(self.build_result)
+        if self._reports_generator is not None:
+            self._reports_generator.finish_tests_report()
+            self._reports_generator.finish_style_report()
+        self._close_reports()
+        logger.debug("Build results listener statistics: %s", self._build_results_listener.stat)
 
-        suites = []
-        if self.opts.report_skipped_suites_only or self.opts.report_skipped_suites:
-            suites = self.ctx.stripped_tests
-        if not self.opts.report_skipped_suites_only and not self.opts.list_tests:
-            suites += build_report.fill_suites_results(self, self.ctx.tests, self._output_root)
-
-        report_prototype = collections.defaultdict(list)
-
-        self._reports_generator.add_tests_results(
-            suites, self.build_result.build_errors, self.build_result.node_build_errors_links, report_prototype
-        )
-        self._reports_generator.finish_tests_report()
-        self._reports_generator.finish_style_report()
-        self._reports_generator.finish()
-        if self._build_results_listener:
-            logger.debug("Build results listener statistics: %s", self._build_results_listener.stat)
+    def _close_reports(self) -> None:
+        try:
+            self._build_results_listener.close()
+        finally:
+            # Workers must stop before their writer closes, including after a
+            # failed setup or EOF. Closing never synthesizes missing results.
+            if self._reports_generator is not None and not self._reports_closed:
+                self._reports_closed = True
+                self._reports_generator.finish()
 
     def go(self):
         self._setup_build_root(self.opts.bld_root)
-        self._setup_reports()
+        with contextlib.ExitStack() as cleanup:
+            cleanup.callback(self._close_reports)
+            self._setup_reports()
+            return self._run_build()
+
+    def _run_build(self):
         self._setup_compact_for_gc()
 
         if not self.ctx.threads:
