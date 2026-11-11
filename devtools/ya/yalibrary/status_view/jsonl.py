@@ -29,6 +29,7 @@ from yalibrary import display as display_lib
 from yalibrary.status_view import helpers
 from yalibrary.status_view import pacer
 from yalibrary.status_view import plain
+from yalibrary.status_view import status as status_model
 import yalibrary.formatter
 
 import typing as tp
@@ -67,8 +68,9 @@ class JsonlProgressView(object):
         event['type'] = 'progress'
         event['stage'] = self._stage
         event['active'] = len(active)
-        event['done'] = self._status.done()
-        event['total'] = self._status.count
+        snapshot = status_model.progress_snapshot(self._status)
+        event['done'] = snapshot.completed
+        event['total'] = snapshot.total
         preparations = [
             task.progress_event()
             for task, _ in getattr(self._status, 'auxiliary_active', lambda: [])()

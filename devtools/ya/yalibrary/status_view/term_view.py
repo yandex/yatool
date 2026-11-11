@@ -3,6 +3,7 @@ import time
 
 from yalibrary.status_view import helpers
 from yalibrary.status_view import plain
+from yalibrary.status_view import status as status_model
 from yalibrary import display
 from yalibrary.term import size as term_size
 import yalibrary.formatter
@@ -188,8 +189,9 @@ class TermView(object):
             self._last_id += 1
             self._plain_finished(task)
         active = getattr(self._status, "display_active", self._status.active)()
+        snapshot = status_model.progress_snapshot(self._status, history_count=self._last_id)
         line = self._progress.tick(
-            time.time(), self._last_id, self._status.count, len(active), lambda: self._running(active)
+            time.time(), snapshot.completed, snapshot.total, len(active), lambda: self._running(active)
         )
         if line:
             self._display.emit_message(line)
@@ -212,19 +214,19 @@ class TermView(object):
                 continue
             body = self._body(task)
             if not self._hidden(task) and (body or not self._ninja):
+                if not body or self._extra_progress:
+                    snapshot = status_model.progress_snapshot(self._status, history_count=self._last_id)
                 pre = []
                 if body:
                     pre.append('[[unimp]]-------[[rst]]')
                 else:
                     pre.append(
                         '|[[unimp]]{}[[rst]]|'.format(
-                            helpers.percent_to_string(
-                                100.0 * self._last_id / max(1, self._status.count), self._roman_numerals
-                            )
+                            helpers.percent_to_string(100.0 * snapshot.fraction, self._roman_numerals)
                         )
                     )
                 if self._extra_progress:
-                    pre.extend([1, '%s/%s' % (self._last_id, self._status.count)])
+                    pre.extend([1, '%s/%s' % (snapshot.completed, snapshot.total)])
 
                 self._display.emit_message(self._fmt_status(task_status, pre, []))
                 if body:

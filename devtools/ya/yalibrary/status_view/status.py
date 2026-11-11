@@ -5,6 +5,28 @@ import operator
 
 import six
 
+# Completion counts may be supplied independently of finished task history.
+ProgressCounts = collections.namedtuple("ProgressCounts", "completed total")
+ProgressSnapshot = collections.namedtuple("ProgressSnapshot", "completed total fraction")
+
+
+def _progress_fraction(counts):
+    # type: (ProgressCounts) -> float
+    return float(counts.completed) / counts.total if counts.total else 1.0
+
+
+def progress_snapshot(status, history_count=None):
+    # type: (object, int | None) -> ProgressSnapshot
+    """Read external counts, or retain the caller's legacy history cursor."""
+    # Legacy Status providers may not implement externally supplied counts.
+    read_counts = getattr(status, "progress_counts", None)
+    counts = read_counts() if read_counts is not None else None
+    if counts is not None:
+        return ProgressSnapshot(counts.completed, counts.total, _progress_fraction(counts))
+    completed = status.done() if history_count is None else history_count
+    total = status.count
+    return ProgressSnapshot(completed, total, float(completed) / max(1, total))
+
 
 class DummyListener(object):
     @staticmethod
@@ -66,6 +88,14 @@ class Status(object):
         def set_progress(self, progress):
             self._status._progress = progress
 
+        def set_progress_counts(self, counts):
+            # type: (ProgressCounts) -> None
+            # Update authoritative work counts independently of task history.
+            with self._status._lock:
+                self._status._progress_counts = counts
+                self._status._qty = counts.total
+                self._status._progress = _progress_fraction(counts)
+
     def __init__(self):
         self._active = collections.OrderedDict()
         self._auxiliary = collections.OrderedDict()
@@ -73,6 +103,7 @@ class Status(object):
         self._lock = threading.Lock()
         self._qty = 0
         self._progress = 0.0
+        self._progress_counts = None
 
     def listener(self):
         return Status._Listener(self)
@@ -86,6 +117,11 @@ class Status(object):
 
     def progress(self):
         return self._progress
+
+    def progress_counts(self):
+        # type: () -> ProgressCounts | None
+        with self._lock:
+            return self._progress_counts
 
     def done(self):
         with self._lock:
@@ -106,8 +142,7 @@ class Status(object):
 
     def stop_activity(self, task):
         # type: (object) -> None
-        # Cache retrieval attempts use the node display but are not completed
-        # commands: a failed attempt may still be followed by local execution.
+        # End activity independently of the completed-command output history.
         with self._lock:
             del self._active[task]
 
