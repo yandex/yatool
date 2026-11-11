@@ -16,6 +16,8 @@ namespace NSJson {
         TVector<TString> ArrayItemPath{};
         THashSet<TString> ArrayItemKeyWhiteList{};
         TVector<TVector<TString>> CompactPaths{};
+        TVector<TVector<TString>> StringMapPaths{};
+        PyObject* StringMapConsumer{};
         TCompactStorage* CompactStorage{};
         PyObject* CompactOwner{};
         PyObject* (*CompactFactory)(PyObject*, TIndexType){};

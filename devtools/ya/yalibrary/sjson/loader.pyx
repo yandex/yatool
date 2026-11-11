@@ -21,6 +21,8 @@ cdef extern from "devtools/ya/yalibrary/sjson/lib/load.h" namespace "NSJson":
         TVector[TString] ArrayItemPath
         THashSet[TString] ArrayItemKeyWhiteList
         TVector[TVector[TString]] CompactPaths
+        TVector[TVector[TString]] StringMapPaths
+        PyObject* StringMapConsumer
         TCompactStorage* CompactStorage
         PyObject* CompactOwner
         PyObject* (*CompactFactory)(PyObject*, TIndexType) except NULL
@@ -86,18 +88,35 @@ def load(
     array_item_path: wb_list_type = None,
     array_item_key_white_list: wb_list_type = None,
     compact_paths=None,
+    string_map_paths=None,
+    string_map_consumer=None,
 ) -> typing.Any:
     """Load JSON, optionally storing selected container subtrees in a C++ arena.
 
     compact_paths consists of tuples of object keys (an empty tuple selects the
     root). CompactMap/CompactList preserve mutable mapping/sequence operations;
     strings are ordinary str and shared value blocks have independent mutations.
+    string_map_paths selects maps whose string values are passed immediately to
+    string_map_consumer(path, key, value), without interning or retaining values.
+    The selected maps remain empty in the returned DOM. Consumer exceptions
+    propagate to the caller; selected maps cannot be inside compact subtrees.
     """
     cdef TLoaderOptions opts
     cdef _GraphStorage storage
     cdef TVector[TString] compact_path
     opts.InternKeys = intern_keys
     opts.InternValues = intern_vals
+    string_map_paths = tuple(tuple(six.ensure_binary(key) for key in path) for path in string_map_paths or ())
+    if (len(string_map_paths) > 0) != (string_map_consumer is not None):
+        raise ValueError('string_map_paths and string_map_consumer must be supplied together')
+    if string_map_consumer is not None and not callable(string_map_consumer):
+        raise TypeError('string_map_consumer must be callable')
+    for path in string_map_paths:
+        compact_path.clear()
+        for key in path:
+            compact_path.push_back(six.ensure_binary(key))
+        opts.StringMapPaths.push_back(compact_path)
+    opts.StringMapConsumer = <PyObject*>string_map_consumer if string_map_consumer is not None else NULL
     if root_key_white_list and root_key_black_list:
         raise ValueError("Only one of lists is allowed: root_key_white_list or root_key_black_list")
     if root_key_white_list:
@@ -120,6 +139,9 @@ def load(
     if compact_paths is not None:
         for path in compact_paths:
             path = tuple(six.ensure_binary(key) for key in path)
+            for selected in string_map_paths:
+                if len(path) <= len(selected) and selected[:len(path)] == path:
+                    raise ValueError('A compact subtree cannot contain a consumed string map')
             if array_item_path is not None and len(path) < len(array_item_path) and array_item_path[:len(path)] == path:
                 raise ValueError('A compact path cannot contain a deeper projected array')
             compact_path.clear()
@@ -146,6 +168,8 @@ def loads(
     array_item_path: wb_list_type = None,
     array_item_key_white_list: wb_list_type = None,
     compact_paths=None,
+    string_map_paths=None,
+    string_map_consumer=None,
 ) -> typing.Any:
     if isinstance(s, str) and six.PY3:
         s = s.encode()
@@ -159,4 +183,6 @@ def loads(
         array_item_path=array_item_path,
         array_item_key_white_list=array_item_key_white_list,
         compact_paths=compact_paths,
+        string_map_paths=string_map_paths,
+        string_map_consumer=string_map_consumer,
     )

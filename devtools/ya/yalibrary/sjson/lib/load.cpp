@@ -236,36 +236,46 @@ namespace NSJson {
             bool OnNull() override {
                 if (Compact_) return Compact_->OnNull();
                 if (SkipScalar()) return true;
+                if (RejectConsumedNonString()) return false;
                 return SetValue(MakePyNoneObject());
             }
 
             bool OnBoolean(bool val) override {
                 if (Compact_) return Compact_->OnBoolean(val);
                 if (SkipScalar()) return true;
+                if (RejectConsumedNonString()) return false;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnInteger(long long val) override {
                 if (Compact_) return Compact_->OnInteger(val);
                 if (SkipScalar()) return true;
+                if (RejectConsumedNonString()) return false;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnUInteger(unsigned long long val) override {
                 if (Compact_) return Compact_->OnUInteger(val);
                 if (SkipScalar()) return true;
+                if (RejectConsumedNonString()) return false;
                 return SetValue(MakePyObject(val));
             }
 
             bool OnString(const TStringBuf& val) override {
                 if (Compact_) return Compact_->OnString(val);
                 if (SkipScalar()) return true;
+                if (Options_.StringMapConsumer) {
+                    for (const auto& path : Options_.StringMapPaths) {
+                        if (StringMapValueMatches(path)) return ConsumeStringMapValue(path, val);
+                    }
+                }
                 return SetValue(MakePyObject(val, InternVals_));
             }
 
             bool OnDouble(double val) override {
                 if (Compact_) return Compact_->OnDouble(val);
                 if (SkipScalar()) return true;
+                if (RejectConsumedNonString()) return false;
                 return SetValue(MakePyObject(val));
             }
 
@@ -279,6 +289,7 @@ namespace NSJson {
                     return false;
                 }
                 try {
+                    if (RejectConsumedNonString()) return false;
                     if (StartCompact()) return Compact_->OnOpenArray();
                     switch (StateStack_.back()) {
                         case START:
@@ -335,6 +346,7 @@ namespace NSJson {
                     return false;
                 }
                 try {
+                    if (RejectConsumedNonString()) return false;
                     if (StartCompact()) return Compact_->OnOpenMap();
                     switch (StateStack_.back()) {
                         case START:
@@ -415,6 +427,52 @@ namespace NSJson {
             }
 
         private:
+            bool RejectConsumedNonString() const {
+                if (Options_.StringMapConsumer) {
+                    for (const auto& path : Options_.StringMapPaths) {
+                        if (StringMapValueMatches(path)) {
+                            PyErr_SetString(PyExc_ValueError, "A consumed string map requires string values");
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            bool StringMapValueMatches(const TVector<TString>& path) const {
+                if (StateStack_.empty() || StateStack_.back() != AFTER_MAP_KEY || Path_.size() != path.size() + 1) {
+                    return false;
+                }
+                for (size_t i = 0; i < path.size(); ++i) {
+                    if (!std::holds_alternative<TString>(Path_[i]) || std::get<TString>(Path_[i]) != path[i]) {
+                        return false;
+                    }
+                }
+                return std::holds_alternative<TString>(Path_.back());
+            }
+
+            bool ConsumeStringMapValue(const TVector<TString>& path, TStringBuf value) {
+                TPyObjectPtr pyPath{PyTuple_New(path.size()), BORROW};
+                if (!pyPath.Get()) return false;
+                for (size_t i = 0; i < path.size(); ++i) {
+                    PyObject* key = MakePyObject(path[i], false);
+                    if (!key) return false;
+                    PyTuple_SET_ITEM(pyPath.Get(), i, key);
+                }
+                TPyObjectPtr key{MakePyObject(std::get<TString>(Path_.back()), InternKeys_), BORROW};
+                // Reuse the streaming CI parser seam: payloads must not enter
+                // the interning pool or a Python DOM, regardless of its size.
+                TPyObjectPtr payload{MakePyObject(value, false), BORROW};
+                if (!key.Get() || !payload.Get()) return false;
+                TPyObjectPtr result{PyObject_CallFunctionObjArgs(
+                    Options_.StringMapConsumer, pyPath.Get(), key.Get(), payload.Get(), nullptr), BORROW};
+                if (!result.Get()) return false;
+                StateStack_.pop_back();
+                HolderStack_.pop_back();
+                RemoveMapKeyFromPath();
+                return true;
+            }
+
             bool PathMatches(const TVector<TString>& path) const {
                 if (path.size() != Path_.size()) return false;
                 for (size_t i = 0; i < path.size(); ++i) {
