@@ -102,6 +102,10 @@ IF (NOT YA_OPENSOURCE)
     )
 ENDIF()
 
+IF (NOT YA_OPENSOURCE AND NOT OS_WINDOWS)
+    PEERDIR(devtools/ya/yalibrary/bazel_warming/persistence)
+ENDIF()
+
 END()
 
 RECURSE(

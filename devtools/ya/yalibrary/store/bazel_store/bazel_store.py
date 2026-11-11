@@ -13,6 +13,7 @@ import re
 import shutil
 
 from exts import hashing
+from exts import timer
 from six.moves.urllib import parse
 from yalibrary.store.dist_store import DistStore
 import yalibrary.store.bazel_store.protocol as _protocol
@@ -545,6 +546,7 @@ class BazelStore(DistStore):
 
     def __init__(self, *args, **kwargs):
         self._put_observer = kwargs.pop('put_observer', None)
+        self._restore_observer = kwargs.pop('restore_observer', None)
         super(BazelStore, self).__init__(
             name='bazel-store',
             stats_name='bazel_store_status',
@@ -664,16 +666,16 @@ class BazelStore(DistStore):
         self._inc_data_size(data_size, 'put')
         return True
 
-    def _do_try_restore(self, uid, into_dir, filter_func=None, expected_outputs=None):
+    def _restore_files(self, uid, into_dir, filter_func=None, expected_outputs=None):
         if self._disabled:
-            return False
+            return None
 
         try:
             meta = self._client.get_data(into_dir, uid, filter_func, expected_outputs=expected_outputs)
         except BazelStoreBrokenException as e:
             self._disable_store(e)
             self._count_failure('get')
-            return False
+            return None
         except BazelStoreException as e:
             logger.debug('Failed to restore %s: %s', uid, e)
             # AC may still exist while a referenced CAS file is missing. Permit repair after rebuilding.
@@ -681,13 +683,33 @@ class BazelStore(DistStore):
                 self._failed_restores.add(uid)
                 self._meta.pop(uid, None)
             self._count_failure('get')
-            return False
+            return None
 
         with self._lock:
             self._failed_restores.discard(uid)
         data_size = self._get_data_size(meta)
         self._inc_data_size(data_size, 'get')
+        return meta
+
+    def _do_try_restore(self, uid, into_dir, filter_func=None, expected_outputs=None):
+        return self._restore_files(uid, into_dir, filter_func, expected_outputs) is not None
+
+    def try_restore(self, uid, into_dir, filter_func=None, expected_outputs=None):
+        if self._restore_observer is None:
+            return super(BazelStore, self).try_restore(uid, into_dir, filter_func, expected_outputs)
+        # Shared persistence is warming work, not HTTP download time. Keep it
+        # outside the native get timer so cache throughput remains comparable.
+        with timer.AccumulateTime(lambda seconds: self._inc_time(seconds, 'get')):
+            meta = self._restore_files(uid, into_dir, filter_func, expected_outputs)
+        if meta is None:
+            return False
+        self._restore_observer(uid, into_dir, meta)
         return True
+
+    def stats(self, execution_log, evlog_writer):
+        if self._restore_observer is not None:
+            self._restore_observer.finish()
+        super(BazelStore, self).stats(execution_log, evlog_writer)
 
     @property
     def avg_compression_ratio(self):

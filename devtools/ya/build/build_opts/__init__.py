@@ -2821,6 +2821,7 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.bazel_remote_warming = False
         self.bazel_remote_warming_manifest = None
         self.bazel_remote_warming_run_id = None
+        self.bazel_remote_warming_persistence_config = None
 
     @staticmethod
     def consumer():
@@ -2975,6 +2976,14 @@ class DistCacheOptions(DistCacheSetupOptions):
                     help='Unique run identifier for the Bazel warming manifest; '
                     'use with --bazel-remote-warming-manifest',
                     hook=SetValueHook('bazel_remote_warming_run_id'),
+                    group=YT_CACHE_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ArgConsumer(
+                    ['--bazel-remote-warming-persistence-config'],
+                    help='Private shared-cache settings for repairing selected warming HTTP hits in S3; '
+                    'requires a writable Bazel cache and a warming manifest',
+                    hook=SetValueHook('bazel_remote_warming_persistence_config'),
                     group=YT_CACHE_CONTROL_GROUP,
                     visible=HelpLevel.EXPERT,
                 ),
@@ -3307,6 +3316,16 @@ class DistCacheOptions(DistCacheSetupOptions):
         super().postprocess2(params)
         path = params.bazel_remote_warming_manifest
         run_id = params.bazel_remote_warming_run_id
+        persistence = params.bazel_remote_warming_persistence_config
+        if persistence is not None:
+            if not app_config.in_house or os.name != 'posix':
+                raise ArgsValidatingException('Shared warming persistence is supported only by internal POSIX ya')
+            if path is None or not isinstance(persistence, str) or not os.path.isabs(persistence):
+                raise ArgsValidatingException(
+                    'Shared warming persistence requires a manifest and an absolute settings path'
+                )
+            if parse_bazel_remote_caches(params.bazel_remote_caches):
+                raise ArgsValidatingException('Shared warming persistence requires one explicit Bazel cache URI')
         if (path is None) != (run_id is None):
             raise ArgsValidatingException(
                 '--bazel-remote-warming-manifest and --bazel-remote-warming-run-id must be used together'

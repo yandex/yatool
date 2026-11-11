@@ -530,6 +530,14 @@ class CacheFactory:
         password = self._get_bazel_password()
         fits_filter = self._get_fits_filter()
         connection_pool_size = self._get_connection_pool_size()
+        persistence_config = getattr(self._opts, 'bazel_remote_warming_persistence_config', None)
+        persistence = None
+        if persistence_config:
+            from yalibrary.bazel_warming.persistence import PersistenceObserver
+
+            persistence = PersistenceObserver(
+                persistence_config, self.warming_manifest, self._opts.bazel_remote_baseuri
+            )
 
         return bazel_store.BazelStore(
             base_uri=getattr(self._opts, 'bazel_remote_baseuri'),
@@ -541,6 +549,7 @@ class CacheFactory:
             timeout=getattr(self._opts, 'bazel_remote_timeout', bazel_store.DEFAULT_TIMEOUT),
             fits_filter=fits_filter,
             put_observer=self.warming_manifest.record_put if self.warming_manifest else None,
+            restore_observer=persistence,
         )
 
     def _init_yt_dist_cache(self):
