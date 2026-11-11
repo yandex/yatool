@@ -133,6 +133,11 @@ class ManifestWriter:
                 self._error = error
                 raise
 
+    def selected_node(self, uid):
+        """Return only a node from the original plan to warming observers."""
+        with self._lock:
+            return self._nodes.get(uid)
+
     def checkpoint(self):
         """Сохранить весь выбранный план и накопленные итоги PUT без завершения запуска."""
         with self._lock:
