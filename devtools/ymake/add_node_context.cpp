@@ -181,6 +181,16 @@ TNodeAddCtx::TNodeAddCtx(TModule* module, TYMake& yMake, TUpdEntryStats& entry, 
     }
 }
 
+EMakeNodeType TNodeAddCtx::GetRegisteredNodeType(TElemId elemId) const {
+    if (IsModule && ModuleDef && Module == &ModuleDef->GetModule() && Module->GetId() == elemId) {
+        return Module->GetNodeType();
+    }
+    if (!IsModule && ElemId == elemId && NodeType == EMNT_NonParsedFile && Entry.get().ModuleData.Added) {
+        return NodeType;
+    }
+    return EMNT_Deleted;
+}
+
 TModAddData& TNodeAddCtx::GetModuleData() {
     const auto cacheId = MakeDepsCacheId(NodeType, ElemId);
     TModAddData* modData = UpdIter.GetAddedModuleInfo(cacheId);
@@ -458,8 +468,15 @@ void TNodeAddCtx::WriteHeader() {
                         << Graph.GetFileName(node.NodeType, AssumeFile(node.ElemId))
                         << " new: " << NodeType << " != old: " << node.NodeType << Endl;
         }
+        const bool registeredRoleChange = GetRegisteredNodeType(ElemId) == NodeType &&
+            ((node.NodeType == EMNT_NonParsedFile && IsModuleType(NodeType)) ||
+             (IsModuleType(node.NodeType) && NodeType == EMNT_NonParsedFile));
         Y_ASSERT(NodeType == node.NodeType || (IsDirType(NodeType) && IsDirType(node.NodeType)) || (NodeType == EMNT_MakeFile && node.NodeType == EMNT_File) ||
-                 (NodeType == EMNT_File && node.NodeType == EMNT_MissingFile));
+                 (NodeType == EMNT_File && node.NodeType == EMNT_MissingFile) || registeredRoleChange);
+
+        if (registeredRoleChange && IsModuleType(NodeType)) {
+            TIndDepsRule::ResetNodeFlags(Graph.GetFileNodeData(ElemId));
+        }
 
         AssertEx(IsFileType(NodeType) == IsFileType(node.NodeType), "Inplace node type changes are prohibited");
         AssertEx(ElemId == node.ElemId, "Inplace node renames are prohibited");

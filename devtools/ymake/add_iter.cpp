@@ -1149,6 +1149,19 @@ inline bool TUpdIter::Enter(TState& state) {
     if (st.Node.NodeType == EMNT_Deleted)
         return false;
 
+    // A current declaration can replace a cached output with a module, or vice versa.
+    // Classify it before choosing module context and dependency-transfer rules.
+    if (IsOutputType(st.Node.NodeType)) {
+        const auto entry = Nodes.find(MakeDepsCacheId(st.Node.NodeType, st.Node.ElemId));
+        if (entry != Nodes.end() && entry->second.AddCtx) {
+            const auto registeredType = entry->second.AddCtx->GetRegisteredNodeType(st.Node.ElemId);
+            if ((st.Node.NodeType == EMNT_NonParsedFile && IsModuleType(registeredType)) ||
+                (IsModuleType(st.Node.NodeType) && registeredType == EMNT_NonParsedFile)) {
+                st.Node.NodeType = registeredType;
+            }
+        }
+    }
+
     st.ModulePosition = prev ? prev->ModulePosition : 0;
 
     // Check if the entered node is induced deps node
@@ -1516,15 +1529,14 @@ bool TUpdIter::DirectDepsNeedUpdate(const TDGIterAddable& st, const TDepTreeNode
         const auto node = Graph.GetNodeById(st.Node);
         auto request = isPeerdir ? TMatchPeerRequest::CheckAll() : TMatchPeerRequest{false, true, {}};
         const auto peerNode = NPeers::GetPeerNode(YMake.Modules, dirNode, module, std::move(request));
+        if (peerNode.Status != EPeerSearchStatus::Match) {
+            // A former module can become an ordinary output at the same graph node.
+            // Recheck the consumer even if its old direct dependency is no longer a module.
+            return true;
+        }
         const auto directPeerNode = NPeers::GetDirectPeerNode(Graph, YMake.Modules, node, dirNode.Id(), isTooldir);
 
-        if ((peerNode.Status == EPeerSearchStatus::Match) != directPeerNode.IsValid()) {
-            return true;
-        }
-
-        if (peerNode.Status == EPeerSearchStatus::Match && directPeerNode.Id() != peerNode.Node.Id()) {
-            return true;
-        }
+        return !directPeerNode.IsValid() || directPeerNode.Id() != peerNode.Node.Id();
     }
     return false;
 }

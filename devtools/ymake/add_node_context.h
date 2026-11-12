@@ -79,6 +79,8 @@ struct TNodeAddCtx : public TAddDepAdaptor {
     void Init2(TAddIterStack& stack, TFileHolder& fileContent, TModule* mod, EReadFileContentMethod readMethod);
     ~TNodeAddCtx() override;
 
+    EMakeNodeType GetRegisteredNodeType(TElemId elemId) const;
+
     void WriteHeader();
 
 public:
