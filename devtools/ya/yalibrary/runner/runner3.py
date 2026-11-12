@@ -598,7 +598,7 @@ class TaskContext(object):
 
         host_memory = virtual_memory()
         self.test_ram_capacity = None
-        if self.opts.memory_limit:
+        if self.opts.test_memory_reservation and self.opts.memory_limit:
             memory_state = self._app_ctx.host_health.get_memory_state()
             self.test_ram_capacity = _test_ram_capacity(self.opts.memory_limit, memory_state)
 

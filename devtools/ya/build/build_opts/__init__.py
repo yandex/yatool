@@ -1191,6 +1191,7 @@ class ExecutorOptions(Options):
         self.dir_outputs_test_mode = False
         self.schedule_strategy = None
         self.memory_limit = None
+        self.test_memory_reservation = False
 
     @staticmethod
     def consumer():
@@ -1294,7 +1295,7 @@ class ExecutorOptions(Options):
                 ['--memory-limit'],
                 help=(
                     'Restrict new build work when host memory usage exceeds this threshold '
-                    '(Examples: 50GB, 92%). Test launches also reserve their declared RAM within this budget. '
+                    '(Examples: 50GB, 92%). '
                     'This does not limit memory of an individual process '
                     'or guarantee that OOM cannot occur. Unsupported with Larry'
                 ),
@@ -1304,6 +1305,17 @@ class ExecutorOptions(Options):
             ),
             EnvConsumer('YA_MEMORY_LIMIT', hook=SetValueHook('memory_limit')),
             ConfigConsumer('memory_limit'),
+            ArgConsumer(
+                ['--test-memory-reservation'],
+                help='Reserve declared test RAM before launch within --memory-limit (disabled by default). '
+                'Has no effect without --memory-limit',
+                hook=SetConstValueHook('test_memory_reservation', True),
+                group=ADVANCED_OPT_GROUP,
+                visible=HelpLevel.EXPERT,
+            ),
+            EnvConsumer(
+                'YA_TEST_MEMORY_RESERVATION', hook=SetValueHook('test_memory_reservation', return_true_if_enabled)
+            ),
         ]
 
     def postprocess(self):
