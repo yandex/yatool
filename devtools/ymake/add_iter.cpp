@@ -720,6 +720,9 @@ void TDGIterAddable::RepeatResolving(TYMake& ymake, TAddIterStack& stack, TFileH
             return;
         }
         YDIAG(VV) << "Repeat resolving caused changes, file " << Node.ElemId << " was updated" << Endl;
+        // Removing an include can remove its last induced property. Notify consumers
+        // even when no remaining child supplies a newer property timestamp.
+        Entry().Props.UpdateIntentTimestamp(EVI_InducedDeps, ymake.TimeStamps.CurStamp());
         Add = new TNodeAddCtx(module, ymake, EntryPtr->second, false, nullptr, fileContent, EReadFileContentMethod::ON_DEMAND);
         Add->NeedInit2 = false;
         Add->NodeType = Node.NodeType;

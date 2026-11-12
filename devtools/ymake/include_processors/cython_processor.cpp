@@ -177,7 +177,9 @@ void TCythonIncludeProcessor::ProcessIncludes(TAddDepAdaptor& node,
 
     TVector<TResolveFile> resolvedInduced(Reserve(preparedInduced.size() + PREDEFINED_INDUCED.size()));
     module.ResolveAsUnset(preparedInduced, resolvedInduced);
-    module.ResolveAsUnset(PREDEFINED_INDUCED, resolvedInduced);
+    if (!module.IsTrue("_USE_RESOURCE_CYTHON")) {
+        module.ResolveAsUnset(PREDEFINED_INDUCED, resolvedInduced);
+    }
     node.AddParsedIncls("cpp", resolvedInduced);
 }
 

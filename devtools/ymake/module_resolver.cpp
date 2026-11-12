@@ -380,7 +380,11 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
 
     TSysinclResolver::TResult sysinclResult = Conf.Sysincl.Resolve(src, include.Path);
     Y_ASSERT(addinclResult->IsSuccess() ? !addinclResult->View.Empty() : !addinclResult->UnresolvedName.empty());
-    if (!sysinclResult) {
+    // Cython's standard declarations belong to its tool. Project ADDINCLs still
+    // take precedence over SYSINCL defaults for standard or external declarations.
+    const bool projectCythonInclude = sysinclResult && addinclResult->IsSuccess() &&
+        langId == NLanguages::GetLanguageId("cython") && Module.Vars.IsTrue("_USE_RESOURCE_CYTHON");
+    if (!sysinclResult || projectCythonInclude) {
         if (addinclResult->IsSuccess()) {
             result.emplace_back(addinclResult->View);
         } else {
