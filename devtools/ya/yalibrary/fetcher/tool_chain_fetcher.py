@@ -1,7 +1,6 @@
 import logging
 import os
 import requests
-import six
 import sys
 import time
 from collections import namedtuple
@@ -32,7 +31,6 @@ from .resource_fetcher import (
 logger = logging.getLogger(__name__)
 
 
-_CACHE_FILE_NAME = ".platform.cache"
 _SB_REST_API_TIMEOUT = 1 * 60
 
 
@@ -88,7 +86,7 @@ def resolve_resource_id(root, toolchain_name, bottle_name, formula, platform):
 
 def get_formula_value(formula):
     '''Return the value directly or read from a file if the value is a file name'''
-    if isinstance(formula, six.string_types):
+    if isinstance(formula, str):
         return config.config_from_arc_rel_path(formula)
     else:
         return formula
@@ -125,10 +123,6 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
         self._force_refetch = force_refetch
         self._download_fn = download_fn
 
-    def resource_id_from_cache(self):
-        resource = self._get_matched_resource()
-        return self._get_resource_uri(resource)
-
     @stringify_memoize(cache_kwarg='cache')
     def fetch_if_need(self):
         if self._force_refetch or not self._check():
@@ -145,43 +139,10 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
             return installed(self._where)
         return False
 
-    def _get_matched_resource(self):
-        by_platform = self._by_platform
-        best_match = platform_matcher.match_platform(
-            self._platform, list(by_platform.keys()), self._platform_replacements
-        )
-        if best_match is not None:
-            logger.debug("{0}: will use '{1}' platform".format(self._toolchain_name, best_match))
-            return by_platform[best_match]
-        else:
-            raise platform_matcher.PlatformNotSupportedException(
-                '{}: platform ({}) not matched to any of {}'.format(
-                    self._toolchain_name, self._platform, by_platform.keys()
-                )
-            )
-
-    def _resource_path(self, resource_id):
-        return os.path.join(self._root, str(resource_id))
-
     def _fetch(self):
-        resource = self._get_matched_resource()
-        res = self._download_fn(
-            None,
-            self._root,
-            self._get_resource_uri(resource),
-            force_refetch=self._force_refetch,
-            **self._binname_kwargs
-        )
-        return res.where
-
-    def _details(self):
         raise NotImplementedError()
 
-    @func.lazy_property
-    def _by_platform(self):
-        return self._make_by_platform()
-
-    def _make_by_platform(self):
+    def _details(self):
         raise NotImplementedError()
 
 
@@ -194,28 +155,23 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
         )
         self.__by_platform = by_platform
 
-    # Dumped once
-    @stringify_memoize
-    def _dump_resources_to_file(self, dump_file):
-        platform_by_resource_id = {}
-        for platform, resource_desc in self.__by_platform.items():
-            parsed_uri = parse_resource_uri(self._get_resource_uri(resource_desc))
-            if parsed_uri.resource_type == 'sbr':
-                platform_by_resource_id[int(parsed_uri.resource_id)] = platform
-        if platform_by_resource_id:
-            resources = _list_all_resources(id=list(platform_by_resource_id.keys()))
-            for resource in resources:
-                attrs = resource['attributes']
-                # Add platform attribute if it's missing
-                if 'platform' not in attrs:
-                    attrs['platform'] = platform_by_resource_id[resource['id']]
-            _dump_resources_file(dump_file, resources)
+    def resource_id_from_cache(self):
+        resource = self._get_matched_resource()
+        return self._get_resource_uri(resource)
 
-    def _make_by_platform(self):
-        dump_file = os.environ.get('YA_DUMP_RESOURCES_FILE')
-        if dump_file:
-            self._dump_resources_to_file(dump_file)
-        return self.__by_platform
+    def _get_matched_resource(self):
+        best_match = platform_matcher.match_platform(
+            self._platform, list(self.__by_platform.keys()), self._platform_replacements
+        )
+        if best_match is not None:
+            logger.debug("{0}: will use '{1}' platform".format(self._toolchain_name, best_match))
+            return self.__by_platform[best_match]
+        else:
+            raise platform_matcher.PlatformNotSupportedException(
+                '{}: platform ({}) not matched to any of {}'.format(
+                    self._toolchain_name, self._platform, self.__by_platform.keys()
+                )
+            )
 
     def _get_resource_uri(self, resource_desc):
         return resource_desc['uri']
@@ -417,9 +373,6 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         return "params: {}".format(self.__params)
 
     def _fetch(self):
-        dump_file = os.environ.get("YA_DUMP_RESOURCES_FILE")
-        if dump_file:
-            self._dump_resources_to_file(dump_file)
         resource_id = self._get_matched_resource_id()
         fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'sbr')
         self._download_fn(
@@ -438,33 +391,12 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         toolscache.notify_tool_cache(link_path)
         return install_symlink(resource_path, link_path)
 
+    def _resource_path(self, resource_id):
+        return os.path.join(self._root, str(resource_id))
+
     @func.lazy_property
     def __is_auto_update_disabled(self):
         return os.path.exists(os.path.join(self._root, self._DISABLE_AUTO_UPDATE_FILE_NAME))
-
-    # Dumped once
-    @stringify_memoize
-    def _dump_resources_to_file(self, dump_file):
-        found_platforms = set()
-        resources = []
-        for sb_api_query in self._get_sb_api_queries(platforms=[], limit=30):
-            logger.debug('{}: lookup resources with query: {}'.format(self._toolchain_name, sb_api_query))
-            for resource in _list_resources(**sb_api_query):
-                platform = resource['attributes'].get('platform', 'any')
-                if platform not in found_platforms:
-                    found_platforms.add(platform)
-                    resources.append(resource)
-        _dump_resources_file(dump_file, resources, self.__bottle_name)
-
-
-def _to_list(val):
-    if val is None:
-        return []
-
-    if isinstance(val, list):
-        return val
-
-    return [val]
 
 
 def _get_fetcher(name, resource_type):
@@ -524,18 +456,6 @@ def _get_fetcher(name, resource_type):
         return None, progress_printer
 
 
-def _list_all_resources(**kwargs):
-    from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
-
-    return _do_sandbox_method(SandboxClient.list_all_resources, **kwargs)
-
-
-def _list_resources(**kwargs):
-    from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
-
-    return _do_sandbox_method(SandboxClient.list_resources, **kwargs)
-
-
 def _list_resources_no_links(**kwargs):
     # A widely held resource has thousands of host links, and the lookup needs only its id
     from devtools.ya.yalibrary.yandex.sandbox import SandboxClient
@@ -566,17 +486,3 @@ def _get_cancel_checker():
         return app_ctx.state.check_cancel_state
     except (ImportError, AttributeError):
         return None
-
-
-def _dump_resources_file(dump_file, resources, bottle_name=None):
-    task_resources = {}
-    # Group resources by task id
-    for resource in resources:
-        task_resources.setdefault(resource['task']['id'], []).append(resource)
-    with open(dump_file, "a") as f:
-        for task_id, res in task_resources.items():
-            row = {'task_id': task_id, 'list_resources': res}
-            if bottle_name:
-                row['bottle'] = bottle_name
-            json.dump(row, f)
-            f.write('\n')

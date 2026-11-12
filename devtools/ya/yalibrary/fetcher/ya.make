@@ -1,4 +1,4 @@
-PY23_LIBRARY()
+PY3_LIBRARY()
 
 PEERDIR(
     contrib/python/contextlib2
@@ -10,17 +10,12 @@ PEERDIR(
     devtools/ya/core/config
     devtools/ya/yalibrary/fetcher/uri_parser
     devtools/ya/yalibrary/fetcher/progress_info
+    devtools/ya/yalibrary/fetcher/ufetcher
     devtools/ya/yalibrary/guards
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/toolscache
     devtools/libs/yaplatform/python
 )
-
-IF (PYTHON3)
-    PEERDIR(
-        devtools/ya/yalibrary/fetcher/ufetcher
-    )
-ENDIF()
 
 IF (NOT YA_OPENSOURCE)
     PEERDIR(

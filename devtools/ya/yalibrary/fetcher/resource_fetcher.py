@@ -5,8 +5,6 @@ import sys
 import collections
 import shutil
 
-import six
-
 from exts import http_client
 
 from library.python import unique_id, func
@@ -159,13 +157,8 @@ def fetch_resource_if_need(
             target_is_tool_dir,
             force_refetch,
         )
-    except Exception:
-        ei = sys.exc_info()
-        six.reraise(
-            ei[0],
-            ei[0]("{}\n{}".format(ei[1], 'Failed while fetching resource with id: ' + str(parsed_uri.resource_id))),
-            ei[2],
-        )
+    except Exception as e:
+        raise type(e)("{}\nFailed while fetching resource with id: {}".format(e, parsed_uri.resource_id)) from e
 
 
 def select_resource(item, platform=None):
