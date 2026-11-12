@@ -875,6 +875,20 @@ def create_test_node(
     # Disallow other nodes from execution while user will interact with debugger
     if getattr(opts, 'debugger_requested'):
         requirements["cpu"] = "all"
+    # FUZZING=yes also comes from release-fuzzing replay; only --fuzzing needs cpu:all for --workers.
+    # Only the node changes: suite requirements feed the report and the Large slot; meta_raw keeps the MetaInfo pickle shape.
+    elif (
+        suite.meta.meta_raw.get("FUZZING") == "1"
+        and not getattr(opts, "fuzzing", False)
+        and not is_for_distbuild
+        and not any(o.startswith(("-jobs=", "-workers=", "-fork=")) for o in suite.get_fuzz_opts(opts).split())
+    ):
+        logger.debug(
+            "Corpus replay of %s runs a single process: cpu:all is replaced with cpu:%s",
+            suite,
+            default_cpu_requirements,
+        )
+        requirements["cpu"] = default_cpu_requirements
     elif suite_cpu_requirements:
         requirements["cpu"] = suite_cpu_requirements
     else:
