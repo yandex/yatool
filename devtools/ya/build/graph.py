@@ -2688,7 +2688,8 @@ def _resolve_global_tools(graph_maker, toolchain, opts, targets, resources, debu
         [os.path.join(opts.arc_root, t) for t in targets],
         graph_kind=_GraphKind.GLOBAL_TOOLS,
         debug_id=debug_id,
-        enabled_events='PSLGE',
+        # Cache snapshots need run boundaries (U) and cache commit messages (D) for global tools too.
+        enabled_events=YmakeEvents.DEFAULT.value + YmakeEvents.PROGRESS.value,
     )
     no_pic = tg.no_pic
     graph = no_pic().graph
