@@ -570,7 +570,7 @@ namespace NYa {
             TYtErrorRetrier(NThreading::TCancellationToken cancellationToken, std::size_t maxRetries, TDuration maxTime) {
                 auto retryClassFunction = [token = cancellationToken] (const yexception& e) {
                     token.ThrowIfCancellationRequested();
-                    if (IsYtError(e) && !IsPermanentError(e)) {
+                    if (IsYtError(e) && IsTemporaryYtStoreError(e)) {
                         return ERetryErrorClass::ShortRetry;
                     }
                     return ERetryErrorClass::NoRetry;
@@ -637,6 +637,13 @@ namespace NYa {
                 static_assert(MULTIPLIER > 1);
                 static_assert(MAX_DURATION > INIT_DURATION);
         };
+    }
+
+    bool IsTemporaryYtStoreError(const std::exception& error) noexcept {
+        if (const auto* ytError = dynamic_cast<const NYT::TErrorResponse*>(&error)) {
+            return !IsPermanentError(*ytError);
+        }
+        return dynamic_cast<const TYtStoreInitTimeoutError*>(&error) || dynamic_cast<const TYtStorePrepareTimeoutError*>(&error);
     }
 
     class TYtStore::TImpl {

@@ -98,9 +98,10 @@ cdef extern void YaYtStoreFinishStage(void* owner, const TString& name) with gil
 
 
 class YtStoreError(Exception):
-    def __init__(self, message, mute=False):
+    def __init__(self, message, mute=False, temporary=False):
         super().__init__(message)
         self.mute = mute
+        self.temporary = temporary
 
 cdef public PyObject* yt_store_error = <PyObject*>YtStoreError
 
@@ -112,21 +113,30 @@ cdef extern from *:
     r"""
         extern PyObject* yt_store_error;
         static void raise_yt_store_error() {
+            TString message;
+            bool mute = false;
+            bool temporary = false;
             try {
                 throw;
             } catch (const NYa::TYtStoreError& e) {
-                PyObject* err = PyObject_CallFunction(yt_store_error, "sO", e.what(), e.Mute ? Py_True : Py_False);
-                if (!err) {
-                    return;
-                }
-                PyErr_SetObject(yt_store_error, err);
+                message = e.what();
+                mute = e.Mute;
+                temporary = NYa::IsTemporaryYtStoreError(e);
             } catch (const std::exception& e) {
-                TString error = TypeName(e) + ": " + e.what();
-                PyErr_SetString(yt_store_error, error.c_str());
+                message = TypeName(e) + ": " + e.what();
+                temporary = NYa::IsTemporaryYtStoreError(e);
             } catch (...) {
-                TString error = CurrentExceptionMessage();
-                PyErr_SetString(yt_store_error, error.c_str());
+                message = CurrentExceptionMessage();
             }
+            // ya maps temporary errors to exit code 12, reusing Sandbox's bounded heater retries.
+            PyObject* err = PyObject_CallFunction(
+                yt_store_error, "sOO", message.c_str(),
+                mute ? Py_True : Py_False, temporary ? Py_True : Py_False);
+            if (!err) {
+                return;
+            }
+            PyErr_SetObject(yt_store_error, err);
+            Py_DECREF(err);
         }
     """
     cdef void raise_yt_store_error()

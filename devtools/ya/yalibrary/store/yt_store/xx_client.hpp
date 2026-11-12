@@ -4,6 +4,8 @@
 
 #include <util/folder/path.h>
 
+#include <exception>
+
 namespace NYa {
     void AtExit();
     void InitializeLogger();
@@ -76,6 +78,9 @@ namespace NYa {
     // This exception reports about an incorrect YtStore usage or internal error.
     struct TYtStoreFatalError : public yexception {
     };
+
+    // Preserve the cache client's retry classification when errors cross the Python boundary.
+    bool IsTemporaryYtStoreError(const std::exception& error) noexcept;
 
     class TYtStore {
     public:
