@@ -1,6 +1,8 @@
 import os
 import sys
 import logging
+import typing
+from collections.abc import Callable
 
 from devtools.ya.build.graph_description import GraphNodeUid
 from exts.fs import get_file_size
@@ -11,6 +13,10 @@ import yalibrary.worker_threads as worker_threads
 import yalibrary.runner.fs
 
 from yalibrary.runner.tasks.enums import WorkerPoolType
+
+if typing.TYPE_CHECKING:
+    import yalibrary.runner.patterns
+
 
 logger = logging.getLogger(__name__)
 
@@ -40,128 +46,6 @@ def _untared_path(path):
             if new_path:
                 return new_path
     return path + '_unpacked'
-
-
-def process_output(
-    self, output, pat, tared_kind=TARED_NONE, legacy_install=False, legacy_bin_dir=False, legacy_lib_dir=False
-):
-    if not output.startswith('$(B'):
-        return False
-
-    built = pat.fill(output)
-
-    if not os.path.isfile(built):
-        logger.debug('Cannot build target %s', output)
-        # self.err[output].append([])
-        return False
-
-    result = {}
-
-    if tared_kind == TARED_DIR:
-        output = _untared_path(output)
-
-    path = pat.fill(output.replace('$(BUILD_ROOT)', ''))
-
-    def wrap_os_error(func, built, output, **kwargs):
-        try:
-            return func(built, output, **kwargs)
-        except Exception as exc:
-            import errno
-
-            if isinstance(exc, OSError) and exc.errno in (
-                errno.EEXIST,
-                errno.ENOENT,
-            ):
-                logger.debug('Concurrent processing of result %s from %s', output, built)
-            elif on_win() and isinstance(exc, WindowsError) and exc.winerror in RETRIABLE_FILE_ERRORS:
-                logger.debug('Concurrent processing of result %s from %s', output, built)
-            else:
-                raise
-
-    def make_output(built, output, tared):
-        if tared:
-            exts.archive.extract_from_tar(built, output, apply_mtime=True)
-        else:
-            if os.path.exists(output) and os.path.isdir(output):
-                logger.warning("Not creating hardlink to %s: %s exists and is a directory", built, output)
-                return
-
-            yalibrary.runner.fs.make_hardlink(built, output, retries=1, prepare=True)
-            built_file_size = get_file_size(built)
-            output_file_size = get_file_size(output)
-            if built_file_size != output_file_size:
-                logger.warning('File %s size mismatch: expected %d got %d', output, built_file_size, output_file_size)
-
-    def suppress_output():
-        default_suppress_outputs = self._suppress_outputs_conf['default_suppress_outputs']
-        add_result = self._suppress_outputs_conf['add_result']
-        suppress_outputs = self._suppress_outputs_conf['suppress_outputs']
-        return (
-            any([path.endswith(x) for x in default_suppress_outputs])
-            and not any([path.endswith(x) for x in add_result])
-        ) or any([path.endswith(x) for x in suppress_outputs])
-
-    if self._need_test_trace_file and built.endswith('ytest.report.trace'):
-        result['trace_file'] = built
-
-    tared = tared_kind != TARED_NONE
-    tared_nodir = tared_kind == TARED_NODIR
-
-    if not suppress_output():
-        # Persistent output on demand
-        if self._need_output:
-            result['artifact'] = wrap_os_error(
-                self._output_result.put,
-                built,
-                path,
-                action=make_output,
-                forced_existing_dir_removal=tared,
-                tared=tared,
-                tared_nodir=tared_nodir,
-            )
-
-        # Output for symlinks
-        if self._need_symlinks:
-            result['symlink'] = wrap_os_error(
-                self._symlink_result.put,
-                built,
-                path,
-                target_action=make_output,
-                forced_existing_dir_removal=tared,
-                tared=tared,
-                tared_nodir=tared_nodir,
-            )
-
-        if legacy_install:
-            wrap_os_error(
-                self._install_result.put,
-                built,
-                path,
-                action=make_output,
-                forced_existing_dir_removal=tared,
-            )
-
-        if legacy_bin_dir:
-            wrap_os_error(
-                self._bin_result.put,
-                built,
-                path,
-                action=make_output,
-                forced_existing_dir_removal=tared,
-            )
-
-        if legacy_lib_dir:
-            wrap_os_error(
-                self._lib_result.put,
-                built,
-                path,
-                action=make_output,
-                forced_existing_dir_removal=tared,
-            )
-
-    self._res[self._node.uid].append(result)
-
-    return True
 
 
 class ResultNodeTask(object):
@@ -204,6 +88,155 @@ class ResultNodeTask(object):
         self._provider = provider
         logger.debug("ResultsNodeTask for %s created (provider=%s)", self._node.uid, self._provider)
 
+    @staticmethod
+    def _wrap_os_error(func: Callable[..., str], built: str, output: str, **kwargs) -> str | None:
+        try:
+            return func(built, output, **kwargs)
+        except Exception as exc:
+            import errno
+
+            if isinstance(exc, OSError) and exc.errno in (
+                errno.EEXIST,
+                errno.ENOENT,
+            ):
+                logger.debug('Concurrent processing of result %s from %s', output, built)
+            elif on_win() and isinstance(exc, WindowsError) and exc.winerror in RETRIABLE_FILE_ERRORS:
+                logger.debug('Concurrent processing of result %s from %s', output, built)
+            else:
+                raise
+
+    @staticmethod
+    def _make_output(built: str, output: str, tared: bool) -> None:
+        if tared:
+            exts.archive.extract_from_tar(built, output, apply_mtime=True)
+        else:
+            if os.path.exists(output) and os.path.isdir(output):
+                logger.warning("Not creating hardlink to %s: %s exists and is a directory", built, output)
+                return
+
+            yalibrary.runner.fs.make_hardlink(built, output, retries=1, prepare=True)
+            built_file_size = get_file_size(built)
+            output_file_size = get_file_size(output)
+            if built_file_size != output_file_size:
+                logger.warning('File %s size mismatch: expected %d got %d', output, built_file_size, output_file_size)
+
+    def _is_suppressed_output(self, path: str) -> bool:
+        default_suppress_outputs = self._suppress_outputs_conf['default_suppress_outputs']
+        add_result = self._suppress_outputs_conf['add_result']
+        suppress_outputs = self._suppress_outputs_conf['suppress_outputs']
+        return (
+            any([path.endswith(x) for x in default_suppress_outputs])
+            and not any([path.endswith(x) for x in add_result])
+        ) or any([path.endswith(x) for x in suppress_outputs])
+
+    def _process_output(
+        self,
+        output: str,
+        pat: "yalibrary.runner.patterns.Patterns",
+        tared_kind: int = TARED_NONE,
+        legacy_install: bool = False,
+        legacy_bin_dir: bool = False,
+        legacy_lib_dir: bool = False,
+    ) -> bool:
+        if not output.startswith('$(B'):
+            return False
+
+        built = pat.fill(output)
+
+        if not os.path.isfile(built):
+            logger.debug('Cannot build target %s', output)
+            # self.err[output].append([])
+            return False
+
+        if tared_kind == TARED_DIR:
+            output = _untared_path(output)
+
+        path = pat.fill(output.replace('$(BUILD_ROOT)', ''))
+        return self._publish_result(
+            built,
+            path,
+            action=self._make_output,
+            tared_kind=tared_kind,
+            legacy_install=legacy_install,
+            legacy_bin_dir=legacy_bin_dir,
+            legacy_lib_dir=legacy_lib_dir,
+        )
+
+    def _publish_result(
+        self,
+        built: str,
+        path: str,
+        *,
+        action: Callable[[str, str, bool], None],
+        tared_kind: int = TARED_NONE,
+        legacy_install: bool = False,
+        legacy_bin_dir: bool = False,
+        legacy_lib_dir: bool = False,
+    ) -> bool:
+        result = {}
+
+        if self._need_test_trace_file and built.endswith('ytest.report.trace'):
+            result['trace_file'] = built
+
+        tared = tared_kind != TARED_NONE
+        tared_nodir = tared_kind == TARED_NODIR
+
+        if not self._is_suppressed_output(path):
+            # Persistent output on demand
+            if self._need_output:
+                result['artifact'] = self._wrap_os_error(
+                    self._output_result.put,
+                    built,
+                    path,
+                    action=action,
+                    forced_existing_dir_removal=tared,
+                    tared=tared,
+                    tared_nodir=tared_nodir,
+                )
+
+            # Output for symlinks
+            if self._need_symlinks:
+                result['symlink'] = self._wrap_os_error(
+                    self._symlink_result.put,
+                    built,
+                    path,
+                    target_action=action,
+                    forced_existing_dir_removal=tared,
+                    tared=tared,
+                    tared_nodir=tared_nodir,
+                )
+
+            if legacy_install:
+                self._wrap_os_error(
+                    self._install_result.put,
+                    built,
+                    path,
+                    action=action,
+                    forced_existing_dir_removal=tared,
+                )
+
+            if legacy_bin_dir:
+                self._wrap_os_error(
+                    self._bin_result.put,
+                    built,
+                    path,
+                    action=action,
+                    forced_existing_dir_removal=tared,
+                )
+
+            if legacy_lib_dir:
+                self._wrap_os_error(
+                    self._lib_result.put,
+                    built,
+                    path,
+                    action=action,
+                    forced_existing_dir_removal=tared,
+                )
+
+        self._res[self._node.uid].append(result)
+
+        return True
+
     def __call__(self, deps):
         for x in [self._provider] if self._provider else deps:
             if hasattr(x, 'build_root') and x.build_root.ok:
@@ -220,8 +253,7 @@ class ResultNodeTask(object):
 
                 for o in x.build_root.result_output:
                     if o not in self._node.tared_outputs:
-                        self._ok &= process_output(
-                            self,
+                        self._ok &= self._process_output(
                             o,
                             pat,
                             legacy_install=legacy_install,
@@ -229,8 +261,8 @@ class ResultNodeTask(object):
                             legacy_lib_dir=legacy_lib_dir,
                         )
                     else:
-                        self._ok &= process_output(
-                            self, o, pat, str_to_tared_kind(self._node.kv.get('tared_kind', 'dir'))
+                        self._ok &= self._process_output(
+                            o, pat, str_to_tared_kind(self._node.kv.get('tared_kind', 'dir'))
                         )
 
                 x.build_root.dec()
