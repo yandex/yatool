@@ -18,23 +18,31 @@ from . import consts
 
 logger = logging.getLogger(__name__)
 
+WORKSPACE_MODULE_FIELDS = frozenset(("Module Dir", "NodeType", "SrcDirs", "Var MODULE_LANG", "Var MANGLED_MODULE_TYPE"))
+
 
 def configure_module_info_dump(params: devtools.ya.core.yarg.Params, dump_dir: str) -> None:
     params.debug_options.append("h")
     params.dump_file_path = dump_dir
 
 
-def module_info_from_dumps(dump_dir: str) -> str:
+def iter_module_info_from_dumps(dump_dir: str):
     dump_names = sorted(os.listdir(dump_dir))
     if not dump_names:
         raise RuntimeError("No module-info dumps were produced")
 
-    result = []
     for dump_name in dump_names:
         with open(os.path.join(dump_dir, dump_name)) as dump_file:
-            content = dump_file.read()
-        result.append(content if content.endswith("\n") else content + "\n")
-    return "".join(result)
+            empty = True
+            for line in dump_file:
+                empty = False
+                yield line if line.endswith("\n") else line + "\n"
+            if empty:
+                yield "\n"
+
+
+def module_info_from_dumps(dump_dir: str) -> str:
+    return "".join(iter_module_info_from_dumps(dump_dir))
 
 
 def module_info(params: devtools.ya.core.yarg.Params, dump_dir: str | None = None) -> str:
@@ -62,6 +70,20 @@ def module_info(params: devtools.ya.core.yarg.Params, dump_dir: str | None = Non
     )(dump_params).stdout
 
 
+def collect_modules(params: devtools.ya.core.yarg.Params, dump_dir: str | None = None) -> dict:
+    def parse(lines):
+        return get_modules(lines, skip_modules=params.skip_modules, fields=WORKSPACE_MODULE_FIELDS)
+
+    if dump_dir is not None:
+        try:
+            logger.info("Using precomputed module info")
+            return parse(iter_module_info_from_dumps(dump_dir))
+        except Exception as e:
+            logger.error("Failed to get module info from %s: %s", dump_dir, e)
+
+    return parse(module_info(params))
+
+
 def removeprefix(s, prefix):
     return s[len(prefix) :] if s.startswith(prefix) else s
 
@@ -74,7 +96,7 @@ def shorten_module_name(module_name, rel_targets):
     return module_name
 
 
-def get_modules(module_info_res, rel_targets=None, skip_modules=None):
+def get_modules(module_info_res, rel_targets=None, skip_modules=None, fields=None):
     modules = {}
     current = {}
     skip_modules = set(skip_modules or [])
@@ -94,7 +116,8 @@ def get_modules(module_info_res, rel_targets=None, skip_modules=None):
 
         current.clear()
 
-    for line in six.StringIO(module_info_res):
+    lines = six.StringIO(module_info_res) if isinstance(module_info_res, str) else module_info_res
+    for line in lines:
         if not line.startswith("\t"):
             flush()
         parts = line.strip().split(":", 1)
@@ -102,6 +125,8 @@ def get_modules(module_info_res, rel_targets=None, skip_modules=None):
             current["path"] = removeprefix(removeprefix(parts[0], "$S/"), "$B/")
         elif len(parts) == 2 and parts[0]:
             key = parts[0].strip()
+            if fields is not None and key not in fields:
+                continue
             value = parts[1].strip()
             values = [removeprefix(removeprefix(s, "$S/"), "$B/") for s in value.split(" ")]
             current[key] = values if len(values) > 1 else values[0]
