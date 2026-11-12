@@ -30,6 +30,23 @@ class MemLimiter(StrEnum):
     CGROUP = "cgroup"
 
 
+def _memory_state(vm, cgroup):
+    if cgroup:
+        limiter = MemLimiter.CGROUP
+        mem_limit = cgroup.get_mem_limit()
+        mem_used = cgroup.get_mem_used()
+    else:
+        limiter = MemLimiter.RAM
+        mem_limit = vm.total
+        mem_used = vm.total - vm.available
+    return {
+        "limiter": limiter,
+        "total": mem_limit,
+        "used": mem_used,
+        "used_perc": mem_used / mem_limit * 100.0,
+    }
+
+
 class HostHealth:
     def __init__(self):
         self._watcher = None
@@ -44,6 +61,14 @@ class HostHealth:
 
     def get_host_state(self) -> dict | None:
         return self._watcher.get_host_state() if self._watcher else None
+
+    def get_memory_state(self) -> dict:
+        state = self.get_host_state()
+        if state is not None and "mem_limit" in state:
+            return state["mem_limit"]
+        # The test runner needs a memory budget before the first watcher sample,
+        # including when the watcher is not running. Do not wait for CPU sampling.
+        return _memory_state(psutil.virtual_memory(), _CgroupMemoryInfo.get_cgroup_info())
 
 
 class HostWatcher:
@@ -86,23 +111,9 @@ class HostWatcher:
 
     def _update_state(self):
         vm = psutil.virtual_memory()
-        if self._cgroup_info:
-            limiter = MemLimiter.CGROUP
-            mem_limit = self._cgroup_info.get_mem_limit()
-            mem_used = self._cgroup_info.get_mem_used()
-        else:
-            limiter = MemLimiter.RAM
-            mem_limit = vm.total
-            mem_used = vm.total - vm.available
-        mem_perc = mem_used / mem_limit * 100.0
+        mem_limit_info = _memory_state(vm, self._cgroup_info)
+        mem_perc = mem_limit_info["used_perc"]
         cpu_usage = self._cpu_usage.get()
-
-        mem_limit_info = {
-            "limiter": limiter,
-            "total": mem_limit,
-            "used": mem_used,
-            "used_perc": mem_perc,
-        }
 
         while mem_perc >= MEMORY_THRESHOLDS[self._threshold_idx + 1]:
             self._threshold_idx += 1

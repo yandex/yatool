@@ -1294,7 +1294,8 @@ class ExecutorOptions(Options):
                 ['--memory-limit'],
                 help=(
                     'Restrict new build work when host memory usage exceeds this threshold '
-                    '(Examples: 50GB, 92%). This does not limit memory of an individual process '
+                    '(Examples: 50GB, 92%). Test launches also reserve their declared RAM within this budget. '
+                    'This does not limit memory of an individual process '
                     'or guarantee that OOM cannot occur. Unsupported with Larry'
                 ),
                 hook=SetValueHook('memory_limit'),

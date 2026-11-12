@@ -114,6 +114,21 @@ class CapCalculator:
         return self._max_cap
 
 
+def _test_ram_capacity(memory_limit: dict[str, float] | None, memory_state: dict[str, float]) -> int | None:
+    if not memory_limit:
+        return None
+    limits = [memory_state['total']]
+    if memory_limit['abs']:
+        limits.append(memory_limit['abs'])
+    if memory_limit['rel']:
+        limits.append(memory_state['total'] * memory_limit['rel'] / 100)
+    if len(limits) == 1:
+        return None
+    # Account for the graph and other memory already in use before starting tests.
+    # One oversized test must still make progress, just as with the soft mem gate.
+    return max(1, int(min(limits) - memory_state['used']))
+
+
 class TaskContext(object):
     def __init__(
         self,
@@ -581,6 +596,12 @@ class TaskContext(object):
 
         from psutil import virtual_memory
 
+        host_memory = virtual_memory()
+        self.test_ram_capacity = None
+        if self.opts.memory_limit:
+            memory_state = self._app_ctx.host_health.get_memory_state()
+            self.test_ram_capacity = _test_ram_capacity(self.opts.memory_limit, memory_state)
+
         max_cap = worker_threads.ResInfo(
             io=io_limit,
             cpu=self._threads,
@@ -588,8 +609,13 @@ class TaskContext(object):
             download=self._threads + net_threads,
             upload=net_threads,
             mem=self._threads,
-            ram=(virtual_memory().total >> 30),  # Gigabytes
+            ram=(host_memory.total >> 30),  # Gigabytes
         )
+        if self.test_ram_capacity is not None:
+            # Reserve declared test memory before launch: the existing mem gate
+            # reacts only after running tests have already crossed the threshold.
+            # Keep this separate from ram, which also controls CU build tasks.
+            max_cap = max_cap.copy(test_ram=self.test_ram_capacity)
         worker_pools = {WorkerPoolType.BASE: self._threads + 1, WorkerPoolType.SERVICE: net_threads}
         strategy = schedule_strategy.Strategies.pick(self.opts.schedule_strategy, build_time_cache_availability)
         calc_cap = CapCalculator(self._app_ctx.host_health, max_cap, self.opts.memory_limit)

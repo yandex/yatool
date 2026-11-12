@@ -752,7 +752,13 @@ class RunNodeTask(object):
             else:
                 cpu = parse_cpu_requirement(cpu)
                 cpu = min(max(int(cpu), 1), self._threads)
-            return worker_threads.ResInfo(test=1, cpu=cpu, mem=1)
+            resources = worker_threads.ResInfo(test=1, cpu=cpu, mem=1)
+            capacity = self._ctx.test_ram_capacity
+            if capacity is not None:
+                ram = self._node.requirements.get('ram', 1)
+                reserved = capacity if ram == 'all' else min(ram * 1024**3, capacity)
+                resources = resources.copy(test_ram=reserved)
+            return resources
         return worker_threads.ResInfo(cpu=1, mem=1)
 
     def status(self):
