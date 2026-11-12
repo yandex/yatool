@@ -20,6 +20,7 @@ import devtools.ya.build.build_plan as bp
 import devtools.ya.build.build_result as br
 import devtools.ya.build.gen_plan as gp
 import devtools.ya.build.graph as lg
+from devtools.ya.build import configuration, yt_local_warming
 import devtools.ya.build.owners as ow
 import devtools.ya.build.reports.autocheck_report as ar
 import devtools.ya.build.reports.results_listener as pr
@@ -1100,6 +1101,7 @@ class Context:
         context_creation_stage = stager.start('context_creation')
 
         self.stage_times = {}
+        graph_from_sources = graph is None and not opts.custom_json
 
         self._cache_factory = CacheFactory(opts)
         self.warming_manifest = self._cache_factory.warming_manifest
@@ -1354,6 +1356,24 @@ class Context:
             self.graph = lg.strip_graph(self.graph)
 
             timer.show_step("sandbox_run_test_processing finished")
+
+        if getattr(opts, 'yt_local_max_nodes_per_core', 0):
+            selection = yt_local_warming.select_execution(
+                self.graph,
+                opts,
+                self.cache,
+                self.dist_cache,
+                full_graph=graph_from_sources and disk_graph is None,
+                tests=bool(self.tests or opts.run_tests),
+                host=configuration.execution_host_platform(opts),
+            )
+            # Keep the already configured commands and UIDs; only change their executor.
+            if opts.use_distbuild and selection['mode'] == 'local':
+                self.threads = selection['cores']
+            opts.use_distbuild = selection['mode'] == 'distbuild'
+            logger.info('YT warmup execution selection: %s', selection)
+            if getattr(app_ctx, 'evlog', None):
+                app_ctx.evlog.get_writer('yt_store')('execution-selection', **selection)
 
         # We assume that graph won't be modified after this point. Lite graph should be same as full one -- but lite!
 

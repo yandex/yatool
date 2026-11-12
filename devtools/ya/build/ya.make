@@ -13,6 +13,7 @@ PY_SRCS(
     targets_deref.py
     test_results_console_printer.py
     ya_make.py
+    yt_local_warming.py
 )
 
 PEERDIR(

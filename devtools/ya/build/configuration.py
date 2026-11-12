@@ -110,6 +110,15 @@ def iter_target_flags(opts):
         yield 'WITH_CREDITS', 'yes'
 
 
+def execution_host_platform(opts) -> str:
+    """Resolve the host without changing target normalization or toolchain state."""
+    if opts.host_platform:
+        return bg.mine_platform_name(opts.host_platform)
+    if opts.use_distbuild:
+        return bg.mine_platform_name('default-linux-x86_64')
+    return bg.host_platform_name()
+
+
 def resolve_toolchains(opts, *, report_warning=None):
     host = opts.host_platform
     target_platforms = opts.target_platforms
@@ -127,7 +136,7 @@ def resolve_toolchains(opts, *, report_warning=None):
 
     if opts.use_distbuild:
         if not host:
-            host = bg.mine_platform_name('default-linux-x86_64')
+            host = execution_host_platform(opts)
         if not target_platforms:
             target_platforms = [{'platform_name': bg.host_platform_name()}]
     else:
@@ -145,7 +154,7 @@ def resolve_toolchains(opts, *, report_warning=None):
             except Exception as e:
                 logger.error("Can't print arm64 warning message: {}".format(e))
         if not host:
-            host = bg.host_platform_name()
+            host = execution_host_platform(opts)
         if not target_platforms:
             target_platforms = [{'platform_name': host}]
 

@@ -2809,6 +2809,8 @@ class DistCacheOptions(DistCacheSetupOptions):
         self.yt_replace_result = False
         self.yt_replace_result_yt_upload_only = False
         self.yt_replace_result_add_objects = False
+        self.yt_local_max_nodes_per_core = 0
+        self.yt_local_cores = 0
         self.yt_store_exclusive = False
         self.yt_store_threads = max(get_cpu_count() // 2, 1)
         self.yt_store_wt = True
@@ -3140,6 +3142,22 @@ class DistCacheOptions(DistCacheSetupOptions):
                     hook=lambda n: SetConstValueHook(n, True),
                 ),
             )
+            + [
+                ArgConsumer(
+                    ['--yt-local-max-nodes-per-core'],
+                    help='Run small YT warmups locally: maximum predicted executions per available core (0 disables)',
+                    hook=SetValueHook('yt_local_max_nodes_per_core', transform=int),
+                    group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+                ArgConsumer(
+                    ['--yt-local-cores'],
+                    help='CPU budget for local YT warmups, limited by build threads (0 uses build threads)',
+                    hook=SetValueHook('yt_local_cores', transform=int),
+                    group=YT_CACHE_PUT_CONTROL_GROUP,
+                    visible=HelpLevel.EXPERT,
+                ),
+            ]
             + make_opt_consumers(
                 'yt_replace_result_add_objects',
                 help='Tune yt-replace-result option: add objects (.o) files to build results. Useless without --yt-replace-result',
@@ -3289,6 +3307,10 @@ class DistCacheOptions(DistCacheSetupOptions):
             or self.bazel_remote_timeout <= 0
         ):
             raise ArgsValidatingException('Bazel HTTP timeout must be a finite positive number of seconds')
+
+        for name in ('yt_local_max_nodes_per_core', 'yt_local_cores'):
+            if type(getattr(self, name)) is not int or getattr(self, name) < 0:
+                raise ArgsValidatingException(f'{name} must be a nonnegative integer')
 
         if self.yt_store_exclusive:
             self.yt_store = True
