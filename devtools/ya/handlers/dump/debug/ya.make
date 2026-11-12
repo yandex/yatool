@@ -7,6 +7,7 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/app
     devtools/ya/build/build_opts
+    devtools/ya/build/larry_service
     devtools/ya/core/common_opts
     devtools/ya/core/logger
     devtools/ya/core/config

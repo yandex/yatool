@@ -200,6 +200,14 @@ def do_dump_debug(params):
 
     item.load()
 
+    larry_report = item.debug_bundle_data.get('larry_diagnostics')
+    if larry_report is not None:
+        from devtools.ya.build.larry_service import diagnostics as larry_diagnostics
+        from devtools.ya.core import sec
+
+        suppressions = sec.mine_suppression_filter(item.debug_bundle_data)
+        item.debug_bundle_data['larry_diagnostics'] = larry_diagnostics.collect(larry_report, suppressions=suppressions)
+
     _decompress_evlog_if_needed(item)
 
     # Store all tools_cache logs

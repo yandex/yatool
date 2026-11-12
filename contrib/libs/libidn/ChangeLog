@@ -1,0 +1,171 @@
+2025-03-21  Simon Josefsson  <simon@josefsson.org>
+
+	version 1.43
+	* NEWS: Record release date.
+
+	Clean up doc/specifications/ and re-generate Unicode tables.
+
+2025-03-20  Simon Josefsson  <simon@josefsson.org>
+
+	cicd: Test Guix-generated archive.
+
+	maint: Reproducability fixes.
+
+	cicd: Reduce PDF/texlive usage.
+
+	doc: Generate libidn-components.* using dot.
+
+2025-03-17  Simon Josefsson  <simon@josefsson.org>
+
+	Harmonize with libidn2.
+
+2025-03-16  Simon Josefsson  <simon@josefsson.org>
+
+	Run 'make update-NEWS-hash'.
+
+	maint: Run 'make my-update-copyright'.
+
+	maint: Sync libidn2 ./bootstrap-funclib aclocal fix.
+
+	maint: Run ./bootstrap --bootstrap-sync.
+
+	maint: Bump gnulib revision.
+
+2024-12-29  Simon Josefsson  <simon@josefsson.org>
+
+	cicd: Fixes preparing for release.
+
+	cfg.mk: Add git as bootstrapping tool.
+
+	doc: NEWS fixes.
+
+	doc: More README-releases fixes.
+
+	Fix typo in po-CreationDate-to-mtime-NEWS.
+
+	Set texinfo mtime for stamp-vti/version.texi reproducibility.
+
+	doc: Fix README-release.
+
+	Revert .tarball-version-git syntax for too old git in Trisquel 11.
+
+	Shorten ChangeLog for reproducability in sparse clones.
+
+2024-12-27  Simon Josefsson  <simon@josefsson.org>
+
+	Use announce_gen_args = --cksum-checksums.
+
+	cfg.mk: Use wget -nv for aximport.
+
+	Drop git submodule maint.mk bug workaround.
+
+	Add --format=posix to TAR_OPTIONS.
+
+	cfg.mk: Cleanup sc_codespell.
+
+	Use abbrev=4 in .tarball-version-git to match git-version-gen.
+
+	cicd: Various improvements.
+
+	po-CreationDate-to-mtime-NEWS: Also update *.po not only *.pot.
+
+	Fix srcdir!=builddir builds and improve tarball reproducibility.
+
+	Add .tarball-version-git for git-version-gen.
+
+	Fix -Wformat-security warnings.
+
+2024-12-26  Simon Josefsson  <simon@josefsson.org>
+
+	doc: Put GPLv3 in COPYING file and improve README.md.
+
+	Fix GCC analyzer-use-of-uninitialized-value.
+
+	cicd: Fixes.  Don't use build images.
+
+	cicd: Use arm64 shared runners, and add Ubuntu 24.04 arm64 job.
+
+	fuzz: Silence -Wcast-align and -Wvla warnings.
+
+	maint: Run ./bootstrap --bootstrap-sync.
+
+	Bump gnulib for csharpcomp fixes, and more.
+
+2024-10-10  Simon Josefsson  <simon@josefsson.org>
+
+	cicd: Add 'make release' job.
+
+	gen-ChangeLog: Sync with gnulib manual for reproducibility.
+
+2024-10-09  Simon Josefsson  <simon@josefsson.org>
+
+	Disable parallel builds for C#, broke with dotnet.
+
+	doc: Fix typos.
+
+	ci: Detect codespell bugs.
+
+	Test that both Mono and .NET builds works.
+
+	Update gnulib files.
+
+2024-09-15  Simon Josefsson  <simon@josefsson.org>
+
+	Reproducible tarball.
+
+2024-09-11  Simon Josefsson  <simon@josefsson.org>
+
+	cicd: Fixes.
+
+	doc: Add NEWS entry.
+
+	cicd: Fix pipeline.
+
+	Fix declaration before use.
+
+	Fix missing static declaration (-Werror=missing-variable-declarations) error.
+
+	Fix missing static declaration (-Werror=missing-variable-declarations) error.
+
+	Fix missing static declaration (-Werror=missing-variable-declarations) error.
+
+	Fix missing previous declaration (-Werror=missing-variable-declarations) error.
+
+2024-09-04  Simon Josefsson  <simon@josefsson.org>
+
+	Fix syntax-check warnings.
+
+	maint: Run ./bootstrap --bootstrap-sync.
+
+	maint: Use GNULIB_REVISION instead of git submodule.
+
+2024-01-14  Simon Josefsson  <simon@josefsson.org>
+
+	doc: Add NEWS entry about strverscmp fix.
+
+	maint: Make tests/ the really last SUBDIRS.
+
+2024-01-13  Simon Josefsson  <simon@josefsson.org>
+
+	cicd: macOS: Need coreutils for join in gnulib-tool.
+
+	maint: Update gnulib submodule, for new strversmp on Windows.
+
+	maint: Reorder SUBDIRS so tests/ comes after fuzz/.
+
+	cicd: Fix Windows jobs.  Use mold on Alpine.
+
+	Remove cut'n'paste mistake from libidn2.
+
+	Bump versions.
+
+	maint: post-release administrivia
+	* NEWS: Add header line for next release.
+	* .prev-version: Record previous version.
+	* cfg.mk (old_NEWS_hash): Auto-update.
+
+	version 1.42
+	* NEWS: Record release date.
+
+
+See the source repo for older entries

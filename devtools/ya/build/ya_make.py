@@ -2251,54 +2251,79 @@ class YaMake:
                         from devtools.ya.build.larry_client.cache_options import from_build_options
                         from yalibrary.runner import called_by_agent
                         from devtools.ya.build.larry_client.build_variables import collect_build_variables
+                        from devtools.ya.build.larry_client import release_info
+                        from devtools.ya.build.larry_service import diagnostics as debug_report
+                        from devtools.ya_make.libs.larry_client.py import TRANSPORT_VERSION
                     except ImportError:
                         raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
 
-                    service_recovery = None
-                    if self.opts.larry_addr == 'local:':
-                        from devtools.ya.build.larry_service import recovery, credentials, paths
-                        from devtools.ya.build.larry_client import release_info
+                    client_date = release_info.get_release_date()
+                    # Capture the entire Larry setup: path resolution, credentials
+                    # and option preparation can fail before an adapter exists.
+                    with debug_report.capture(
+                        self.app_ctx.dump_debug,
+                        self.opts.larry_addr,
+                        transport_version=TRANSPORT_VERSION,
+                        client_release_date=client_date.isoformat() if client_date is not None else None,
+                        suppressions=self.app_ctx.hide_token,
+                    ) as report:
+                        service_recovery = None
+                        if self.opts.larry_addr == 'local:':
+                            from devtools.ya.build.larry_service import recovery, credentials, paths
 
-                        service_paths = paths.default_service_paths()
-                        if sys.platform.startswith('linux') or sys.platform == 'darwin':
-                            if self.opts.yt_store:
-                                credentials.prepare_credentials(service_paths, self.opts, token_resolver=get_yt_token)
-                        service_recovery = recovery.ServiceRecovery(
-                            service_paths, client_date=release_info.get_release_date
-                        )
-                    sandbox_token = self.app_ctx.fetcher_params[2] or ''
-                    diagnostics = DiagnosticOptions.from_build_options(self.opts)
-                    result = LarryClient(
-                        callback,
-                        self.ctx.graph,
-                        self.ctx.src_dir,
-                        service_recovery=service_recovery,
-                        display=self.app_ctx.display,
-                        output_replacements=self.ctx.output_replacements,
-                        sandbox_token=sandbox_token,
-                        cache_layers=from_build_options(self.opts, CacheFactory._read_bazel_password),
-                        yt_token=(
-                            get_yt_token(self.opts)
-                            if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
-                            else ''
-                        ),
-                        result_context=self.ctx,
-                        build_variables=collect_build_variables(self.ctx, self.app_ctx, recipe_context=recipe_context),
-                        environment_whitelist=self.opts.larry_environment_whitelist,
-                        test_environment_whitelist=self.opts.larry_test_environment_whitelist,
-                        build_threads=self.opts.build_threads,
-                        build_cache_policy='ignore' if self.opts.clear_build else 'use',
-                        test_threads=getattr(self.opts, 'test_threads', 0),
-                        diagnostics=diagnostics,
-                        view_options={
-                            'style': getattr(self.opts, 'output_style', None),
-                            'extra_progress': getattr(self.opts, 'ext_progress', False),
-                            'use_roman_numerals': getattr(self.opts, 'use_roman_numerals', False),
-                        },
-                        failure_output=(
-                            FailureOutput.DIAGNOSTIC if called_by_agent(self.app_ctx) else FailureOutput.COMMAND
-                        ),
-                    ).build(self.opts.larry_addr)
+                            service_paths = paths.default_service_paths()
+                            debug_report.attach_service(
+                                self.app_ctx.dump_debug,
+                                report,
+                                service_paths.root,
+                                suppressions=self.app_ctx.hide_token,
+                            )
+                            if sys.platform.startswith('linux') or sys.platform == 'darwin':
+                                if self.opts.yt_store:
+                                    credentials.prepare_credentials(
+                                        service_paths, self.opts, token_resolver=get_yt_token
+                                    )
+                            service_recovery = recovery.ServiceRecovery(
+                                service_paths, client_date=release_info.get_release_date
+                            )
+                        sandbox_token = self.app_ctx.fetcher_params[2] or ''
+                        diagnostics = DiagnosticOptions.from_build_options(self.opts)
+                        result = LarryClient(
+                            callback,
+                            self.ctx.graph,
+                            self.ctx.src_dir,
+                            service_recovery=service_recovery,
+                            debug_store=self.app_ctx.dump_debug,
+                            debug_report=report,
+                            debug_suppressions=self.app_ctx.hide_token,
+                            display=self.app_ctx.display,
+                            output_replacements=self.ctx.output_replacements,
+                            sandbox_token=sandbox_token,
+                            cache_layers=from_build_options(self.opts, CacheFactory._read_bazel_password),
+                            yt_token=(
+                                get_yt_token(self.opts)
+                                if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
+                                else ''
+                            ),
+                            result_context=self.ctx,
+                            build_variables=collect_build_variables(
+                                self.ctx, self.app_ctx, recipe_context=recipe_context
+                            ),
+                            environment_whitelist=self.opts.larry_environment_whitelist,
+                            test_environment_whitelist=self.opts.larry_test_environment_whitelist,
+                            build_threads=self.opts.build_threads,
+                            build_cache_policy='ignore' if self.opts.clear_build else 'use',
+                            test_threads=getattr(self.opts, 'test_threads', 0),
+                            diagnostics=diagnostics,
+                            view_options={
+                                'style': getattr(self.opts, 'output_style', None),
+                                'extra_progress': getattr(self.opts, 'ext_progress', False),
+                                'use_roman_numerals': getattr(self.opts, 'use_roman_numerals', False),
+                            },
+                            failure_output=(
+                                FailureOutput.DIAGNOSTIC if called_by_agent(self.app_ctx) else FailureOutput.COMMAND
+                            ),
+                        ).build(self.opts.larry_addr)
                     result_analyzer = (
                         self._make_local_result_analyzer(result[8], result[1]) if diagnostics.timings != 'off' else None
                     )
