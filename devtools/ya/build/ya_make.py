@@ -551,7 +551,12 @@ class CacheFactory:
             fits_filter=fits_filter,
             put_observer=self.warming_manifest.record_put if self.warming_manifest else None,
             restore_observer=persistence,
+            put_required=self._warming_requires_put if persistence is not None else None,
         )
+
+    def _warming_requires_put(self, uid: str) -> bool:
+        node = self.warming_manifest.selected_node(uid)
+        return node is not None and node.cacheable
 
     def _init_yt_dist_cache(self):
         from yalibrary.store.yt_store import yt_store

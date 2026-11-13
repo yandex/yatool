@@ -84,6 +84,10 @@ class DistStore(object):
         with AccumulateTime(lambda x: self._inc_time(x, 'has')):
             return self._do_has(*args, **kwargs)
 
+    def requires_put(self, uid: str) -> bool:
+        """Decide whether a ready local result needs an upload task."""
+        return not self.has(uid)
+
     def _do_put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
         raise NotImplementedError()
 

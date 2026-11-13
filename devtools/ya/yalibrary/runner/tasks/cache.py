@@ -246,7 +246,7 @@ class DistCacheMixin:
             self.dist_cache_exists_and_writable()
             and (not self.__result_only or self.__node.is_result_node)
             and self.__dist_cache.fits(self._node)
-            and not self.__dist_cache.has(self.__node.uid)
+            and self.__dist_cache.requires_put(self.__node.uid)
         )
 
     def dist_cache_exists_and_writable(self) -> bool:

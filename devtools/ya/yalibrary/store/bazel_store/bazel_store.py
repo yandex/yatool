@@ -547,6 +547,7 @@ class BazelStore(DistStore):
     def __init__(self, *args, **kwargs):
         self._put_observer = kwargs.pop('put_observer', None)
         self._restore_observer = kwargs.pop('restore_observer', None)
+        self._put_required = kwargs.pop('put_required', None)
         super(BazelStore, self).__init__(
             name='bazel-store',
             stats_name='bazel_store_status',
@@ -561,11 +562,21 @@ class BazelStore(DistStore):
         self._lock = threading.Lock()
 
     def put(self, self_uid, uid, root_dir, files, codec=None, cuid=None):
-        """Наблюдатель получает статус и живые выходы; без него обычная запись не меняется."""
+        """Notify warming observers while the upload task still owns the files."""
         status = super().put(self_uid, uid, root_dir, files, codec=codec, cuid=cuid)
         if self._put_observer is not None:
             self._put_observer(uid, status.name.lower(), root_dir, files)
+        if status.ok and not self.readonly() and self._restore_observer is not None:
+            # S3 readback is warming work, outside the native HTTP put timer.
+            self._restore_observer(uid, root_dir, self._meta[uid])
         return status
+
+    def requires_put(self, uid: str) -> bool:
+        # Another pod can have AC while the shared result is still incomplete.
+        # Keep selected live files in the upload task until persistence finishes.
+        if self._put_required is not None and self._put_required(uid):
+            return True
+        return super().requires_put(uid)
 
     @property
     def base_uri(self):
