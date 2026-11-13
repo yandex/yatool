@@ -1,5 +1,20 @@
 # Larry gRPC wire and runtime
 
+Server result delivery is an optional extension. `Start.required_capabilities`
+requests `server-result-delivery-v1`; `Ready.capabilities` acknowledges it before
+graph production. An absent capability fails before upload without fallback or
+replay. `BuildRequest.server_delivery.nodes` maps every result UID to named
+destinations (logical output, absolute root, relative path, explicit/source link
+kind and none/directory/contents archive expansion). The server installs each
+ready result and returns `CompletedBuild.delivered_results` with final paths and
+warnings. These files do not borrow a result view or require a result ACK.
+Execution and delivery failures remain separate. Without the extension, the
+callback/ACK behavior below remains unchanged.
+
+`server_delivery.replaceable_symres_roots` explicitly identifies old ya-owned
+stores for source-link migration. Their links may be replaced, but Larry GC
+never traverses or deletes data in those stores.
+
 `proto/session.proto` defines the optional native build session. It is generated
 with `PROTO_LIBRARY` and `GRPC`; `codec.*` explicitly maps native values and
 protobuf values. `bytes` fields preserve native paths and command diagnostics;

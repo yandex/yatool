@@ -1,5 +1,20 @@
 # Python facade
 
+For explicitly selected gRPC transports, `BuildRequest.server_delivery` accepts
+`ServerDeliveryOptions(nodes={uid: (ResultDestination(...), ...)})`. Each result
+UID must be present, including outputless nodes. Destinations select a declared
+logical output, absolute root, relative path, `kind='explicit'|'source_link'` and
+`expansion='none'|'directory'|'contents'`. A contents destination may use `'.'`
+to merge archive children into its root. Support is checked before graph upload;
+legacy rejects this option before connecting. Installed results are reported in
+`BuildResult.delivered_results` as `DeliveryReport` values with final paths and
+warnings. The result consumer is not called for server installation. Existing
+result consumers retain their callback/ACK lifetimes when the option is absent.
+
+`ServerDeliveryOptions.replaceable_symres_roots` identifies previous owned ya
+stores whose public links may be replaced during migration. Larry never collects
+those old stores; unrelated links remain protected.
+
 `LarryClient().execute_build(address, BuildRequest(...), results_consumer,
 progress_listener)` returns `BuildResult`. Rejection is an ordinary result with
 `execution == 'rejected'`, a reason, and no statistics. Execution, consumption and
