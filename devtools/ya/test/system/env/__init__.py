@@ -12,7 +12,7 @@ import devtools.ya.core.sec as sec
 # "YA_EMULATOR_ENV_FOO" reaches the test as "FOO" on every backend (host in-process, iOS via
 # SIMCTL_CHILD_, Android via wrap.sh). Non-prefixed vars are not forwarded to the app, which
 # keeps host secrets (ARC_TOKEN, YA_TOKEN, SANDBOX_SESSION_TOKEN, ...) out of the emulator.
-# See devtools/ya/docs/agents/TEST_WRAPPERS.md.
+# See devtools/ya/docs/agents/04-dataflow-and-contracts/TEST_WRAPPERS.md.
 FORWARD_ENV_PREFIX = 'YA_EMULATOR_ENV_'
 
 
