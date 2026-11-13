@@ -699,11 +699,14 @@ void TDGIterAddable::RepeatResolving(TYMake& ymake, TAddIterStack& stack, TFileH
     if (Node.NodeType == EMNT_File) {
         ymake.IncParserManager.ProcessFile(*fileContent, ymake.GetFileProcessContext(module, node));
     } else if (Node.NodeType == EMNT_NonParsedFile) {
+        const auto file = Graph.GetFileName(Node.NodeType, AssumeFile(Node.ElemId));
+        if (file.GetContextType() == ELT_Action) {
+            return;
+        }
         if (auto ptr = module->RawIncludes.FindPtr(AssumeFile(Node.ElemId))) {
             node.NodeType = Node.NodeType;
             node.ElemId = Node.ElemId;
 
-            const auto file = Graph.GetFileName(Node.NodeType, AssumeFile(Node.ElemId));
             const auto depRule = ymake.IncParserManager.IndDepsRuleByPath(file);
             TAddDepContext nodeCtx(node, *module, Graph, ymake, *ymake.UpdIter, depRule);
             nodeCtx.InduceDeps(CachedPropertiesSearchFunction(*ptr));
@@ -997,9 +1000,11 @@ inline void TDGIterAddable::UseProps(TYMake& ymake, const TPropertiesState& prop
     switch (Node.NodeType) {
         case EMNT_NonParsedFile:
             if (Add && !Add->NeedInit2 && Dep.DepType != EDT_Include) {
-                Add->InitDepsRule();
-                TAddDepContext context(*Add, ymake.Conf.WriteDepsCache);
-                context.InduceDeps(StatePropertiesSearchFunction(props, restrictedProps));
+                if (graph.GetFileName(AssumeFile(Node.ElemId)).GetContextType() != ELT_Action) {
+                    Add->InitDepsRule();
+                    TAddDepContext context(*Add, ymake.Conf.WriteDepsCache);
+                    context.InduceDeps(StatePropertiesSearchFunction(props, restrictedProps));
+                }
 
                 if (const auto* propValues = props.FindValues(TPropertyType{symbols, EVI_CommandProps, "CfgVars"})) {
                     auto& modData = Add->GetModuleData();

@@ -260,7 +260,7 @@ void TModuleResolver::ResolveSingleInclude(TFileView src, const TInclude& includ
     resolverOptions.AllowAbsRoot = false;
     src.GetStr(_SrcName);
     TFileView srcDir = fileConf.Parent(src);
-    srcDir = fileConf.ResolveLink(srcDir);
+    Y_ASSERT(!srcDir.IsLink());
 
     bool isKnownRoot = NPath::IsKnownRoot(include.Path);
 

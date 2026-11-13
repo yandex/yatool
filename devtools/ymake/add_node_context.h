@@ -243,6 +243,7 @@ struct TAddDepContext {
         , DepsRule(rule)
         , UpdateReresolveCache(false)
     {
+        Y_ASSERT(Graph.GetFileName(AssumeFile(Node.ElemId)).GetContextType() != ELT_Action);
     }
 
     TAddDepContext(TNodeAddCtx& node, bool updateReresolveCache)
@@ -254,6 +255,7 @@ struct TAddDepContext {
         , DepsRule(node.DepsRule)
         , UpdateReresolveCache(updateReresolveCache)
     {
+        Y_ASSERT(Graph.GetFileName(AssumeFile(Node.ElemId)).GetContextType() != ELT_Action);
     }
 
     void InduceDeps(const TPropsSearchFunction& searchProps);

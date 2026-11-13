@@ -363,11 +363,10 @@ void TNodeAddCtx::AddDirsToProps(const TPropsNodeList& props, TStringBuf propNam
 }
 
 void TNodeAddCtx::InitDepsRule() {
+    TFileView file = Graph.GetFileName(NodeType, AssumeFile(ElemId));
+    Y_ASSERT(file.GetContextType() != ELT_Action);
     if (!DepsRuleSet) {
-        TFileView file = Graph.GetFileName(NodeType, AssumeFile(ElemId));
-        if (file.GetContextType() != ELT_Action) {
-            SetDepsRuleByName(file.GetTargetStr());
-        }
+        SetDepsRuleByName(file.GetTargetStr());
     }
 }
 
