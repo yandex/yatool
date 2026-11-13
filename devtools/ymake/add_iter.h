@@ -704,7 +704,15 @@ public:
         : public THashMap<TDepsCacheId, TUpdEntryStats>
         , public TGraphDebugOnly
     {
-        TNodes(const TDepGraph& graph) : TGraphDebugOnly{graph} {}
+        TNodes(const TDepGraph& graph) : TGraphDebugOnly{graph} {
+            // Pre-size the hash map to the current graph node count.
+            // The DFS traversal will enter at least as many nodes as are already
+            // in the graph, so reserving upfront eliminates O(log N) rehash
+            // cycles that would otherwise occur as the map grows from zero.
+            // graph.Size() includes the sentinel node at index 0, which is a
+            // safe over-estimate (no harm in one extra bucket).
+            reserve(graph.Size());
+        }
         iterator Insert(TDepsCacheId id, TYMake* yMake = nullptr, TModule* module = nullptr) {
             auto [i, _] = try_emplace(id, false, TNodeDebugOnly{*this, id});
             if (module) {
