@@ -16,6 +16,8 @@ strange_macros_list[0].sort_values()
 make_list.write(PATH_TO_YA_MAKE)
 ```
 
+`CRATE`, `CRATE_PROC_MACRO`, `RUST_BUILD_SCRIPT`, and `RUST_RUNTIME` are projects and support the same `LICENSE` edits as C++ and Python modules.
+
 ### Создать ya.make руками
 
 ```python

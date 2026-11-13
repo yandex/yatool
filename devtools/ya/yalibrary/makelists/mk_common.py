@@ -17,6 +17,9 @@ PROJECT_MACROS = {
     'BOOSTTEST',
     'BOOSTTEST_WITH_MAIN',
     'CI_GROUP',
+    # DTCC-2761 Rust modules need project-level edits, including license updates.
+    'CRATE',
+    'CRATE_PROC_MACRO',
     'CUDA_DEVICE_LINK_LIBRARY',
     'DEV_DLL_PROXY',
     'DLL',
@@ -62,6 +65,8 @@ PROJECT_MACROS = {
     'PYTEST_BIN',
     'PY_LIBRARY',
     'RESOURCES_LIBRARY',
+    'RUST_BUILD_SCRIPT',
+    'RUST_RUNTIME',
     'SANDBOX_PY23_3_TASK',
     'SANDBOX_PY23_TASK',
     'SANDBOX_PY3_TASK',
