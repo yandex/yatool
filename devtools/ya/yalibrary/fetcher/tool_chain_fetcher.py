@@ -5,6 +5,8 @@ import sys
 import time
 from collections import namedtuple
 from copy import deepcopy
+from dataclasses import dataclass, field
+from hashlib import md5
 
 import exts.yjson as json
 import yalibrary.fetcher.progress_info as progress_info_lib
@@ -32,10 +34,38 @@ logger = logging.getLogger(__name__)
 
 
 _SB_REST_API_TIMEOUT = 1 * 60
+_RESERVED_ATTRIBUTES = frozenset(
+    {
+        "platform",
+    }
+)
 
 
 class ResourceNotFound(RuntimeError):
     mute = True
+
+
+@dataclass(kw_only=True, frozen=True)
+class ExtraQuery:
+    releases: str | None = None
+    attributes: dict[str, str | None] = field(default_factory=dict)
+
+    def __post_init__(self):
+        for k in self.attributes:
+            if k in _RESERVED_ATTRIBUTES:
+                raise ValueError(f"Attribute {k} cannot be redefined")
+        # Normalize key order for self.digest() and stringify_memoize()
+        object.__setattr__(
+            self,
+            'attributes',
+            dict(sorted(self.attributes.items())),
+        )
+
+    def __bool__(self):
+        return self.releases is not None or bool(self.attributes)
+
+    def digest(self) -> str:
+        return md5(str(self).encode()).hexdigest()[:10]
 
 
 @stringify_memoize
@@ -48,6 +78,7 @@ def get_tool_chain_fetcher(
     binname=None,
     force_refetch=False,
     download_fn=fetch_resource_if_need,
+    extra_query: ExtraQuery | None = None,
 ):
     if for_platform is None:
         for_platform = platform_matcher.my_platform()
@@ -75,6 +106,7 @@ def get_tool_chain_fetcher(
             force_refetch,
             download_fn,
             bottle_name,
+            extra_query,
         )
     else:
         raise Exception("Unsupported formula: {}".format(formula))
@@ -191,7 +223,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
             progress_callback,
             force_refetch=self._force_refetch,
             strip_prefix=strip_prefix,
-            **self._binname_kwargs
+            **self._binname_kwargs,
         )
         return res.where
 
@@ -212,6 +244,7 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         force_refetch,
         download_fn,
         bottle_name,
+        extra_query: ExtraQuery | None = None,
     ):
         super(_ToolChainLatestMatchedResourceFetcher, self).__init__(
             root, toolchain_name, platform_replacements, for_platform, binname, force_refetch, download_fn
@@ -220,6 +253,7 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         self.__bottle_name = bottle_name
         self.__update_interval = params.get('update_interval', self._DEFAULT_UPDATE_INTERVAL)
         self.__force_update = bool(os.environ.get('YA_TOOL_FORCE_UPDATE'))
+        self.__extra_query_digest = extra_query.digest() if extra_query else None
         if params.get('ignore_platform', False):
             self.__platforms = []
         else:
@@ -227,6 +261,24 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
                 for_platform, self._platform_replacements
             )
             self.__platforms = self._add_default_arch(platforms)
+        if extra_query:
+            # Patch query
+            self.__params = deepcopy(self.__params)
+            query = self.__params['query']
+            if extra_query.releases is not None:
+                if extra_query.releases == '':
+                    query.pop('releases', None)
+                else:
+                    query['releases'] = extra_query.releases
+            if extra_query.attributes:
+                attrs = query.pop('attributes', {})
+                for k, v in extra_query.attributes.items():
+                    if v is None:
+                        attrs.pop(k, None)
+                    else:
+                        attrs[k] = v
+                if attrs:
+                    query['attributes'] = attrs
 
     def _add_default_arch(self, platforms):
         default_arch = 'x86_64'
@@ -243,7 +295,10 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         return 'sbr:{}'.format(resource_id)
 
     def _get_symlink_path(self):
-        return os.path.join(self._root, '-'.join([self.__bottle_name, self._platform]))
+        bottle_name = self.__bottle_name
+        if self.__extra_query_digest:
+            bottle_name += '@' + self.__extra_query_digest
+        return os.path.join(self._root, '-'.join([bottle_name, self._platform]))
 
     def _get_info_path(self):
         return self._get_symlink_path() + '.info'
@@ -381,7 +436,7 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
             self._get_resource_uri(resource_id),
             progress_callback,
             force_refetch=self._force_refetch,
-            **self._binname_kwargs
+            **self._binname_kwargs,
         )
         return self._install_symlink(resource_id)
 

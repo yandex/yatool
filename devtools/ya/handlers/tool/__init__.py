@@ -19,6 +19,7 @@ from devtools.ya.core.yarg import (
     OptsHandler,
     FreeArgConsumer,
     ConfigConsumer,
+    DictPutHook,
     SetAppendHook,
     ShowHelpException,
     NoValueDummyHook,
@@ -36,6 +37,7 @@ from devtools.ya.build.build_opts import CustomFetcherOptions, SandboxAuthOption
 from devtools.ya.core.yarg.help import format_help, format_examples
 from devtools.ya.core.yarg.handler import print_formatted, SimpleHandler
 from yalibrary import tools
+from yalibrary.fetcher.tool_chain_fetcher import ExtraQuery
 from yalibrary.toolscache import lock_resource
 import devtools.ya.core.config
 import devtools.ya.core.respawn
@@ -203,12 +205,16 @@ class ToolYaHandler(BaseHandler):
             for_platform = params.platform or params.host_platform or None
         else:
             for_platform = params.host_platform or None
+        extra_query = None
+        if params.release is not None or params.attributes:
+            extra_query = ExtraQuery(releases=params.release, attributes=params.attributes)
         return tools.xtool(
             name_parts,
             toolchain_extra=params.toolchain,
             for_platform=for_platform,
             target_platform=params.target_platform,
             force_refetch=params.force_refetch,
+            extra_query=extra_query,
         )
 
     def _recursive_sub_handlers(self, parent: tuple[str] | None = None) -> dict[str, SimpleHandler] | None:
@@ -250,11 +256,31 @@ class YaToolOptions(Options):
         self.with_path = False
         self.show_tool_options_warning = False
         self.tags = []
+        self.release = None
+        self.attributes = {}
 
     @staticmethod
     def consumer() -> list[ArgConsumer | EnvConsumer | ConfigConsumer]:
         return [
             ArgConsumer(["--disable-fastpath"], help="Always run python ya tool version", hook=NoValueDummyHook()),
+            ArgConsumer(
+                ["--release"],
+                help="Override Sandbox release filter",
+                hook=SetValueHook("release", values_limit=1),
+                visible=False,
+            ),
+            ArgConsumer(
+                ["--attribute"],
+                help="Add or replace Sandbox resource attribute",
+                hook=DictPutHook("attributes", default_value=""),
+                visible=False,
+            ),
+            ArgConsumer(
+                ["--no-attribute"],
+                help="Remove Sandbox resource attribute",
+                hook=DictPutHook("attributes"),
+                visible=False,
+            ),
             ArgConsumer(
                 ["--json"],
                 help="Dump tools info in JSON format",

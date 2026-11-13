@@ -77,7 +77,7 @@ def stringify_memoize(orig_func, cache_kwarg=None):
     Passing this kwarg with False value disable memoization for the particular call.
     Notice: this kwarg will be never passed to the original function.
     '''
-    memoized_func = memoize(func=orig_func, key=lambda args, kwargs: str((args, list(sorted(kwargs)))))
+    memoized_func = memoize(func=orig_func, key=lambda args, kwargs: str((args, sorted(kwargs.items()))))
     if cache_kwarg is None:
         return memoized_func
 

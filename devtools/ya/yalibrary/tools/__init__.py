@@ -15,6 +15,7 @@ import exts.path2
 import devtools.libs.yaplatform.python.platform_map as platform_map
 import yalibrary.toolscache as toolscache
 
+from yalibrary.fetcher.tool_chain_fetcher import ExtraQuery
 from typing import NotRequired
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ class _Bottle:
         executable: str | dict[str, list[str]] | None,
         for_platform: str | None,
         force_refetch: bool,
+        extra_query: ExtraQuery | None,
     ) -> None:
         self.__formula = formula
         self.__bottle_name = bottle_name
@@ -90,6 +92,7 @@ class _Bottle:
             for_platform,
             binname,
             force_refetch,
+            extra_query=extra_query,
         )
 
     def resolve(self, cache: bool = True) -> str:
@@ -130,6 +133,7 @@ def xtool(
     target_platform: str | None = None,
     cache: bool = True,
     force_refetch: bool = False,
+    extra_query: ExtraQuery | None = None,
 ) -> '_XTool':
     tool = _XTool(
         tuple(name),
@@ -138,6 +142,7 @@ def xtool(
         target_platform=target_platform,
         cache=cache,
         force_refetch=force_refetch,
+        extra_query=extra_query,
     )
     if tool.config.availability == ToolAvailability.INTERNAL:
         raise ToolResolveException("Tool {} is for internal use only".format(tool.name))
@@ -154,9 +159,11 @@ class _XTool:
         target_platform: str | None = None,
         cache: bool = True,
         force_refetch: bool = False,
+        extra_query: ExtraQuery | None = None,
     ) -> None:
         self._for_platform = for_platform
         self._force_refetch = force_refetch
+        self._extra_query = extra_query
         self._cache = cache
         self._tool_cfg = _tool_config_reader.tool(name_parts)
         self._bottle_cache = None
@@ -244,6 +251,7 @@ class _XTool:
                 bottle_value.get('executable'),
                 self._for_platform,
                 self._force_refetch,
+                self._extra_query,
             )
         return self._bottle_cache
 
