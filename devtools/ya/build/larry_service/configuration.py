@@ -13,6 +13,7 @@ class ServiceOptions(typing.NamedTuple):
     endpoint: str
     local_cache_directory: str
     yt_proxy_role: str | None = None
+    grpc_endpoint: str | None = None
 
 
 class ServiceLaunch(typing.NamedTuple):
@@ -43,6 +44,10 @@ def write_configuration(
         raise ValueError('Local cache directory must be absolute')
     if options.yt_proxy_role is not None and not isinstance(options.yt_proxy_role, str):
         raise ValueError('YT proxy role must be text')
+    if options.grpc_endpoint is not None and (not isinstance(options.grpc_endpoint, str) or not options.grpc_endpoint):
+        raise ValueError('gRPC endpoint must be nonempty text')
+    if options.grpc_endpoint == options.endpoint:
+        raise ValueError('Service endpoints must be distinct')
     with installation._locked(paths, check_cancel):
         installed = installation._load(paths, artifact_id)
         values = {
@@ -52,6 +57,8 @@ def write_configuration(
             'installed-artifact-id': installed.artifact_id,
             'yt-token-path': paths.token_file,
         }
+        if options.grpc_endpoint is not None:
+            values['grpc-endpoint'] = options.grpc_endpoint
         if options.yt_proxy_role is not None:
             values['yt-proxy-role'] = options.yt_proxy_role
         # All fields are strings; JSON's generated string escapes are valid TOML.
@@ -65,6 +72,7 @@ def configured_endpoint(
     paths: service_paths.ServicePaths,
     artifact_id: str,
     *,
+    protocol: str = "legacy",
     check_cancel: Callable[[], None] = release._check_cancel,
 ) -> str | None:
     """Keep a selected installation's transport binding across client generations."""
@@ -72,8 +80,10 @@ def configured_endpoint(
         installed = installation._load(paths, artifact_id)
         try:
             with open(os.path.join(installed.root, 'service.toml'), 'rb') as source:
-                endpoint = tomllib.load(source).get('listen-socket')
+                endpoint = tomllib.load(source).get('grpc-endpoint' if protocol == 'grpc' else 'listen-socket')
         except FileNotFoundError:
+            return None
+        if protocol == 'grpc' and endpoint is None:
             return None
         if not isinstance(endpoint, str) or not endpoint:
             raise ValueError('Installed service configuration has no endpoint')

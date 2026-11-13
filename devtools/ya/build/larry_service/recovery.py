@@ -27,6 +27,25 @@ class RecoveryError(protocol.ClientError):
 
 
 class ServiceRecovery:
+    def _launch_options(self, endpoint, artifact_id, previous_artifact_id=None):
+        legacy = configuration.configured_endpoint(self.paths, artifact_id, check_cancel=self._check_cancel)
+        grpc = configuration.configured_endpoint(
+            self.paths, artifact_id, protocol='grpc', check_cancel=self._check_cancel
+        )
+        if previous_artifact_id is not None and previous_artifact_id != artifact_id:
+            legacy = legacy or configuration.configured_endpoint(
+                self.paths, previous_artifact_id, check_cancel=self._check_cancel
+            )
+            grpc = grpc or configuration.configured_endpoint(
+                self.paths, previous_artifact_id, protocol='grpc', check_cancel=self._check_cancel
+            )
+        if endpoint.startswith('grpc:'):
+            grpc = endpoint[5:]
+            legacy = legacy or address.resolve_address('local:').address
+        else:
+            legacy = endpoint
+        return configuration.ServiceOptions(legacy, os.path.join(self.paths.root, 'cache'), grpc_endpoint=grpc)
+
     def __init__(
         self,
         paths: service_paths.ServicePaths,
@@ -94,10 +113,17 @@ class ServiceRecovery:
                 if selected is not None:
                     self._check_age(selected.metadata, selected.origin, client_date)
                 configured_endpoint = (
-                    configuration.configured_endpoint(self.paths, selected.artifact_id, check_cancel=self._check_cancel)
+                    configuration.configured_endpoint(
+                        self.paths,
+                        selected.artifact_id,
+                        protocol='grpc' if request.endpoint.address.startswith('grpc:') else 'legacy',
+                        check_cancel=self._check_cancel,
+                    )
                     if selected is not None
                     else None
                 )
+                if configured_endpoint is not None and request.endpoint.address.startswith('grpc:'):
+                    configured_endpoint = 'grpc:' + configured_endpoint
                 # A missing versioned socket can mean a healthy service for a
                 # different transport. Never rebind that release and restart it
                 # merely because another generation of ya cannot connect.
@@ -165,7 +191,11 @@ class ServiceRecovery:
                     configuration.write_configuration(
                         self.paths,
                         installed.artifact_id,
-                        configuration.ServiceOptions(request.endpoint.address, os.path.join(self.paths.root, 'cache')),
+                        self._launch_options(
+                            request.endpoint.address,
+                            installed.artifact_id,
+                            selected.artifact_id if selected is not None else None,
+                        ),
                         check_cancel=self._check_cancel,
                     )
                     stage = 'activating release'
@@ -182,7 +212,7 @@ class ServiceRecovery:
                 launch = configuration.write_configuration(
                     self.paths,
                     selected.artifact_id,
-                    configuration.ServiceOptions(request.endpoint.address, os.path.join(self.paths.root, 'cache')),
+                    self._launch_options(request.endpoint.address, selected.artifact_id),
                     check_cancel=self._check_cancel,
                 )
                 service.ensure_installed(launch)

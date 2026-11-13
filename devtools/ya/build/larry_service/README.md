@@ -10,8 +10,9 @@ configuration key no longer select Larry. Protocol compatibility is maintained w
 and stable may break compatibility. `larry-betta` uses the separate LARRY/YATOOL/prestable publication stream; `larry-latest`
 continues to use stable.
 
-Only an original `local:` address is managed. `resolve_address` expands it to
-`local:ya_make/larry-{TRANSPORT_VERSION}` using the native constant. None, sync
+Only the original shortcuts `local:` (legacy) and `grpc:local:` (opt-in gRPC) are managed.
+`resolve_address` expands legacy to `local:ya_make/larry-{TRANSPORT_VERSION}`
+using the native constant, and gRPC to its separate versioned namespace (see below). None, sync
 and explicit endpoints retain their existing mode, including an explicit address
 identical to the managed expansion.
 
@@ -325,3 +326,18 @@ of an active build may not become readable until their buffers flush. Verify the
 printed command/time before using a bundle for a failure, or list saved runs with
 `ya dump debug` and select the matching item number. The list is not a stable
 snapshot while new invocations appear.
+
+### Optional gRPC endpoint
+
+`ServiceOptions.grpc_endpoint` adds the TOML `grpc-endpoint` next to
+`listen-socket`. Readiness matches the requested protocol's address, while
+both addresses share the same process/run identity. Legacy `local:` remains
+the beta default. `grpc:local:` explicitly selects the managed gRPC namespace
+`grpc:local:ya_make/larry-grpc-1`; an explicit full gRPC address remains unmanaged.
+
+Recovery of a missing/refused managed endpoint retries the same protocol once,
+only before acceptance. Enabling gRPC preserves the installed legacy address;
+recovering legacy retains the optional gRPC address. A selected binary lacking
+the new configuration option fails startup explicitly. Generic gRPC bootstrap
+errors (including UNIMPLEMENTED) do not authorize recovery or legacy fallback.
+The gRPC namespace generation is independent of the frozen legacy version.

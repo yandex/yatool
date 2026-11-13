@@ -55,6 +55,10 @@ def read_ready_instance(paths, status, expected):
         record = json.loads(data)
         if not isinstance(record, dict):
             return None
+        endpoint = record.get('endpoint')
+        if expected.endpoint.startswith('grpc:'):
+            grpc_endpoint = record.get('grpc_endpoint')
+            endpoint = 'grpc:' + grpc_endpoint if isinstance(grpc_endpoint, str) and grpc_endpoint else None
         if (
             type(record.get('format_version')) is not int
             or record['format_version'] != 1
@@ -69,7 +73,7 @@ def read_ready_instance(paths, status, expected):
             or not isinstance(record.get('artifact_id'), str)
             or not record['artifact_id']
             or (expected.artifact_id is not None and record['artifact_id'] != expected.artifact_id)
-            or record.get('endpoint') != expected.endpoint
+            or endpoint != expected.endpoint
         ):
             return None
         return ReadyInstance(

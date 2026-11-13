@@ -2268,7 +2268,7 @@ class YaMake:
                         suppressions=self.app_ctx.hide_token,
                     ) as report:
                         service_recovery = None
-                        if self.opts.larry_addr == 'local:':
+                        if self.opts.larry_addr in ('local:', 'grpc:local:'):
                             from devtools.ya.build.larry_service import recovery, credentials, paths
 
                             service_paths = paths.default_service_paths()
@@ -2302,7 +2302,7 @@ class YaMake:
                             cache_layers=from_build_options(self.opts, CacheFactory._read_bazel_password),
                             yt_token=(
                                 get_yt_token(self.opts)
-                                if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
+                                if self.opts.yt_store and self.opts.larry_addr.startswith(('sync:', 'grpc-sync:'))
                                 else ''
                             ),
                             result_context=self.ctx,
