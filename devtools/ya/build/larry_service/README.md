@@ -341,3 +341,31 @@ recovering legacy retains the optional gRPC address. A selected binary lacking
 the new configuration option fails startup explicitly. Generic gRPC bootstrap
 errors (including UNIMPLEMENTED) do not authorize recovery or legacy fallback.
 The gRPC namespace generation is independent of the frozen legacy version.
+
+
+## Embedded configuration template
+
+`service.toml.template` is embedded through `RESOURCE`. `configuration.render_configuration`
+uses `string.Template.substitute`: unused inputs are allowed, while unknown slots
+and malformed templates fail explicitly. The beta slot contract may evolve;
+stable compatibility is not promised by this change.
+
+The `endpoint`, `local_cache_directory`, `service_state_file`, `installed_artifact_id`
+and `yt_token_path` slots contain complete TOML string literals. Do not surround
+slots with additional quotes. Literal dollar signs in the template use `$$`;
+substituted values are not expanded recursively. `yt_proxy_role_setting` is an
+optional whole assignment: empty for `None`, otherwise `yt-proxy-role = <quoted value>`.
+This preserves the existing distinction between absent and empty roles.
+`grpc_endpoint_setting` likewise contains an optional `grpc-endpoint` assignment.
+When gRPC is requested, its endpoint must also match after rendering.
+
+Before publishing `service.toml`, the renderer parses TOML and verifies the exact
+endpoint, state-file path and installation identity. Recovery validates a new
+candidate before activating it. Invalid templates leave an existing configuration
+unchanged and do not start the service. Error messages omit configuration contents.
+Other settings may be omitted by a template; service-specific validation belongs
+to Larry. The embedded template preserves the existing startup settings.
+
+Only the embedded template is used at this stage. Delivery alongside Larry and
+selection from the installed artifact are subsequent steps in
+[the migration plan](../../../ya_make/plans/service-configuration-template.md).

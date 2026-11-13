@@ -1,0 +1,7 @@
+listen-socket = ${endpoint}
+local-cache-dir = ${local_cache_directory}
+service-state-file = ${service_state_file}
+installed-artifact-id = ${installed_artifact_id}
+yt-token-path = ${yt_token_path}
+${yt_proxy_role_setting}
+${grpc_endpoint_setting}

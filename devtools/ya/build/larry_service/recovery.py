@@ -247,7 +247,12 @@ class ServiceRecovery:
                 str(error)
                 if isinstance(
                     error,
-                    (manager.ServiceManagerError, installation.InstallationError, release.ReleasePreparationError),
+                    (
+                        manager.ServiceManagerError,
+                        installation.InstallationError,
+                        release.ReleasePreparationError,
+                        configuration.ConfigurationError,
+                    ),
                 )
                 else type(error).__name__
             )

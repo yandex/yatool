@@ -19,7 +19,10 @@ PY_SRCS(
     recovery.py
 )
 
+RESOURCE(service.toml.template /larry_service/service.toml.template)
+
 PEERDIR(
+    library/python/resource
     devtools/local_cache/psingleton/python
     devtools/ya_make/libs/larry_client/py
     devtools/ya/exts
