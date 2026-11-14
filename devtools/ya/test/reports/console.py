@@ -1,5 +1,6 @@
 # coding: utf-8
 import json
+import collections
 import logging
 import os
 
@@ -71,17 +72,19 @@ class ConsoleReporter(object):
         status_pattern = "[[{marker}]]\t{count} - {status}[[rst]]"
         if test_suites:
             count = len(test_suites)
-            suite_results = [s.get_status() for s in test_suites]
+            suite_results = collections.Counter(s.get_status() for s in test_suites)
             lines.append('\nTotal {} suite{}:'.format(count, '' if count == 1 else 's'))
-            lines.append("\n".join(common.get_formatted_statuses(suite_results.count, status_pattern)))
+            lines.append("\n".join(common.get_formatted_statuses(suite_results.__getitem__, status_pattern)))
         else:
             lines.append('\nTotal 0 suites')
 
-        test_results = [test.status for suite in test_suites for test in suite.tests]
-        test_count = len(test_results)
+        test_results = collections.Counter()
+        for suite in test_suites:
+            test_results.update(test.status for test in suite.tests)
+        test_count = sum(test_results.values())
         if test_count:
             lines.append('Total {} test{}:'.format(test_count, '' if test_count == 1 else 's'))
-            lines.append("\n".join(common.get_formatted_statuses(test_results.count, status_pattern)))
+            lines.append("\n".join(common.get_formatted_statuses(test_results.__getitem__, status_pattern)))
         else:
             lines.append('Total 0 tests')
         self._display.emit_message('\n'.join(lines))

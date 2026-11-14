@@ -696,7 +696,7 @@ class TaskContext(object):
                     self.nodes[d].refcount += 1
 
         # Do not delete results for last_failed module
-        for suite in self._ctx.tests:
+        for suite in self._ctx.tests.metadata():
             for tuid in suite.result_uids:
                 if tuid in self.nodes:
                     self.nodes[tuid].refcount += 1
@@ -743,7 +743,9 @@ class TaskContext(object):
             res_nodes = [x for x in self.nodes.values() if x.is_result_node]
             if self.opts.output_only_tests:  # XXX
                 # We need to download test's output (testing_output_stuff.tar, etc) from distbuild - use output_uids instead of result_uids
-                res_set = set(sum([t.output_uids for t in self._ctx.tests], []))
+                res_set = set()
+                for suite in self._ctx.tests.metadata():
+                    res_set.update(suite.output_uids)
                 res_nodes = [x for x in res_nodes if x.uid in res_set]
             download_test_results = _is_test_requested(self.opts)
             if not self.opts.download_artifacts and download_test_results:

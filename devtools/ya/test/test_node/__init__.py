@@ -25,6 +25,7 @@ import devtools.ya.test.dependency.sandbox_resource as sandbox_resource
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import devtools.ya.test.error as test_error
+import devtools.ya.test.suite_storage.suites as suite_storage
 from . import coverage
 from . import cmdline
 from . import fuzzing
@@ -34,7 +35,6 @@ from . import sandbox as sandbox_node
 import exts.timer
 import devtools.ya.test.canon.data as canon_data
 import devtools.ya.test.common as test_common
-from devtools.ya.test.test_types.common import AbstractTestSuite
 import devtools.ya.test.common.ytest_common_tools as ytest_common_tools
 import devtools.ya.test.const
 import devtools.ya.test.filter as test_filter
@@ -1870,7 +1870,9 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
 
 def get_merger_root_path(suites):
     assert suites
-    return os.path.join(suites[0].project_path, "tests_merger")
+    suites = suite_storage.Suites.from_models(suites)
+    with suites.read(next(suites.refs())) as suite:
+        return os.path.join(suite.project_path, "tests_merger")
 
 
 def create_merge_test_runs_node(graph, test_nodes, suite, opts, backup, upload_to_remote_store):
@@ -2053,122 +2055,99 @@ def inject_split_test_nodes(arc_root, graph, suite, custom_deps, opts, platform_
 
 # stub for now, seek a more intelligent solution later
 def make_test_merge_chunks(tests):
+    tests = suite_storage.Suites.from_models(tests)
     chunks = collections.defaultdict(list)
-    for suite in tests:
-        chunks[suite.project_path].append(suite)
-    return chunks.values()
+    for ref in tests.refs():
+        with tests.read(ref) as suite:
+            chunks[suite.project_path].append(ref)
+    return [tests.select_refs(refs) for refs in chunks.values()]
 
 
-def filter_last_failed(tests: list[AbstractTestSuite], opts) -> list[AbstractTestSuite]:
+def filter_last_failed(tests, opts) -> suite_storage.Suites:
+    tests = suite_storage.Suites.from_models(tests)
     logger.debug("Going to apply `last_failed` filter from last run for %d suites", len(tests))
     store_path = last_failed.get_tests_restart_cache_dir(opts.bld_dir)
     status_storage = last_failed.StatusStore(store_path)
-    is_all_empty = True
-    suites_to_rerun = []
-    for suite in tests:
-        suite_hash = suite.get_state_hash()
-        failed_tests = status_storage.get(suite_hash)
+    try:
+        selected = tests.select(lambda suite: _select_last_failed(suite, status_storage), writable=True)
+        status_storage.flush()
+        return tests if not selected or opts.tests_filters else selected
+    finally:
+        status_storage.close()
 
-        if failed_tests:
-            is_all_empty = False
-            suites_to_rerun.append(suite)
-            if suite_hash not in failed_tests:
-                # if a suite is not marked as failed we add filters to run only failed tests
-                suite.insert_additional_filters([ytest_common_tools.to_utf8(k) for k in failed_tests.keys()])
-                logger.debug("Found %d failed tests for suite %s (%s)", len(failed_tests), suite, suite_hash)
-            else:
-                logger.debug(
-                    "Full suite will be restarted due status `%s`: %s (%s)", failed_tests[suite_hash], suite, suite_hash
-                )
-        else:
-            logger.debug("Removing suite %s (%s)", suite, suite_hash)
 
-    status_storage.flush()
-    if is_all_empty or opts.tests_filters:
-        return tests
+def _select_last_failed(suite, status_storage):
+    suite_hash = suite.get_state_hash()
+    failed_tests = status_storage.get(suite_hash)
+    if not failed_tests:
+        logger.debug("Removing suite %s (%s)", suite, suite_hash)
+        return False
+    if suite_hash not in failed_tests:
+        suite.insert_additional_filters([ytest_common_tools.to_utf8(k) for k in failed_tests])
+        logger.debug("Found %d failed tests for suite %s (%s)", len(failed_tests), suite, suite_hash)
     else:
-        return suites_to_rerun
+        logger.debug(
+            "Full suite will be restarted due status `%s`: %s (%s)", failed_tests[suite_hash], suite, suite_hash
+        )
+    return True
 
 
-def filter_blacklist(tests: list[AbstractTestSuite], opts) -> list[AbstractTestSuite]:
+def filter_blacklist(tests, opts) -> suite_storage.Suites:
+    tests = suite_storage.Suites.from_models(tests)
     if not opts.test_blacklist_path:
         return tests
     logger.debug("Going to apply `blacklist` filter from last run for %d suites", len(tests))
     filters_manager = test_filter.SuiteFiltersManager(opts.test_blacklist_path)
-    result = []
-    for suite in tests:
-        name_filter = filters_manager.get_test_filter(suite)
-        if name_filter is None:
-            logger.debug("Add suite as is %s", suite)
-            result.append(suite)
-            continue
-        tests = suite.get_additional_filters()
-        if not tests:
-            tests = suite.get_computed_test_names(opts)
-        if not tests:
-            logger.debug("Suite is empty, skip %s", suite)
-            continue
-        tests = list(filter(lambda x: not name_filter(x), tests))
-        if tests:
-            logger.debug("Add suite %s with %d tests", suite, len(tests))
-            suite._additional_filters = tests
-            result.append(suite)
-        else:
-            logger.debug("Suite is empty now, skip %s", suite)
-    return result
+    return tests.select(lambda suite: _select_test_names(suite, filters_manager, opts, black=True), writable=True)
 
 
-def filter_whitelist(tests: list[AbstractTestSuite], opts) -> list[AbstractTestSuite]:
+def filter_whitelist(tests, opts) -> suite_storage.Suites:
+    tests = suite_storage.Suites.from_models(tests)
     if not opts.test_whitelist_path:
         return tests
     logger.debug("Going to apply `whitelist` filter from last run for %d suites", len(tests))
     filters_manager = test_filter.SuiteFiltersManager(opts.test_whitelist_path)
-    result = []
-    for suite in tests:
-        name_filter = filters_manager.get_test_filter(suite)
-        if name_filter is None:
-            logger.debug("Suite not in list %s", suite)
-            continue
-        tests = suite.get_additional_filters()
-        if not tests:
-            tests = suite.get_computed_test_names(opts)
-        if not tests:
-            suite.insert_additional_filters(name_filter.filter_list)
-            logger.debug("Suite has not testnames, added %d %s", len(name_filter.filter_list), suite)
-            result.append(suite)
-        else:
-            tests = list(filter(name_filter, tests))
-            if tests:
-                logger.debug("Add suite %s with %d tests", suite, len(tests))
-                suite._additional_filters = tests
-                result.append(suite)
-            else:
-                logger.debug("Suite is empty now, skip %s", suite)
+    return tests.select(lambda suite: _select_test_names(suite, filters_manager, opts, black=False), writable=True)
 
-    return result
+
+def _select_test_names(suite, filters_manager, opts, black):
+    name_filter = filters_manager.get_test_filter(suite)
+    if name_filter is None:
+        return black
+    names = suite.get_additional_filters() or suite.get_computed_test_names(opts)
+    if not names:
+        if not black:
+            suite.insert_additional_filters(name_filter.filter_list)
+        return not black
+    names = [name for name in names if bool(name_filter(name)) != black]
+    if names:
+        suite._additional_filters = names
+    return bool(names)
 
 
 def configure_suites(suites, process, stage, add_error_func):
     def _p(data, p):
-        return data[max(int(round(p * len(data))) - 1, 0)][1]
+        return data[max(int(round(p * len(data))) - 1, 0)][-1]
 
+    suites = suite_storage.Suites.from_models(suites)
     times = []
     processed = []
 
-    for suite in suites:
+    for ref in suites.refs():
         start = time.time()
-        with test_error.SuiteCtx(add_error_func, suite):
-            try:
-                process(suite)
-            except Exception as e:
-                test_error.SuiteCtx.add_error(e)
-            else:
-                processed.append(suite)
+        with suites.edit(ref) as suite:
+            with test_error.SuiteCtx(add_error_func, suite):
+                try:
+                    process(suite)
+                except Exception as e:
+                    test_error.SuiteCtx.add_error(e)
+                else:
+                    processed.append(ref)
 
-        times.append((suite, time.time() - start))
+            times.append((str(suite), len(suite.chunks), time.time() - start))
 
     if times:
-        times.sort(key=lambda x: x[1])
+        times.sort(key=lambda x: x[-1])
         logger.debug(
             "Processed %d suite(s) in %s stage: p100:%0.4fs p99:%0.4fs p95:%0.4fs",
             len(times),
@@ -2179,13 +2158,14 @@ def configure_suites(suites, process, stage, add_error_func):
         )
         logger.debug(
             "The longest 10 suites processed:\n%s",
-            '\n'.join("{:.4f}s {} chunks:{}".format(t, s, len(s.chunks)) for s, t in reversed(times[-10:])),
+            '\n'.join("{:.4f}s {} chunks:{}".format(t, name, chunks) for name, chunks, t in reversed(times[-10:])),
         )
 
-    return processed
+    return suites.select_refs(processed)
 
 
 def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=None, opts=None):
+    tests = suite_storage.Suites.from_models(tests)
     injected_tests = []
 
     def process(suite):
@@ -2238,7 +2218,7 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
             logger.warning("Skipping test '%s (%s)' due to unresolved dependencies", suite.project_path, suite.name)
             return
 
-        injected_tests.append(suite)
+        injected_tests.append(suite.uid)
 
         assert test_nodes
         if len(test_nodes) > 1:
@@ -2274,7 +2254,8 @@ def inject_test_nodes(arc_root, graph, tests, platform_descriptor, custom_deps=N
 
     configure_suites(tests, process, 'suites-injection', add_error_func=None)
 
-    return injected_tests
+    injected_uids = set(injected_tests)
+    return tests.select(lambda suite: suite.uid in injected_uids)
 
 
 def in_canonize_mode(test_opts):
@@ -2298,6 +2279,7 @@ def in_fuzzing_mode(test_opts):  # XXX
 
 
 def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_tool_resolver):
+    suites = suite_storage.Suites.from_models(suites)
     if not suites:
         return []
 
@@ -2337,7 +2319,7 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_to
                     )
             if canonization_nodes:
                 inject_canonization_result_node(
-                    [s for s in suites if s.supports_canonization], plan, canonization_nodes, test_opts
+                    suites.select(lambda suite: suite.supports_canonization), plan, canonization_nodes, test_opts
                 )
                 timer.show_step('inject canonize nodes')
             else:
@@ -2368,7 +2350,7 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_to
 
     timer.show_step('inject test nodes')
 
-    cov_suites = [x for x in suites if x.supports_coverage]
+    cov_suites = suites.select(lambda suite: suite.supports_coverage)
     if len(cov_suites):
         coverage.inject_coverage_nodes(arc_root, plan, cov_suites, test_opts, platform_descriptor)
         timer.show_step('inject coverage merge nodes')
@@ -2950,13 +2932,15 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
 
 
 def inject_test_list_nodes(arc_root, graph, tests, opts, custom_deps, platform_descriptor):
+    tests = suite_storage.Suites.from_models(tests)
     injected_tests = []
-    for suite in tests:
-        list_node = inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_descriptor)
-        if list_node:
-            graph.append_node(list_node, add_to_result=False)
-            injected_tests.append(suite)
-    return injected_tests
+    for ref in tests.refs():
+        with tests.edit(ref) as suite:
+            list_node = inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_descriptor)
+            if list_node:
+                graph.append_node(list_node, add_to_result=False)
+                injected_tests.append(ref)
+    return tests.select_refs(injected_tests)
 
 
 def inject_list_result_node(graph, tests, opts, tests_filter_descr):
@@ -3049,13 +3033,15 @@ def _get_skipped_tests_annotations(suites):
 
 
 def split_stripped_tests(tests, opts):
+    tests = suite_storage.Suites.from_models(tests)
     injected_tests, skipped_tests = [], []
-    for t in tests:
-        if t.is_skipped():
-            skipped_tests.append(t)
-        else:
-            injected_tests.append(t)
-    return injected_tests, skipped_tests
+    for ref in tests.refs():
+        with tests.read(ref) as suite:
+            if suite.is_skipped():
+                skipped_tests.append(ref)
+            else:
+                injected_tests.append(ref)
+    return tests.select_refs(injected_tests), tests.select_refs(skipped_tests)
 
 
 def filter_test_cases(tests, opts, test_opts=None):

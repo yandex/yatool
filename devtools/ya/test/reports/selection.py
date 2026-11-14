@@ -33,6 +33,8 @@ def slowest_test_cases(test_suites, limit):
     """
     if limit <= 0:
         return []
+    if hasattr(test_suites, 'slowest_test_cases'):
+        return test_suites.slowest_test_cases(limit)
     ran = [(suite, test_case) for suite in test_suites for test_case in suite.tests if test_case.elapsed > 0]
     ran.sort(key=lambda pair: (-pair[1].elapsed, pair[0].project_path, pair[1].name))
     return ran[:limit]

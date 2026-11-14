@@ -219,11 +219,13 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                 get_id(suite.project_path, suite.get_type(), test_type=suite.get_ci_type_name())
             )
         general_info = get_blank_record()
+        # Records can outlive a const storage loan. Export owned plain data,
+        # not wrappers or aliases to nested suite/chunk/case containers.
         general_info.update(
             {
                 "type": suite.get_ci_type_name(),
                 "path": suite.project_path,
-                "tags": suite.tags,
+                "tags": list(suite.tags),
                 "uid": suite.uid,
                 "target_platform_descriptor": suite.target_platform_descriptor,
                 "is_skipped": suite.is_skipped(),
@@ -297,7 +299,7 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                     "id": chunk_id,
                     "hid": chunk_hid,
                     "links": get_test_logs(chunk.logs, suite.name, merger_out_dir),
-                    "metrics": chunk.metrics,
+                    "metrics": copy.deepcopy(chunk.metrics),
                     "name": suite.get_type(),
                     "rich-snippet": build_container_comment(chunk),
                     "status": convert_test_status(chunk.get_status()),
@@ -348,10 +350,10 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                     test_entry["path"] = test.path
 
                 if test.metrics:
-                    test_entry["metrics"].update(test.metrics)
+                    test_entry["metrics"].update(copy.deepcopy(test.metrics))
 
                 if test.tags:
-                    test_entry["tags"] = list(set(test_entry["tags"] + test.tags))
+                    test_entry["tags"] = list(set(test_entry["tags"] + list(test.tags)))
 
                 # Protocol's "status" field is binary: good/fail
                 # However suites/tests/subtests operates with status that may be good/fail/missing/crashed/skipped
@@ -364,7 +366,7 @@ def make_suites_results_prototype(suites, merger_out_dir=None):
                     test_result = {}
                     try:
                         for key, obj in six.iteritems(test.result):
-                            obj = external.ExternalDataInfo(obj)
+                            obj = external.ExternalDataInfo(copy.deepcopy(obj))
                             test_result[key] = {
                                 "hash": obj.checksum,
                                 "url": obj.path,

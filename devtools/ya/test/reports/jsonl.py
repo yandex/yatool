@@ -152,7 +152,10 @@ class JsonlReporter(object):
     def _add_tips(self, test_suites):
         # type: (list[tp.Any]) -> None
         """Suggest options that shorten the agent's next iteration over these results."""
-        failed_suites = [suite for suite in test_suites if suite.get_status() not in _NOT_FAILED_STATUSES]
+        if hasattr(test_suites, 'select'):
+            failed_suites = test_suites.select(lambda suite: suite.get_status() not in _NOT_FAILED_STATUSES)
+        else:
+            failed_suites = [suite for suite in test_suites if suite.get_status() not in _NOT_FAILED_STATUSES]
         style_paths = sorted(
             {
                 self._absolute_path(path)

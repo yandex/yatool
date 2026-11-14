@@ -5,6 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/test/suite_storage
     devtools/ya/test/dartfile
     devtools/ya/test/test_types
 )

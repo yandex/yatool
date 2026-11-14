@@ -1,5 +1,6 @@
 import devtools.ya.test.const
 import devtools.ya.test.reports
+import devtools.ya.test.suite_storage.suites as suite_storage
 from devtools.ya.test.util.shared import build_filter_message
 
 
@@ -23,7 +24,7 @@ def remove_empty_suites(suites):
     Empty suites may appears if filtering requested
     when test node is launched with user specified filter and it doesn't contain required tests
     '''
-    return [suite for suite in suites if not is_empty_suite(suite)]
+    return suite_storage.Suites.from_models(suites).select(lambda suite: not is_empty_suite(suite))
 
 
 def get_number_of_empty_suites(suites):
@@ -31,15 +32,14 @@ def get_number_of_empty_suites(suites):
 
 
 def get_suites_to_show(suites, fail_fast=False, report_skipped_suites=False):
-    suites_to_show = [s for s in suites if not s.is_skipped() or report_skipped_suites]
+    suites_to_show = suite_storage.Suites.from_models(suites).select(
+        lambda suite: not suite.is_skipped() or report_skipped_suites
+    )
     suites_to_show = remove_empty_suites(suites_to_show)
     if fail_fast:
-        try:
-            suites_to_show = [
-                [suite for suite in suites_to_show if suite.get_status() != devtools.ya.test.const.Status.GOOD][0]
-            ]
-        except IndexError:
-            pass
+        failed = suites_to_show.select(lambda suite: suite.get_status() != devtools.ya.test.const.Status.GOOD)
+        if failed:
+            suites_to_show = failed.select_refs([next(failed.refs())])
     return suites_to_show
 
 

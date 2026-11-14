@@ -2,9 +2,12 @@
 
 import os
 import copy
+import contextlib
 import exts.yjson as json
 import logging
+import devtools.ya.test.suite_storage.suites as suite_storage
 import threading
+import typing as tp
 import urllib
 
 from collections import defaultdict
@@ -401,6 +404,13 @@ class YaMakeProgress:
         return ci_progress
 
 
+class _PreparedTestResult(tp.NamedTuple):
+    entries: list[dict]
+    test_size: str
+    ci_type_name: str
+    toolchain: str | None
+
+
 class ReportGenerator:
     _logger = logging.getLogger('ReportGenerator')
 
@@ -417,12 +427,16 @@ class ReportGenerator:
         ensure_removed(self._messages_dir)
         create_dirs(self._messages_dir)
         self._processed_lock = threading.Lock()
+        self._publication_lock = threading.Lock()
+        self._links_lock = threading.Lock()
         self._processed_uids = set()
         self._tests_by_size = defaultdict(set)
+        self._tests_by_type = defaultdict(set)
         tests_count = defaultdict(lambda: defaultdict(int))
         style_tests_count = defaultdict(int)
         logger.debug("Got %d tests to report", len(tests))
         for test in tests:
+            self._tests_by_type[test.get_ci_type_name()].add(test.uid)
             toolchain = test.target_platform_descriptor
             transformed_toolchain = results_report.transform_toolchain(self._report_config, toolchain)
             should_report = (
@@ -434,9 +448,6 @@ class ReportGenerator:
             elif test.get_ci_type_name() == YaMakeProgress.STYLE:
                 style_tests_count[transformed_toolchain] += 1 * should_report
 
-        self._tests_by_type = defaultdict(set)
-        for test in tests:
-            self._tests_by_type[test.get_ci_type_name()].add(test.uid)
         for size in TEST_SIZES:
             if size not in self._tests_by_size:
                 self.finish_tests_report_by_size(size)
@@ -509,6 +520,9 @@ class ReportGenerator:
 
     def _add_entries(self, entries):
         filtered_entries = [_f for _f in map(self._post_process, entries) if _f]
+        self._queue_entries(filtered_entries)
+
+    def _queue_entries(self, filtered_entries):
         for report in self._reports:
             report(filtered_entries)
 
@@ -689,13 +703,43 @@ class ReportGenerator:
         if "result" in entry:
             external.apply(resolve_external_path, entry["result"])
 
-    def _add_test_result(self, suite, node_errors, links, report_prototype):
-        import devtools.ya.test.const as test_const
-
+    def _add_test_result(self, suite, node_errors, links, report_prototype, isolated_links):
         with self._processed_lock:
             if suite.uid in self._processed_uids:
                 return
             self._processed_uids.add(suite.uid)
+
+        prepared = self._prepare_test_result(suite, node_errors, links, report_prototype, isolated_links)
+        # Independent suites can prepare concurrently, but publishing records
+        # and closing their type/size streams must be one atomic operation.
+        with self._publication_lock:
+            self._publish_test_result(suite.uid, prepared)
+
+    def _suite_links_snapshot(self, suite, entry_prototypes, resolver, isolated_links):
+        links_map = {resolver.substitute(key): value for key, value in suite.links_map.items()}
+        if isolated_links:
+            # Disposable CI suites already carry their complete link set. Do
+            # not retain it in the legacy cross-suite accumulator.
+            return links_map
+
+        link_keys = set()
+        if self._opts.use_links_in_report and self._opts.build_results_resource_id is None:
+            for prototype in entry_prototypes:
+                if prototype['is_skipped']:
+                    continue
+                for paths in prototype.get('links', {}).values():
+                    for path in paths:
+                        for suffix in ('.link', '.tar.link', '.tar.zstd.link'):
+                            link_keys.add(resolver.substitute(path) + suffix)
+        with self._links_lock:
+            # Legacy suites may use previous suites' links. Capture only keys
+            # queried by the resolver, without copying the growing global map.
+            # The snapshot also protects concurrent normalized-key collisions.
+            self._links_map.update(links_map)
+            return {key: self._links_map[key] for key in link_keys if key in self._links_map}
+
+    def _prepare_test_result(self, suite, node_errors, links, report_prototype, isolated_links) -> _PreparedTestResult:
+        import devtools.ya.test.const as test_const
 
         if suite.uid in report_prototype:
             entry_prototypes = report_prototype[suite.uid]
@@ -727,11 +771,11 @@ class ReportGenerator:
 
         resolver = test_reports.TextTransformer(replacements)
 
-        for k, v in suite.links_map.items():
-            self._links_map[resolver.substitute(k)] = v
+        links_map = self._suite_links_snapshot(suite, entry_prototypes, resolver, isolated_links)
 
-        if not suite_prototype["is_skipped"]:
-            suite.set_work_dir(resolver.substitute(suite.work_dir()))
+        # Root normalization belongs to report data, not to the shared model.
+        # Const views also avoid initializing AbstractTestSuite's work-dir cache.
+        work_dir = resolver.substitute(suite.work_dir()) if not suite_prototype["is_skipped"] else None
 
         entries = []
 
@@ -752,7 +796,7 @@ class ReportGenerator:
             # TODO: DEVTOOLS-5005 - stop sending skipped tests to distbs
             requirements = suite._original_requirements
             if requirements:
-                entry["requirements"] = requirements
+                entry["requirements"] = copy.deepcopy(requirements)
 
             # for now we change toolchain for all large tests from default-linux-x86_64-relwithdebinfo to
             # default-linux-x86_64-release except tests tagged with ya:relwithdebinfo
@@ -779,7 +823,7 @@ class ReportGenerator:
                 and (entry != suite_prototype or suite_prototype["links"])
                 and not entry_prototype["is_skipped"]
             ):
-                _replace_logs_with_links(entry, self._build_root, suite.work_dir(), self._links_map)
+                _replace_logs_with_links(entry, self._build_root, work_dir, links_map)
             if links:
                 if "links" not in entry:
                     entry["links"] = {}
@@ -788,13 +832,18 @@ class ReportGenerator:
             entries.append(entry)
 
         toolchain = entries[-1].get("toolchain", None) if len(entries) and entries[-1] else None
+        filtered_entries = [_f for _f in map(self._post_process, entries) if _f]
+        return _PreparedTestResult(filtered_entries, test_size, ci_type_name, toolchain)
+
+    def _publish_test_result(self, uid: str, prepared: _PreparedTestResult) -> None:
+        entries, test_size, ci_type_name, toolchain = prepared
         if self.ya_make_progress and toolchain:
             if ci_type_name == YaMakeProgress.STYLE:
                 self.ya_make_progress.increment_style_done(toolchain, 1)
             else:
                 self.ya_make_progress.increment_test_done(toolchain, test_size, 1)
 
-        self._add_entries(entries)
+        self._queue_entries(entries)
 
         def _discard_last_item(m, key, u):
             if key in m and len(m[key]) > 0:
@@ -802,32 +851,42 @@ class ReportGenerator:
                 return len(m[key]) == 0
             return False
 
-        if _discard_last_item(self._tests_by_size, test_size, suite.uid):
+        if _discard_last_item(self._tests_by_size, test_size, uid):
             self._logger.debug('Fetched all tests results by size %s, close stream', test_size)
             self.finish_tests_report_by_size(test_size)
 
-        if _discard_last_item(self._tests_by_type, ci_type_name, suite.uid):
+        if _discard_last_item(self._tests_by_type, ci_type_name, uid):
             self._logger.debug('Fetched all tests results by type %s, close stream', ci_type_name)
             self._finish_report_by_type(ci_type_name)
 
-    def add_tests_results(self, suites, build_errors, node_build_errors_links, report_prototype=None):
+    def add_tests_results(
+        self, suites, build_errors, node_build_errors_links, report_prototype=None, *, isolated_links: bool = False
+    ) -> None:
+        """Publish suites, optionally resolving links without cross-suite retention.
+
+        Independent workers must supply complete suite-local links when using
+        isolated_links. Join all workers before explicitly finishing reports.
+        """
         if report_prototype is None:
             report_prototype = defaultdict(list)
-        for suite in suites:
-            if build_errors:
-                target_platform = suite.target_platform_descriptor or platform_matcher.my_platform()
-                key = (suite.project_path, target_platform, suite.uid)
-                errors = build_errors.get(key)
-            else:
-                errors = []
+        with contextlib.ExitStack() as resources:
+            if isinstance(suites, suite_storage.Suites):
+                suites = resources.enter_context(contextlib.closing(suites.report_iterator()))
+            for suite in suites:
+                if build_errors:
+                    target_platform = suite.target_platform_descriptor or platform_matcher.my_platform()
+                    key = (suite.project_path, target_platform, suite.uid)
+                    errors = build_errors.get(key)
+                else:
+                    errors = []
 
-            links = {}
-            if suite.uid in node_build_errors_links:
-                for dep_uid, logs in node_build_errors_links[suite.uid]:
-                    for url in logs:
-                        links["{}_{}".format(dep_uid, os.path.basename(url))] = [url]
+                links = {}
+                if suite.uid in node_build_errors_links:
+                    for dep_uid, logs in node_build_errors_links[suite.uid]:
+                        for url in logs:
+                            links["{}_{}".format(dep_uid, os.path.basename(url))] = [url]
 
-            self._add_test_result(suite, errors, links, report_prototype)
+                self._add_test_result(suite, errors, links, report_prototype, isolated_links)
 
     def add_stage(self, build_stage):
         for report in self._reports:
@@ -840,7 +899,7 @@ def prepare_results(test_results, report_prototype, builder, configure_errors, r
         builder.opts,
         builder.distbuild_graph,
         builder.targets,
-        builder.ctx.tests,
+        suite_storage.metadata(builder.ctx.tests),
         builder.get_make_files(),
         results_dir,
         build_root,
@@ -863,8 +922,15 @@ def prepare_results(test_results, report_prototype, builder, configure_errors, r
             report_prototype,
         )
     else:
+        selected = (
+            test_results.select_refs(
+                ref for ref, info in zip(test_results.refs(), test_results.metadata()) if not info.skipped
+            )
+            if isinstance(test_results, suite_storage.Suites)
+            else (test for test in test_results if not test.is_skipped())
+        )
         generator.add_tests_results(
-            [t for t in test_results if not t.is_skipped()],
+            selected,
             builder.build_result.build_errors,
             builder.build_result.node_build_errors_links,
             report_prototype,

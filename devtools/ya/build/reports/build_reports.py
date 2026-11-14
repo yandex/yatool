@@ -6,6 +6,7 @@ import devtools.ya.test.reports.console as rc
 import devtools.ya.test.test_node as test_node
 
 from devtools.ya.test import common as test_common
+import devtools.ya.test.suite_storage.suites as suite_storage
 
 CANONICAL_REPORT_TYPE = 'canonical'
 HUMAN_READABLE_REPORT_TYPE = 'human_readable'
@@ -26,7 +27,19 @@ def fill_suites_results(builder, suites, output_root):
     return suites
 
 
-def generate_results_report(builder):
+def generate_results_report(builder, *, suites_prepared=False):
+    """Generate full JSON and/or JUnit reports from the final suite results.
+
+    JSONL/full JSON reporting prepares suites at EOF in TestNodeListener.
+    Reuse those results when suites_prepared is true to avoid another mutable
+    fill pass and its payload/index writes. JUnit-only runs have no such EOF
+    preparation, so they must keep the fallback fill pass here.
+
+    Args:
+        builder: Build owner providing options, suites, and execution results.
+        suites_prepared: Whether EOF preparation completed for these suites;
+            use the listener's results_prepared flag, not report options alone.
+    """
     if not hasattr(builder.opts, "output_root"):
         return
     if not builder.opts.build_results_report_file and not builder.opts.junit_path:
@@ -41,13 +54,17 @@ def generate_results_report(builder):
     assert output_dir
     output_dir = test_common.strings_to_utf8(output_dir)
 
-    not_skipped_suites = []
-    skipped_suites = []
+    not_skipped_suites = suite_storage.Suites()
+    skipped_suites = suite_storage.Suites()
 
     if builder.opts.report_skipped_suites_only or builder.opts.report_skipped_suites:
         skipped_suites = builder.ctx.stripped_tests
     if not builder.opts.report_skipped_suites_only:
-        not_skipped_suites = fill_suites_results(builder, builder.ctx.tests, output_dir)
+        # EOF already prepared these same models when JSONL/full JSON reporting
+        # is active. Repeating the fill pass only adds pickle and index writes.
+        not_skipped_suites = (
+            builder.ctx.tests if suites_prepared else fill_suites_results(builder, builder.ctx.tests, output_dir)
+        )
 
     suites = not_skipped_suites + skipped_suites
 

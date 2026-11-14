@@ -11,6 +11,7 @@ import devtools.ya.test.const
 from library.python import func
 
 import devtools.ya.test.test_types.common as common_suites
+import devtools.ya.test.suite_storage.suites as suite_storage
 
 logger = logging.getLogger(__name__)
 
@@ -336,29 +337,32 @@ def test_list(path: str, black: bool, opts):
     return filter_function
 
 
-def filter_suites(suites: list[common_suites.AbstractTestSuite], opts, tc) -> list[common_suites.AbstractTestSuite]:
+def filter_suites(suites, opts, tc) -> suite_storage.Suites:
     def apply_filter(
-        suites: list[common_suites.AbstractTestSuite],
+        suites: suite_storage.Suites,
         callback: Callable[[common_suites.AbstractTestSuite], bool],
         filter_description,
-    ) -> list[common_suites.AbstractTestSuite]:
+    ) -> suite_storage.Suites:
         logger.debug("Going to apply filter '%s' on %s suites", filter_description, len(suites))
         skipped = []
         filtered = []
-        for suite in suites:
-            if callback(suite):
-                filtered.append(suite)
-            else:
-                if inspect.isfunction(filter_description):
-                    reason = filter_description(suite)
+        for ref in suites.refs():
+            with suites.edit(ref) as suite:
+                if callback(suite):
+                    filtered.append(ref)
                 else:
-                    reason = "skipped by {}".format(filter_description)
-                suite.add_suite_error(reason, devtools.ya.test.const.Status.SKIPPED)
-                skipped.append(common_suites.SkippedTestSuite(suite))
+                    if inspect.isfunction(filter_description):
+                        reason = filter_description(suite)
+                    else:
+                        reason = "skipped by {}".format(filter_description)
+                    suite.add_suite_error(reason, devtools.ya.test.const.Status.SKIPPED)
+                    suites.replace(ref, common_suites.SkippedTestSuite(suite))
+                    skipped.append(ref)
         if len(filtered) != len(suites):
             skipped_suites.extend(skipped)
-        return filtered
+        return suites.select_refs(filtered)
 
+    suites = suite_storage.Suites.from_models(suites)
     skipped_suites = []
     test_size_filters = tc.get("test_size_filters") or opts.test_size_filters
     if not test_size_filters:
@@ -393,4 +397,4 @@ def filter_suites(suites: list[common_suites.AbstractTestSuite], opts, tc) -> li
     suites = apply_filter(suites, fixed_test_names(opts.tests_filters, opts), 'name')
     suites = apply_filter(suites, test_list(opts.test_whitelist_path, False, opts), 'whitelist')
     suites = apply_filter(suites, test_list(opts.test_blacklist_path, True, opts), 'blacklist')
-    return suites + skipped_suites
+    return suites + suites.select_refs(skipped_suites)

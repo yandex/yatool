@@ -6,6 +6,7 @@ import math
 import os
 import re
 import traceback
+import types
 import typing as tp
 
 import devtools.ya.core.error
@@ -225,13 +226,44 @@ def fill_suites_results(suites, builder, results_root, resolver=None):
     return fill_suites_results_from_build_result(suites, builder.build_result, results_root, resolver)
 
 
+type _BuildErrorTarget = tuple[str, str | None, str]
+
+
+def index_build_errors_by_uid(
+    build_errors: tp.Iterable[_BuildErrorTarget],
+) -> tp.Mapping[str, _BuildErrorTarget]:
+    """Share one immutable build-error lookup across disposable EOF workers."""
+    return types.MappingProxyType({target[2]: target for target in build_errors})
+
+
 def fill_suites_results_from_build_result(
-    suites: tp.Iterable, build_result: 'br.BuildResult', results_root: str, resolver=None
+    suites: tp.Iterable,
+    build_result: 'br.BuildResult',
+    results_root: str,
+    resolver=None,
+    *,
+    build_errors_by_uid: tp.Mapping[str, _BuildErrorTarget] | None = None,
 ) -> None:
+    """Prepare all models; the iterator variant also supports in-loan publication."""
+    for _ in iter_suites_results_from_build_result(
+        suites, build_result, results_root, resolver, build_errors_by_uid=build_errors_by_uid
+    ):
+        pass
+
+
+def iter_suites_results_from_build_result(
+    suites: tp.Iterable,
+    build_result: 'br.BuildResult',
+    results_root: str,
+    resolver=None,
+    *,
+    build_errors_by_uid: tp.Mapping[str, _BuildErrorTarget] | None = None,
+) -> tp.Iterator:
     """Fill suite models using execution facts, without retaining a YaMake owner.
 
     Both resident listeners and disposable CI workers need the same failure and
     trace interpretation; only the legacy adapter above needs a builder.
+    A supplied build_errors_by_uid must describe this same unchanged BuildResult.
     """
     if not suites:
         return
@@ -267,7 +299,9 @@ def fill_suites_results_from_build_result(
             errs.append("\n".join(build_result.build_errors[target]))
         return errs
 
-    build_errors_map = {uid: (path, platform, uid) for path, platform, uid in build_result.build_errors}
+    build_errors_map = (
+        index_build_errors_by_uid(build_result.build_errors) if build_errors_by_uid is None else build_errors_by_uid
+    )
 
     def collect_errors_for_suite(suite):
         DEP_LIMIT = 2
@@ -376,6 +410,7 @@ def fill_suites_results_from_build_result(
             # XXX suite has already been loaded
             if suite.chunks:
                 record_test_preparation(suite, build_result)
+                yield suite
                 continue
 
             result = TestPackedResultView(work_dir)
@@ -445,3 +480,6 @@ def fill_suites_results_from_build_result(
                 suite.fix_roots(resolver)
 
         record_test_preparation(suite, build_result)
+        # Keep the storage loan open through publication. Separating fill and
+        # report passes needlessly restores and saves every disk-backed suite.
+        yield suite

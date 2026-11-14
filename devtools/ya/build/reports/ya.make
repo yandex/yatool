@@ -10,6 +10,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/test/suite_storage
     devtools/ya/build/owners
     devtools/ya/build/stat
     devtools/ya/exts

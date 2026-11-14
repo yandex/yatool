@@ -1,3 +1,5 @@
+import contextlib
+import devtools.ya.test.suite_storage.suites as suite_storage
 import logging
 import os
 import time
@@ -173,6 +175,11 @@ def _run_build_with_warming_manifest(builder):
 
 
 def _do_ya_make(params, app_ctx):
+    with contextlib.ExitStack() as resources:
+        return _do_ya_make_impl(params, app_ctx, resources)
+
+
+def _do_ya_make_impl(params, app_ctx, resources):
     from devtools.ya.build import ya_make
 
     distbuild_mock = None
@@ -204,15 +211,15 @@ def _do_ya_make(params, app_ctx):
         context = remote_graph_generator.generate(params, app_ctx)
         builder = context.builder
     elif params.custom_context:
-        from devtools.ya.build.disk_graph import load_custom_context
-
-        custom_context_json = load_custom_context(params)
-        context = ya_make.BuildContext.load(params, app_ctx, custom_context_json)
+        context = ya_make.BuildContext.load_file(params, app_ctx)
         builder = context.builder
-        del custom_context_json
     else:
         builder = ya_make.YaMake(params, app_ctx)
         context = None
+
+    if context is not None:
+        resources.callback(context.close)
+    resources.callback(suite_storage.close_collections, builder.ctx.tests, builder.ctx.stripped_tests)
 
     context_generating_stage.finish()
 

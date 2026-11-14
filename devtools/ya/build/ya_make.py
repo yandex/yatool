@@ -13,7 +13,6 @@ import typing as tp  # noqa
 from devtools.ya.test import const
 
 import six
-import pickle as cPickle
 
 import app_config
 import devtools.ya.build.build_plan as bp
@@ -53,6 +52,7 @@ from devtools.ya.build.reports import configure_error as ce
 from devtools.ya.build.reports import results_report
 from devtools.ya.core import stage_tracer
 from devtools.ya.yalibrary import sjson
+import devtools.ya.test.suite_storage.suites as suite_storage
 import library.python.filelock as filelock
 import library.python.tmp as tmp
 import library.python.windows as windows
@@ -772,44 +772,57 @@ def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Faile
 # TODO: Merge to Context
 class BuildContext:
     @classmethod
+    def load_file(cls, params, app_ctx):
+        from devtools.ya.build import disk_graph
+
+        return cls.load(params, app_ctx, disk_graph.load_custom_context(params))
+
+    @classmethod
     def load(cls, params, app_ctx, data):
         """Restore a disposable context, consuming its serialized suite dictionaries."""
 
         def restore_tests(pickled_tests):
-            tests = []
-            for uid in pickled_tests:
-                pickled_test = pickled_tests[uid]
-                # Keep the key order while releasing each payload as it is consumed.
-                # Iterating values() or copying them would retain the serialized suites.
-                pickled_tests[uid] = None
-                tests.append(cPickle.loads(six.ensure_binary(pickled_test, encoding='latin-1'), encoding='utf-8'))
-            pickled_tests.clear()
-            return tests
+            return suite_storage.Suites.from_serialized(pickled_tests)
 
-        builder = YaMake(
-            params,
-            app_ctx,
-            graph=data.get('graph'),
-            tests=restore_tests(data['tests']),
-            stripped_tests=restore_tests(data.get('stripped_tests', {})),
-            configure_errors=data['configure_errors'],
-            make_files=data['make_files'],
-        )
-        return BuildContext(builder, owners=data['owners'])
+        with contextlib.ExitStack() as loading:
+            tests = restore_tests(data['tests'])
+            loading.callback(tests.close)
+            stripped = restore_tests(data.get('stripped_tests', {}))
+            loading.callback(stripped.close)
+            builder = YaMake(
+                params,
+                app_ctx,
+                graph=data.get('graph'),
+                tests=tests,
+                stripped_tests=stripped,
+                configure_errors=data['configure_errors'],
+                make_files=data['make_files'],
+            )
+            context = cls(builder, owners=data['owners'])
+            context._resources.enter_context(loading.pop_all())
+            return context
 
     def __init__(self, builder, owners=None, ctx=None):
         self.builder = builder
         self.ctx = ctx
         self.owners = owners or builder.get_owners()
+        self._resources = contextlib.ExitStack()
+
+    def close(self) -> None:
+        self._resources.close()
+
+    def __enter__(self) -> 'BuildContext':
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
     def save(self):
         ctx = self.ctx or self.builder.ctx
         return {
             'configure_errors': ctx.configure_errors,
-            'tests': {test.uid: six.ensure_str(cPickle.dumps(test), encoding='latin-1') for test in ctx.tests},
-            'stripped_tests': {
-                test.uid: six.ensure_str(cPickle.dumps(test), encoding='latin-1') for test in ctx.stripped_tests
-            },
+            'tests': suite_storage.Suites.from_models(ctx.tests).serialized(),
+            'stripped_tests': suite_storage.Suites.from_models(ctx.stripped_tests).serialized(),
             'make_files': ctx.make_files,
             'owners': self.owners,
             'graph': ctx.full_graph,
@@ -1177,18 +1190,18 @@ class Context:
                     graph = sjson.load(custom_json_file, intern_keys=True, intern_vals=True)
                     lg.finalize_graph(graph, opts)
             self.graph = graph
-            self.tests = tests
-            self.stripped_tests = []
+            self.tests = suite_storage.Suites.from_models(tests)
+            self.stripped_tests = suite_storage.Suites()
             if stripped_tests is not None:
-                self.stripped_tests = stripped_tests
+                self.stripped_tests = suite_storage.Suites.from_models(stripped_tests)
             self.configure_errors = load_configure_errors(configure_errors)
             self.make_files = make_files or []
         elif opts.custom_json is not None and opts.custom_json:
             with udopen(opts.custom_json, "rb") as custom_json_file:
                 self.graph = sjson.load(custom_json_file, intern_keys=True, intern_vals=True)
                 lg.finalize_graph(self.graph, opts)
-            self.tests = []
-            self.stripped_tests = []
+            self.tests = suite_storage.Suites()
+            self.stripped_tests = suite_storage.Suites()
             self.make_files = []
         else:
             try:
@@ -1208,6 +1221,9 @@ class Context:
                 raise ConfigurationError()
 
         self._populate_graph_fields()
+
+        self.tests = suite_storage.Suites.from_models(self.tests)
+        self.stripped_tests = suite_storage.Suites.from_models(self.stripped_tests)
 
         print_status("Configuring local and dist store caches")
 
@@ -1237,13 +1253,13 @@ class Context:
             self.graph['result'] = warming_results
             self.graph = lg.strip_graph(self.graph)
             results = set(self.graph['result'])
-            self.tests = [test for test in self.tests if test.uid in results]
+            self.tests = self.tests.select(lambda test: test.uid in results)
         elif opts.bazel_remote_store and opts.dist_cache_evict_cached:
             self.graph['result'] = replace_dist_cache_results(self.graph, opts, self.dist_cache, app_ctx)
             logger.debug("Strip graph due bazel_remote_store mode")
             self.graph = lg.strip_graph(self.graph)
             results = set(self.graph['result'])
-            self.tests = [x for x in self.tests if x.uid in results]
+            self.tests = self.tests.select(lambda test: test.uid in results)
         # XXX see YA-1354
         elif opts.yt_replace_result or opts.dist_cache_evict_cached:
             new_results, cached_results = replace_yt_results(
@@ -1258,13 +1274,13 @@ class Context:
             self.yt_cached_results = cached_results
             self.yt_not_cached_results = new_results
             results = set(self.graph['result'])
-            self.tests = [x for x in self.tests if x.uid in results]
+            self.tests = self.tests.select(lambda test: test.uid in results)
 
         elif opts.frepkage_target_uid:
             assert opts.frepkage_target_uid in graph['result'], (opts.frepkage_target_uid, graph['result'])
             logger.debug("Strip graph using %s uid as single result", opts.frepkage_target_uid)
             self.graph = lg.strip_graph(self.graph, result=[opts.frepkage_target_uid])
-            self.tests = [x for x in self.tests if x.uid == opts.frepkage_target_uid]
+            self.tests = self.tests.select(lambda test: test.uid == opts.frepkage_target_uid)
             assert self.tests
 
         elif sandbox_run_test_uids:
@@ -1326,7 +1342,8 @@ class Context:
             from devtools.ya.test import test_node
 
             # All tests have same global resources
-            test_global_resources = self.tests[0].global_resources
+            with self.tests.read(next(self.tests.refs())) as suite:
+                test_global_resources = dict(suite.global_resources)
 
             # Move frepkage uploading to the separate node in the graph to avoid a bottleneck
             upload_node, upload_res_info_filename = test_node.create_upload_frepkage_node(
@@ -1339,18 +1356,19 @@ class Context:
             self.graph['graph'].append(populate_node)
 
             # Replace ya:force_sandbox tagged result test nodes with sandbox_run_test node
-            test_map = {x.uid: x for x in self.tests}
+            test_map = self.tests.by_uid()
             nodes_map = {node['uid']: node for node in self.graph['graph']}
             for uid in sandbox_run_test_uids:
                 node = nodes_map[uid]
-                new_node = test_node.create_sandbox_run_test_node(
-                    node,
-                    test_map[uid],
-                    nodes_map,
-                    frepkage_res_info=upload_res_info_filename,
-                    deps=[upload_node['uid'], populate_node['uid']],
-                    opts=self.opts,
-                )
+                with self.tests.edit(test_map[uid]) as suite:
+                    new_node = test_node.create_sandbox_run_test_node(
+                        node,
+                        suite,
+                        nodes_map,
+                        frepkage_res_info=upload_res_info_filename,
+                        deps=[upload_node['uid'], populate_node['uid']],
+                        opts=self.opts,
+                    )
                 node.clear()
                 node.update(new_node)
 
@@ -1766,7 +1784,7 @@ class YaMake:
 
     def _generate_report(self):
         logger.debug("Generating results report")
-        build_report.generate_results_report(self)
+        build_report.generate_results_report(self, suites_prepared=self._test_results.results_prepared)
         build_report.generate_empty_tests_result_report(self)
 
     def _dump_json(self, filename, content):
@@ -1902,9 +1920,10 @@ class YaMake:
                 )
 
     def _setup_repo_state(self):
-        suites = [t for t in self.ctx.tests if not t.is_skipped()]
         source_root = self.ctx.src_dir
-        for s in suites:
+        for s in self.ctx.tests:
+            if s.is_skipped():
+                continue
             test_project_path = getattr(s, "project_path", None)
             if test_project_path is None:
                 continue
@@ -1929,7 +1948,9 @@ class YaMake:
         self._output_root = self.opts.output_root or tempfile.mkdtemp()
 
         tests = (
-            [t for t in self.ctx.tests if t.is_skipped()] if self.opts.report_skipped_suites_only else self.ctx.tests
+            self.ctx.tests.select(lambda test: test.is_skipped())
+            if self.opts.report_skipped_suites_only
+            else self.ctx.tests
         )
         report_list = []
 
@@ -1940,7 +1961,7 @@ class YaMake:
             self.opts,
             self.distbuild_graph,
             self.targets,
-            tests,
+            suite_storage.metadata(tests),
             self.get_make_files(),
             results_dir,
             self._output_root,

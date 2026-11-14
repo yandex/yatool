@@ -4,6 +4,7 @@ import os
 import logging
 
 from devtools.ya.test import dartfile
+import devtools.ya.test.suite_storage.suites as suite_storage
 from devtools.ya.test.test_types import (
     benchmark,
     boost_test,
@@ -65,35 +66,34 @@ def generate_tests_by_dart(
 ):
     darts = dartfile.parse_dart(dart_content.split('\n'))
 
-    suites: list[types_common.AbstractTestSuite] = []
+    suites = suite_storage.Suites()
     darts = dartfile.merge_darts(darts)
+    suites_dict: dict[tuple[str, ...], suite_storage.SuiteRef] = {}
     for dart_info in darts:
         suite = gen_suite(dart_info, target_platform_descriptor, multi_target_platform_run, with_wine)
-        if suite:
-            suites.append(suite)
-
-    suites_dict: dict[tuple[str, ...], types_common.AbstractTestSuite] = {}
-    for suite in suites:
+        if suite is None:
+            continue
         suite_uid = dartfile.get_suite_id(suite)
         if suite_uid in suites_dict:
-            existing_suite = suites_dict[suite_uid]
-            if not all(
-                [
-                    not existing_suite.is_skipped(),
-                    existing_suite.fork_test_files_requested(opts),
-                    not suite.is_skipped(),
-                    suite.fork_test_files_requested(opts),
-                ]
-            ):
+            with suites.read(suites_dict[suite_uid]) as existing_suite:
+                duplicate_allowed = all(
+                    [
+                        not existing_suite.is_skipped(),
+                        existing_suite.fork_test_files_requested(opts),
+                        not suite.is_skipped(),
+                        suite.fork_test_files_requested(opts),
+                    ]
+                )
+            if not duplicate_allowed:
                 logger.error(
-                    'Found more than one test with the same suite uid %s, name %s in %s, will test a random one',
+                    'Found duplicate suite %s, name %s in %s; keeping the first',
                     suite_uid,
                     suite.name,
                     suite.project_path,
                 )
         else:
-            suites_dict[suite_uid] = suite
-    return suites_dict.values()
+            suites_dict[suite_uid] = suites.add(suite)
+    return suites
 
 
 def gen_suite(
@@ -125,7 +125,9 @@ def gen_suite(
 def generate_diff_tests(opts, target_platform_descriptor):
     revision = opts.test_diff or "HEAD"
     project_path = os.path.relpath(opts.abs_targets[0], opts.arc_root)
-    return [types_common.DiffTestSuite(project_path, revision, target_platform_descriptor=target_platform_descriptor)]
+    return suite_storage.Suites.from_models(
+        [types_common.DiffTestSuite(project_path, revision, target_platform_descriptor=target_platform_descriptor)]
+    )
 
 
 def configure_platform_runners(suites, tc):

@@ -21,6 +21,7 @@ import devtools.ya.test.common as test_common
 import devtools.ya.test.result as test_result
 import devtools.ya.test.reports as test_reports
 import yalibrary.display
+import devtools.ya.test.suite_storage.suites as suite_storage
 
 import typing as tp
 
@@ -83,6 +84,15 @@ def summarize_suites(suites: tp.Iterable['tt_common.AbstractTestSuite']) -> Test
 
 
 class TestResultsListener(ResultsListener):
+    @property
+    def results_prepared(self) -> bool:
+        """Whether EOF prepared shared models for subsequent full reports."""
+        return False
+
+    @abc.abstractmethod
+    def report_skipped_suites(self, suites) -> None:
+        """Publish discovery before active results can close their streams."""
+
     @abc.abstractmethod
     def summary(self) -> TestSummary:
         """Return the current outcome without requiring resident suite models."""
@@ -305,16 +315,16 @@ class TestNodeListener(TestResultsListener):
     def __init__(self, tests, output_root, report_generator, *, stream_results=True, report_context=None):
         self._lock = threading.Lock()
         self._output_root = output_root
-        self._tests = {}  # type: dict[str, tt_common.AbstractTestSuite]
+        self._tests = {}
         self._seen = set()
         self._report_generator = report_generator
-        self._suites = tests
+        self._suites = suite_storage.Suites.from_models(tests)
         self._stream_results = stream_results
         self._report_context = report_context or TestReportContext(output_root)
+        self._results_prepared = False
 
         if stream_results:
-            for tst in tests:
-                self._tests[tst.uid] = tst
+            self._tests = self._suites.by_uid()
 
     def __call__(self, res=None, build_stage=None):
         if not self._stream_results:
@@ -336,21 +346,46 @@ class TestNodeListener(TestResultsListener):
         context = self._report_context
         # Do not extend Context.stripped_tests in place: later full reports and
         # console output reuse that selection independently of JSONL reporting.
-        suites = context.skipped_suites
-        if not context.skipped_only and not context.list_tests:
-            resolver = test_reports.TextTransformer(
-                [("$(BUILD_ROOT)", context.output_root), ("$(SOURCE_ROOT)", "arcadia")]
+        with contextlib.ExitStack() as resources:
+            suites = context.skipped_suites
+            prepare = not context.skipped_only and not context.list_tests
+            if prepare:
+                resolver = test_reports.TextTransformer(
+                    [("$(BUILD_ROOT)", context.output_root), ("$(SOURCE_ROOT)", "arcadia")]
+                )
+                prepared = resources.enter_context(
+                    contextlib.closing(
+                        test_result.iter_suites_results_from_build_result(
+                            self._suites, result, context.output_root, resolver
+                        )
+                    )
+                )
+                skipped = resources.enter_context(contextlib.closing(self._suites_iterator(suites)))
+                suites = itertools.chain(skipped, prepared)
+            self._report_generator.add_tests_results(
+                suites, result.build_errors, result.node_build_errors_links, defaultdict(list)
             )
-            test_result.fill_suites_results_from_build_result(self._suites, result, context.output_root, resolver)
-            suites = itertools.chain(suites, self._suites)
-        self._report_generator.add_tests_results(
-            suites, result.build_errors, result.node_build_errors_links, defaultdict(list)
-        )
+            self._results_prepared = prepare
+
+    @staticmethod
+    def _suites_iterator(suites):
+        if isinstance(suites, suite_storage.Suites):
+            yield from suites.report_iterator()
+        else:
+            yield from suites
+
+    @property
+    def results_prepared(self) -> bool:
+        return self._results_prepared
+
+    def report_skipped_suites(self, suites) -> None:
+        self._report_generator.add_tests_results(suites, build_errors=None, node_build_errors_links=[])
 
     def summary(self) -> TestSummary:
         # Full reports and console preparation may still update these models
         # after EOF. Unlike CI's compact summary this view must remain live.
-        return summarize_suites(self._suites)
+        with contextlib.closing(self._suites.const_iterator()) as suites:
+            return summarize_suites(suites)
 
     def _on_test_node_failed(self, uid, status):
         self._logger.debug('Test node %s is failed. Status: %s', uid, status)
@@ -361,7 +396,10 @@ class TestNodeListener(TestResultsListener):
                 return
             self._seen.add(uid)
 
-        suite = self._tests[uid]
+        with self._suites.edit(self._tests[uid]) as suite:
+            self._load_and_report(suite, res)
+
+    def _load_and_report(self, suite, res):
         build_root = res['build_root']
         work_dir = test_common.get_test_suite_work_dir(
             build_root,

@@ -27,9 +27,9 @@ class _SuiteCtx:
         self._stack.append((func, suite))
         try:
             yield
-        except Exception:
+        finally:
+            # A completed preparation scope must not retain its model.
             self._stack.pop()
-            raise
 
     def add_error(self, exc):
         if devtools.ya.core.config.is_test_mode():

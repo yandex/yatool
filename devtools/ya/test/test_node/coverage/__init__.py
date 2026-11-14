@@ -1,4 +1,5 @@
 import logging
+import devtools.ya.test.suite_storage.suites as suite_storage
 
 from . import cpp
 from . import extensions
@@ -36,7 +37,9 @@ def inject_coverage_nodes(arc_root, graph, suites, opts, platform_descriptor):
     if resolvers_map and getattr(opts, 'upload_coverage_report', False):
         assert suites
         # All suites has the same global_resources - take first
-        global_resources = suites[0].global_resources
+        selection = suite_storage.Suites.from_models(suites)
+        with selection.read(next(selection.refs())) as suite:
+            global_resources = dict(suite.global_resources)
 
         # create root node only once (otherwise may hit the queue limit for yt account)
         create_table_node_uid = (

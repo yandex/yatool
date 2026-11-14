@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import contextlib2
 import copy
 import logging
+import devtools.ya.test.suite_storage.suites as suite_storage
 import os
 import re2
 import six
@@ -1771,14 +1772,12 @@ class _GraphMaker(configuration.ConfigurationPreparation):
             with_wine = None
             if self._needs_wine64_for_tests([tc]):
                 with_wine = 'wine64'
-            tests = list(
-                te.generate_tests_by_dart(
-                    dart,
-                    target_platform_descriptor,
-                    multi_target_platform_run,
-                    self._opts,
-                    with_wine=with_wine,
-                )
+            tests = te.generate_tests_by_dart(
+                dart,
+                target_platform_descriptor,
+                multi_target_platform_run,
+                self._opts,
+                with_wine=with_wine,
             )
         logger.debug("Found %d tests", len(tests))
         timer.show_step('generate tests')
@@ -2792,8 +2791,8 @@ def _build_merged_graph(
 ):
     merged_graph: graph_descr.DictGraph | None = None
     ytexec_required = False
-    stripped_tests = []
-    injected_tests = []
+    stripped_tests = suite_storage.Suites()
+    injected_tests = suite_storage.Suites()
     sandboxing_test_uids = set()
 
     if any_tests:
@@ -2858,7 +2857,7 @@ def _build_merged_graph(
         conf = gen_plan.gen_extra_dict_by_opts(opts, repository_type=opts.repository_type)
         merged_graph['conf'].update(conf)
 
-    return merged_graph, list(injected_tests), list(stripped_tests), united_make_files
+    return merged_graph, injected_tests, stripped_tests, united_make_files
 
 
 def _inject_tests(

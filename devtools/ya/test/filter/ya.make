@@ -6,6 +6,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/test/suite_storage
     contrib/python/six
     devtools/ya/exts
     devtools/ya/test/const
