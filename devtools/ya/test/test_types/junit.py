@@ -88,6 +88,8 @@ class JavaTestSuite(test_types.AbstractTestSuite):
             for_test=True,
         )
         self.jacoco_agent_resource = base.resolve_jacoco_agent(self.global_resources, opts)
+        # unpacking_jtest_runner.py fills the option in from the class lists of the modules matched by the filter
+        self.jacoco_includes = ',includes=' if getattr(opts, 'java_coverage_source_filter', None) else ''
         self.jvm_args.append('-DJAVA=' + test_tools.jdk_tool('java', jdk_path=self.jdk_for_tests_resource))
         self.python = test_common.get_python_cmd(opts=opts)
         self.initialized = True
@@ -212,7 +214,15 @@ class JavaTestSuite(test_types.AbstractTestSuite):
         return os.path.join(suite_work_dir, test_const.TEMPORARY_TRACE_DIR_NAME)
 
     def get_run_cmd_inputs(self, opts):
-        return super(JavaTestSuite, self).get_run_cmd_inputs(opts)
+        inputs = super(JavaTestSuite, self).get_run_cmd_inputs(opts)
+        if getattr(opts, 'java_coverage', False) and getattr(opts, 'java_coverage_source_filter', None):
+            # unpacking_jtest_runner.py builds the jacoco `includes` from the class lists next to the classpath
+            # jars; declare them so that distbuild delivers the ones that exist (contrib and the modules
+            # outside the filter have none, which is fine)
+            inputs = inputs + [
+                os.path.splitext(jar)[0] + test_const.JAVA_COVERAGE_CLASSES_EXT for jar in self.classpath
+            ]
+        return inputs
 
     def get_list_cmd(self, arc_root, build_root, opts):
         assert self.initialized
@@ -384,9 +394,10 @@ class JavaTestSuite(test_types.AbstractTestSuite):
             coverage = []
         else:
             coverage = [
-                '-javaagent:{}=output=file,destfile={}'.format(
+                '-javaagent:{}=output=file,destfile={}{}'.format(
                     test_tools.jacoco_agent_tool(self.jacoco_agent_resource),
                     os.path.join(suite_work_dir, 'java.coverage', 'report.exec'),
+                    self.jacoco_includes,
                 )
             ]
 

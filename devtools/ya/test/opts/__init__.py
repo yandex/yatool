@@ -1406,6 +1406,7 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         self.fast_clang_coverage_merge = False
         self.go_coverage = False
         self.java_coverage = False
+        self.java_coverage_source_filter = None
         self.merge_coverage = False
         self.nlg_coverage = False
         self.python_coverage = False
@@ -1498,6 +1499,13 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
                 hook=devtools.ya.core.yarg.SetConstValueHook('java_coverage', True),
                 subgroup=COVERAGE_SUBGROUP,
                 visible=help_level.HelpLevel.BASIC,
+            ),
+            TestArgConsumer(
+                ['--java-coverage-source-filter'],
+                help='Collect java coverage only for the sources of the modules whose Arcadia path matches the regexp',
+                hook=devtools.ya.core.yarg.SetValueHook('java_coverage_source_filter'),
+                subgroup=COVERAGE_SUBGROUP,
+                visible=help_level.HelpLevel.ADVANCED,
             ),
             TestArgConsumer(
                 ['--merge-coverage'],
@@ -1722,6 +1730,8 @@ class CoverageOptions(devtools.ya.core.yarg.Options):
         if params.java_coverage:
             params.flags['JAVA_COVERAGE'] = 'yes'
             coverage_requested = True
+            if params.java_coverage_source_filter:
+                params.flags['JAVA_COVERAGE_SOURCE_FILTER'] = params.java_coverage_source_filter
 
         if params.nlg_coverage:
             params.flags['NLG_COVERAGE'] = 'yes'

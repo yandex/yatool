@@ -2249,6 +2249,7 @@ class OutputOptions(Options):
             '..',
             '.cpf',
             '.cpsf',
+            '.covcls',
             '.srclst',
             '.fake',
             '.vet.out',

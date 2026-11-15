@@ -1,3 +1,5 @@
+import os
+
 from . import rigel
 
 import devtools.ya.build.gen_plan as gen_plan
@@ -11,6 +13,7 @@ import devtools.ya.test.util.tools as util_tools
 
 COVERAGE_MERGED_TAR_FILENAME = "java.coverage-merged.tar"
 CREATE_COVERAGE_REPORT_SCRIPT = "$(SOURCE_ROOT)/build/scripts/create_jcoverage_report.py"
+COVERAGE_CLASSES_EXT = devtools.ya.test.const.JAVA_COVERAGE_CLASSES_EXT
 
 
 def inject_jacoco_report_nodes(graph, tests, source_filename, opts=None, add_to_result=True):
@@ -70,18 +73,40 @@ def inject_create_java_coverage_report_node(
 
     uid = uid_gen.get_random_uid("java-coverage-report")
 
-    jars, jars_uids = set(), set()
+    jar_uids = {}
+    covered_jars = set()
+    contrib_prefix = '$(BUILD_ROOT)/contrib/java'
 
     for node in graph.get_graph()['graph']:
         for out in node['outputs']:
+            if out.endswith(COVERAGE_CLASSES_EXT):
+                covered_jars.add(os.path.splitext(out)[0] + '.jar')
+
             if not out.endswith('.jar'):
                 continue
 
-            if path2.path_startswith(out, '$(BUILD_ROOT)/contrib/java') and not opts.enable_java_contrib_coverage:
+            if path2.path_startswith(out, contrib_prefix) and not opts.enable_java_contrib_coverage:
                 continue
 
-            jars.add(out)
-            jars_uids.add(node['uid'])
+            jar_uids[out] = node['uid']
+
+    if opts.java_coverage_source_filter:
+        # The modules to cover were chosen by --java-coverage-source-filter at configure time and marked
+        # with class lists, so the report needs their jars only: no interface jars, classpath copies or
+        # modules outside the filter. The sources of a module are packed into a separate -sources.jar,
+        # which the report needs for the source pages.
+        # contrib/java is dropped even with --enable-java-contrib-coverage: its modules have no class
+        # lists, so the jacoco agent does not instrument them and the report would only gain classes
+        # that are never covered.
+        sources_suffix = '-sources.jar'
+        jar_uids = {
+            jar: uid
+            for jar, uid in jar_uids.items()
+            if jar in covered_jars
+            or (jar.endswith(sources_suffix) and jar.removesuffix(sources_suffix) + '.jar' in covered_jars)
+        }
+
+    jars, jars_uids = set(jar_uids), set(jar_uids.values())
 
     import devtools.ya.jbuild.gen.actions.compile
 
