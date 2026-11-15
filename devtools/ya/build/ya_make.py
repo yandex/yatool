@@ -2295,7 +2295,7 @@ class YaMake:
                     ) as report:
                         service_recovery = None
                         if self.opts.larry_addr in ('local:', 'grpc:local:'):
-                            from devtools.ya.build.larry_service import recovery, credentials, paths
+                            from devtools.ya.build.larry_service import configuration, recovery, credentials, paths
 
                             service_paths = paths.default_service_paths()
                             debug_report.attach_service(
@@ -2309,8 +2309,14 @@ class YaMake:
                                     credentials.prepare_credentials(
                                         service_paths, self.opts, token_resolver=get_yt_token
                                     )
+                            try:
+                                cache = configuration.cache_options_from_build_options(self.opts)
+                            except ValueError as error:
+                                raise devtools.ya.core.yarg.ArgsValidatingException(str(error)) from None
                             service_recovery = recovery.ServiceRecovery(
-                                service_paths, client_date=release_info.get_release_date
+                                service_paths,
+                                client_date=release_info.get_release_date,
+                                cache=cache,
                             )
                         sandbox_token = self.app_ctx.fetcher_params[2] or ''
                         diagnostics = DiagnosticOptions.from_build_options(self.opts)
