@@ -471,7 +471,6 @@ Type | Description
 `classpath.clash` | Checking for duplicate classes in `classpath` when compiling a Java project.
 `eslint` | Checking style and typical TypeScript code errors using the `ESLint` utility.
 `exectest` | Executing an arbitrary command and checking its return code.
-`flake8.py2` | Checking Python 2 code style using the `Flake8` utility.
 `flake8.py3` | Checking Python 3 code style using the `Flake8` utility.
 `fuzz` | [Fuzzing](https://en.wikipedia.org/wiki/Fuzzing) test.
 `g_benchmark` | Running C++ benchmarks using the [Google Benchmark](https://github.com/google/benchmark) library.

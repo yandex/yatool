@@ -471,7 +471,6 @@ END()
 `classpath.clash` | Проверка наличия дублирующихся классов в `classpath` при компиляции Java-проекта.
 `eslint` | Проверка стиля и типичных ошибок кода на TypeScript с использованием утилиты `ESLint`.
 `exectest` | Выполнение произвольной команды и проверка ее кода возврата.
-`flake8.py2` | Проверка стиля кода на Python 2 c использованием утилиты `Flake8`.
 `flake8.py3` | Проверка стиля кода на Python 3 c использованием утилиты `Flake8`.
 `fuzz` | [Fuzzing](https://en.wikipedia.org/wiki/Fuzzing) тест.
 `g_benchmark` | Выполнение бенчмарков на C++ библиотекой [Google Benchmark](https://github.com/google/benchmark).
