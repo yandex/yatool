@@ -98,6 +98,7 @@ class BuildRoot(object):
         self._refcount = refcount
         self._created = False
         self._lock = threading.Lock()
+        self._executable_outputs_cache = None
         self._ok = False
         self._dir_outputs = []
         self._validate_content = validate_content
@@ -378,17 +379,23 @@ class BuildRoot(object):
                         os.environ.get("LANG"),
                     )
 
-    @func.lazy_property
+    @property
     def _executable_outputs(self):
-        """Set of output paths that are executable — computed once, used in every steal() call."""
-        result = set()
-        for x in self._outputs:
-            try:
-                if os.stat(x).st_mode & stat.S_IXUSR:
-                    result.add(x)
-            except OSError:
-                pass
-        return result
+        """Cache executable output paths for subsequent steal() calls."""
+        if self._executable_outputs_cache is None:
+            # Share one scan between consumers of this root without blocking
+            # independent roots on lazy_property's descriptor-wide lock.
+            with self._lock:
+                if self._executable_outputs_cache is None:
+                    result = set()
+                    for x in self._outputs:
+                        try:
+                            if os.stat(x).st_mode & stat.S_IXUSR:
+                                result.add(x)
+                        except OSError:
+                            pass
+                    self._executable_outputs_cache = result
+        return self._executable_outputs_cache
 
     def steal(self, into, dec=True):
         if not self._ok:
