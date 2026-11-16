@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include <util/generic/list.h>
 #include <util/generic/maybe.h>
 #include <util/generic/string.h>
@@ -7,6 +9,20 @@
 #include <util/system/shellcommand.h>
 
 namespace NYa::NSnowden::NPrivate {
+    enum class EPythonEntryPointLaunchMode {
+        Synchronous,
+        Detached,
+    };
+
+    EPythonEntryPointLaunchMode SelectPythonEntryPointLaunchMode(bool async);
+
+    TVector<std::wstring> BuildWindowsEnvironment(
+        const wchar_t* environment,
+        const std::wstring& entryPoint
+    );
+
+    std::wstring QuoteWindowsArgument(const std::wstring& argument);
+
     TShellCommandOptions BuildPythonEntryPointOptions(bool async);
 
     TMaybe<int> RunPythonEntryPoint(

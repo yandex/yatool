@@ -20,6 +20,15 @@
     #include <fcntl.h>
     #include <sys/wait.h>
     #include <unistd.h>
+#elif defined(_win_)
+    #include <algorithm>
+    #include <cerrno>
+    #include <memory>
+    #include <process.h>
+    #include <string>
+
+    #include <util/charset/wide.h>
+    #include <util/system/winint.h>
 #endif
 
 namespace NYa::NSnowden {
@@ -41,8 +50,30 @@ namespace NYa::NSnowden {
     }
 
     namespace {
+        bool IsPythonEntryPointEnvironmentVariable(const std::wstring& variable) {
+            constexpr wchar_t name[] = L"Y_PYTHON_ENTRY_POINT";
+            constexpr size_t nameSize = sizeof(name) / sizeof(*name) - 1;
+            if (variable.size() <= nameSize || variable[nameSize] != L'=') {
+                return false;
+            }
+
+            for (size_t i = 0; i < nameSize; ++i) {
+                wchar_t ch = variable[i];
+                if (ch >= L'a' && ch <= L'z') {
+                    ch -= L'a' - L'A';
+                }
+                if (ch != name[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
 #if defined(_unix_)
-        void SpawnDetached(const TString& executable, const TList<TString>& args, const THashMap<TString, TString>& env) {
+        void SpawnDetached(const TString& executable, const TList<TString>& args, const TString& entryPoint) {
+            THashMap<TString, TString> env = NYa::Environ();
+            env["Y_PYTHON_ENTRY_POINT"] = entryPoint;
+
             TVector<TString> argvStorage;
             argvStorage.reserve(args.size() + 1);
             argvStorage.push_back(executable);
@@ -122,10 +153,141 @@ namespace NYa::NSnowden {
                 DEBUG_LOG << "[snowden] Cannot fork grandchild process, child status: " << status << "\n";
             }
         }
+#elif defined(_win_)
+        std::wstring ToWide(TStringBuf value) {
+            const TUtf16String utf16 = UTF8ToWide(value);
+            return std::wstring(utf16.begin(), utf16.end());
+        }
+
+        std::wstring GetCurrentExecutablePathWide() {
+            TVector<wchar_t> buffer(MAX_PATH);
+            for (;;) {
+                const DWORD size = GetModuleFileNameW(
+                    nullptr,
+                    buffer.data(),
+                    static_cast<DWORD>(buffer.size())
+                );
+                if (size == 0) {
+                    ythrow TSystemError() << "Cannot get current executable path";
+                }
+                if (size < buffer.size()) {
+                    return std::wstring(buffer.data(), size);
+                }
+                buffer.resize(buffer.size() * 2);
+            }
+        }
+
+        std::wstring GetWindowsExecutablePath(TStringBuf executable) {
+            // GetExecPath() uses the narrow Windows API. Avoid interpreting its
+            // active-code-page bytes as UTF-8 when relaunching the current ya-bin.
+            return executable == GetExecPath() ? GetCurrentExecutablePathWide() : ToWide(executable);
+        }
+
+        std::wstring ToSpawnArgument(TStringBuf value) {
+            return NPrivate::QuoteWindowsArgument(ToWide(value));
+        }
+
+        void SpawnDetached(const TString& executable, const TList<TString>& args, const TString& entryPoint) {
+            const std::wstring wideExecutable = GetWindowsExecutablePath(executable);
+
+            TVector<std::wstring> argvStorage;
+            argvStorage.reserve(args.size() + 1);
+            argvStorage.push_back(NPrivate::QuoteWindowsArgument(wideExecutable));
+            for (const auto& arg : args) {
+                argvStorage.push_back(ToSpawnArgument(arg));
+            }
+
+            TVector<const wchar_t*> argv;
+            argv.reserve(argvStorage.size() + 1);
+            for (const auto& arg : argvStorage) {
+                argv.push_back(arg.c_str());
+            }
+            argv.push_back(nullptr);
+
+            // NYa::Environ() contains Windows MBCS strings. Read the native Unicode block
+            // directly so non-ASCII paths are not interpreted as UTF-8.
+            wchar_t* rawEnvironment = GetEnvironmentStringsW();
+            if (!rawEnvironment) {
+                ythrow TSystemError() << "Cannot read Windows environment";
+            }
+            const std::unique_ptr<wchar_t, decltype(&FreeEnvironmentStringsW)> environment{
+                rawEnvironment,
+                &FreeEnvironmentStringsW,
+            };
+            TVector<std::wstring> envStorage = NPrivate::BuildWindowsEnvironment(
+                environment.get(),
+                ToWide(entryPoint)
+            );
+            std::sort(envStorage.begin(), envStorage.end(), [](const std::wstring& lhs, const std::wstring& rhs) {
+                return CompareStringOrdinal(
+                    lhs.data(),
+                    static_cast<int>(lhs.size()),
+                    rhs.data(),
+                    static_cast<int>(rhs.size()),
+                    TRUE
+                ) == CSTR_LESS_THAN;
+            });
+
+            TVector<const wchar_t*> envp;
+            envp.reserve(envStorage.size() + 1);
+            for (const auto& var : envStorage) {
+                envp.push_back(var.c_str());
+            }
+            envp.push_back(nullptr);
+
+            errno = 0;
+            if (_wspawnve(_P_DETACH, wideExecutable.c_str(), argv.data(), envp.data()) == -1) {
+                ythrow TSystemError(errno) << "Cannot start detached Snowden process";
+            }
+        }
 #endif
     } // namespace
 
     namespace NPrivate {
+        EPythonEntryPointLaunchMode SelectPythonEntryPointLaunchMode(bool async) {
+            return async ? EPythonEntryPointLaunchMode::Detached : EPythonEntryPointLaunchMode::Synchronous;
+        }
+
+        std::wstring QuoteWindowsArgument(const std::wstring& argument) {
+            std::wstring result;
+            result.reserve(argument.size() + 2);
+            result.push_back(L'"');
+
+            size_t backslashes = 0;
+            for (const wchar_t character : argument) {
+                if (character == L'\\') {
+                    ++backslashes;
+                    continue;
+                }
+
+                result.append(character == L'"' ? backslashes * 2 + 1 : backslashes, L'\\');
+                result.push_back(character);
+                backslashes = 0;
+            }
+
+            result.append(backslashes * 2, L'\\');
+            result.push_back(L'"');
+            return result;
+        }
+
+        TVector<std::wstring> BuildWindowsEnvironment(
+            const wchar_t* environment,
+            const std::wstring& entryPoint
+        ) {
+            Y_ENSURE(environment, "Windows environment must not be null");
+
+            TVector<std::wstring> result;
+            for (const wchar_t* variable = environment; *variable;) {
+                std::wstring value{variable};
+                variable += value.size() + 1;
+                if (!IsPythonEntryPointEnvironmentVariable(value)) {
+                    result.push_back(std::move(value));
+                }
+            }
+            result.push_back(L"Y_PYTHON_ENTRY_POINT=" + entryPoint);
+            return result;
+        }
+
         TShellCommandOptions BuildPythonEntryPointOptions(bool async) {
             TShellCommandOptions opts;
             opts
@@ -144,13 +306,15 @@ namespace NYa::NSnowden {
             const TList<TString>& args,
             bool async
         ) {
-            THashMap<TString, TString> env = NYa::Environ();
-            env["Y_PYTHON_ENTRY_POINT"] = entryPoint;
-#if defined(_unix_)
-            if (async) {
-                SpawnDetached(executable, args, env);
+            if (SelectPythonEntryPointLaunchMode(async) == EPythonEntryPointLaunchMode::Detached) {
+                SpawnDetached(executable, args, entryPoint);
                 return Nothing();
             }
+
+            THashMap<TString, TString> env = NYa::Environ();
+            env["Y_PYTHON_ENTRY_POINT"] = entryPoint;
+
+#if defined(_unix_)
             // Keep fd 0 occupied while TShellCommand creates its output pipes.
             // Otherwise an output pipe can take fd 0 and close the redirected
             // stdin in the child while rearranging descriptors after fork().
@@ -165,9 +329,6 @@ namespace NYa::NSnowden {
 
             TShellCommand cmd(executable, args, opts);
             cmd.Run();
-            if (async) {
-                return Nothing();
-            }
             return cmd.GetExitCode();
         }
 
