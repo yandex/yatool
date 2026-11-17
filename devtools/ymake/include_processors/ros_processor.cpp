@@ -48,7 +48,7 @@ namespace {
         TStringBuf name = NPath::BasenameWithoutExtension(resolvedPath);
 
         TStringBuf dirname = NPath::Basename(dir);
-        if (dirname == "msg" || dirname == "srv") {
+        if (dirname == "msg") {
             dir = NPath::Parent(dir);
         }
 
@@ -118,12 +118,6 @@ TVector<TString> MapRosOutputIncludes(TFileView output, const TVector<TStringBuf
     TStringBuf suffix = output.Basename();
     if (!suffix.SkipPrefix(NPath::BasenameWithoutExtension(props.front()))) {
         return {};
-    }
-    if (NPath::Extension(props.front()) == "srv") {
-        // The service wrapper includes its request/response headers explicitly.
-        if (!suffix.SkipPrefix("Request") && !suffix.SkipPrefix("Response")) {
-            return {};
-        }
     }
     if (suffix != ".h" && suffix != "_zero_copy.h" && suffix != "_ros_converter.h") {
         // Sources include their own header; binding declarations need none.
