@@ -10,6 +10,7 @@ available until serialization/retries have finished.
 import logging
 import os
 import struct
+from collections.abc import Callable
 
 import exts.yjson as json
 
@@ -91,10 +92,27 @@ def can_load_from_disk(params):
     )
 
 
-def load_custom_context(params):
+def _load_json_context(reader, source, suite_consumer, **options):
+    # Keep ownership/index policy outside the parser. Every payload is consumed
+    # before the next record, so no accumulated tests/stripped_tests DOM exists.
+    if suite_consumer is not None:
+        from devtools.ya.test.suite_storage import context as suite_context
+
+        options['string_map_paths'] = suite_context.SUITE_PATHS
+        options['string_map_consumer'] = suite_consumer
+    data = reader(source, **options)
+    if suite_consumer is not None:
+        for field in ('tests', 'stripped_tests'):
+            if field in data and (not isinstance(data[field], dict) or data[field]):
+                raise ValueError(f'Context {field} must be a map of serialized suite strings')
+    return data
+
+
+def load_custom_context(params, *, suite_consumer: Callable[[tuple[str, ...], str, str], None] | None = None):
+    """Read a context, optionally consuming suite payloads through a callback."""
     if not can_load_from_disk(params):
         with udopen(params.custom_context, 'rb') as source:
-            return sjson.load(source, intern_keys=True, intern_vals=True)
+            return _load_json_context(sjson.load, source, suite_consumer, intern_keys=True, intern_vals=True)
 
     path = os.path.abspath(params.custom_context)
     native_input = _native_input_supported(path)
@@ -107,10 +125,10 @@ def load_custom_context(params):
     )
     with stager.scope('load_custom_context_projection'):
         if native_input:
-            data = sjson.load_file(path, **options)
+            data = _load_json_context(sjson.load_file, path, suite_consumer, **options)
         else:
             with udopen(path, 'rb') as source:
-                data = sjson.load(source, **options)
+                data = _load_json_context(sjson.load, source, suite_consumer, **options)
     graph = data.get('graph')
     if not isinstance(graph, dict):
         # Preserve the existing error handling for contexts without a graph.

@@ -17,6 +17,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/test/suite_storage/disk
     contrib/python/humanfriendly
     contrib/python/pyre2
     contrib/deprecated/python/ujson

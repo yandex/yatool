@@ -53,6 +53,7 @@ from devtools.ya.build.reports import results_report
 from devtools.ya.core import stage_tracer
 from devtools.ya.yalibrary import sjson
 import devtools.ya.test.suite_storage.suites as suite_storage
+import devtools.ya.test.suite_storage.disk as disk_storage
 import library.python.filelock as filelock
 import library.python.tmp as tmp
 import library.python.windows as windows
@@ -773,16 +774,32 @@ def get_suites_exit_code(suites, test_fail_exit_code=const.TestRunExitCode.Faile
 class BuildContext:
     @classmethod
     def load_file(cls, params, app_ctx):
+        """Restore custom-context suites into mutable disk storage unconditionally."""
         from devtools.ya.build import disk_graph
+        from devtools.ya.test.suite_storage import loading as suite_loading
 
-        return cls.load(params, app_ctx, disk_graph.load_custom_context(params))
+        with contextlib.ExitStack() as resources:
+            source = resources.enter_context(suite_loading.SuiteCollector())
+            data = disk_graph.load_custom_context(params, suite_consumer=source.consume)
+            if 'tests' not in data:
+                raise KeyError('tests')
+            source.finish_loading()
+            data['tests'] = source.tests
+            data['stripped_tests'] = source.stripped_tests
+            context = cls.load(params, app_ctx, data)
+            context._resources.enter_context(resources.pop_all())
+            return context
 
     @classmethod
     def load(cls, params, app_ctx, data):
         """Restore a disposable context, consuming its serialized suite dictionaries."""
 
         def restore_tests(pickled_tests):
-            return suite_storage.Suites.from_serialized(pickled_tests)
+            if isinstance(pickled_tests, suite_storage.Suites):
+                return pickled_tests
+            # Context already supplies pickle. Keep it off heap while retaining
+            # edits for ordinary listeners, final reports and context export.
+            return suite_storage.Suites.from_serialized(pickled_tests, disk_storage.DiskStorage())
 
         with contextlib.ExitStack() as loading:
             tests = restore_tests(data['tests'])
@@ -1764,6 +1781,7 @@ class YaMake:
         self._test_results: pr.TestResultsListener
         self._output_root = None
         self._reports_generator = None
+        self._report_sinks = []
         self._reports_closed = False
 
     def _setup(self, opts):
@@ -1952,10 +1970,8 @@ class YaMake:
             if self.opts.report_skipped_suites_only
             else self.ctx.tests
         )
-        report_list = []
-
-        if self.opts.json_line_report_file:
-            report_list.append(results_report.JsonLineReport(self.opts.json_line_report_file))
+        report_list = self._create_report_sinks()
+        self._report_sinks = report_list
 
         self._reports_generator = ar.ReportGenerator(
             self.opts,
@@ -1993,6 +2009,14 @@ class YaMake:
             self._reports_generator.finish_tests_report()
 
         self._reports_generator.finish_configure_report()
+
+    def _create_report_sinks(self) -> list:
+        # Full JSON reports create their own accumulator in prepare_results().
+        # Live reporting only owns the explicitly requested streaming sinks.
+        reports = []
+        if self.opts.json_line_report_file:
+            reports.append(results_report.JsonLineReport(self.opts.json_line_report_file))
+        return reports
 
     def _create_test_results_listener(
         self, results_root: str | None, generator: ar.ReportGenerator | None = None
@@ -2099,9 +2123,14 @@ class YaMake:
         finally:
             # Workers must stop before their writer closes, including after a
             # failed setup or EOF. Closing never synthesizes missing results.
-            if self._reports_generator is not None and not self._reports_closed:
+            if not self._reports_closed:
                 self._reports_closed = True
-                self._reports_generator.finish()
+                if self._reports_generator is not None:
+                    self._reports_generator.finish()
+                else:
+                    with contextlib.ExitStack() as cleanup:
+                        for report in self._report_sinks:
+                            cleanup.callback(report.finish)
 
     def go(self):
         self._setup_build_root(self.opts.bld_root)
