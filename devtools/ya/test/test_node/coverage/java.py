@@ -194,7 +194,7 @@ def get_create_java_coverage_command(
         cmd += ['--raw-output']
     if agent_disposition:
         cmd += ['--agent-disposition', util_tools.jacoco_agent_tool(agent_disposition)]
-    if prefix_filter:
+    if prefix_filter and not opts.java_coverage_source_filter:
         cmd += ['--prefix-filter', prefix_filter]
     if exclude_regexp:
         cmd += ['--exclude-filter', exclude_regexp]
