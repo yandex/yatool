@@ -194,6 +194,12 @@ def collect_python_path(arc_root, links_dir, modules, srcdirs, use_new_extra_pat
         for child in node.children:
             if isinstance(child, yalibrary.makelists.macro_definitions.PyNamespaceValue) and child.value:
                 return child.value
+            if isinstance(child, yalibrary.makelists.macro_definitions.Macro) and child.name == "ALL_PY_SRCS":
+                # ALL_PY_SRCS keeps NAMESPACE as plain values, so the typed-node lookup misses its import roots.
+                values = child.get_values()
+                for keyword, value in zip(values, values[1:]):
+                    if keyword.name == "NAMESPACE":
+                        return value.name
             if (
                 isinstance(child, yalibrary.makelists.macro_definitions.Macro)
                 and child.name == "PY_NAMESPACE"
