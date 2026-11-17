@@ -167,12 +167,17 @@ def create_package(
 
     digest = None
     if push:
+        cmd = ["push", image_full_name]
+        if docker_use_podman:
+            cmd += [
+                "--compression-format=gzip",
+                "--force-compression",
+                "--format=v2s2",
+            ]
+
         push_out, _ = package.process.run_process(
             binary,
-            [
-                "push",
-                image_full_name,
-            ],
+            cmd,
             add_line_timestamps=True,
             tee=True,
         )
