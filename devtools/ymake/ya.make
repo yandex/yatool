@@ -228,6 +228,9 @@ END()
 
 RECURSE(
     bin
+    graph_augmenter
+    graph_merger
+    graph_sinks
     common
     compact_graph
     contrib
