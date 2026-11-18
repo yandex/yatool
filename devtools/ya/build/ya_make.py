@@ -2323,7 +2323,7 @@ class YaMake:
                         suppressions=self.app_ctx.hide_token,
                     ) as report:
                         service_recovery = None
-                        if self.opts.larry_addr in ('local:', 'grpc:local:'):
+                        if self.opts.larry_addr == 'local:':
                             from devtools.ya.build.larry_service import configuration, recovery, credentials, paths
 
                             service_paths = paths.default_service_paths()
