@@ -15,9 +15,15 @@ namespace NYa {
         TDuration Ttl;
     };
 
+    enum class EEmptyProxyRole {
+        InheritFromEnvironment,
+        UseNoRole,
+    };
+
     struct TYtConnectOptions {
         TString Token{};
         TString ProxyRole{};
+        EEmptyProxyRole EmptyProxyRole = EEmptyProxyRole::InheritFromEnvironment;
     };
 
     enum class ECritLevel {
@@ -164,6 +170,14 @@ namespace NYa {
         TYtStore(const TString& proxy, const TString& dataDir, const TYtStoreOptions& options);
         ~TYtStore();
 
+        enum class EInitializationResult {
+            Ready,
+            Disabled,
+            AuthenticationRejected,
+        };
+
+        // Blocking: call only on an executor intended for native YT operations.
+        EInitializationResult WaitForInitialization();
         bool Disabled() const noexcept;
         bool ReadOnly() const noexcept;
         void Prepare(TPrepareOptionsPtr options);

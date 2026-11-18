@@ -2360,10 +2360,14 @@ class YaMake:
                             display=self.app_ctx.display,
                             output_replacements=self.ctx.output_replacements,
                             sandbox_token=sandbox_token,
-                            cache_layers=from_build_options(self.opts, CacheFactory._read_bazel_password),
+                            cache_layers=from_build_options(
+                                self.opts,
+                                CacheFactory._read_bazel_password,
+                                read_yt_token=lambda: get_yt_token(self.opts),
+                            ),
                             yt_token=(
                                 get_yt_token(self.opts)
-                                if self.opts.yt_store and self.opts.larry_addr.startswith(('sync:', 'grpc-sync:'))
+                                if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
                                 else ''
                             ),
                             result_context=self.ctx,

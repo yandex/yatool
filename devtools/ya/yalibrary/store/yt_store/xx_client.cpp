@@ -1256,6 +1256,19 @@ namespace NYa {
             PutStat(config, key, NYT::NodeFromYsonString(value));
         }
 
+        TYtStore::EInitializationResult WaitForInitialization() {
+            try {
+                InitializeControl_.GetValue();
+                return TYtStore::EInitializationResult::Ready;
+            } catch (const yexception& error) {
+                return IsYtAuthError(error)
+                    ? TYtStore::EInitializationResult::AuthenticationRejected
+                    : TYtStore::EInitializationResult::Disabled;
+            } catch (...) {
+                return TYtStore::EInitializationResult::Disabled;
+            }
+        }
+
         void Shutdown() noexcept {
             WriteDisabledEventEnabled_.store(false, std::memory_order::relaxed);
             CancellationSource_.Cancel();
@@ -2029,7 +2042,8 @@ namespace NYa {
             if (connectOptions.Token) {
                 options.Token(connectOptions.Token);
             }
-            if (connectOptions.ProxyRole) {
+            // A fresh config reads YT_HTTP_PROXY_ROLE; an explicit no-role profile must clear it.
+            if (connectOptions.ProxyRole || connectOptions.EmptyProxyRole == EEmptyProxyRole::UseNoRole) {
                 if (!options.Config_) {
                     options.Config(MakeIntrusive<NYT::TConfig>());
                 }
@@ -2828,6 +2842,10 @@ namespace NYa {
     TYtStore::~TYtStore() {
         Shutdown();
     };
+
+    TYtStore::EInitializationResult TYtStore::WaitForInitialization() {
+        return Impl_->WaitForInitialization();
+    }
 
     bool TYtStore::Disabled() const noexcept {
         return Impl_->Disabled();

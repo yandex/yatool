@@ -2571,6 +2571,7 @@ class DistCacheSetupOptions(LocalCacheOptions):
             self.yt_dir = ''
 
         self.yt_token = None
+        self.yt_credential_unavailable_reason = 'missing'
         self.yt_token_path = '~/.yt/token'
         self.yt_proxy_role = None
         self.yt_readonly = True
@@ -2716,14 +2717,20 @@ class DistCacheSetupOptions(LocalCacheOptions):
                 token = f.read().decode('utf-8-sig').strip()
                 token = six.ensure_str(token)
                 if not token:
+                    self.yt_credential_unavailable_reason = 'empty'
                     return
 
                 self.yt_token = token
                 logger.debug("Load yt token from %s", self.yt_token_path)
         except UnicodeDecodeError:
+            self.yt_credential_unavailable_reason = 'invalid-encoding'
             logger.warning('Incorrect file "{}" encoding. Utf8 is expected'.format(self.yt_token_path))
             self.yt_token_path = None
+        except FileNotFoundError:
+            self.yt_credential_unavailable_reason = 'missing'
+            self.yt_token_path = None
         except Exception:
+            self.yt_credential_unavailable_reason = 'unreadable'
             self.yt_token_path = None
 
 

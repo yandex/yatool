@@ -16,10 +16,17 @@ class LarryOptions(yarg.Options):
         return [
             yarg.ArgConsumer(
                 ['--larry-runner'],
-                help='Use beta Larry (compatible within beta; beta-to-stable protocol may change)',
+                help=(
+                    'Use beta Larry (compatible within beta; beta-to-stable protocol may change). '
+                    'With YT enabled, explicit proxy/directory/role settings from flags, environment or config '
+                    '(including values equal to defaults) require grpc: or grpc-sync:. '
+                    'Legacy JSON services also reject explicit credentials; legacy sync: retains token-file forwarding. '
+                    'These YT restrictions do not apply with --no-yt-store. '
+                    'See devtools/ya/build/larry_client/README.md for YT profile compatibility.'
+                ),
                 hook=yarg.SetValueHook('larry_addr'),
                 group=groups.LARRY_OPT_GROUP,
-                visible=False,
+                visible=yarg.HelpLevel.INTERNAL,
             ),
             yarg.ArgConsumer(
                 ['--larry-no-local-cache'],
@@ -51,6 +58,15 @@ class LarryOptions(yarg.Options):
         # Keep Larry compatibility here, using yarg's merged, processed options.
         if getattr(params, 'use_distbuild', False):
             raise yarg.ArgsValidatingException('--larry-runner cannot be combined with --dist')
+
+        if getattr(params, 'yt_store', False) and not self.larry_addr.startswith(('grpc:', 'grpc-sync:')):
+            # SetValueHook tracks CLI, environment and config assignments even
+            # when the explicitly supplied value equals a built-in default.
+            yt_overrides = ['yt_proxy', 'yt_dir', 'yt_proxy_role']
+            if not self.larry_addr.startswith('sync:'):
+                yt_overrides += ['yt_token', 'yt_token_path']
+            if any(getattr(params, f'_{name}_counter', 0) for name in yt_overrides):
+                raise yarg.ArgsValidatingException('Per-build YT settings require a gRPC Larry address')
 
         unsupported = (
             ('--lld-threads', getattr(params, 'lld_threads', None) is not None),
