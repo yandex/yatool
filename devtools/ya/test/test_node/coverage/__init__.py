@@ -13,21 +13,32 @@ from . import upload
 logger = logging.getLogger(__name__)
 
 
+_COVERAGE_INJECTORS = (
+    ('java_coverage', java.inject_java_coverage_nodes),
+    ('python_coverage', python.inject_python_coverage_nodes),
+    ('sancov_coverage', cpp.inject_sancov_coverage_nodes),
+    ('ts_coverage', ts.inject_ts_coverage_nodes),
+    ('clang_coverage', cpp.inject_clang_coverage_nodes),
+    ('go_coverage', go.inject_go_coverage_nodes),
+    ('nlg_coverage', extensions.inject_nlg_coverage_nodes),
+)
+
+
+def is_coverage_requested(opts):
+    return (
+        getattr(opts, 'merge_coverage', False)
+        or getattr(opts, 'upload_coverage_report', False)
+        or any(getattr(opts, name, False) for name, _ in _COVERAGE_INJECTORS)
+    )
+
+
 def inject_coverage_nodes(arc_root, graph, suites, opts, platform_descriptor):
     coverage_uids = []
     resolvers_map = None
     if getattr(opts, "merge_coverage", False) or getattr(opts, 'upload_coverage_report', False):
         resolvers_map = {}
     inplace_cov = []
-    for opt_name, inject_func in [
-        ('java_coverage', java.inject_java_coverage_nodes),
-        ('python_coverage', python.inject_python_coverage_nodes),
-        ('sancov_coverage', cpp.inject_sancov_coverage_nodes),
-        ('ts_coverage', ts.inject_ts_coverage_nodes),
-        ('clang_coverage', cpp.inject_clang_coverage_nodes),
-        ('go_coverage', go.inject_go_coverage_nodes),
-        ('nlg_coverage', extensions.inject_nlg_coverage_nodes),
-    ]:
+    for opt_name, inject_func in _COVERAGE_INJECTORS:
         if getattr(opts, opt_name, False):
             coverage_uids += inject_func(graph, suites, resolvers_map, opts, platform_descriptor)
     if getattr(opts, "merge_coverage", False):

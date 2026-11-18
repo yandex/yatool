@@ -13,7 +13,7 @@ import stat
 import time
 
 import app_config
-import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.build.node_metadata as node_metadata
 import devtools.ya.core.config
 import devtools.ya.core.error
 import devtools.ya.core.imprint.imprint as imprint
@@ -33,7 +33,7 @@ from . import fuzzing
 from . import sandbox as sandbox_node
 
 import exts.timer
-import devtools.ya.test.canon.data as canon_data
+from devtools.ya.test.canon.constants import MAX_DEFAULT_FILE_SIZE
 import devtools.ya.test.common as test_common
 import devtools.ya.test.common.ytest_common_tools as ytest_common_tools
 import devtools.ya.test.const
@@ -46,7 +46,6 @@ from library.python import func
 from library.python import strings
 from library.python import windows
 
-import yalibrary.last_failed.last_failed as last_failed
 import yalibrary.upload.consts
 import yalibrary.fetcher.uri_parser as uri_parser
 
@@ -107,7 +106,7 @@ def inject_download_docker_image_node(graph, image, opts):
         preloaded_path,
     ]
 
-    node_requirements = gen_plan.get_requirements(opts)
+    node_requirements = node_metadata.get_requirements(opts)
 
     if opts.use_distbuild:
         timeout = 900
@@ -195,7 +194,7 @@ def inject_mds_resource_to_graph(graph, resource, opts):
                 "pc": 'cyan',
                 "show_out": True,
             },
-            "requirements": gen_plan.get_requirements(opts, {"network": "full"}),
+            "requirements": node_metadata.get_requirements(opts, {"network": "full"}),
             "cmds": [{"cmd_args": fetch_cmd, "cwd": "$(BUILD_ROOT)"}],
         }
         graph.append_node(node, add_to_result=False)
@@ -351,7 +350,7 @@ class TestFramer(object):
             ctx_str = json.dumps(context, indent=2, sort_keys=True, separators=(",", ": "))
             uid = uid_gen.get_uid([output, ctx_str], 'test-ctx-gen')
 
-            tags, platform, platform_id = gen_plan.prepare_tags(self.platform, {}, self.opts)
+            tags, platform, platform_id = node_metadata.prepare_tags(self.platform, {}, self.opts)
 
             node = {
                 "node-type": devtools.ya.test.const.NodeType.TEST_AUX,
@@ -372,7 +371,7 @@ class TestFramer(object):
                 'kv': {'p': 'CP', 'pc': 'light-blue'},
                 'outputs': [output],
                 'priority': 0,
-                'requirements': gen_plan.get_requirements(self.opts, {'network': 'restricted'}),
+                'requirements': node_metadata.get_requirements(self.opts, {'network': 'restricted'}),
                 'cache': True,
                 'type': 2,
                 'tags': tags,
@@ -478,7 +477,8 @@ def create_test_node(
         test_context_output = os.path.join(work_dir, devtools.ya.test.const.SUITE_CONTEXT_FILE_NAME)
         outputs.append(test_context_output)
 
-    runner_cmd += cmdline.get_environment_relative_options(suite, opts)
+    related_paths = testdeps.get_test_related_paths(suite, "$(SOURCE_ROOT)", opts)
+    runner_cmd += cmdline.get_environment_relative_options(suite, opts, related_paths=related_paths)
 
     if opts and (opts.keep_temps or opts.show_test_cwd):
         runner_cmd += ["--show-test-cwd"]
@@ -654,7 +654,7 @@ def create_test_node(
     if python_lib:
         runner_cmd += ["--python-lib-path", python_lib]
 
-    inputs.update(testdeps.get_suite_requested_input(suite, opts))
+    inputs.update(related_paths)
 
     for path in suite.python_paths:
         runner_cmd += ["--python-sys-path", path.replace("arcadia", '$(SOURCE_ROOT)')]
@@ -1846,7 +1846,7 @@ def create_results_accumulator_node(test_nodes, suite, graph, retry, opts=None, 
             "pc": 'light-cyan',
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(opts, {"network": "restricted"}),
+        "requirements": node_metadata.get_requirements(opts, {"network": "restricted"}),
         "cmds": cmds,
     }
 
@@ -2064,6 +2064,8 @@ def make_test_merge_chunks(tests):
 
 
 def filter_last_failed(tests, opts) -> suite_storage.Suites:
+    import yalibrary.last_failed.last_failed as last_failed
+
     tests = suite_storage.Suites.from_models(tests)
     logger.debug("Going to apply `last_failed` filter from last run for %d suites", len(tests))
     store_path = last_failed.get_tests_restart_cache_dir(opts.bld_dir)
@@ -2278,7 +2280,7 @@ def in_fuzzing_mode(test_opts):  # XXX
     return False
 
 
-def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_tool_resolver):
+def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_tool_resolver, *, suite_injector=None):
     suites = suite_storage.Suites.from_models(suites)
     if not suites:
         return []
@@ -2294,13 +2296,18 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_to
         custom_deps.extend(inject_test_checkout_node(plan, suites, arc_root, opts=test_opts))
         timer.show_step('inject test checkout nodes')
 
+    if suite_injector is not None:
+        injected_tests = suite_injector(arc_root, plan, suites, platform_descriptor, custom_deps, test_opts)
+
     if getattr(test_opts, "list_tests", False):
-        injected_tests = inject_test_list_nodes(arc_root, plan, suites, test_opts, custom_deps, platform_descriptor)
+        if suite_injector is None:
+            injected_tests = inject_test_list_nodes(arc_root, plan, suites, test_opts, custom_deps, platform_descriptor)
         timer.show_step('inject test list nodes')
     else:
-        injected_tests = inject_test_nodes(
-            arc_root, plan, suites, platform_descriptor, custom_deps, opts=test_opts
-        )  # nedd host_resolver
+        if suite_injector is None:
+            injected_tests = inject_test_nodes(
+                arc_root, plan, suites, platform_descriptor, custom_deps, opts=test_opts
+            )  # need host_resolver
         if in_canonize_mode(test_opts):
             canonization_nodes = []
             for suite in suites:
@@ -2350,10 +2357,11 @@ def inject_tests(arc_root, plan, suites, test_opts, platform_descriptor, host_to
 
     timer.show_step('inject test nodes')
 
-    cov_suites = suites.select(lambda suite: suite.supports_coverage)
-    if len(cov_suites):
-        coverage.inject_coverage_nodes(arc_root, plan, cov_suites, test_opts, platform_descriptor)
-        timer.show_step('inject coverage merge nodes')
+    if coverage.is_coverage_requested(test_opts):
+        cov_suites = suites.select(lambda suite: suite.supports_coverage)
+        if len(cov_suites):
+            coverage.inject_coverage_nodes(arc_root, plan, cov_suites, test_opts, platform_descriptor)
+            timer.show_step('inject coverage merge nodes')
 
     return injected_tests
 
@@ -2383,7 +2391,7 @@ def create_populate_token_to_sandbox_vault_node(global_resources, opts):
             "pc": "dark-cyan",
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(opts, {"network": "full"}),
+        "requirements": node_metadata.get_requirements(opts, {"network": "full"}),
         "cmds": [{"cmd_args": node_cmd, "cwd": "$(BUILD_ROOT)"}],
     }
 
@@ -2481,7 +2489,7 @@ def inject_canonization_result_node(tests, graph, canonization_nodes, opts):
             "pc": 'green',
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(opts, {"network": "restricted"}),
+        "requirements": node_metadata.get_requirements(opts, {"network": "restricted"}),
         "cmds": _generate_projects_file_cmds(injected_tests, opts=opts) + [{"cmd_args": cmd, "cwd": "$(BUILD_ROOT)"}],
     }
     graph.append_node(canonization_result_node, add_to_result=True)
@@ -2584,7 +2592,7 @@ def _inject_canonize_node(graph, suite, sandbox_url, owner, keys, user, transpor
         "--resource-ttl",
         str(yalibrary.upload.consts.TTL_INF),
         "--max-file-size",
-        str(canon_data.MAX_DEFAULT_FILE_SIZE),
+        str(MAX_DEFAULT_FILE_SIZE),
         "--log-path",
         node_log_path,
         "--result-path",

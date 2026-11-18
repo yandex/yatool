@@ -2,7 +2,7 @@ import os
 
 from . import rigel
 
-import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.build.node_metadata as node_metadata
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import exts.path2 as path2
@@ -77,18 +77,13 @@ def inject_create_java_coverage_report_node(
     covered_jars = set()
     contrib_prefix = '$(BUILD_ROOT)/contrib/java'
 
-    for node in graph.get_graph()['graph']:
-        for out in node['outputs']:
-            if out.endswith(COVERAGE_CLASSES_EXT):
-                covered_jars.add(os.path.splitext(out)[0] + '.jar')
+    for _, out in graph.get_outputs_by_suffix(COVERAGE_CLASSES_EXT):
+        covered_jars.add(os.path.splitext(out)[0] + '.jar')
 
-            if not out.endswith('.jar'):
-                continue
-
-            if path2.path_startswith(out, contrib_prefix) and not opts.enable_java_contrib_coverage:
-                continue
-
-            jar_uids[out] = node['uid']
+    for jar_uid, out in graph.get_outputs_by_suffix('.jar'):
+        if path2.path_startswith(out, contrib_prefix) and not opts.enable_java_contrib_coverage:
+            continue
+        jar_uids[out] = jar_uid
 
     if opts.java_coverage_source_filter:
         # The modules to cover were chosen by --java-coverage-source-filter at configure time and marked
@@ -341,7 +336,7 @@ def inject_java_coverage_resolve_node(
             "pc": 'cyan',
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(
+        "requirements": node_metadata.get_requirements(
             opts,
             {
                 "cpu": 3,

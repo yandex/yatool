@@ -11,7 +11,9 @@ MERGE_FIELDS = ["TEST-FILES"]
 HASH_FIELDS = ["SCRIPT-REL-PATH", "SOURCE-FOLDER-PATH", "TEST-NAME"]
 
 
-def parse_dart(dart_content):
+def parse_dart(dart_content, string_pool=None):
+    """Parse declarations, optionally sharing immutable strings through a request-local pool."""
+
     def to_stream(data):
         dart_entry = {}
         for line in data:
@@ -25,6 +27,12 @@ def parse_dart(dart_content):
                 value = value.strip()
                 if value.startswith('"') and value.endswith('"'):
                     value = value.strip('"').split(';')
+                if string_pool is not None:
+                    key = string_pool.setdefault(key, key)
+                    if isinstance(value, list):
+                        value = [string_pool.setdefault(item, item) for item in value]
+                    else:
+                        value = string_pool.setdefault(value, value)
                 dart_entry[key] = value
 
     result = list(to_stream(dart_content))

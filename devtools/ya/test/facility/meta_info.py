@@ -4,6 +4,28 @@ from collections import namedtuple
 import devtools.ya.test.const
 
 
+def _copy_dart(dart):
+    # Parsed DART contains strings and lists of strings. Preserve list aliases,
+    # but avoid recursively visiting immutable leaves. Keep general input support.
+    if type(dart) is not dict:
+        return copy.deepcopy(dart)
+    for key, value in dart.items():
+        if type(key) is not str or not (
+            type(value) is str or type(value) is list and all(type(item) is str for item in value)
+        ):
+            return copy.deepcopy(dart)
+    lists = {}
+    result = {}
+    for key, value in dart.items():
+        if type(value) is list:
+            identity = id(value)
+            if identity not in lists:
+                lists[identity] = value[:]
+            value = lists[identity]
+        result[key] = value
+    return result
+
+
 def _dart_get_global_resources(dart):
     return {k: v for k, v in dart.items() if k.endswith('_RESOURCE_GLOBAL')}
 
@@ -14,7 +36,7 @@ def _dart_get_resource_by_name(dart, name):
 
 # meta field name, default value, (function to retrieve a value from the source, its fixed *args)
 _META_MAP = [
-    ('meta_raw', None, (copy.deepcopy, ())),
+    ('meta_raw', None, (_copy_dart, ())),
     ('android_apk_test_activity', '', (dict.get, ('ANDROID_APK_TEST_ACTIVITY',))),
     ('benchmark_opts', list, (dict.get, ('BENCHMARK-OPTS',))),
     ('binary_path', None, (dict.get, ('BINARY-PATH',))),
@@ -95,7 +117,7 @@ _META_MAP = [
 MetaInfo = namedtuple('MetaInfo', tuple(m[0] for m in _META_MAP))
 
 
-def make_meta_from_dart(dart):
+def _make_meta_from_mapping(dart):
     data = {}
     for m in _META_MAP:
         field, default, (getter, args) = m[0], m[1], m[2]
@@ -107,9 +129,39 @@ def make_meta_from_dart(dart):
     return MetaInfo(**data)
 
 
+# Compile the field table once. Most declarations provide only a small subset
+# of fields; construct fresh mutable defaults and evaluate indirect resources.
+_META_DEFAULTS = tuple(None if callable(default) else default for _, default, _ in _META_MAP)
+_META_FACTORIES = [(index, default) for index, (_, default, _) in enumerate(_META_MAP) if callable(default)]
+_META_FIELDS = {}
+_META_COMPUTED = []
+for _index, (_, _, (_getter, _args)) in enumerate(_META_MAP):
+    if _getter is dict.get and len(_args) == 1:
+        _META_FIELDS.setdefault(_args[0], []).append(_index)
+    else:
+        _META_COMPUTED.append((_index, _getter, _args))
+
+
+def make_meta_from_dart(dart):
+    if type(dart) is not dict:
+        return _make_meta_from_mapping(dart)
+    values = list(_META_DEFAULTS)
+    for key, value in dart.items():
+        if value is not None:
+            for index in _META_FIELDS.get(key, ()):
+                values[index] = value
+    for index, getter, args in _META_COMPUTED:
+        value = getter(dart, *args)
+        if value is not None:
+            values[index] = value
+    for index, factory in _META_FACTORIES:
+        if values[index] is None:
+            values[index] = factory()
+    return MetaInfo._make(values)
+
+
 def meta_dart_replace_test_name(meta, value):
     # FIXME: Delete this function. Meta must be created once and be read only.
-    new_meta = copy.deepcopy(meta)
     new_meta = meta._replace(test_name=value)
     new_meta.meta_raw['TEST-NAME'] = value
     return new_meta

@@ -10,8 +10,6 @@ import exts.fs
 from library.python import windows
 from devtools.ya.test import const
 
-from yalibrary.loggers.file_log import TokenFilterFormatter
-
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +39,8 @@ def get_common_logging_file_handler(path, mode="a"):
     :param mode: file open mode
     :return: logging file handler
     """
+    from yalibrary.loggers.file_log import TokenFilterFormatter
+
     file_handler = logging.FileHandler(path, mode=mode)
     file_handler.setFormatter(
         TokenFilterFormatter("%(asctime)s - %(levelname)s - %(name)s - %(funcName)s: %(message)s")

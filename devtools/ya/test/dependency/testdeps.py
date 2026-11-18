@@ -9,6 +9,12 @@ from yalibrary.large_files import ExternalFile
 logger = logging.getLogger(__name__)
 
 
+@func.memoize(limit=4096)
+def _source_data_path(arc_root, data):
+    # Share immutable path strings across suites; never cache suite data or filesystem state.
+    return os.path.join(arc_root, data.replace("/", os.path.sep))
+
+
 def get_test_related_paths(test, arc_root, opts):
     """
     Get all paths on file system that a test may depend on
@@ -19,8 +25,7 @@ def get_test_related_paths(test, arc_root, opts):
 
     # add arcadia folders that are specified in the test CMakeLists.txt
     for data in test.get_arcadia_test_data():
-        data = data.replace("/", os.path.sep)
-        test_related_paths.append(os.path.join(arc_root, data))
+        test_related_paths.append(_source_data_path(arc_root, data))
 
     # add test related paths required for wrappers (suites)
     for path in reversed(test.get_test_related_paths(arc_root, opts)):

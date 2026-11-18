@@ -10,7 +10,6 @@ import tempfile
 
 import app_config
 
-import exts.archive
 
 from exts import fs, hashing, asyncthread
 
@@ -138,6 +137,8 @@ class SandboxStorage(object):
         return os.path.exists(self.get_dir_outputs_resource_tar_path(resource_id))
 
     def dir_outputs_process_prepared_resource(self, resource, build_root):
+        import exts.archive
+
         resource_id = resource.get_id()
         resource_path = self.get_storage_resource_path(build_root, resource_id)
         resource_renamed_path = self._get_resource_content_file_path(resource_id)
@@ -163,6 +164,8 @@ class SandboxStorage(object):
         os.remove(resource_renamed_path)
 
     def dir_outputs_prepare_downloaded_resource(self, resource, resource_id, dir_outputs_in_runner=True):
+        import exts.archive
+
         resource_path = self._get_resource_content_file_path(resource_id)
         resource_dir = self._get_resource_path(resource_id)
         dir_output_tared_path = self.get_dir_outputs_resource_tar_path(resource_id)
@@ -282,6 +285,8 @@ class SandboxStorage(object):
         """
         :param resource_file: downloaded resource file RESOURCE_CONTENT_FILE_NAME with accompanying RESOURCE_INFO_JSON in the same directory
         """
+        import exts.archive
+
         resource_path = self._get_resource_path(resource_id)
         if os.path.exists(resource_path):
             exts.fs.remove_tree(resource_path)
@@ -332,6 +337,8 @@ class SandboxStorage(object):
         return resource_info
 
     def _get_cached_resource(self, resource_id, decompress_if_archive, verify=False):
+        import exts.archive
+
         logger.debug("Verify if there is a valid copy of resource %s", resource_id)
         info_path = self._get_resource_info_path(resource_id)
 
@@ -397,6 +404,8 @@ class SandboxStorage(object):
         return None
 
     def _extract_from_tar(self, tar_path, resource_path):
+        import exts.archive
+
         temp_dir = tempfile.mkdtemp(prefix="from_tar.", dir=resource_path)
 
         exts.archive.extract_from_tar(tar_path, temp_dir)

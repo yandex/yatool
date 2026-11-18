@@ -2,7 +2,7 @@ import os
 import time
 
 import devtools.ya.yalibrary.app_ctx
-import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.build.node_metadata as node_metadata
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import library.python.func
@@ -86,7 +86,7 @@ def create_yt_root_maker_node(arc_root, graph, nchunks, global_resources, opts):
             "pc": "light-cyan",
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(opts, {"network": "full"}),
+        "requirements": node_metadata.get_requirements(opts, {"network": "full"}),
         "cmds": [
             {
                 "cmd_args": node_cmd,
@@ -162,7 +162,7 @@ def create_coverage_upload_node(arc_root, graph, suite, covname, deps, chunk, op
             "pc": "light-cyan",
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(opts, {"network": "full"}),
+        "requirements": node_metadata.get_requirements(opts, {"network": "full"}),
         "cmds": cmds,
         "tags": ['coverage_upload_node'],
     }

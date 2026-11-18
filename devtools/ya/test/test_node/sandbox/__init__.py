@@ -1,5 +1,5 @@
 # coding: utf-8
-import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.build.node_metadata as node_metadata
 
 import devtools.ya.test.dependency.sandbox_resource as sandbox_resource
 import devtools.ya.test.dependency.sandbox_storage as sandbox_storage
@@ -37,7 +37,7 @@ def inject_download_sandbox_resource_node(graph, resource, opts, global_resource
         ]
 
         extra_reqs = {"network": "full"} if app_config.in_house else None
-        node_requirements = gen_plan.get_requirements(opts, extra_reqs)
+        node_requirements = node_metadata.get_requirements(opts, extra_reqs)
 
         if opts.dir_outputs_in_nodes:
             resource_dir_output = storage.get_dir_outputs_resource_dir_path(resource_id)

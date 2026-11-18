@@ -25,11 +25,13 @@ def get_base_environment_relative_options(suite):
     ]
 
 
-def get_environment_relative_options(suite, opts):
+def get_environment_relative_options(suite, opts, related_paths=None):
     # type: (AbstractTestSuite, tp.Any) -> list[str]
     options = get_base_environment_relative_options(suite)
 
-    for path in testdeps.get_test_related_paths(suite, "$(SOURCE_ROOT)", opts):
+    if related_paths is None:
+        related_paths = testdeps.get_test_related_paths(suite, "$(SOURCE_ROOT)", opts)
+    for path in related_paths:
         options += ["--test-related-path", path]
 
     if not suite.supports_clean_environment or devtools.ya.test.const.YaTestTags.Dirty in suite.tags:

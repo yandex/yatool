@@ -9,6 +9,8 @@ import os
 import sortedcontainers
 import sys
 import time
+import threading
+import weakref
 
 import six
 
@@ -36,6 +38,10 @@ ATTRS_TO_STATE_HASH = [
     'name',
 ]
 DIFF_TEST_TYPE = "canon_diff"
+
+# Cache computed counts without keeping every injected suite alive until shutdown.
+_parallel_workers_cache = weakref.WeakKeyDictionary()
+_parallel_workers_lock = threading.Lock()
 
 yatest_logger = logging.getLogger(__name__)
 
@@ -815,12 +821,17 @@ class AbstractTestSuite(facility.Suite):
     def get_split_params(self):
         return self._modulo, self._modulo_index, self._split_file_name
 
-    @func.memoize()
     def get_parallel_tests_within_node_workers(self):
-        if self.meta.parallel_tests_within_node_workers == "auto":
-            return self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 1)
-        else:
-            return int(self.meta.parallel_tests_within_node_workers or 0)
+        with _parallel_workers_lock:
+            try:
+                return _parallel_workers_cache[self]
+            except KeyError:
+                if self.meta.parallel_tests_within_node_workers == "auto":
+                    workers = self.requirements.get(devtools.ya.test.const.TestRequirements.Cpu, 1)
+                else:
+                    workers = int(self.meta.parallel_tests_within_node_workers or 0)
+                _parallel_workers_cache[self] = workers
+                return workers
 
     def get_fork_mode(self):
         return self.meta.fork_mode

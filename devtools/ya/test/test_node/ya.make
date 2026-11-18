@@ -8,7 +8,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/app_config
-    devtools/ya/build/gen_plan
+    devtools/ya/build/node_metadata
     devtools/ya/core/error
     devtools/ya/core/imprint
     devtools/ya/core/profiler

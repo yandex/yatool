@@ -14,10 +14,9 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/test/suite_storage
-    devtools/ya/build/gen_plan
+    devtools/ya/build/node_metadata
     devtools/ya/exts
     devtools/ya/test/const
-    devtools/ya/test/dependency
     devtools/ya/test/dependency
     devtools/ya/test/util
     devtools/ya/yalibrary/app_ctx

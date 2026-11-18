@@ -4,7 +4,7 @@ import itertools
 
 from . import rigel
 
-import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.build.node_metadata as node_metadata
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
 import devtools.ya.test.common as test_common
@@ -183,7 +183,7 @@ def inject_clang_coverage_unify_node(graph, suite, clang_resolver_uid, raw_resol
             "pc": 'cyan',
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(
+        "requirements": node_metadata.get_requirements(
             opts,
             {
                 "cpu": 4,
@@ -275,7 +275,7 @@ def inject_clang_coverage_resolve_node(
             "pc": 'cyan',
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(
+        "requirements": node_metadata.get_requirements(
             opts,
             {
                 "cpu": 4,

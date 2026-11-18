@@ -12,6 +12,7 @@ import traceback
 
 import devtools.ya.test.common as common
 from . import compare as test_canon_compare
+from .constants import MAX_DEFAULT_FILE_SIZE
 import devtools.ya.test.util.tools as test_tools
 import devtools.ya.test.const as test_const
 import devtools.ya.test.system.process
@@ -34,7 +35,6 @@ if app_config.in_house:
     import yalibrary.svn as svn
 
 
-MAX_DEFAULT_FILE_SIZE = 150 * 1024
 DEFAULT_FILE_GROUP_SIZE = 200 * 1024 * 1024
 SANDBOX_CANONICAL_RESOURCE_TYPE = "CANONICAL_TEST_DATA"
 

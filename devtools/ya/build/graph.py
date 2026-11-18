@@ -590,6 +590,12 @@ def _substitute_uids(graph, tests, replaces, propagate=False):
             replaces.get(res_uid, res_uid) for res_uid in graph['conf']['context']['sandbox_run_test_result_uids']
         ]
 
+    _substitute_test_uids(tests, replaces)
+
+    timer.show_step('substitude_uids')
+
+
+def _substitute_test_uids(tests, replaces):
     for test in tests:
         test.uid = replaces.get(test.uid, test.uid)
         test._result_uids = [replaces.get(dep_uid, dep_uid) for dep_uid in test._result_uids]
@@ -599,8 +605,6 @@ def _substitute_uids(graph, tests, replaces, propagate=False):
             test._test_prepare_uids = {replaces.get(uid, uid) for uid in prepare_uids}
         test.dep_uids = [replaces.get(dep_uid, dep_uid) for dep_uid in test.dep_uids]
         test.change_build_dep_uids(replaces)
-
-    timer.show_step('substitude_uids')
 
 
 def _add_requirements(node, reqs):
@@ -2998,20 +3002,9 @@ def _strip_skipped_results(graph, plan, tests):
     # to avoid building targets which wouldn't be used
     tests_strip_skipped_results_stage = stager.start('tests_strip_skipped_results')
 
-    results = graph['result']
-    required, stripped = [], []
-    for suite in tests:
-        if suite.is_skipped():
-            # stripped suites doesn't contain filled deps, we need to calculate them manually
-            suite.fill_test_build_deps(plan)
-            stripped += list(suite.get_build_dep_uids())
-        else:
-            required += list(suite.get_build_dep_uids())
+    from devtools.ya.test.test_node.semantic import strip_skipped_result_uids
 
-    unused = set(stripped) - set(required)
-
-    logger.debug("Going to remove %d nodes from results as unused by stripped tests", len(unused))
-    graph['result'] = list(set(results) - unused)
+    graph['result'] = strip_skipped_result_uids(graph['result'], plan, tests)
 
     tests_strip_skipped_results_stage.finish()
 

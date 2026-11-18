@@ -62,9 +62,14 @@ SUITE_MAP: dict[str, type[types_common.AbstractTestSuite]] = {
 
 # TODO naming
 def generate_tests_by_dart(
-    dart_content, target_platform_descriptor=None, multi_target_platform_run=False, opts=None, with_wine=None
+    dart_content,
+    target_platform_descriptor=None,
+    multi_target_platform_run=False,
+    opts=None,
+    with_wine=None,
+    dart_string_pool=None,
 ):
-    darts = dartfile.parse_dart(dart_content.split('\n'))
+    darts = dartfile.parse_dart(dart_content.split('\n'), string_pool=dart_string_pool)
 
     suites = suite_storage.Suites()
     darts = dartfile.merge_darts(darts)

@@ -86,6 +86,12 @@ class BuildPlan(object):
             elif unroll_bundle and module_type == 'bundle':
                 q.extend(node['deps'])
 
+    def get_outputs_by_suffix(self, suffix):
+        for node in self._graph['graph']:
+            for output in node['outputs']:
+                if output.endswith(suffix):
+                    yield node['uid'], output
+
     def get_uids_by_outputs(self, output):
         if output.startswith('$('):
             return self._uids_by_outputs.get(output, [])

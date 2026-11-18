@@ -2,6 +2,7 @@ PY3_LIBRARY()
 
 PY_SRCS(
     compare.py
+    constants.py
     data.py
 )
 

@@ -27,7 +27,6 @@ from library.python import eq_interval_sampling
 
 from yalibrary import formatter
 from yalibrary import term
-from yalibrary.loggers.file_log import TokenFilterFormatter
 from yalibrary.term import console
 
 logger = logging.getLogger(__name__)
@@ -40,6 +39,8 @@ def setup_logging(
     extra_file_loggers=None,
     fmt="%(asctime)-15s %(levelname)s %(name)s: %(message)s",
 ):
+    from yalibrary.loggers.file_log import TokenFilterFormatter
+
     root_logger = logging.getLogger()
     root_logger.handlers = []
     root_logger.setLevel(logging.DEBUG)

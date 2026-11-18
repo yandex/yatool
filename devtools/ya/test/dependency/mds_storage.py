@@ -1,9 +1,6 @@
 import os
 import logging
 
-import exts.archive
-import yalibrary.fetcher.http_client as http_client
-
 CANON_OUTPUT_STORAGE = 'canondata_storage'
 
 logger = logging.getLogger(__name__)
@@ -27,6 +24,9 @@ class MdsStorage(object):
         return os.path.join(self._storage_root, CANON_OUTPUT_STORAGE, resource_id)
 
     def get_resource(self, resource_id):
+        import exts.archive
+        import yalibrary.fetcher.http_client as http_client
+
         resource_file = self.get_storage_resource_path(resource_id)
 
         if not os.path.exists(resource_file):

@@ -45,3 +45,15 @@ def strip_dependency_inputs(plan, outputs):
 
         node["inputs"] = get_diff(node["inputs"], inputs_to_remove)
         node["deps"] = get_diff(node["deps"], uids_to_remove)
+
+
+def strip_skipped_result_uids(results, plan, tests):
+    """Remove build roots needed only by filtered test suites."""
+    required, stripped = set(), set()
+    for suite in tests:
+        if suite.is_skipped():
+            suite.fill_test_build_deps(plan)
+            stripped.update(suite.get_build_dep_uids())
+        else:
+            required.update(suite.get_build_dep_uids())
+    return list(set(results) - (stripped - required))

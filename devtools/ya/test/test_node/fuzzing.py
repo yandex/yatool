@@ -2,7 +2,7 @@ import json
 import os
 
 import app_config
-import devtools.ya.build.gen_plan as gen_plan
+import devtools.ya.build.node_metadata as node_metadata
 
 import devtools.ya.test.dependency.testdeps as testdeps
 import devtools.ya.test.dependency.uid as uid_gen
@@ -118,7 +118,7 @@ def inject_fuzz_upload_node(graph, suite, deps, input_path, minimize, opts):
             "pc": "light-cyan",
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(
+        "requirements": node_metadata.get_requirements(
             opts,
             {
                 "network": "full",
@@ -209,7 +209,7 @@ def inject_fuzz_minimization_node(graph, suite, corpus_path, resources, opts):
             "show_out": True,
         },
         # node updates resource last usage time
-        "requirements": gen_plan.get_requirements(
+        "requirements": node_metadata.get_requirements(
             opts,
             {
                 "network": "full",
@@ -282,7 +282,7 @@ def inject_fuzz_result_node(arc_root, graph, suites, upload_nodes, input_files, 
             "pc": "yellow",
             "show_out": True,
         },
-        "requirements": gen_plan.get_requirements(opts),
+        "requirements": node_metadata.get_requirements(opts),
         "cmds": [
             {
                 "cmd_args": node_cmd,

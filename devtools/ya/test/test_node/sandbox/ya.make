@@ -6,7 +6,7 @@ PY_SRCS(
 
 PEERDIR(
     devtools/ya/app_config
-    devtools/ya/build/gen_plan
+    devtools/ya/build/node_metadata
     devtools/ya/test/dependency
     devtools/ya/test/dependency/sandbox_storage
     devtools/ya/test/system

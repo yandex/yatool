@@ -5,6 +5,7 @@ PY_SRCS(
 )
 
 PEERDIR(
+    devtools/ya/build/node_metadata
     devtools/ya/build/ymake2
     devtools/ya/core/config
     devtools/ya/core/gsid
