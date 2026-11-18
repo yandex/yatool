@@ -389,7 +389,7 @@ class DumpYaHandler(CompositeHandler):
             opts=self.common_opts + self.common_build_facade_opts() + [DumpDescriptionOptions()],
         )
         self['root'] = OptsHandler(
-            action=devtools.ya.app.execute(lambda params: sys.stdout.write(params.arc_root) and 0),
+            action=devtools.ya.app.execute(action=do_dump_root),
             description='Print Arcadia root',
             opts=self.common_opts,
         )
@@ -421,6 +421,13 @@ class DumpYaHandler(CompositeHandler):
             import devtools.ya.handlers.dump.arcadia_specific as arcadia_specific
 
             self['groups'] = arcadia_specific.GroupsHandler()
+
+
+def do_dump_root(params):
+    # Callers also consume the redirected output as a raw filesystem path.
+    suffix = '\n' if sys.stdout.isatty() else ''
+    sys.stdout.write(f'{params.arc_root}{suffix}')
+    return 0
 
 
 def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=None, **kwargs):
@@ -456,7 +463,7 @@ def _do_dump(gen_func, params, debug_options=[], write_stdout=True, build_root=N
         ymake_bin=getattr(params, 'ymake_bin', None),
         host_platform=params.host_platform,
         target_platforms=params.target_platforms,
-        **kwargs
+        **kwargs,
     )
     if write_stdout:
         delay_stdout_write(res.stdout)
