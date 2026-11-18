@@ -10,6 +10,7 @@
 #include <util/string/split.h>
 #include <util/system/spinlock.h>
 
+#include <algorithm>
 #include <limits>
 
 namespace {
@@ -22,14 +23,13 @@ namespace {
         return pattern.StartsWith('^') ? TString{pattern} : TString::Join("^", pattern);
     }
 
-    template <class TAccept>
-    TMaybe<size_t> FindFirstMatch(const TVector<size_t>& localFrom, const TVector<size_t>& localTo, const TVector<size_t>& globalFrom, const TVector<size_t>& globalTo, TAccept accept) {
+    TMaybe<size_t> FindFirstMatch(TConstArrayRef<size_t> localFrom, TConstArrayRef<size_t> localTo, TConstArrayRef<size_t> globalFrom, TConstArrayRef<size_t> globalTo) {
         auto localToIt = localTo.begin();
         auto localFromIt = localFrom.begin();
         auto globalToIt = globalTo.begin();
         auto globalFromIt = globalFrom.begin();
 
-        auto chooseMin = [](auto& first, const auto& firstEnd, auto& second, const auto& secondEnd) -> TVector<size_t>::const_iterator& {
+        auto chooseMin = [](auto& first, const auto& firstEnd, auto& second, const auto& secondEnd) -> auto& {
             if (first == firstEnd) {
                 return second;
             } else if (second == secondEnd) {
@@ -44,11 +44,7 @@ namespace {
             auto& from = chooseMin(localFromIt, localFrom.end(), globalFromIt, globalFrom.end());
 
             if (*to == *from) {
-                if (accept(*to)) {
-                    return *to;
-                }
-                ++to;
-                ++from;
+                return *to;
             } else if (*to < *from) {
                 to++;
             } else {
@@ -61,7 +57,7 @@ namespace {
 }
 
 TMaybe<size_t> NPeers::FindFirstMatch(const TVector<size_t>& localFrom, const TVector<size_t>& localTo, const TVector<size_t>& globalFrom, const TVector<size_t>& globalTo) {
-    return ::FindFirstMatch(localFrom, localTo, globalFrom, globalTo, [](size_t) { return true; });
+    return ::FindFirstMatch(localFrom, localTo, globalFrom, globalTo);
 }
 
 TAppliedPeersRules::TAppliedPeersRules(const TPeersRules& rules, TStringBuf dirName)
@@ -89,20 +85,49 @@ TPeersRules::EPolicy TAppliedPeersRules::operator()(const TAppliedPeersRules& ch
     return MatchGlobal(child, false).GetOrElse(TPeersRules::Default);
 }
 
-TMaybe<TPeersRules::EPolicy> TAppliedPeersRules::MatchGlobal(const TAppliedPeersRules& child, bool priority) const {
-    if (priority && !Rules.HasPriorityRules) {
+TConstArrayRef<size_t> TAppliedPeersRules::TierCandidates(const TVector<size_t>& matches, bool priority) const {
+    const TConstArrayRef<size_t> all(matches);
+    if (matches.empty() || !Rules.HasPriorityRules || !Rules.HasFallbackRules) {
+        return all;
+    }
+    const auto split = std::lower_bound(matches.begin(), matches.end(), Rules.PriorityRulesCount) - matches.begin();
+    return priority ? all.Slice(0, split) : all.Slice(split);
+}
+
+TMaybe<TPeersRules::EPolicy> TAppliedPeersRules::MatchGlobal(const TAppliedPeersRules& child, bool priority, TPeersRules::ECachedMatch* cached) const {
+    using EMatch = TPeersRules::ECachedMatch;
+    if (cached && *cached != EMatch::Unknown) {
+        switch (*cached) {
+            case EMatch::Allow: return TPeersRules::EPolicy::ALLOW;
+            case EMatch::Deny: return TPeersRules::EPolicy::DENY;
+            case EMatch::NoMatch: return {};
+            case EMatch::Unknown: Y_UNREACHABLE();
+        }
+    }
+    if (priority ? !Rules.HasPriorityRules : !Rules.HasFallbackRules) {
+        if (cached) {
+            *cached = EMatch::NoMatch;
+        }
         return {};
     }
-    const auto result = ::FindFirstMatch(MatchesFrom, child.MatchesTo, Rules.GlobalRulesFrom, Rules.GlobalRulesTo,
-        [&](size_t index) { return Rules.Rules[index].Priority == priority; });
+    const size_t tier = priority ? 0 : 1;
+    const auto result = ::FindFirstMatch(TierCandidates(MatchesFrom, priority), child.TierCandidates(child.MatchesTo, priority),
+        Rules.GlobalRulesFrom[tier], Rules.GlobalRulesTo[tier]);
     if (result) {
-        return Rules.GetRuleResult(*result);
+        const auto policy = Rules.GetRuleResult(*result);
+        if (cached) {
+            *cached = policy == TPeersRules::EPolicy::ALLOW ? EMatch::Allow : EMatch::Deny;
+        }
+        return policy;
+    }
+    if (cached) {
+        *cached = EMatch::NoMatch;
     }
     return {};
 }
 
-TMaybe<TPeersRules::EPolicy> TAppliedPeersRules::MatchPriority(const TAppliedPeersRules& child) const {
-    return MatchGlobal(child, true);
+TMaybe<TPeersRules::EPolicy> TAppliedPeersRules::MatchPriority(const TAppliedPeersRules& child, TPeersRules::TMatchCache* cached) const {
+    return MatchGlobal(child, true, cached ? &cached->Priority : nullptr);
 }
 
 TVector<TAppliedPeersRules::TLocalRule> TAppliedPeersRules::LoadLocalRules(TStringBuf value) const {
@@ -121,11 +146,14 @@ void TAppliedPeersRules::SetLocalRules(TStringBuf fromRules, TStringBuf toRuleOv
     ToRuleOverrides = LoadLocalRules(toRuleOverrides);
 }
 
-TPeersRules::EPolicy TAppliedPeersRules::CheckDirectPeer(const TAppliedPeersRules& child, TStringBuf fromDir, TStringBuf toDir) const {
+TPeersRules::EPolicy TAppliedPeersRules::CheckDirectPeer(const TAppliedPeersRules& child, TStringBuf fromDir, TStringBuf toDir, TPeersRules::TMatchCache* cached) const {
+    if (!NeedsDirectPeerCheck(child)) {
+        return TPeersRules::Default;
+    }
     // Priority rules are enforced at the existing direct/transitive validation
     // sites. A matched priority rule excludes this pair from deferred checks,
     // including when the original validation exempts an implicit peer.
-    if (MatchPriority(child)) {
+    if (MatchPriority(child, cached)) {
         return TPeersRules::EPolicy::ALLOW;
     }
     for (const auto& rule : ToRuleOverrides) {
@@ -138,7 +166,7 @@ TPeersRules::EPolicy TAppliedPeersRules::CheckDirectPeer(const TAppliedPeersRule
             return rule.Policy;
         }
     }
-    return MatchGlobal(child, false).GetOrElse(TPeersRules::Default);
+    return MatchGlobal(child, false, cached ? &cached->Fallback : nullptr).GetOrElse(TPeersRules::Default);
 }
 
 struct TPeersRules::TLocalMatcherCache {
@@ -174,19 +202,29 @@ TPeersRules& TPeersRules::operator+=(TPeersRules&& other) {
 }
 
 void TPeersRules::Finalize() {
+    const auto fallback = std::stable_partition(Rules.begin(), Rules.end(), [](const TRule& rule) { return rule.Priority; });
+    PriorityRulesCount = fallback - Rules.begin();
+    HasPriorityRules = PriorityRulesCount != 0;
+    HasFallbackRules = PriorityRulesCount != Rules.size();
+    for (size_t tier = 0; tier < 2; ++tier) {
+        GlobalRulesFrom[tier].clear();
+        GlobalRulesTo[tier].clear();
+    }
     for (size_t i = 0; i < Rules.size(); i++) {
-        HasPriorityRules |= Rules[i].Priority;
+        const size_t tier = Rules[i].Priority ? 0 : 1;
         if (Rules[i].From.MatchAll) {
-            GlobalRulesFrom.push_back(i);
+            GlobalRulesFrom[tier].push_back(i);
         }
         if (Rules[i].To.MatchAll) {
-            GlobalRulesTo.push_back(i);
+            GlobalRulesTo[tier].push_back(i);
         }
     }
 
     Rules.shrink_to_fit();
-    GlobalRulesFrom.shrink_to_fit();
-    GlobalRulesTo.shrink_to_fit();
+    for (size_t tier = 0; tier < 2; ++tier) {
+        GlobalRulesFrom[tier].shrink_to_fit();
+        GlobalRulesTo[tier].shrink_to_fit();
+    }
 }
 
 TPeersRules TPeersRulesReader::Read() {

@@ -7,12 +7,14 @@
 #include <devtools/ymake/diag/diag.h>
 
 #include <util/generic/maybe.h>
+#include <util/generic/array_ref.h>
 #include <util/generic/string.h>
 #include <util/generic/vector.h>
 
 #include <util/stream/input.h>
 #include <util/stream/file.h>
 
+#include <array>
 #include <memory>
 
 class TPeersRules {
@@ -25,6 +27,22 @@ public:
         ALLOW,
         DENY,
         DEFAULT = DENY
+    };
+
+    enum class ECachedMatch : ui8 {
+        Unknown,
+        NoMatch,
+        Allow,
+        Deny,
+    };
+
+    struct TMatchCache {
+        ECachedMatch Priority = ECachedMatch::Unknown;
+        ECachedMatch Fallback = ECachedMatch::Unknown;
+        // Set by the direct-peer pass and excluded from the saved record.
+        bool SeenDirectPeer = false;
+
+        Y_SAVELOAD_DEFINE(Priority, Fallback);
     };
 
     struct TWildcard {
@@ -44,9 +62,12 @@ public:
 protected:
     TVector<TRule> Rules;
 
-    TVector<size_t> GlobalRulesFrom;
-    TVector<size_t> GlobalRulesTo;
+    // Priority rules precede fallback rules, preserving order within each tier.
+    size_t PriorityRulesCount = 0;
+    std::array<TVector<size_t>, 2> GlobalRulesFrom;
+    std::array<TVector<size_t>, 2> GlobalRulesTo;
     bool HasPriorityRules = false;
+    bool HasFallbackRules = false;
 
     IPathMatcher::TRef GetLocalMatcher(TStringBuf pattern) const;
 
@@ -99,7 +120,8 @@ private:
     TVector<TLocalRule> ToRuleOverrides;
 
     TVector<TLocalRule> LoadLocalRules(TStringBuf value) const;
-    TMaybe<TPeersRules::EPolicy> MatchGlobal(const TAppliedPeersRules& child, bool priority) const;
+    TConstArrayRef<size_t> TierCandidates(const TVector<size_t>& matches, bool priority) const;
+    TMaybe<TPeersRules::EPolicy> MatchGlobal(const TAppliedPeersRules& child, bool priority, TPeersRules::ECachedMatch* cached = nullptr) const;
 
 public:
     TAppliedPeersRules(const TPeersRules& rules, TStringBuf dirName);
@@ -113,9 +135,15 @@ public:
     }
 
     TPeersRules::EPolicy operator()(const TAppliedPeersRules& child) const;
-    TMaybe<TPeersRules::EPolicy> MatchPriority(const TAppliedPeersRules& child) const;
+    TMaybe<TPeersRules::EPolicy> MatchPriority(const TAppliedPeersRules& child, TPeersRules::TMatchCache* cached = nullptr) const;
     void SetLocalRules(TStringBuf fromRules, TStringBuf toRuleOverrides);
-    TPeersRules::EPolicy CheckDirectPeer(const TAppliedPeersRules& child, TStringBuf fromDir, TStringBuf toDir) const;
+    bool NeedsDirectPeerCheck(const TAppliedPeersRules& child) const {
+        return !ToRuleOverrides.empty() || !child.FromRules.empty() || Rules.HasFallbackRules;
+    }
+    bool HasGlobalRules() const {
+        return !Rules.Empty();
+    }
+    TPeersRules::EPolicy CheckDirectPeer(const TAppliedPeersRules& child, TStringBuf fromDir, TStringBuf toDir, TPeersRules::TMatchCache* cached = nullptr) const;
 };
 
 // $S/build/peerdirs.policy syntax:

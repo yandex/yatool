@@ -25,6 +25,8 @@
 #include <util/string/subst.h>
 #include <util/string/vector.h>
 
+#include <utility>
+
 namespace {
     const TStringBuf EMPTY_TAG_NAME = TStringBuf("__EMPTY__");
     const TStringBuf PROP_TAG = TStringBuf("TAG");
@@ -217,6 +219,8 @@ TModule::TModule(TModuleSavedState&& saved, TModulesSharedContext& context)
 
     ConfigVars = std::move(saved.ConfigVars);
 
+    GlobalPeerPolicyMatches = std::move(saved.GlobalPeerPolicyMatches);
+
     Loaded = true;
 }
 
@@ -233,6 +237,7 @@ void TModule::Save(TModuleSavedState& saved) const {
     saved.Transition = Transition;
     saved.ModuleGlobsData = ModuleGlobsData;
     saved.QueriedPeers = QueriedPeers;
+    saved.GlobalPeerPolicyMatches = GlobalPeerPolicyMatches;
 
     saved.Attrs.AllBits = Attrs.AllBits;
 
@@ -435,8 +440,26 @@ EPeerSearchStatus TModule::MatchPeer(const TModule& peer, const TMatchPeerReques
     return PeersRestrictions.Match(peer, request);
 }
 
-bool TModule::IsDirectPeerAllowed(const TModule& peer) const {
-    return PeersRules.CheckDirectPeer(peer.PeersRules, GetDir().GetTargetStr(), peer.GetDir().GetTargetStr()) == TPeersRules::EPolicy::ALLOW;
+bool TModule::IsDirectPeerAllowed(const TModule& peer) {
+    if (!PeersRules.NeedsDirectPeerCheck(peer.PeersRules)) {
+        return true;
+    }
+    auto* cached = PeersRules.HasGlobalRules() ? &GlobalPeerPolicyMatches[peer.GetDirId()] : nullptr;
+    if (cached) {
+        cached->SeenDirectPeer = true;
+    }
+    return PeersRules.CheckDirectPeer(peer.PeersRules, GetDir().GetTargetStr(), peer.GetDir().GetTargetStr(), cached) == TPeersRules::EPolicy::ALLOW;
+}
+
+void TModule::PruneGlobalPeerPolicyMatches() {
+    for (auto it = GlobalPeerPolicyMatches.begin(); it != GlobalPeerPolicyMatches.end();) {
+        if (it->second.SeenDirectPeer) {
+            it->second.SeenDirectPeer = false;
+            ++it;
+        } else {
+            GlobalPeerPolicyMatches.erase(it++);
+        }
+    }
 }
 
 void TModule::SetupPeerdirRestrictions() {
@@ -469,7 +492,10 @@ void TModule::ImportPeerdirTags() {
 
 void TModule::ImportPeerdirRules() {
     auto match = [this](const TModule& peer) {
-        const auto policy = PeersRules.MatchPriority(peer.PeersRules);
+        const auto* cached = GlobalPeerPolicyMatches.empty()
+            ? nullptr : std::as_const(GlobalPeerPolicyMatches).FindPtr(peer.GetDirId());
+        auto cachedMatch = cached ? *cached : TPeersRules::TMatchCache{};
+        const auto policy = PeersRules.MatchPriority(peer.PeersRules, cached ? &cachedMatch : nullptr);
         return policy && *policy == TPeersRules::EPolicy::DENY;
     };
 

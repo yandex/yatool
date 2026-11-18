@@ -873,7 +873,7 @@ void CheckDirectPeerPolicies(const TRestoreContext& restoreContext) {
         if (!node.IsValid() || !node->State.GetReachable() || !IsModuleType(node->NodeType)) {
             continue;
         }
-        const auto* module = restoreContext.Modules.Get(AssumeFile(node->ElemId));
+        auto* module = restoreContext.Modules.Get(AssumeFile(node->ElemId));
         if (!module) {
             continue;
         }
@@ -916,6 +916,7 @@ void CheckDirectPeerPolicies(const TRestoreContext& restoreContext) {
                 checkPeer(*peer);
             }
         }
+        module->PruneGlobalPeerPolicyMatches();
     }
 }
 

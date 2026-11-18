@@ -28,7 +28,8 @@ namespace {
     const ui64 ImageVersion = 62;
     const ui64 DMCacheVersion = 1;
     // Module records change independently of the reusable filesystem image.
-    constexpr ui64 MODULE_CACHE_FORMAT_VERSION = 1;
+    // Older records can contain global policy matches for the transitive closure.
+    constexpr ui64 MODULE_CACHE_FORMAT_VERSION = 4;
 
     template <size_t HashSize>
     class TVersionImpl {

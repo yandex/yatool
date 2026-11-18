@@ -185,6 +185,8 @@ private:
 
     THashSet<TFileElemId> QueriedPeers;
 
+    THashMap<TFileElemId, TPeersRules::TMatchCache> GlobalPeerPolicyMatches;
+
 public:
     TModuleSavedState(const TModule& mod);
 
@@ -216,7 +218,8 @@ public:
         Transition,
         ModuleGlobsData,
         QueriedPeers,
-        CheckedDirsIds
+        CheckedDirsIds,
+        GlobalPeerPolicyMatches
     );
 };
 
@@ -440,7 +443,8 @@ public:
     }
 
     EPeerSearchStatus MatchPeer(const TModule& peer, const TMatchPeerRequest& request) const;
-    bool IsDirectPeerAllowed(const TModule& peer) const;
+    bool IsDirectPeerAllowed(const TModule& peer);
+    void PruneGlobalPeerPolicyMatches();
 
     bool PassPeers() const {
         return Attrs.PassPeers;
@@ -572,6 +576,10 @@ private:
     }
 
     ~TModule() = default;
+
+public:
+    // Persist global rule hits and misses for direct peer directories.
+    THashMap<TFileElemId, TPeersRules::TMatchCache> GlobalPeerPolicyMatches;
 };
 
 void DumpModuleInfo(IOutputStream& out, const TModule& module);
