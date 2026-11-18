@@ -120,6 +120,7 @@ public:
 
         struct TStatistics {
             size_t DepsCount = 0;
+            size_t SkippedDepsCount = 0;
             size_t PathNodesCount = 0;
             TMap<size_t, size_t> PathLengths;
         };

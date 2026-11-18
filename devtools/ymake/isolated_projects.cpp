@@ -60,9 +60,11 @@ namespace {
             TPathId PathId{EmptyPath}; // index fist path node in TDepsCollectorVisitor::Paths (nodes on path from 'From' to 'To')
         };
 
-        TDepsCollectorVisitor(const TIsolatedProjects::TCheckInput& input, TIsolatedProjects::TCheckResult& result)
+        TDepsCollectorVisitor(const TIsolatedProjects::TCheckInput& input, const TFoldersTree& projects, TIsolatedProjects::TCheckResult& result)
             : Input_(input)
+            , Projects_(projects)
             , Result_(result)
+            , DestinationKinds_(input.Graph().Names().FileConf.Size(), EDestinationKind::Unknown)
         {
             Paths_.push_back(TNodeId::Invalid); // reserve place for EmptyPath id
         }
@@ -156,6 +158,10 @@ namespace {
             if (SourcesNodesStack_.empty()) {
                 return; // From absent
             }
+            if (!IsIsolatedDestination(toElemId)) {
+                ++SkippedDepsCount_;
+                return;
+            }
             const auto& graph = Input_.Graph();
             const auto& fileConf = graph.Names().FileConf;
             auto fromElemId = fileConf.GetTargetId(AssumeFile(graph.Get(TNodeId{ToUnderlying(SourcesNodesStack_.back()) & 0x7fffffff})->ElemId));
@@ -210,11 +216,33 @@ namespace {
         }
 
         TIsolatedProjects::TCheckResult::TStatistics Statistics() const {
-            return {Deps_.size(), Paths_.size(), PathsLengthStat_};
+            return {Deps_.size(), SkippedDepsCount_, Paths_.size(), PathsLengthStat_};
         }
 
     private:
+        enum class EDestinationKind : ui8 {
+            Unknown,
+            Outside,
+            Inside,
+        };
+
+        bool IsIsolatedDestination(TFileElemId targetId) {
+            // Both graph edges and DATA use the unlinked name-store index.
+            auto& kind = DestinationKinds_[RawElemId(targetId)];
+            if (kind == EDestinationKind::Unknown) {
+                auto path = Input_.Graph().Names().FileConf.GetName(targetId).CutAllTypes();
+                const auto* folder = &Projects_;
+                TStringBuf component;
+                while (folder && !folder->ExistsProject() && path.NextTok('/', component)) {
+                    folder = folder->At(component);
+                }
+                kind = folder && folder->ExistsProject() ? EDestinationKind::Inside : EDestinationKind::Outside;
+            }
+            return kind == EDestinationKind::Inside;
+        }
+
         const TIsolatedProjects::TCheckInput& Input_;
+        const TFoldersTree& Projects_;
         TVector<TNodeId> SourcesNodesStack_;
         TVector<size_t> LateGlob_;
         TVector<TSourceDep> Deps_;
@@ -224,6 +252,8 @@ namespace {
         TDeque<TNodeId> Paths_;
         TMap<size_t, size_t> PathsLengthStat_;
         TIsolatedProjects::TCheckResult& Result_;
+        TVector<EDestinationKind> DestinationKinds_;
+        size_t SkippedDepsCount_ = 0;
     };
 
     class TRecurseIsolatedProjectsVisitor: public TNoReentryStatsConstVisitor<TVisitorStateItem<TEntryStatsData>> {
@@ -340,6 +370,7 @@ void TIsolatedProjects::TCheckResult::Apply(const TDepGraph& graph) const {
     if (Statistics) {
         TStringStream statistics;
         statistics << " deps_count=" << Statistics->DepsCount << ";";
+        statistics << " skipped_deps_count=" << Statistics->SkippedDepsCount << ";";
         statistics << " paths_nodes_count=" << Statistics->PathNodesCount << ";";
         for (const auto& [pathLength, count] : Statistics->PathLengths) {
             statistics << " paths_len" << pathLength << "_count=" << count << ";";
@@ -519,12 +550,18 @@ TIsolatedProjects::TCheckResult TIsolatedProjects::CheckAll(const TCheckInput& i
 
 void TIsolatedProjects::CollectDeps(const TCheckInput& input, TCheckResult& result) const {
     const auto& graph = input.Graph();
-    TDepsCollectorVisitor visitor(input, result);
-    IterateAll(graph, input.StartTargets_, visitor);
+    TDepsCollectorVisitor visitor(input, FoldersTree_, result);
+    {
+        TTraceStage stage{"Collect isolated project dependencies"};
+        IterateAll(graph, input.StartTargets_, visitor);
+    }
 
     result.Statistics = visitor.Statistics();
 
-    visitor.SortDepsByTo();
+    {
+        TTraceStage stage{"Sort isolated project dependencies"};
+        visitor.SortDepsByTo();
+    }
 
     // use parallel walk by isolated projects list & sorted deps for find deps leads to isolated projects and check it's isolation
     // NOTE: we use reverse iteration, because need process long project names before short (as example 'projecta' before 'project')
