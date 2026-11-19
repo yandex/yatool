@@ -20,6 +20,7 @@ PEERDIR(
 
     devtools/ya/core/gsid
     devtools/ya/core/report
+    devtools/ya/core/sec
     devtools/ya/core/monitoring
     devtools/ya/yalibrary/store
 

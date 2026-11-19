@@ -26,6 +26,7 @@ import weakref
 from devtools.ya.core import config as core_config
 from devtools.ya.core import monitoring as core_monitoring
 from devtools.ya.core import report
+from devtools.ya.core import sec
 from devtools.ya.core import stage_tracer
 
 
@@ -99,7 +100,8 @@ cdef extern void YaYtStoreFinishStage(void* owner, const TString& name) with gil
 
 class YtStoreError(Exception):
     def __init__(self, message, mute=False, temporary=False):
-        super().__init__(message)
+        # Native response errors may reflect credentials, including in the full nested error.
+        super().__init__(sec.cleanup(message, report.SUPPRESSIONS))
         self.mute = mute
         self.temporary = temporary
 
