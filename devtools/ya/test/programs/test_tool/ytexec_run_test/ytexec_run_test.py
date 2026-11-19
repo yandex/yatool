@@ -56,6 +56,8 @@ ENV_SKIP = {
     'USER',
     'WINEPREFIX',
     'YA_TOKEN',
+    'YA_YT_TOKEN',
+    'YA_YT_TOKEN_PATH',
     'YT_TOKEN',
     const.DISTBUILD_STATUS_REPORT_ENV_NAME,
 }
