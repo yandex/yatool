@@ -42,6 +42,8 @@ public:
         TOutputFormat OutputFormat = TOutputFormat::TabSeparated;
         // Dump some fields (e.g. timestamp) in more human-readable format
         bool HumanReadable = false;
+        // Allow JSON consumers to handle invalid UTF-8 in the dump.
+        bool DisableUtf8Validation = false;
 
         TOutputOptions(TOutputFormat outputFormat = TOutputFormat::TabSeparated)
             : OutputFormat(outputFormat)
@@ -51,6 +53,13 @@ public:
         TOutputOptions(TOutputFormat outputFormat, bool humanReadable)
             : OutputFormat(outputFormat)
             , HumanReadable(humanReadable)
+        {
+        }
+
+        TOutputOptions(TOutputFormat outputFormat, bool humanReadable, bool disableUtf8Validation)
+            : OutputFormat(outputFormat)
+            , HumanReadable(humanReadable)
+            , DisableUtf8Validation(disableUtf8Validation)
         {
         }
     };

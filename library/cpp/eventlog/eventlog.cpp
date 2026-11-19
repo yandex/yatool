@@ -52,6 +52,7 @@ void TEvent::Print(IOutputStream& out, const TOutputOptions& options, const TEve
     } else if (options.OutputFormat == TOutputFormat::Json) {
         NJson::TJsonWriterConfig jsonWriterConfig;
         jsonWriterConfig.FormatOutput = 0;
+        jsonWriterConfig.ValidateUtf8 = !options.DisableUtf8Validation;
         NJson::TJsonWriter jsonWriter(&out, jsonWriterConfig);
 
         jsonWriter.OpenMap();
