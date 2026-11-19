@@ -457,6 +457,25 @@ class CacheFactory:
                 opts.dist_cache_max_file_size,
             )
 
+    def start_dist_cache(self) -> tp.Callable | None:
+        # Larry owns execution caches. Start legacy setup only for consumers
+        # that still inspect frontend cache metadata; ignoring an eager future
+        # later would leave backend initialization running in the background.
+        frontend_consumers = (
+            'use_distbuild',
+            'yt_replace_result',
+            'dist_cache_evict_cached',
+            'bazel_remote_warming',
+            'bazel_remote_warming_manifest',
+            'yt_local_max_nodes_per_core',
+            'stat_only_report_file',
+        )
+        if getattr(self._opts, 'larry_addr', None) is not None and not any(
+            getattr(self._opts, name, False) for name in frontend_consumers
+        ):
+            return None
+        return core_async.future(self.get_dist_cache_instance)
+
     def get_dist_cache_instance(self):
         cache_instance = self._try_init_bazel_remote_cache()
         if cache_instance is None:
@@ -647,7 +666,7 @@ class CacheFactory:
 
 
 def make_dist_cache(dist_cache_future, opts, graph_nodes, heater_mode):
-    if not graph_nodes:
+    if dist_cache_future is None or not graph_nodes:
         return None
 
     self_uids = [node.get('self_uid') or node['uid'] for node in graph_nodes]
@@ -1186,7 +1205,7 @@ class Context:
 
         self.output_replacements = [(opts.oauth_token, "<YA-TOKEN>")] if opts.oauth_token else []
 
-        dist_cache_future = core_async.future(lambda: self._cache_factory.get_dist_cache_instance())
+        dist_cache_future = self._cache_factory.start_dist_cache()
 
         display = getattr(app_ctx, 'display', None)
         print_status = get_print_status_func(opts, display, logger)
