@@ -648,7 +648,7 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
     }
 
     TMaybe<EBuildResult> configureBuildRes;
-    if (conf.ShouldUseOnlyYmakeCache() || yMake->CanBypassConfigure()) {
+    if (graphBypassed || conf.ShouldUseOnlyYmakeCache()) {
         configureBuildRes = StaticConfigureGraph(yMake);
     } else {
         configureBuildRes = co_await RunConfigureAsync(yMake, exec);
@@ -670,12 +670,17 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
         co_return BR_FATAL_ERROR;
     }
 
-    if (yMake->CanBypassConfigure()) {
+    if (graphBypassed) {
         yMake->SetStartTargetsFromCache();
+        InitializeLocalChangeFlags(yMake->Graph, yMake->StartTargets);
         yMake->UpdateExternalFilesChanges();
     } else {
         yMake->AddRecursesToStartTargets();
         yMake->AddModulesToStartTargets();
+        if (conf.ShouldUseOnlyYmakeCache()) {
+            // The include fixer can update local change flags on restored nodes.
+            InitializeLocalChangeFlags(yMake->Graph, yMake->StartTargets);
+        }
         yMake->FindLostIncludes();
     }
 
@@ -744,11 +749,14 @@ TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& c
     return TMaybe<EBuildResult>();
 }
 
-bool PostConfigureStage(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
+TMaybe<EBuildResult> PostConfigureStage(TBuildConfiguration& conf, THolder<TYMake>& yMake, bool& hasBadLoops) {
     yMake->ReportModulesStats();
 
     if (!yMake->CanBypassConfigure()) {
         yMake->ComputeReachableNodes();
+        if (conf.ShouldUseOnlyYmakeCache() && !yMake->UpdateExternalFilesChanges(/*failOnMissingFiles=*/true)) {
+            return BR_CONFIGURE_FAILED;
+        }
         yMake->SortAllEdges();
     }
 
@@ -758,14 +766,14 @@ bool PostConfigureStage(TBuildConfiguration& conf, THolder<TYMake>& yMake) {
         yMake->Compact();
     }
 
-    bool hasBadLoops = yMake->DumpLoops();
+    hasBadLoops = yMake->DumpLoops();
     if (hasBadLoops) {
         NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::BadLoops), true);
         if (!conf.IsYmakeSaveAllCachesWhenBadLoops()) {
             conf.DoNotWriteAllCaches();
         }
     }
-    return hasBadLoops;
+    return Nothing();
 }
 
 namespace {
@@ -930,7 +938,12 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
         co_return result.GetRef();
     }
 
-    bool hasBadLoops = PostConfigureStage(conf, yMake);
+    bool hasBadLoops = false;
+    result = PostConfigureStage(conf, yMake, hasBadLoops);
+    if (result.Defined()) {
+        ConfMsgManager()->Flush();
+        co_return result.GetRef();
+    }
     if (conf.WriteFsCache || conf.WriteDepsCache) {
         // The DM, internal, and UID caches must use one generation fingerprint. Prepare it before
         // DM is saved and before internal-cache saving and rendering start concurrently.

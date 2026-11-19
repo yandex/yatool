@@ -201,7 +201,7 @@ public:
         HasGraphStructuralChanges_ = false;
         Y_ASSERT(CanBypassConfigure());
     }
-    void UpdateExternalFilesChanges();
+    bool UpdateExternalFilesChanges(bool failOnMissingFiles = false);
     void UpdateUnreachableExternalFileChanges();
 
     TModuleResolveContext GetModuleResolveContext(const TModule& mod);

@@ -179,7 +179,7 @@ void PropagateChangeFlags(TDepGraph& graph, const TGraphLoops& loops, TVector<TT
     FORCE_TRACE(U, ev);
 }
 
-namespace NSetLocalChangesForGrandBypass {
+namespace NInitializeLocalChangeFlags {
     using TStateItem = TGraphIteratorStateItemBase<false>;
 
     class TVisitor: public TDirectPeerdirsVisitor<TEntryStats, TStateItem> {
@@ -199,7 +199,8 @@ namespace NSetLocalChangesForGrandBypass {
     };
 }
 
-void SetLocalChangesForGrandBypass(TDepGraph& graph, const TVector<TTarget>& startTargets) {
-    NSetLocalChangesForGrandBypass::TVisitor visitor;
+void InitializeLocalChangeFlags(TDepGraph& graph, const TVector<TTarget>& startTargets) {
+    NYMake::TTraceStage scopeTracer{"Initialize local change flags"};
+    NInitializeLocalChangeFlags::TVisitor visitor;
     IterateAll(graph, startTargets, visitor);
 }

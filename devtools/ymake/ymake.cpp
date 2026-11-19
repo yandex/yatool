@@ -11,7 +11,6 @@
 #include <devtools/ymake/diag/dbg.h>
 #include <devtools/ymake/diag/trace.h>
 #include <devtools/ymake/compute_reachability.h>
-#include <devtools/ymake/propagate_change_flags.h>
 #include <devtools/ymake/python_runtime.h>
 
 #include <asio/co_spawn.hpp>
@@ -207,10 +206,8 @@ void TYMake::ComputeReachableNodes() {
     NComputeReachability::ComputeReachableNodes(Graph, StartTargets);
 }
 
-void TYMake::UpdateExternalFilesChanges() {
-    NYMake::TTraceStage scopeTracer{"Update External changes for Grand Bypass"};
-
-    SetLocalChangesForGrandBypass(Graph, StartTargets);
+bool TYMake::UpdateExternalFilesChanges(bool failOnMissingFiles) {
+    NYMake::TTraceStage scopeTracer{"Update external file changes"};
 
     auto& fileConf = Names.FileConf;
     auto externalChanges = fileConf.GetExternalChanges();
@@ -222,11 +219,18 @@ void TYMake::UpdateExternalFilesChanges() {
             if (node.IsValid()) {
                 if (node->State.GetReachable() && node->NodeType == EMNT_File) {
                     fileConf.GetFileById(elemId)->GetContent();
+                    if (failOnMissingFiles && fileConf.GetFileDataById(elemId).NotFound) {
+                        YErr() << "Cannot use --cache-path because required source file "
+                               << fileConf.GetName(elemId).GetTargetStr()
+                               << " is missing. Reconfigure without --cache-path." << Endl;
+                        return false;
+                    }
                     node->State.SetLocalChanges(false, true);
                 }
             }
         }
     }
+    return true;
 }
 
 void TYMake::UpdateUnreachableExternalFileChanges() {
