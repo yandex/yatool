@@ -301,6 +301,7 @@ def _do_build(build_info, params, arcadia_root, app_ctx, parsed_package, formatt
     build_options.dump_graph = params.dump_graph
 
     build_options.run_tests = params.run_tests
+    build_options.drop_graph_result_before_tests = params.drop_graph_result_before_tests
     build_options.cache_tests = params.cache_tests
     build_options.test_env = params.test_env
     build_options.allure_report = params.allure_report
