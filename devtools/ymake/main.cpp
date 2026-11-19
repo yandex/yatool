@@ -90,7 +90,7 @@ namespace {
         }
         targets = std::move(newTargets);
     }
-}
+} // namespace
 
 TYMake::TYMake(TBuildConfiguration& conf)
     : Conf(conf)
@@ -112,11 +112,13 @@ static TMaybe<EBuildResult> StaticConfigureGraph(THolder<TYMake>& yMake) {
     for (size_t i = 0; i < conf.StartDirs.size(); ++i) {
         TString curDir = NPath::ConstructPath(NPath::FromLocal(conf.StartDirs[i]), NPath::Source);
         TFileElemId node = yMake->Graph.Names().FileConf.GetIdNx(curDir);
-        if (!node)
+        if (!node) {
             continue;
+        }
         const TNodeId offs = yMake->Graph.GetFileNodeById(node).Id();
-        if (offs != TNodeId::Invalid)
+        if (offs != TNodeId::Invalid) {
             yMake->StartTargets.push_back(offs);
+        }
     }
     return yMake->StartTargets.size() ? TMaybe<EBuildResult>() : TMaybe<EBuildResult>(BR_CONFIGURE_FAILED);
 }
@@ -138,7 +140,7 @@ TNodeId TYMake::GetUserTarget(const TStringBuf& target) const {
 }
 
 bool TYMake::InitTargets() {
-    for (const TFsPath& target: Conf.Targets) {
+    for (const TFsPath& target : Conf.Targets) {
         TNodeId offs = GetUserTarget(NPath::FromLocal(target));
         if (offs == TNodeId::Invalid) {
             YConfErr(UserErr) << "Target '" << target.c_str() << "' not found" << Endl;
@@ -146,7 +148,7 @@ bool TYMake::InitTargets() {
         }
         EMakeNodeType type = Graph.GetType(offs);
         if (type == EMNT_Directory) {
-            //XXX: try to not iterate here
+            // XXX: try to not iterate here
             for (auto& s : StartTargets) {
                 if (offs == s.Id) {
                     s.IsUserTarget = true;
@@ -209,7 +211,8 @@ namespace {
         TModulesInfo(const TDepGraph& graph, const TModules& modules)
             : Graph(graph)
             , Modules(modules)
-        {}
+        {
+        }
 
         std::pair<ui32, ui32> Get(const TDepTreeNode& node) {
             Y_ASSERT(IsDirType(node.NodeType));
@@ -251,7 +254,7 @@ namespace {
         }
         return true;
     }
-}
+} // namespace
 
 void TYMake::AddRecursesToStartTargets() {
     if (HasNonDirTargets) {
@@ -259,7 +262,7 @@ void TYMake::AddRecursesToStartTargets() {
     }
 
     TNodesQueue pureRecursesQueue;
-    for (const auto& node: StartTargets) {
+    for (const auto& node : StartTargets) {
         if (node.IsModuleTarget) {
             continue;
         }
@@ -371,7 +374,7 @@ void TYMake::AddRecursesToStartTargets() {
 
 void TYMake::CreateRecurseGraph() {
     TMineRecurseVisitor mineVisitor(Graph, RecurseGraph);
-    IterateAll(Graph, StartTargets, mineVisitor, [](TTarget target){ return !target.IsModuleTarget; });
+    IterateAll(Graph, StartTargets, mineVisitor, [](TTarget target) { return !target.IsModuleTarget; });
 
     TFilterRecurseVisitor filterVisitor(Graph, StartTargets, RecurseGraph);
     IterateAll(RecurseGraph, filterVisitor);
@@ -453,6 +456,7 @@ void TYMake::AddModulesToStartTargets() {
 //       [2 of 2] Dep: EDT_Include, Type: EMNT_Bundle, Id: 13, Name: $B/junk/snermolaev/union_inner/junk-snermolaev-union_inner.pkg.fake
 class TDependsToModulesCollector: public TNoReentryStatsConstVisitor<> {
     using TBase = TNoReentryStatsConstVisitor<>;
+
 public:
     TDependsToModulesCollector(const TRestoreContext& restoreContext, TDependsToModulesClosure& closure)
         : RestoreContext(restoreContext)
@@ -506,10 +510,56 @@ public:
             }
         }
 
-        return dep.To()->NodeType == EMNT_Bundle && TBase::AcceptDep(state);
+        if (dep.To()->NodeType != EMNT_Bundle) {
+            return false;
+        }
+        if (IsModuleWithManageablePeers(dep.To())) {
+            CollectManagedDependencies(dep.To().Id());
+            return false;
+        }
+        return TBase::AcceptDep(state);
     }
 
 private:
+    void CollectManagedDependencies(TNodeId root) {
+        TVector<std::pair<TNodeId, bool>> pending{{root, true}};
+        THashSet<TNodeId> expandedManaged;
+        THashSet<TNodeId> visited;
+        const auto append = [&](TNodeId id) {
+            if (!IsFakeModule(RestoreContext.Modules, AssumeFile(RestoreContext.Graph[id]->ElemId))) {
+                Iterator->second.push_back(id);
+            }
+        };
+        while (!pending.empty()) {
+            const auto [id, expandManaged] = pending.back();
+            pending.pop_back();
+            const auto node = RestoreContext.Graph.Get(id);
+            const bool managed = IsModuleWithManageablePeers(node);
+            if (managed && expandManaged && expandedManaged.insert(id).second) {
+                // Use the root's resolved versions and exclusions, not each peer's local closure.
+                const auto* module = RestoreContext.Modules.Get(AssumeFile(node->ElemId));
+                for (const auto peer : RestoreContext.Modules.GetModuleNodeLists(module->GetId()).UniqPeers()) {
+                    append(peer);
+                    pending.emplace_back(peer, false);
+                }
+            }
+            if (node->NodeType != EMNT_Bundle || !visited.insert(id).second) {
+                continue;
+            }
+            for (const auto dep : node.Edges()) {
+                if ((*dep != EDT_Include && !managed) || !IsModuleType(dep.To()->NodeType)) {
+                    continue;
+                }
+                // Managed closures omit native peers for modules that do not consume them.
+                if ((managed && IsModuleWithManageablePeers(dep.To())) || !IsReachableManagedDependency(RestoreContext, dep)) {
+                    continue;
+                }
+                append(dep.To().Id());
+                pending.emplace_back(dep.To().Id(), true);
+            }
+        }
+    }
+
     bool IsModuleWithManageablePeers(TConstDepNodeRef node) const {
         if (!IsModuleType(node->NodeType)) {
             return false;
@@ -544,7 +594,7 @@ void TYMake::ComputeDependsToModulesClosure() {
         collector.Reset();
     }
     // Remove empty closures
-    EraseNodesIf(DependsToModulesClosure, [](const auto& item) {return item.second.empty();});
+    EraseNodesIf(DependsToModulesClosure, [](const auto& item) { return item.second.empty(); });
     DependsToModulesClosureCollected = true;
 }
 
@@ -555,8 +605,9 @@ void TYMake::GetDependsToModulesClosure() {
 }
 
 void TYMake::DumpMetaData() {
-    if (! Conf.WriteMetaData.size())
+    if (!Conf.WriteMetaData.size()) {
         return;
+    }
 
     IOutputStream* out = Conf.OutputStream.Get();
     THolder<IOutputStream> hout;
@@ -574,7 +625,7 @@ void TYMake::DumpMetaData() {
     jsonWriter.WriteJsonValue(&metaJson, true);
 }
 
-//TODO: move to appropriate place
+// TODO: move to appropriate place
 bool TYMake::DumpLoops() {
     NYMake::TTraceStage stage("Detect loops");
     const auto Loops = TGraphLoops::Find(Graph, StartTargets, false);
@@ -626,7 +677,7 @@ asio::awaitable<TMaybe<EBuildResult>> ConfigureStage(THolder<TYMake>& yMake, TBu
         if (conf.StartDirs.empty()) {
             conf.ConfigureCachePolicy.ConfirmInternalCachesNotApplicable();
             conf.ForeignTargetWriter->WriteLine(NYMake::EventToStr(NEvent::TAllForeignPlatformsReported{}));
-            FORCE_TRACE(U,  NEvent::TCacheIsExpectedToBeEmpty{conf.YmakeCache.GetPath()});
+            FORCE_TRACE(U, NEvent::TCacheIsExpectedToBeEmpty{conf.YmakeCache.GetPath()});
             if (conf.MakePlanSink) {
                 TMakePlan emptyPlan{*conf.MakePlanSink};
                 conf.MakePlanSink->OnFinish(emptyPlan);
@@ -712,14 +763,12 @@ TMaybe<EBuildResult> PrepareStage(THolder<TYMake>& yMake, TBuildConfiguration& c
         if (!conf.ReadFsCache) {
             conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Disabled(
                 EConfigureCacheKind::FS,
-                conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::FS)
-            ));
+                conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::FS)));
         }
         if (!conf.ReadDepsCache) {
             conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Disabled(
                 EConfigureCacheKind::Deps,
-                conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Deps)
-            ));
+                conf.ConfigureCachePolicy.DisableSource(EConfigureCacheKind::Deps)));
         }
         if (!conf.CachePath.Exists()) {
             conf.ConfigureCachePolicy.OnInternalCacheFailure(TConfigureCacheLoadResult::Missing(EConfigureCacheKind::FS));
@@ -798,7 +847,7 @@ namespace {
         }
         return TMaybe<EBuildResult>();
     }
-}
+} // namespace
 
 asio::awaitable<TMaybe<EBuildResult>> AnalysesStage(TBuildConfiguration& conf, TYMake& yMake, bool hasBadLoops, TExecutorWithContext<TExecContext> exec) {
     const bool checkBlacklist = !yMake.CanBypassConfigure() || conf.IsBlacklistHashChanged();
@@ -819,13 +868,11 @@ asio::awaitable<TMaybe<EBuildResult>> AnalysesStage(TBuildConfiguration& conf, T
     TIsolatedProjects::TCheckResult isolatedResult;
     const auto result = co_await RunConcurrentAnalyses(exec, [&] {
         NYMake::TTraceStage stage{"Check isolated projects"};
-        isolatedResult = conf.IsolatedProjects.CheckAll(input);
-    }, [&] {
+        isolatedResult = conf.IsolatedProjects.CheckAll(input); }, [&] {
         if (checkBlacklist) {
             yMake.CheckBlacklist();
         }
-        return AnalyseDependencies(conf, yMake, hasBadLoops);
-    });
+        return AnalyseDependencies(conf, yMake, hasBadLoops); });
     // Both branches have stopped borrowing the input and graph, including on an
     // early DM result. Only this flow writes the isolated-project diagnostics.
     {
@@ -863,13 +910,14 @@ asio::awaitable<TMaybe<EBuildResult>> RenderGraph(TBuildConfiguration& conf, THo
         const auto oldBuildRoot = std::exchange(yMake->Conf.BuildRoot, GetCmdValue(Get1(buildRootVar)));
         if (!yMake->Conf.SourceRoot.IsDefined() || !yMake->Conf.BuildRoot.IsDefined()) {
             YConfErr(Misconfiguration) << fmt::format(
-                "Source root or build root for rendering --sem-graph is empty.\n\t"
-                "NOTE: raw var values before converting to filesystem path are:\n\t"
-                "EXPORTED_BUILD_SYSTEM_SOURCE_ROOT='{}'\n\t"
-                "EXPORTED_BUILD_SYSTEM_BUILD_ROOT='{}'",
-                GetCmdValue(Get1(sourceRootVar)),
-                GetCmdValue(Get1(buildRootVar))) << Endl;
-                co_return BR_CONFIGURE_FAILED;
+                                              "Source root or build root for rendering --sem-graph is empty.\n\t"
+                                              "NOTE: raw var values before converting to filesystem path are:\n\t"
+                                              "EXPORTED_BUILD_SYSTEM_SOURCE_ROOT='{}'\n\t"
+                                              "EXPORTED_BUILD_SYSTEM_BUILD_ROOT='{}'",
+                                              GetCmdValue(Get1(sourceRootVar)),
+                                              GetCmdValue(Get1(buildRootVar)))
+                                       << Endl;
+            co_return BR_CONFIGURE_FAILED;
         }
         RenderSemGraph(*yMake->Conf.OutputStream.Get(), yMake->GetRestoreContext(), yMake->Commands, yMake->GetTraverseStartsContext());
         yMake->Conf.SourceRoot = oldSourceRoot;
@@ -908,7 +956,7 @@ asio::awaitable<void> DumpDarts(TBuildConfiguration& conf, THolder<TYMake>& yMak
     yMake->DumpMetaData();
 }
 
-template<typename T>
+template <typename T>
 auto GetOrEmptyAwaitable(std::optional<asio::experimental::promise<void(std::exception_ptr, T)>>& promise) {
     if (promise) {
         return promise.value()(asio::use_awaitable);
@@ -973,10 +1021,9 @@ asio::awaitable<int> main_real(TBuildConfiguration& conf, TExecutorWithContext<T
                 co_await SaveCoreCaches(conf, yMake);
             });
         } else {
-            co_await (asio::co_spawn(exec, SaveCoreCaches(conf, yMake), asio::use_awaitable)
-                && asio::co_spawn(exec, [&]() -> asio::awaitable<void> {
-                    result = co_await RenderGraph(conf, yMake, exec);
-                }, asio::use_awaitable));
+            co_await (asio::co_spawn(exec, SaveCoreCaches(conf, yMake), asio::use_awaitable) && asio::co_spawn(exec, [&]() -> asio::awaitable<void> {
+                          result = co_await RenderGraph(conf, yMake, exec);
+                      }, asio::use_awaitable));
         }
         if (result.Defined()) {
             auto r = result.GetRef();
