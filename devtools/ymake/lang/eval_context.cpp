@@ -351,6 +351,14 @@ bool TEvalContext::SetStatement(const TStringBuf& name, const TVector<TStringBuf
 }
 
 bool TEvalContext::VarStatement(const TStringBuf& name, TVector<TStringBuf>& args, TSSPool& pool) {
+    if (!args.empty() && args[0].StartsWith('_') &&
+        EqualToOneOf(name, NMacro::SET, NMacro::SET_APPEND, NMacro::SET_APPEND_WITH_GLOBAL,
+                     NMacro::DEFAULT, NMacro::ENABLE, NMacro::DISABLE) &&
+        !CanSetPrivateVariable(args[0])) {
+        YConfErrPrecise(Syntax, GetStatementRow(name), GetStatementColumn(name))
+            << name << " cannot write private variable [[alt1]]" << args[0] << "[[rst]] in a makefile" << Endl;
+        return true;
+    }
     if (SetStatement(name, args, Vars(), OrigVars()) || (NsExtraSetters && NsExtraSetters(name, args))) {
         //recalc variables
         YDIAG(V) << "Need to recalc conditions with " << args[0] << Endl;

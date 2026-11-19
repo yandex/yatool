@@ -53,6 +53,7 @@ public:
 
 protected:
     bool UserStatement(const TStringBuf& name, const TVector<TStringBuf>& args) override;
+    bool CanSetPrivateVariable(TStringBuf name) const override;
     TIncludeController OnInclude(TStringBuf incFile, TStringBuf fromFile) override;
 
 private:

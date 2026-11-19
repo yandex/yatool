@@ -330,6 +330,12 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
     CompileAndRecalcAllConditions();
     FoldGlobalCommands(*this);
     FillModuleScopeOnlyFlag(*this);
+    const auto unprivateVarsList = TCommandInfo(*this, nullptr, nullptr).SubstVarDeeply(NVariableDefs::VAR__UNPRIVATE_VARS, CommandConf);
+    for (const auto name : StringSplitter(unprivateVarsList).Split(' ').SkipEmpty()) {
+        if (auto it = CommandConf.find(name); it != CommandConf.end()) {
+            it->second.Unprivate = true;
+        }
+    }
     ReadModulesWithExtendedGlobs(*this);
     ReadFeatureFlags(*this);
 

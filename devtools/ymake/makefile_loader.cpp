@@ -98,6 +98,11 @@ bool TDirParser::UserStatement(const TStringBuf& name, const TVector<TStringBuf>
     return UserStatementImpl(name, args, /* prohibitInternal */ true);
 }
 
+bool TDirParser::CanSetPrivateVariable(TStringBuf name) const {
+    const auto it = Conf.CommandConf.find(name);
+    return it == Conf.CommandConf.end() || it->second.Unprivate;
+}
+
 bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TStringBuf>& args, bool prohibitInternal) {
     if (prohibitInternal && IsInternalStatement(name)) {
         YConfErrPrecise(Syntax, GetStatementRow(name), GetStatementColumn(name)) << "internal command [[alt1]]" << name << "[[rst]] is not allowed to appear in ya.make" << Endl;

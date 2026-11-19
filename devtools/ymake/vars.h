@@ -200,6 +200,7 @@ struct TYVar: public TVector<TVarStr> {
             ui32 ModuleScopeOnly : 1;
             ui32 FakeDeepReplacement : 1;
             ui32 DontParse : 1;
+            ui32 Unprivate : 1;
         };
     };
     TElemId Id;

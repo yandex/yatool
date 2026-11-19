@@ -181,7 +181,12 @@ bool TModuleDef::ProcessBaseMacro(TStringBuf macroName, const TVector<TStringBuf
         }
         const TStringBuf variable = args[0] == "FROM" ? TStringBuf{NVariableDefs::VAR_PEERDIR_FROM_POLICY} : TStringBuf{NVariableDefs::VAR__PEERDIR_TO_POLICY_OVERRIDE};
         for (auto pattern = args.begin() + 2; pattern != args.end(); ++pattern) {
-            Vars.SetAppendStoreOriginals(variable, TString::Join(args[1], " ", *pattern), OrigVars);
+            const auto rule = TString::Join(args[1], " ", *pattern);
+            if (Vars.EvalValue(variable).empty()) {
+                Vars.SetStoreOriginals(variable, rule, OrigVars);
+            } else {
+                Vars.SetAppendStoreOriginals(variable, rule, OrigVars);
+            }
         }
         return true;
     }
@@ -299,6 +304,13 @@ TDepsCacheId TModuleDef::Commit() {
     if (Vars.Contains(NVariableDefs::VAR_PEERDIR_TAGS)) {
         TString expandedTags = TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(NVariableDefs::VAR_PEERDIR_TAGS, Vars);
         Module.Set(NVariableDefs::VAR_PEERDIR_TAGS, expandedTags);
+    }
+
+    for (const auto variable : {NVariableDefs::VAR_PEERDIR_FROM_POLICY, NVariableDefs::VAR__PEERDIR_TO_POLICY_OVERRIDE}) {
+        if (!Module.Get(variable).empty()) {
+            TString expandedRules = TCommandInfo(Conf, nullptr, nullptr).SubstVarDeeply(variable, Vars);
+            Module.Set(variable, expandedRules);
+        }
     }
 
     Module.FinalizeConfig(modId, ModuleConf);

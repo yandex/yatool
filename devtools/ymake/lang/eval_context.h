@@ -125,6 +125,9 @@ protected:
         // throw
         return false;
     }
+    virtual bool CanSetPrivateVariable(TStringBuf /* name */) const {
+        return true;
+    }
     void StartNamespace(TVars& vars, TOriginalVars& orig, TExtraSetters&& setters = {}) {
         CurrentNs = &vars;
         CurrentOriginal = &orig;
