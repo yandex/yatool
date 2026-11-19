@@ -1,6 +1,7 @@
 import collections
 import contextlib
 import copy
+import functools
 import glob
 import logging
 import os
@@ -2349,7 +2350,7 @@ class YaMake:
                             )
                         sandbox_token = self.app_ctx.fetcher_params[2] or ''
                         diagnostics = DiagnosticOptions.from_build_options(self.opts)
-                        result = LarryClient(
+                        client = LarryClient(
                             callback,
                             self.ctx.graph,
                             self.ctx.src_dir,
@@ -2388,9 +2389,12 @@ class YaMake:
                             failure_output=(
                                 FailureOutput.DIAGNOSTIC if called_by_agent(self.app_ctx) else FailureOutput.COMMAND
                             ),
-                        ).build(self.opts.larry_addr)
+                        )
+                        result = client.build(self.opts.larry_addr)
                     result_analyzer = (
-                        self._make_local_result_analyzer(result[8], result[1]) if diagnostics.timings != 'off' else None
+                        self._make_local_result_analyzer(result[8], result[1], cache_usage=client.cache_usage)
+                        if diagnostics.timings != 'off'
+                        else functools.partial(bs.report_cache_usage, client.cache_usage)
                     )
                     return result[:7] + (result_analyzer, result[8])
                 else:
@@ -2592,7 +2596,7 @@ class YaMake:
 
         return result_analyzer
 
-    def _make_local_result_analyzer(self, execution_log, errors):
+    def _make_local_result_analyzer(self, execution_log, errors, *, cache_usage=None):
         def result_analyzer():
             statistics = bs.get_statistics(self.opts)
             return bs.analyze_local_result(
@@ -2600,10 +2604,11 @@ class YaMake:
                 self.ctx.graph,
                 self.opts.statistics_out_dir,
                 self.opts,
-                set(errors.keys()) if bs.requires_graph_statistics(statistics) else None,
+                set(errors.keys()),
                 get_task_stats() if 'disk_usage' in statistics else None,
                 ctx_stages=self.ctx.stage_times,
                 ymake_stats=self.ctx.ymake_stats,
+                cache_usage=cache_usage,
             )
 
         return result_analyzer

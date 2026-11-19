@@ -28,6 +28,7 @@ from devtools.ya.yalibrary.runner.diagnostics import (
     format_launch_error,
 )
 from yalibrary.runner.build_root import BuildRootError
+from devtools.ya.yalibrary.runner.diagnostics import result_source as result_sources
 
 if tp.TYPE_CHECKING:
     from yalibrary.runner.build_root import BuildRoot  # noqa
@@ -614,6 +615,7 @@ class RunNodeTask(object):
             err_msg = 'unresolved patterns: ' + ', '.join(map(six.ensure_str, self._node.unresolved_patterns()))
 
         cached_by_content_uid = False
+        result_source = result_sources.ResultSource.EXECUTED
         if not have_broken:
             if self._self_uid_support:
                 uids_hashes = [self._node.self_uid]
@@ -636,6 +638,7 @@ class RunNodeTask(object):
                         self._node.content_uid, self._build_root.path
                     ):
                         cached_by_content_uid = True
+                        result_source = result_sources.ResultSource.LOCAL
                     elif (
                         self._dist_cache
                         and getattr(self._dist_cache, 'support_content_uids', True)
@@ -646,6 +649,8 @@ class RunNodeTask(object):
                             self._build_root.path,
                             expected_outputs=list(self._build_root.output),
                         )
+                        if cached_by_content_uid:
+                            result_source = result_sources.source_from_store(self._dist_cache)
                     finish_time = time.time()
 
             if not cached_by_content_uid:
@@ -708,6 +713,9 @@ class RunNodeTask(object):
             self._detailed_timings.finish_stage()
 
         self._execution_log[self._node.uid]['detailed_timings'] = self._detailed_timings.dump()
+        if not self._exit_code:
+            # A successful lookup is not a usable result until output finalization succeeds.
+            self._execution_log[self._node.uid]['result_source'] = result_source.value
 
     def __str__(self):
         return 'Run({})'.format(str(self._node))

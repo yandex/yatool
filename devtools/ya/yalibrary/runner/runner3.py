@@ -34,6 +34,7 @@ from yalibrary.runner import statcalc
 from yalibrary.runner import worker_threads
 from yalibrary.runner import task_cache
 from yalibrary.runner.command_file.python import command_file as cf
+from devtools.ya.yalibrary.runner.diagnostics import result_source as result_sources
 from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.status_view.helpers import format_paths
 from yalibrary.store.usage_map import UsageMap
@@ -162,7 +163,14 @@ class TaskContext(object):
         logger.debug("content UIDs %s in runner", "*enabled*" if self.content_uids else "*disabled*")
 
         self._res: "ResultArtifacts" = collections.defaultdict(list)
-        self._execution_log: ExecutionLog = {}
+        self._execution_log: ExecutionLog = {
+            result_sources.LOG_MARKER: {
+                'schema_version': result_sources.SCHEMA_VERSION,
+                'read_allowed': result_sources.classic_read_allowed(
+                    self._dist_cache, clear_build=self.opts.clear_build, use_distbuild=self.opts.use_distbuild
+                ),
+            }
+        }
         self._build_errors: BuildErrors = {}
 
         # Process can hit soft limit of RLIMIT_NOFILE

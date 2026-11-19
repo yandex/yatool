@@ -26,6 +26,7 @@ from devtools.ya.build.stat.graph import (
 from devtools.ya.core import profiler, stage_tracer
 from devtools.ya.build.stat.changelist_stats import get_changelist_stats
 from devtools.ya.build.stat.cache_statistics import collect_cache_statistics
+from devtools.ya.yalibrary.runner.diagnostics import result_source as result_sources
 
 
 class TaskType(enum.Enum):
@@ -1013,10 +1014,13 @@ def print_graph_statistics(
     def collect_cache_hit():
         filename = _make_file_path('cache-hit.json')
         if cache_counts_f is not None:
-            value = _print_cache_statistics(filename, display, **cache_counts_f())
+            counters = cache_counts_f()
+            value = _print_cache_statistics(filename, display, **counters.legacy_counts)
+            cache_usage = counters.cache_usage
         else:
             value = print_cache_statistics(graph, filename, display)
-        return {'cache_hit': value}
+            cache_usage = graph.get_cache_usage()
+        return {'cache_hit': value, 'cache_usage': cache_usage}
 
     # Creating the registry does not execute collectors. Selection is independent
     # of --stat, which only controls where the selected statistics are displayed.
@@ -1140,7 +1144,9 @@ def report_coverage_upload_status(graph, report_file, fail_report_file):
             reporter.write('\n'.join(failed))
 
 
-def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, ymake_stats=None, cache_counts_f=None):
+def _analyze_result(
+    graph_f, directory, opts, task_stats=None, ctx_stages=None, ymake_stats=None, cache_counts_f=None, cache_usage=None
+):
     start_time = time.time()
     statistics_stage = stager.start('statistics')
     selected_statistics = get_statistics(opts)
@@ -1192,6 +1198,8 @@ def _analyze_result(graph_f, directory, opts, task_stats=None, ctx_stages=None, 
     statistics_overhead = end_time - start_time
     stat_display.emit_message()
     stat_display.emit_message('Statistics overhead {:d} ms'.format(int(statistics_overhead * 1000)))
+    if cache_usage is not None:
+        stats['cache_usage'] = cache_usage
     if stats:
         stats['statistics_overhead_sec'] = statistics_overhead
         import app_ctx
@@ -1221,7 +1229,15 @@ def analyze_distbuild_result(
 
 
 def analyze_local_result(
-    result, graph, directory, opts, failed_uids=None, task_stats=None, ctx_stages=None, ymake_stats=None
+    result,
+    graph,
+    directory,
+    opts,
+    failed_uids=None,
+    task_stats=None,
+    ctx_stages=None,
+    ymake_stats=None,
+    cache_usage=None,
 ):
     _analyze_result(
         lambda: create_graph_with_local_log(graph, result, failed_uids),
@@ -1230,5 +1246,17 @@ def analyze_local_result(
         task_stats=task_stats,
         ctx_stages=ctx_stages,
         ymake_stats=ymake_stats,
-        cache_counts_f=lambda: collect_cache_statistics(graph, local_result=result),
+        cache_counts_f=lambda: collect_cache_statistics(graph, local_result=result, failed_uids=failed_uids),
+        cache_usage=cache_usage,
     )
+
+
+def report_cache_usage(cache_usage: result_sources.CacheUsage | None) -> None:
+    """Publish terminal native counters without enabling stage diagnostics."""
+    if cache_usage is None:
+        return
+    import app_ctx
+
+    stats = {'cache_usage': cache_usage}
+    app_ctx.dump_debug['stats'] = stats
+    devtools.ya.core.report.telemetry.report(devtools.ya.core.report.ReportTypes.GRAPH_STATISTICS, stats)

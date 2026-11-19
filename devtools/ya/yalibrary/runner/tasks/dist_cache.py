@@ -4,6 +4,7 @@ import time
 import devtools.ya.core.error
 import yalibrary.worker_threads as worker_threads
 from yalibrary.runner.tasks.enums import WorkerPoolType
+from devtools.ya.yalibrary.runner.diagnostics import result_source as result_sources
 
 
 def get_link_filename(filename):
@@ -171,6 +172,9 @@ class RestoreFromDistCacheTask(object):
             'prepare': '',
             'type': 'get from dist cache' if is_ok else 'failed to get from dist cache',
         }
+        if is_ok:
+            self._execution_log[str(self)]['result_uid'] = self._node.uid
+            self._execution_log[str(self)]['result_source'] = result_sources.source_from_store(self._dist_cache).value
 
     def __str__(self):
         return 'FromDistCache({})'.format(str(self._node))

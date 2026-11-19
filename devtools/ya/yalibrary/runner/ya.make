@@ -27,6 +27,7 @@ PEERDIR(
     devtools/ya/yalibrary/active_state
     devtools/ya/yalibrary/formatter
     devtools/ya/yalibrary/runner/command_file/python
+    devtools/ya/yalibrary/runner/diagnostics
     devtools/ya/yalibrary/runner/fs
     devtools/ya/yalibrary/runner/sandboxing
     devtools/ya/yalibrary/runner/schedule_strategy

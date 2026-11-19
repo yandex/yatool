@@ -14,6 +14,7 @@ from collections.abc import Iterator, Iterable, Generator
 from dataclasses import dataclass, field
 
 from yalibrary.fetcher import http_client
+from devtools.ya.yalibrary.runner.diagnostics import result_source as result_sources
 from yalibrary.status_view.helpers import format_paths
 from devtools.ya.build.graph_description import GraphNodeUid, GraphNode, DictGraph
 
@@ -32,7 +33,7 @@ _TimeElapsed = _OptionalTime
 
 # This is abstract task without linkage to machine, just as in json graph
 class AbstractTask:
-    __slots__ = ("uid", "meta", "status", "_description", "depends_on")
+    __slots__ = ("uid", "meta", "status", "_description", "depends_on", "result_source")
 
     class Status(enum.StrEnum):
         OK = 'OK'
@@ -40,6 +41,7 @@ class AbstractTask:
 
     def __init__(self, uid: GraphNodeUid, description: str | None, meta: GraphNode):
         self.uid = uid
+        self.result_source = None
         self.meta = meta
         self.status = AbstractTask.Status.OK
         self._description = description
@@ -318,6 +320,13 @@ class CopyTask(BaseTask):
 
 class GraphStats:
     def __init__(self, graph_json: DictGraph, log_json: dict | None = None) -> None:
+        # TODO(YMAKE-2453): remove mutable tracking once classic publishes terminal summaries.
+        self.result_source_counts = dict.fromkeys(result_sources.SOURCE_NAMES.values(), 0)
+        self.unknown_result_sources = 0
+        self.source_observations_complete = False
+        self.source_execution_mode = 'local'
+        self.read_allowed: dict[str, bool | None] | None = None
+        self.data_sizes = result_sources.data_sizes_from_log({})
         self.graph_json = graph_json
         self.log_json = log_json
         self.abstract_tasks: dict[GraphNodeUid, AbstractTask] = {}
@@ -333,6 +342,37 @@ class GraphStats:
         # loading abstract dependency graph
         for node in self.graph_json['graph']:
             self.abstract_tasks[node['uid']] = AbstractTask.from_node(node)
+
+    def set_result_source(self, uid: GraphNodeUid, source: result_sources.ResultSource | None) -> None:
+        abstract = self.abstract_tasks.get(uid)
+        # Service and foreign UIDs are not results of this runtime graph.
+        if abstract is None or not abstract.meta or uid in self.failed_uids:
+            return
+        previous = abstract.result_source
+        if previous == source:
+            return
+        if previous is not None:
+            if previous == result_sources.ResultSource.UNKNOWN:
+                self.unknown_result_sources -= 1
+            else:
+                self.result_source_counts[result_sources.SOURCE_NAMES[previous]] -= 1
+        abstract.result_source = source
+        if source is not None:
+            if source == result_sources.ResultSource.UNKNOWN:
+                self.unknown_result_sources += 1
+            else:
+                self.result_source_counts[result_sources.SOURCE_NAMES[source]] += 1
+
+    def get_cache_usage(self) -> result_sources.CacheUsage:
+        return {
+            **result_sources.make_cache_usage(
+                self.result_source_counts,
+                execution_mode=self.source_execution_mode,
+                observations_complete=self.source_observations_complete and self.unknown_result_sources == 0,
+                read_allowed=self.read_allowed,
+            ),
+            'data_sizes': self.data_sizes,
+        }
 
     def get_prepare_task(self, prepare_type: _PrepareType, host: _Hostname = LOCAL_HOST) -> PrepareTask:
         key = (prepare_type, host)
@@ -596,6 +636,9 @@ def _create_graph_with_distbuild_log(
     graph_json: DictGraph, distbuild_log_json: dict, flog: io.TextIOWrapper
 ) -> GraphStats:
     graph = GraphStats(graph_json, log_json=distbuild_log_json)
+    graph.source_observations_complete = True
+    graph.source_execution_mode = 'distbuild'
+    graph.read_allowed = {'distbuild_cache': graph_json.get('conf', {}).get('cache', True)}
 
     failed_results: dict = distbuild_log_json.get('failed_results', {})
     failed_tasks_uids: list[GraphNodeUid] = failed_results.get('results', [])
@@ -620,6 +663,17 @@ def _create_graph_with_distbuild_log(
         time = int(fields[0])
         ev_type = fields[1]
         uid = fields[2] = sys.intern(fields[2])
+        if ev_type in ('finished', 'finished_from_cache'):
+            source = None
+            if len(fields) > 4 and fields[4] == 'RS_SUCCESS':
+                source = (
+                    result_sources.ResultSource.DISTBUILD_CACHE
+                    if ev_type == 'finished_from_cache'
+                    else result_sources.ResultSource.EXECUTED
+                )
+            elif len(fields) <= 4:
+                graph.source_observations_complete = False
+            graph.set_result_source(uid, source)
 
         if min_time is None or min_time > time:
             min_time = time
@@ -769,9 +823,30 @@ def create_graph_with_local_log(
         graph = GraphStats(graph)
         graph.log_json = execution_log
         graph.failed_uids = failed_uids if failed_uids else set()
+        graph.source_observations_complete = True
 
+    if execution_log or graph.source_execution_mode == 'local':
+        graph.source_observations_complete = graph.source_observations_complete and (
+            (execution_log.get(result_sources.LOG_MARKER) or {}).get('schema_version') == result_sources.SCHEMA_VERSION
+        )
+    graph.read_allowed = result_sources.read_allowed_from_log(
+        execution_log,
+        distbuild_cache=(graph.read_allowed['distbuild_cache'] if graph.source_execution_mode == 'distbuild' else None),
+    )
+    graph.data_sizes = result_sources.data_sizes_from_log(
+        execution_log,
+        distbuild_download_bytes=(
+            0 if graph.source_execution_mode == 'distbuild' and result_sources.LOG_MARKER in execution_log else None
+        ),
+    )
     for uid, info in execution_log.items():
         task = None
+        if info and info.get('type') == 'download from DistBuild':
+            graph.data_sizes['distbuild_download_bytes'] = (graph.data_sizes['distbuild_download_bytes'] or 0) + info[
+                'size'
+            ]
+        if info and 'result_source' in info:
+            graph.set_result_source(info.get('result_uid', uid), info['result_source'])
         if info and info.get('prepare') is not None:
             prepare_type = "{}:{}".format(info['prepare'], uid) if info['prepare'] else uid
             prepare_task = graph.get_prepare_task(prepare_type)

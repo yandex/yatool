@@ -3,6 +3,7 @@ import time
 
 import yalibrary.worker_threads as worker_threads
 from yalibrary.runner.runner3 import Node
+from devtools.ya.yalibrary.runner.diagnostics import result_source as result_sources
 from yalibrary.runner.tasks.enums import WorkerPoolType
 from yalibrary.store.dist_store import DistStore
 from yalibrary.toolscache import tc_force_gc
@@ -277,7 +278,8 @@ class RestoreFromCacheTask(DistCacheMixin):
         start_time = time.time()
         self._build_root.create()
 
-        if self._cache.try_restore(self._node.uid, self._build_root.path):
+        restored = self._cache.try_restore(self._node.uid, self._build_root.path)
+        if restored:
             if self._ctx.opts.dir_outputs_test_mode and self._ctx.opts.runner_dir_outputs:
                 self._build_root.propagate_dir_outputs()
             self._build_root.validate()
@@ -301,6 +303,9 @@ class RestoreFromCacheTask(DistCacheMixin):
             'prepare': '',
             'type': 'get from local cache',
         }
+        if restored:
+            self._execution_log[str(self)]['result_uid'] = self._node.uid
+            self._execution_log[str(self)]['result_source'] = result_sources.ResultSource.LOCAL.value
 
     def __str__(self):
         return 'FromCache({})'.format(str(self._node))

@@ -14,6 +14,7 @@ PEERDIR(
     contrib/python/humanfriendly
     devtools/ya/exts
     devtools/ya/yalibrary/status_view
+    devtools/ya/yalibrary/runner/diagnostics
     devtools/ya/yalibrary/fetcher/http_client
     devtools/ya/yalibrary/monitoring
     devtools/ya/core/profiler
