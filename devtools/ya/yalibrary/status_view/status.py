@@ -160,4 +160,11 @@ class Status(object):
             return [(task, now - started) for task, started in self._auxiliary.items()]
 
     def display_active(self):
-        return sorted(self.active() + self.auxiliary_active(), key=lambda item: -item[1])
+        active = self.active() + self.auxiliary_active()
+        # Build-level explanations fill idle intervals without hiding actual work
+        # or contributing to its "+ more" count.
+        priority = max([getattr(task, 'display_priority', 0) for task, _ in active] or [0])
+        return sorted(
+            ((task, elapsed) for task, elapsed in active if getattr(task, 'display_priority', 0) == priority),
+            key=lambda item: -item[1],
+        )
