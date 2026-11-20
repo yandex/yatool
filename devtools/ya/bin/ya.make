@@ -19,6 +19,7 @@ IF (AUTOCHECK)
         black  # devtools/ya/cpp/entry/tests
         c++
         clang-format  # devtools/ya/handlers/style/tests/acceptance
+        coding-agent  # devtools/support_tools/AI/skills/*/evals/llm
         jstyle  # devtools/ya/handlers/jstyle/tests/acceptance
         print_args  # devtools/ya/yalibrary/tools/tests/acceptance
         python
