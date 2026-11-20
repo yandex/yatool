@@ -2271,7 +2271,13 @@ class YaMake:
 
             return self.exit_code
         finally:
-            self.ctx.cache.flush()
+            try:
+                if client := getattr(self, '_larry_client', None):
+                    client.close()
+            except Exception:
+                logger.warning('Failed to release Larry result resources', exc_info=True)
+            finally:
+                self.ctx.cache.flush()
             release_all_data()
             post_local_cache_report()
             self.ctx.unlock()
@@ -2409,6 +2415,9 @@ class YaMake:
                                 FailureOutput.DIAGNOSTIC if called_by_agent(self.app_ctx) else FailureOutput.COMMAND
                             ),
                         )
+                        # Reports and test status processing consume build_root
+                        # after dispatch returns. Finalization owns its lifetime.
+                        self._larry_client = client
                         result = client.build(self.opts.larry_addr)
                     result_analyzer = (
                         self._make_local_result_analyzer(result[8], result[1], cache_usage=client.cache_usage)
