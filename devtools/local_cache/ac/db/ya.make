@@ -25,6 +25,7 @@ PEERDIR(
     devtools/local_cache/common/db-running-procs
     devtools/local_cache/ac/fs
     devtools/local_cache/ac/proto
+    devtools/local_cache/psingleton
     library/cpp/threading/cancellation
 )
 

@@ -1,12 +1,16 @@
 #include "cas.h"
 
+#include <devtools/local_cache/psingleton/systemptr.h>
+
 #include <library/cpp/digest/md5/md5.h>
 #include <library/cpp/logger/null.h>
 #include <library/cpp/logger/rotating_file.h>
 #include <library/cpp/logger/global/rty_formater.h>
 
+#include <util/folder/path.h>
 #include <util/generic/hash_set.h>
 #include <util/generic/scope.h>
+#include <util/string/cast.h>
 #include <util/system/datetime.h>
 #include <util/system/fstat.h>
 
@@ -20,6 +24,41 @@ namespace NACCache {
 
 namespace {
     constexpr size_t MaxColdSkips = 100000;
+
+    TString ColdStashPrefix() {
+        return MD5::Calc("COLD") + "-";
+    }
+
+    // A killed process never runs its stash cleanup. Its name carries pid and start time,
+    // so a reused pid does not keep it; the unsuffixed stash of older releases is left alone.
+    // Best effort: ya-tc and Larry may remove the same directory at once, and a failure here
+    // must not cancel the compression pass.
+    void RemoveFinishedColdStashes(const TString& rmDir, const TString& own) {
+        TVector<TString> names;
+        try {
+            TFsPath(rmDir).ListNames(names);
+        } catch (const yexception&) {
+            return;
+        }
+        const auto prefix = ColdStashPrefix();
+        for (const auto& name : names) {
+            TStringBuf suffix;
+            TStringBuf startTime;
+            TStringBuf pid;
+            time_t ctime = 0;
+            TProcessId processId = 0;
+            if (name == own || !TStringBuf(name).AfterPrefix(prefix, suffix) || !suffix.TrySplit('.', startTime, pid) ||
+                !TryFromString(startTime, ctime) || !TryFromString(pid, processId)) {
+                continue;
+            }
+            if (!TProcessUID(processId, ctime).CheckProcess()) {
+                try {
+                    NFs::RemoveRecursive(JoinFsPaths(rmDir, name));
+                } catch (const yexception&) {
+                }
+            }
+        }
+    }
 }
 
 namespace NACCache {
@@ -102,7 +141,11 @@ namespace NACCache {
         if (!IsColdCompressionEnabled()) {
             return 0;
         }
-        auto stash = JoinFsPaths(RootDir_, "rm", MD5::Calc("COLD"));
+        // Per process: ya-tc and Larry may compress one store at once, and a shared frame path would mix their writes.
+        const auto rmDir = JoinFsPaths(RootDir_, "rm");
+        const auto stashName = ColdStashPrefix() + TProcessUID::GetMyUniqueSuffix();
+        RemoveFinishedColdStashes(rmDir, stashName);
+        auto stash = JoinFsPaths(rmDir, stashName);
         NFs::RemoveRecursive(stash);
         if (!NFs::MakeDirectory(stash)) {
             ythrow TIoException() << "failed to create " << stash;
