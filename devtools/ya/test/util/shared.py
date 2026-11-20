@@ -815,11 +815,10 @@ def get_oauth_token_options(opts, test_tool_mode=False):
     if not oauth_token:
         oauth_token = getattr(opts, "sandbox_oauth_token", None)
 
-    cmd = []
-    if oauth_token:
-        cmd += ['--token-path', "$(YA_TOKEN_PATH)"] if cc.is_self_contained_runner3(opts) else ['--token', oauth_token]
-
-    return cmd
+    # The embedded planner can record credential presence without serializing the token.
+    if (oauth_token or getattr(opts, "oauth_token_present", False)) and cc.is_self_contained_runner3(opts):
+        return ['--token-path', "$(YA_TOKEN_PATH)"]
+    return ['--token', oauth_token] if oauth_token else []
 
 
 def tee_execute(cmd, out, err, strip_ansi_codes=False, on_timeout=None, on_startup=None):

@@ -22,8 +22,9 @@ class InvalidPlatformSpecification(Exception):
     mute = True
 
 
-cdef public object PyPlatformNotSupportedException = <object>PlatformNotSupportedException
-cdef public object PyInvalidPlatformSpecification = <object>InvalidPlatformSpecification
+# Keep the exception classes in the importing interpreter's module dictionary.
+_unsupported_platform_error = PlatformNotSupportedException
+_platform_specification_error = InvalidPlatformSpecification
 
 
 cdef extern from *:
@@ -31,20 +32,21 @@ cdef extern from *:
         #include <Python.h>
         #include <devtools/libs/yaplatform/platform.h>
 
-        extern "C++" PyObject* PyPlatformNotSupportedException;
-        extern "C++" PyObject* PyInvalidPlatformSpecification;
-
-        void _exception_handler() {
+        void _translate_platform_exception(PyObject* unsupported, PyObject* invalid) {
             try {
                 throw;
             } catch (const NYa::TUnsupportedPlatformError& e) {
-                PyErr_SetString(PyPlatformNotSupportedException, e.what());
+                PyErr_SetString(unsupported, e.what());
             } catch (const NYa::TPlatformSpecificationError& e) {
-                PyErr_SetString(PyInvalidPlatformSpecification, e.what());
+                PyErr_SetString(invalid, e.what());
             }
         }
     """
-    cdef void _exception_handler()
+    void _translate_platform_exception(object unsupported, object invalid) except *
+
+
+cdef void _exception_handler() except *:
+    _translate_platform_exception(_unsupported_platform_error, _platform_specification_error)
 
 
 cdef extern from "devtools/libs/yaplatform/platform.h" namespace "NYa":

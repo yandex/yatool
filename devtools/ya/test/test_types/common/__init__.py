@@ -17,7 +17,6 @@ import six
 import exts.hashing as hashing
 import devtools.ya.test.util.shared
 from devtools.ya.test import facility
-from devtools.ya.test import tracefile
 from devtools.ya.test.dependency import external_tools
 from devtools.ya.test import common as test_common
 from devtools.ya.test.system import process
@@ -621,6 +620,8 @@ class AbstractTestSuite(facility.Suite):
             return
 
         if trace_file_path and os.path.exists(trace_file_path):
+            from devtools.ya.test import tracefile
+
             tracefile.TestTraceParser.parse_from_file(trace_file_path, suite=self, relaxed=relaxed)
 
         if resolver:

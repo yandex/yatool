@@ -244,6 +244,7 @@ RECURSE(
     resolver
     stub
     symbols
+    test_planner
     tools
     yndex
 )
