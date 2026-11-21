@@ -492,3 +492,15 @@ cdef PyObject* _compact_factory(PyObject* storage, TIndexType value) except NULL
 
 MutableMapping.register(CompactMap)
 MutableSequence.register(CompactList)
+
+
+cdef bool GetImmutableList(object value, TCompactStorage** storage, TIndexType* native_value) except *:
+    cdef CompactList view
+    if not isinstance(value, CompactList):
+        return False
+    view = value
+    if view._store.overrides:
+        return False
+    storage[0] = view._store.native
+    native_value[0] = view._value
+    return True

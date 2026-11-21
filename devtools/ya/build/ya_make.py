@@ -55,6 +55,8 @@ from devtools.ya.core import stage_tracer
 from devtools.ya.yalibrary import sjson
 import devtools.ya.test.suite_storage.suites as suite_storage
 import devtools.ya.test.suite_storage.disk as disk_storage
+from devtools.ya.yalibrary.graph_node_index import GraphNodeIndex
+from devtools.ya.build.reports.reverse_index import ReverseIndex
 import library.python.filelock as filelock
 import library.python.tmp as tmp
 import library.python.windows as windows
@@ -1448,6 +1450,8 @@ class Context:
                 self.graph = lg.build_lite_graph(self.graph)
 
         self._dump_graph_diagnostics()
+        self.node_index = GraphNodeIndex(self.graph['graph'])
+        self.reversed_index = ReverseIndex(self.graph['graph'])
 
         if opts.show_command:
             self.threads = 0
@@ -1975,7 +1979,9 @@ class YaMake:
         if getattr(self.app_ctx, 'evlog', None) is not None:
             self._build_results_listener.add(pr.FailedNodeListener(self.app_ctx.evlog))
         if self._structured:
-            self._build_results_listener.add(pr.NodeFailureListener(self.ctx.graph, self.app_ctx.display, self.opts))
+            self._build_results_listener.add(
+                pr.NodeFailureListener(self.app_ctx.display, self.opts, self.ctx.node_index, self.ctx.reversed_index)
+            )
 
         if self.opts.json_line_report_file is None and self.opts.build_results_report_file is None:
             self._test_results = self._create_test_results_listener(test_results_path)
@@ -2011,6 +2017,8 @@ class YaMake:
                 self._reports_generator,
                 test_results_path,
                 self.opts,
+                self.ctx.node_index,
+                self.ctx.reversed_index,
             )
         )
         if self.opts.use_distbuild and 'slot_time' in bs.get_statistics(self.opts):
@@ -2512,6 +2520,7 @@ class YaMake:
                         output_replacements=self.ctx.output_replacements,
                         evlog=getattr(self.app_ctx, 'evlog', None),
                         patterns=patterns,
+                        node_index=self.ctx.node_index,
                     )
                 else:
                     logger.debug("Exit from local runner by exception. No local executor, hence no distbuild started")

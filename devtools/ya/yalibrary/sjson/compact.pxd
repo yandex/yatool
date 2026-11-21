@@ -8,7 +8,9 @@ cdef extern from "devtools/ya/yalibrary/sjson/lib/compact.h" namespace "NSJson":
     # The widest integer here also keeps Python conversions valid for ui64.
     ctypedef unsigned long long TIndexType
     const TIndexType CompactKindMask
+    const unsigned int CompactKindBits
     cdef enum ECompactKind:
+        String
         List
         Map
 
@@ -20,6 +22,7 @@ cdef extern from "devtools/ya/yalibrary/sjson/lib/compact.h" namespace "NSJson":
         object MapKey(TIndexType value, size_t index)
         bool MapGet(TIndexType value, object key, TIndexType* result) except +
         object Scalar(TIndexType value)
+        PyObject* StringObject(TIndexType value)
         size_t NativeBytes()
         size_t StringCount()
         size_t ListCount()
@@ -36,3 +39,4 @@ cdef class _GraphStorage:
     cdef dict overrides
 
 cdef PyObject* _compact_factory(PyObject* storage, TIndexType value) except NULL
+cdef bool GetImmutableList(object value, TCompactStorage** storage, TIndexType* native_value) except *

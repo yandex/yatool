@@ -12,6 +12,7 @@ PY_SRCS(
 PEERDIR(
     devtools/ya/test/suite_storage
     devtools/ya/build/owners
+    devtools/ya/build/reports/reverse_index
     devtools/ya/build/stat
     devtools/ya/exts
     devtools/ya/test/const
@@ -22,6 +23,7 @@ PEERDIR(
     devtools/ya/test/util
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/formatter
+    devtools/ya/yalibrary/graph_node_index
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/sjson
     devtools/ya/yalibrary/term

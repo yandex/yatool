@@ -23,6 +23,9 @@ import devtools.ya.test.reports as test_reports
 import yalibrary.display
 import devtools.ya.test.suite_storage.suites as suite_storage
 
+from .reverse_index import ReverseIndex
+from devtools.ya.yalibrary.graph_node_index import GraphNodeIndex
+
 import typing as tp
 
 if tp.TYPE_CHECKING:
@@ -135,13 +138,11 @@ class NodeFailureListener(ResultsListener):
     node never runs and reports nothing, so the marking is transitive.
     """
 
-    def __init__(self, graph, display, opts):
+    def __init__(self, display, opts, node_index: GraphNodeIndex, reversed_index: ReverseIndex):
         self._display = display
         self._opts = opts
-        self._graph = graph['graph']
-        # Built on the first failure only: a green build pays nothing.
-        self._nodes = None
-        self._reversed_deps = None
+        self._node_index = node_index
+        self._reversed_index = reversed_index
         self._seen = set()
         self._broken = set()
         self._lock = threading.Lock()
@@ -151,15 +152,15 @@ class NodeFailureListener(ResultsListener):
             return
         uid = res['uid']
         with self._lock:
-            if self._nodes is None:
-                self._index_graph()
-            node = self._nodes.get(uid)
+            node = self._node_index.nodes.get(uid)
             if node is None or node.get('node-type') not in (None, 'test') or uid in self._seen:
                 return
+            broken = uid in self._broken
+            if not broken:
+                self._mark_dependents_broken(uid)
             self._seen.add(uid)
-            if uid in self._broken:
+            if broken:
                 return
-            self._mark_dependents_broken(uid)
         stderr, links = extract_node_stderr(res, self._opts)
         details = {
             'kind': node.get('kv', {}).get('p'),
@@ -185,43 +186,33 @@ class NodeFailureListener(ResultsListener):
             }
         )
 
-    def _index_graph(self):
-        self._nodes = {}
-        self._reversed_deps = defaultdict(list)
-        for node in self._graph:
-            self._nodes[node['uid']] = node
-            for dep in set(node['deps']):
-                self._reversed_deps[dep].append(node['uid'])
-
     def _mark_dependents_broken(self, uid):
         # type: (str) -> None
-        stack = list(self._reversed_deps.get(uid, ()))
+        reversed_deps = self._reversed_index.materialize()
+        stack = list(reversed_deps.get(uid, ()))
         while stack:
             dependent = stack.pop()
             if dependent in self._broken:
                 continue
             self._broken.add(dependent)
-            stack.extend(self._reversed_deps.get(dependent, ()))
+            stack.extend(reversed_deps.get(dependent, ()))
 
 
 class BuildResultsListener(ResultsListener):
     _logger = logging.getLogger('BuildResultsListener')
 
-    def __init__(self, graph, report_generator, build_root, opts):
+    def __init__(
+        self, graph, report_generator, build_root, opts, node_index: GraphNodeIndex, reversed_index: ReverseIndex
+    ):
         self._lock = threading.Lock()
         self._build_metrics = st.make_targets_metrics(graph['graph'], {}, {})
         self._report_generator = report_generator
         self._build_root = build_root
         self._notified = set()
         self._processed = set()
-        self._reversed_deps = defaultdict(list)
-        self._nodes = {}
+        self._node_index = node_index
+        self._reversed_index = reversed_index
         self._opts = opts
-
-        for node in graph['graph']:
-            self._nodes[node['uid']] = node
-            for dep in set(node['deps']):
-                self._reversed_deps[dep].append(node['uid'])
 
     def __call__(self, res=None, build_stage=None):
         if res is None:
@@ -236,17 +227,18 @@ class BuildResultsListener(ResultsListener):
             self._on_trace_stage(build_stage)
 
     def _on_completed(self, uid, res):
-        if 'node-type' not in self._nodes[uid]:
+        if 'node-type' not in self._node_index[uid]:
             self._on_build_node_completed(uid)
         else:
             self._logger.debug('Unknown node %s is completed', uid)
 
     def _on_failed(self, uid, error, error_links, exit_code):
-        if 'node-type' not in self._nodes[uid]:
+        node = self._node_index[uid]
+        if 'node-type' not in node:
             self._on_build_node_failed(uid, error, error_links, exit_code)
-        elif self._nodes[uid]['node-type'] == 'merger':
+        elif node['node-type'] == 'merger':
             self._on_merge_node_failed(uid, error)
-        elif self._nodes[uid]['node-type'] == 'test':
+        elif node['node-type'] == 'test':
             self._on_test_node_failed(uid, error)
         else:
             self._logger.debug('Unknown node %s is failed', uid)
@@ -255,10 +247,10 @@ class BuildResultsListener(ResultsListener):
         self._report_generator.add_stage(build_stage)
 
     def _is_module(self, uid):
-        return 'module_type' in self._nodes[uid].get('target_properties', {})
+        return 'module_type' in self._node_index[uid].get('target_properties', {})
 
     def _resolve_target(self, uid):
-        node = self._nodes[uid]
+        node = self._node_index[uid]
         return bp.BuildPlan.node_name(node), bp.BuildPlan.node_platform(node), bp.BuildPlan.get_module_tag(node)
 
     def _on_test_node_failed(self, uid, _):
@@ -268,6 +260,8 @@ class BuildResultsListener(ResultsListener):
         self._logger.debug('Merge node %s is failed', uid)
 
     def _on_build_node_failed(self, uid, error, error_links, exit_code):
+        reversed_deps = self._reversed_index.materialize()
+
         def notify(u, e, a):
             if u not in self._notified:
                 target_name, target_platform, module_tag = self._resolve_target(u)
@@ -293,7 +287,7 @@ class BuildResultsListener(ResultsListener):
                 notify(u, msg, links)
                 broken_dep = broken_dep or u
 
-            for reversed_dep in sorted(self._reversed_deps.get(u, tuple())):
+            for reversed_dep in reversed_deps.get(u, ()):
                 mark_failed(reversed_dep, broken_dep)
 
         with self._lock:

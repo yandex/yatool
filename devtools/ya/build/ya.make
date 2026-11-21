@@ -39,6 +39,7 @@ PEERDIR(
     devtools/ya/build/owners
     devtools/ya/build/prefetch
     devtools/ya/build/reports
+    devtools/ya/build/reports/reverse_index
     devtools/ya/build/result_renaming
     devtools/ya/build/sem_graph
     devtools/ya/build/stat
@@ -69,6 +70,7 @@ PEERDIR(
     devtools/ya/yalibrary/display
     devtools/ya/yalibrary/fetcher
     devtools/ya/yalibrary/graph
+    devtools/ya/yalibrary/graph_node_index
     devtools/ya/yalibrary/last_failed
     devtools/ya/yalibrary/monitoring
     devtools/ya/yalibrary/platform_matcher
