@@ -126,22 +126,44 @@ namespace {
 
             if (module->DataPaths) {
                 for (const auto dirView : *module->DataPaths) {
-                    CheckModuleDir(module, scopedContext, dirView, "DATA/DATA_FILES");
+                    CheckDataPath(module, scopedContext, dirView);
                 }
+            }
+        }
+
+        void EnsureModuleContext(const TModule* module, THolder<TScopedContext>& scopedContext) {
+            if (!scopedContext) {
+                scopedContext = MakeHolder<TScopedContext>(
+                    RestoreContext_.Graph.Names().FileConf.GetStoredName(
+                        NPath::SmartJoin(module->GetDir().GetTargetStr(), "ya.make")
+                    )
+                );
             }
         }
 
         void CheckModuleDir(const TModule* module, THolder<TScopedContext>& scopedContext, const TFileView dirView, const TStringBuf& macro = "") {
             auto dir = dirView.GetTargetStr();
             if (const auto* ptr = RestoreContext_.Conf.BlackList.IsValidPath(dir)) {
-                if (!scopedContext) {
-                    scopedContext = MakeHolder<TScopedContext>(
-                        RestoreContext_.Graph.Names().FileConf.GetStoredName(
-                            NPath::SmartJoin(module->GetDir().GetTargetStr(), "ya.make")
-                        )
-                    );
-                }
+                EnsureModuleContext(module, scopedContext);
                 GenerateBlacklistError(ptr, dir, macro);
+            }
+        }
+
+        void CheckDataPath(const TModule* module, THolder<TScopedContext>& scopedContext, TFileView pathView) {
+            const auto path = pathView.GetTargetStr();
+            const auto& blacklist = RestoreContext_.Conf.BlackList;
+            if (const auto* rule = blacklist.IsValidPath(path)) {
+                EnsureModuleContext(module, scopedContext);
+                GenerateBlacklistError(rule, path, "DATA/DATA_FILES");
+                return;
+            }
+            // Test data includes the entire subtree. Check the policy without expanding DATA.
+            const auto relativePath = NPath::IsTypedPath(path) ? NPath::CutType(path) : path;
+            if (const auto* rule = blacklist.FindBlacklistedDescendant(relativePath)) {
+                EnsureModuleContext(module, scopedContext);
+                YConfErr(BlckLst) << "Path [[imp]]" << path << "[[rst]] inside [[alt1]]DATA/DATA_FILES[[rst]] "
+                    << "includes prohibited path [[alt1]]" << *rule << "[[rst]]" << Endl;
+                HasBlacklistErrors_ = true;
             }
         }
 

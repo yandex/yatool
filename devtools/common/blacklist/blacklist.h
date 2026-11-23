@@ -75,6 +75,8 @@ namespace NBlacklist {
         void LoadFromString(TStringBuf content, TStringBuf file);
         TBlacklistMatch MatchPath(TStringBuf path) const;
         const TString* IsValidPath(TStringBuf path) const;
+        // Returns an effective positive rule strictly below path (empty path means the repository root).
+        const TString* FindBlacklistedDescendant(TStringBuf path) const;
         size_t GetHash() const;
         TBlacklistStats GetStats() const;
         size_t GetLookupStepsForDiagnostics(TStringBuf path) const;

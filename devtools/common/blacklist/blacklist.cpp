@@ -30,6 +30,23 @@ namespace NBlacklist {
             TBlacklistRuleSource RuleSource;
         };
 
+        void KeepFirstRule(const TString*& best, const TString* candidate) {
+            if (candidate && (!best || *candidate < *best)) {
+                best = candidate;
+            }
+        }
+
+        const TString* FindFirstBlacklistedChildRule(const TTrieNode& node) {
+            const TString* best = nullptr;
+            for (const auto& [_, child] : node.Children) {
+                // An inverse rule allows this path but can contain a deeper positive rule.
+                KeepFirstRule(best, child->Status == EBlacklistRuleStatus::Blacklisted
+                    ? &child->RulePath
+                    : FindFirstBlacklistedChildRule(*child));
+            }
+            return best;
+        }
+
         class TTrieBucket {
         public:
             bool Add(const TPathSplitUnix& components, const TBlacklistRule& rule) {
@@ -62,6 +79,18 @@ namespace NBlacklist {
                     }
                 }
                 return result;
+            }
+
+            const TString* FindBlacklistedDescendant(const TPathSplitUnix& components) const {
+                const auto* node = &Root;
+                for (const auto component : components) {
+                    const auto it = node->Children.find(component);
+                    if (it == node->Children.end()) {
+                        return nullptr;
+                    }
+                    node = it->second.Get();
+                }
+                return FindFirstBlacklistedChildRule(*node);
             }
 
             void CollectRules(TVector<const TTrieNode*>& rules) const {
@@ -168,6 +197,24 @@ namespace NBlacklist {
                 return {};
             }
 
+            const TString* FindBlacklistedDescendant(TStringBuf path) const {
+                const TPathSplitUnix components(path);
+                if (components.IsAbsolute) {
+                    return nullptr;
+                }
+                if (!components.empty()) {
+                    const auto& bucket = Buckets[ComputeIndex(components.front())];
+                    return bucket ? bucket->FindBlacklistedDescendant(components) : nullptr;
+                }
+                const TString* best = nullptr;
+                for (const auto& bucket : Buckets) {
+                    if (bucket) {
+                        KeepFirstRule(best, bucket->FindBlacklistedDescendant(components));
+                    }
+                }
+                return best;
+            }
+
             size_t GetHash() const {
                 if (IsValidHash) {
                     return Hash;
@@ -252,6 +299,10 @@ namespace NBlacklist {
 
         TBlacklistMatch MatchPath(TStringBuf path) const {
             return Trie.MatchPath(path);
+        }
+
+        const TString* FindBlacklistedDescendant(TStringBuf path) const {
+            return Trie.FindBlacklistedDescendant(path);
         }
 
         size_t GetHash() const {
@@ -440,6 +491,10 @@ namespace NBlacklist {
     const TString* TSvnBlacklist::IsValidPath(TStringBuf path) const {
         const auto result = MatchPath(path);
         return result.Status == EBlacklistRuleStatus::Blacklisted ? result.RulePath : nullptr;
+    }
+
+    const TString* TSvnBlacklist::FindBlacklistedDescendant(TStringBuf path) const {
+        return Impl->FindBlacklistedDescendant(path);
     }
 
     size_t TSvnBlacklist::GetHash() const {
