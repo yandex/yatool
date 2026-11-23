@@ -7,10 +7,12 @@
 #include <util/generic/algorithm.h>
 #include <util/generic/scope.h>
 #include <util/string/builder.h>
+#include <util/folder/dirut.h>
 #include <util/folder/tempdir.h>
 #include <util/folder/iterator.h>
 #include <util/system/sysstat.h>
 
+#include <optional>
 #include <random>
 
 namespace NUniversalFetcher {
@@ -77,13 +79,17 @@ namespace NUniversalFetcher {
             }
 
             template <typename Callable>
-            void Execute(Callable&& operation) {
+            void Execute(Callable&& operation, const TCancellationToken* cancellation) {
                 while (RetryCount_ <= Params_.MaxRetryCount) {
-                    if (operation() == STOP) {
+                    if (operation() == STOP || (cancellation && RetryCount_ == Params_.MaxRetryCount)) {
                         return;
                     }
-
-                    Sleep(GetDelay());
+                    const auto delay = GetDelay();
+                    if (cancellation && !cancellation->IsDefault()) {
+                        cancellation->Wait(delay);
+                    } else {
+                        Sleep(delay);
+                    }
                     ++RetryCount_;
                 }
             }
@@ -153,6 +159,7 @@ namespace NUniversalFetcher {
 
         const TMaybe<int> sandboxMaxServerErrorRetryCount = params.SandboxMaxServerErrorRetryCount.OrElse(f.Retries.SandboxMaxServerErrorRetryCount);
 
+        const bool cooperative = params.CancellationMode == EFetchCancellationMode::Cooperative;
         TVector<TFetchAttempt> attempts;
         TRetryPolicy policy(f.Retries);
         policy.Execute([&]() {
@@ -163,39 +170,72 @@ namespace NUniversalFetcher {
                 attempt.Duration = TInstant::Now() - attempt.StartTime;
             };
 
-            path.MkDirs(MODE0777);
-            TTempDir tempDir = TTempDir::NewTempDir(path.DirPath());
-            TDstPath tempPath = TDstPath::FromDirPath(tempDir.Path());
-            Chmod(tempPath.DirPath().c_str(), MODE0777);
+            if (cooperative && cancellation.IsCancellationRequested()) {
+                attempt.Result = {.Status = EFetchStatus::Cancelled, .Error = "Fetch has been cancelled"};
+                f.Metrics->OnFetchAttemptFinished(attempt.Result.Status);
+                return TRetryPolicy::STOP;
+            }
 
-            if (path.HasFileName()) {
-                tempPath.SetFileName(path.FileName());
-            }
-            if (cancellation.IsCancellationRequested()) {
-                attempt.Result = {
-                    .Status = EFetchStatus::Cancelled,
-                    .Error = "Fetch has been cancelled"
-                };
-            }
+            std::optional<TTempDir> tempDir;
             try {
+                path.MkDirs(MODE0777);
+                tempDir.emplace(TTempDir::NewTempDir(path.DirPath()));
+                // An error removing the temporary files must not escape its destructor.
+                tempDir->DoNotRemove();
+                TDstPath tempPath = TDstPath::FromDirPath(tempDir->Path());
+                Chmod(tempPath.DirPath().c_str(), MODE0777);
+                if (path.HasFileName()) {
+                    tempPath.SetFileName(path.FileName());
+                }
+
+                if (cooperative) {
+                    cancellation.ThrowIfCancellationRequested();
+                }
                 attempt.Result = f.Fetcher->Fetch(uri, tempPath, params, cancellation);
+                if (attempt.Result.Status == EFetchStatus::Ok) {
+                    TVector<TString> contents;
+                    TFsPath(tempPath.DirPath()).ListNames(contents);
+
+                    for (const auto& name : contents) {
+                        TString from = tempPath.DirPath() + "/" + name;
+                        TString to = path.DirPath() + "/" + name;
+
+                        TFsPath(to).ForceDelete();
+                        if (!NFs::Rename(from, to)) {
+                            ythrow yexception() << "Failed to move from tmp dir to destination, error=" << LastSystemErrorText();
+                        }
+                    }
+                }
+            } catch (const NThreading::TOperationCancelledException&) {
+                attempt.Result = cooperative
+                    ? TFetchResult{.Status = EFetchStatus::Cancelled, .Error = "Fetch has been cancelled"}
+                    : TFetchResult{.Status = EFetchStatus::InternalError, .Error = CurrentExceptionMessage()};
             } catch (...) {
                 attempt.Result = {
                     .Status = EFetchStatus::InternalError,
                     .Error = CurrentExceptionMessage()
                 };
             }
-            if (attempt.Result.Status == EFetchStatus::Ok) {
-                TVector<TString> contents;
-                TFsPath(tempPath.DirPath()).ListNames(contents);
 
-                for (const auto& name : contents) {
-                    TString from = tempPath.DirPath() + "/" + name;
-                    TString to = path.DirPath() + "/" + name;
-
-                    TFsPath(to).ForceDelete();
-                    if (!NFs::Rename(from, to)) {
-                        ythrow yexception() << "Failed to move from tmp dir to destination, error=" << LastSystemErrorText();
+            if (tempDir) {
+                try {
+                    RemoveDirWithContents(tempDir->Name());
+                } catch (...) {
+                    attempt.CleanupError = TStringBuilder() << "Failed to remove the temporary fetch directory: " << CurrentExceptionMessage();
+                    if (attempt.Result.Status != EFetchStatus::Cancelled) {
+                        if (cooperative && cancellation.IsCancellationRequested()) {
+                            // A transport can lose its cancellation status if removing
+                            // a partial transfer throws after it observes cancellation.
+                            TStringBuilder cause;
+                            cause << "Fetch has been cancelled";
+                            if (attempt.Result.Error) {
+                                cause << "; " << *attempt.Result.Error;
+                            }
+                            attempt.Result.Status = EFetchStatus::Cancelled;
+                            attempt.Result.Error = TString{cause};
+                        } else {
+                            attempt.Result.Status = EFetchStatus::InternalError;
+                        }
                     }
                 }
             }
@@ -209,7 +249,7 @@ namespace NUniversalFetcher {
             return attempt.Result.Status == EFetchStatus::RetriableError
                 ? TRetryPolicy::CONTINUE
                 : TRetryPolicy::STOP;
-        });
+        }, cooperative ? &cancellation : nullptr);
 
         ret->LastAttempt = std::move(attempts.back());
         attempts.pop_back();
@@ -224,10 +264,27 @@ namespace NUniversalFetcher {
         return ret;
     }
 
+    TString TUniversalFetcher::TFetchAttempt::GetError() const {
+        if (!CleanupError) {
+            return Result.Error.GetOrElse({});
+        }
+        TStringBuilder diagnostic;
+        if (Result.Error) {
+            diagnostic << *Result.Error << "; ";
+        } else if (Result.Status == EFetchStatus::Cancelled) {
+            diagnostic << "Fetch has been cancelled; ";
+        }
+        return diagnostic << *CleanupError;
+    }
+
     void TUniversalFetcher::TFetchAttempt::ToJson(NJson::TJsonValue& ret) const {
         ret["start_time_us"] = StartTime.MicroSeconds();
         ret["duration_us"] = Duration.MicroSeconds();
         Result.ToJson(ret["result"]);
+        if (CleanupError) {
+            // Existing JSON consumers check result.error before publishing the file.
+            ret["result"]["error"] = GetError();
+        }
     }
 
     NJson::TJsonValue TUniversalFetcher::TResult::ToJson() const {
@@ -251,7 +308,7 @@ namespace NUniversalFetcher {
     }
 
     TString TUniversalFetcher::TResult::GetError() const {
-        return LastAttempt.Result.Error.GetOrElse({});
+        return LastAttempt.GetError();
     }
 
 }

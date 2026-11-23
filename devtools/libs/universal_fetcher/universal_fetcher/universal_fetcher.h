@@ -71,7 +71,10 @@ namespace NUniversalFetcher {
             TInstant StartTime;
             TDuration Duration;
             TFetchResult Result;
+            // The attempt owns its staging directory independently of the provider.
+            TMaybe<TString> CleanupError{};
 
+            TString GetError() const;
             void ToJson(NJson::TJsonValue&) const;
         };
 

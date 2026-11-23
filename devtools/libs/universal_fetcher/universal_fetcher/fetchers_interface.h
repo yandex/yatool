@@ -65,6 +65,11 @@ namespace NUniversalFetcher {
 
     using TFetchProgressCallback = std::function<void(ui64, ui64)>;
 
+    enum class EFetchCancellationMode {
+        Default,
+        Cooperative,
+    };
+
     struct TFetchParams {
         struct TProgressReporting {
             TFetchProgressCallback Callback = [](ui64, ui64) {};
@@ -76,6 +81,8 @@ namespace NUniversalFetcher {
         TMaybe<int> SandboxMaxServerErrorRetryCount = Nothing();
         // Sandbox resources only: skip the skynet transport for this download even if it is in TransportsOrder
         bool SandboxDisableSkynet = false;
+        // Cooperative mode interrupts retry waits and stops fallback on cancellation.
+        EFetchCancellationMode CancellationMode = EFetchCancellationMode::Default;
     };
 
     class IFetcher {
