@@ -24,6 +24,15 @@ struct TCommandData {
 
 static_assert(sizeof(TCommandData) == sizeof(ui16), "union part of TCommandData must fit 16 bit");
 
+template <>
+struct TNameDataTraits<TCommandData> {
+    static constexpr size_t RecordSize = sizeof(ui16);
+    static ui8 Stamp(const TCommandData& value) { return value.CmdModStamp; }
+    static void Remap(TCommandData& value, ui32, const TMetadataStampRemap& remap) {
+        value.CmdModStamp = remap.Modified[value.CmdModStamp];
+    }
+};
+
 using TCmdId = ui32;
 
 class TVersionedCmdId {

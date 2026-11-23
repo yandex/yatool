@@ -11,29 +11,34 @@
 
 #include <library/cpp/containers/absl/flat_hash_map.h>
 
+#include <optional>
+
 class MD5;
 class IOutputStream;
 struct IMemoryPool;
 
 class TNameStore {
 public:
+    // Also the on-disk width of a name ID. Zero is reserved.
+    using TNameId = ui32;
+
     TNameStore();
     ~TNameStore();
 
     size_t Size() const {
         TLightReadGuard guard(Lock_);
-        return Names_.size();
+        return SizeUnlocked();
     }
 
-    ui32 Add(TStringBuf name);
-    ui32 GetId(TStringBuf name) const;
-    ui32 GetIdNx(TStringBuf name) const;
+    TNameId Add(TStringBuf name);
+    TNameId GetId(TStringBuf name) const;
+    TNameId GetIdNx(TStringBuf name) const;
 
     bool Has(TStringBuf name) const;
-    bool CheckId(ui32 id) const;
+    bool CheckId(TNameId id) const;
 
     template <typename View>
-    View GetName(ui32 id) const {
+    View GetName(TNameId id) const {
         if (!CheckId(id)) {
             return {};
         }
@@ -41,7 +46,7 @@ public:
     }
 
     template <typename View>
-    bool GetName(ui32 id, View& view) const {
+    bool GetName(TNameId id, View& view) const {
         if (!CheckId(id)) {
             return false;
         }
@@ -51,13 +56,13 @@ public:
 
     template <typename View>
     View GetStoredName(const TStringBuf& name) {
-        ui32 id = Add(name);
+        TNameId id = Add(name);
         return { this, id };
     }
 
     template <typename View>
     bool GetStoredName(const TStringBuf& name, View& view) {
-        ui32 id = Add(name);
+        TNameId id = Add(name);
         view = { this, id };
         return true;
     }
@@ -71,7 +76,13 @@ public:
 
     // Append keeps returned bytes stable. Clear/Load still require callers
     // to stop using all previously returned views.
-    TStringBuf GetStringBufName(ui32 id) const;
+    TStringBuf GetStringBufName(TNameId id) const;
+
+    // Diagnostics: loading a frozen image must not populate the heap overlay.
+    size_t OverlaySize() const {
+        TLightReadGuard guard(Lock_);
+        return Names_.size();
+    }
 
 private:
     // NameDataStore holds this same lock across name + metadata operations.
@@ -79,15 +90,19 @@ private:
     friend class TNameDataStore;
 
     // Caller must hold Lock_: shared for reads, exclusive for mutations.
-    ui32 AddUnlocked(TStringBuf name);
-    bool CheckIdUnlocked(ui32 id) const;
+    TNameId AddUnlocked(TStringBuf name);
+    bool CheckIdUnlocked(TNameId id) const;
     void SaveUnlocked(TMultiBlobBuilder& builder) const;
-    void LoadUnlocked(TBlob& multi);
-    void LoadSingleBlobUnlocked(TBlob& blob);
+    void LoadUnlocked(TBlob& multi, std::optional<ui64> expectedCount = std::nullopt);
+    void LoadSingleBlobUnlocked(TBlob& blob, std::optional<ui64> expectedCount = std::nullopt);
     void ClearUnlocked();
+    size_t SizeUnlocked() const { return FrozenCount_ + Names_.size(); }
+    TNameId FindUnlocked(ui64 hash) const;
+    TStringBuf StringUnlocked(TNameId id) const;
+    void SaveUnlocked(IOutputStream* out) const;
 
     // pray hashes never clashes
-    using TNameToId = absl::flat_hash_map<ui64, ui32, TIdentity>;
+    using TNameToId = absl::flat_hash_map<ui64, TNameId, TIdentity>;
     using TNames = TVector<TStringBuf>;
 
     friend class TCmdView;
@@ -99,6 +114,11 @@ private:
     TAutoPtr<IMemoryPool> Pool_;
 
     TBlob Blob_;
+    size_t FrozenCount_ = 0;
+    size_t DirectoryOffset_ = 0;
+    size_t DescriptorsOffset_ = 0;
+    size_t IndexOffset_ = 0;
+    size_t StringsOffset_ = 0;
     TNameToId Name2Id_;
     TNames Names_;
 };

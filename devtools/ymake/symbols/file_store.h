@@ -117,6 +117,18 @@ struct TFileData {
 
 static_assert(sizeof(TFileData) == sizeof(TMd5Sig) + sizeof(i64) + sizeof(ui64) + sizeof(ui32) + sizeof(ui32), "union part of TFileData must fit 32 bit"); // HashSum+ModTime+Size+AllFlags+padding
 
+template <>
+struct TNameDataTraits<TFileData> {
+    static constexpr size_t RecordSize = 16 + 8 + 8 + 4; // serialized fields, no ABI padding
+    static ui8 Stamp(const TFileData& value) { return value.RealModStamp; }
+    static void Remap(TFileData& value, ui32 id, const TMetadataStampRemap& remap) {
+        if (id) {
+            value.LastCheckedStamp = remap.Checked[value.LastCheckedStamp];
+            value.RealModStamp = remap.Modified[value.RealModStamp];
+        }
+    }
+};
+
 enum ELinkType : ui8 {
     ELT_Default = 0,
     ELT_MKF, // makefiles

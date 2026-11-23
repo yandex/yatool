@@ -35,7 +35,7 @@ namespace {
     // The upper bound is 32 Gb.
     constexpr size_t JSON_CACHE_EXTREMELY_MAX_SIZE = (32ULL << 30ULL); // 32Gb
 
-    constexpr ui64 JSON_CACHE_FORMAT_VERSION = 3;
+    constexpr ui64 JSON_CACHE_FORMAT_VERSION = 4;
 
     const TStringBuf JOINED_START("[");
     const TStringBuf JOINED_END("]");

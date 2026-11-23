@@ -105,7 +105,7 @@ TFileElemId TFileConf::Add(TStringBuf name) {
     if (sizeBeforeAdd == targetIdRaw && NPath::IsTypedPath(name)) {
         const auto type = NPath::GetType(name);
         if (type == NPath::Source || type == NPath::Unset) {
-            Meta_[targetIdRaw].IsSource = true;
+            GetById(targetIdRaw).IsSource = true;
         }
     }
     if (!isLink) {
@@ -749,11 +749,11 @@ TFileData& TFileConf::GetFileData(TFileView name) {
 }
 
 const TFileData& TFileConf::GetFileDataById(TFileElemId elemId) const {
-    return Meta_[RawElemId(TFileId::Create(elemId).GetTargetId())];
+    return GetById(RawElemId(TFileId::Create(elemId).GetTargetId()));
 }
 
 TFileData& TFileConf::GetFileDataById(TFileElemId elemId) {
-    return Meta_[RawElemId(TFileId::Create(elemId).GetTargetId())];
+    return GetById(RawElemId(TFileId::Create(elemId).GetTargetId()));
 }
 
 

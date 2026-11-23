@@ -25,7 +25,7 @@
 #include <cstdlib>
 
 namespace {
-    const ui64 ImageVersion = 62;
+    const ui64 ImageVersion = 63;
     const ui64 DMCacheVersion = 1;
     // Module records change independently of the reusable filesystem image.
     // Older records can contain global policy matches for the transitive closure.

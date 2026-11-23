@@ -126,10 +126,12 @@ void TTimeStamps::CompressTimes(THashMap<TElemId, TNodeData>& nodeData) {
         useCount.push_back({pos});
 
     // we want to delete least used date stamps
-    for (auto i = Elems.FileConf.Meta_.begin(), e = Elems.FileConf.Meta_.end(); i != e; ++i) {
-        const auto& data = *i;
-        Y_ASSERT(data.RealModStamp < NumTimes);
-        useCount[data.RealModStamp].Count++; // old LastCheckedStamp's have no value, we don't count them
+    const auto fileHistogram = Elems.FileConf.StampHistogram();
+    for (size_t stamp = 0; stamp < fileHistogram.size(); ++stamp) {
+        Y_ENSURE(!fileHistogram[stamp] || stamp < NumTimes, "Invalid file modification stamp");
+        if (stamp < NumTimes) {
+            useCount[stamp].Count = fileHistogram[stamp];
+        }
     }
     Y_ASSERT(KeepLast >= 1);
     DoSwap(useCount[0], useCount[useCount.size() - 1 - KeepLast]);    // 0 is a reserved 'no stamp' stamp
@@ -171,27 +173,32 @@ void TTimeStamps::CompressTimes(THashMap<TElemId, TNodeData>& nodeData) {
     for (size_t n = 0; n < NumTimes /*256*/; n++)
         moveMap[n].Print(n, Times[n]);
 
-    size_t rescanFileCont = 0, rescanNodeCont = 0, recmdCount = 0, delstampCount = 0;
+    size_t rescanFileCont = 0, rescanNodeCont = 0, recmdCount = 0;
     for (auto& [elemId, data] : nodeData) {
         moveMap.MoveStampLeft(data.NodeModStamp, rescanNodeCont);
     }
 
-    for (ui32 i = 1; i < Elems.FileConf.Size(); ++i) {
-        auto file = Elems.FileConf.GetFileById(TFileElemId(i));
-        if (file->IsInternalLink()) {
-            continue;
+    TMetadataStampRemap remap;
+    const auto commandHistogram = Elems.CommandConf.StampHistogram();
+    for (size_t stamp = 0; stamp < 256; ++stamp) {
+        size_t ignored = 0;
+        moveMap.FixStamp(remap.Checked[stamp], ignored);
+        // Never (255) is legal for LastCheckedStamp, not modification stamps.
+        if (stamp < NumTimes) {
+            moveMap.MoveStamp(remap.Modified[stamp], ignored);
+            if (stamp && moveMap[stamp].NeedMove()) {
+                rescanFileCont += fileHistogram[stamp];
+                recmdCount += commandHistogram[stamp];
+            }
+        } else {
+            Y_ENSURE(!commandHistogram[stamp], "Invalid command modification stamp");
         }
-        auto& fileData = file->GetFileData();
-        moveMap.FixStamp(fileData.LastCheckedStamp, delstampCount);
-        moveMap.MoveStamp(fileData.RealModStamp, rescanFileCont);
     }
+    Elems.FileConf.RemapStamps(remap);
+    Elems.CommandConf.RemapStamps(remap);
 
-    for (auto i = Elems.CommandConf.Meta_.begin(), e = Elems.CommandConf.Meta_.end(); i != e; ++i) {
-        moveMap.MoveStamp(i->CmdModStamp, recmdCount);
-    }
-
-    if (rescanFileCont || rescanNodeCont || delstampCount) {
-        YDIAG(DG) << "TTimeStamps: compress spoiled the state of " << rescanFileCont << " files, " << rescanNodeCont << " nodes and removed stamps of " << delstampCount << " files\n";
+    if (rescanFileCont || rescanNodeCont || recmdCount) {
+        YDIAG(DG) << "TTimeStamps: compress spoiled the state of " << rescanFileCont << " files, " << rescanNodeCont << " nodes and " << recmdCount << " commands\n";
     }
 
     NumTimes = rTo;
