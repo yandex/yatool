@@ -2342,6 +2342,7 @@ class YaMake:
                         from devtools.ya.build.larry_client.build_variables import collect_build_variables
                         from devtools.ya.build.larry_client import release_info
                         from devtools.ya.build.larry_service import diagnostics as debug_report
+                        from devtools.ya.build.larry_service import address as addresses
                         from devtools.ya_make.libs.larry_client.py import TRANSPORT_VERSION
                     except ImportError:
                         raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
@@ -2351,11 +2352,19 @@ class YaMake:
                     # and option preparation can fail before an adapter exists.
                     with debug_report.capture(
                         self.app_ctx.dump_debug,
-                        self.opts.larry_addr,
+                        self.opts.larry_requested_addr or self.opts.larry_addr,
                         transport_version=TRANSPORT_VERSION,
                         client_release_date=client_date.isoformat() if client_date is not None else None,
                         suppressions=self.app_ctx.hide_token,
                     ) as report:
+                        if self.opts.larry_requested_addr == 'local:':
+                            report.update(mode='external', execution_mode='sync', selection_reason='windows')
+                            logger.info('Larry execution selection: local: -> sync: (Windows)')
+                            if getattr(self.app_ctx, 'evlog', None):
+                                self.app_ctx.evlog.get_writer('larry')(
+                                    'execution-selection', requested='local', actual='sync', reason='windows'
+                                )
+                        self.opts.larry_addr = addresses.resolve_sync_address(self.opts.larry_addr)
                         service_recovery = None
                         if self.opts.larry_addr == 'local:':
                             from devtools.ya.build.larry_service import configuration, recovery, credentials, paths

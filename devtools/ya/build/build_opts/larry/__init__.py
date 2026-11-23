@@ -1,3 +1,5 @@
+import sys
+
 from devtools.ya.core import yarg
 from devtools.ya.core.yarg import groups
 
@@ -6,6 +8,7 @@ class LarryOptions(yarg.Options):
     def __init__(self):
         super().__init__()
         self.larry_addr = None
+        self.larry_requested_addr = None
         self.larry_local_cache = True
         # Additional exact names; the adapter retains its built-in defaults.
         self.larry_environment_whitelist = []
@@ -53,13 +56,20 @@ class LarryOptions(yarg.Options):
         if self.larry_addr is None:
             return
 
+        if sys.platform == 'win32' and self.larry_addr == 'local:':
+            self.larry_requested_addr = self.larry_addr
+            self.larry_addr = 'sync:'
+
         # Validate the selected runner before graph construction: otherwise distbuild
         # silently wins dispatch, and local-runner limits can be silently ignored.
         # Keep Larry compatibility here, using yarg's merged, processed options.
         if getattr(params, 'use_distbuild', False):
             raise yarg.ArgsValidatingException('--larry-runner cannot be combined with --dist')
 
-        if getattr(params, 'yt_store', False) and not self.larry_addr.startswith(('grpc:', 'grpc-sync:')):
+        grpc = self.larry_addr.startswith(('grpc:', 'grpc-sync:')) or (
+            sys.platform == 'win32' and self.larry_addr.startswith('sync:')
+        )
+        if getattr(params, 'yt_store', False) and not grpc:
             # SetValueHook tracks CLI, environment and config assignments even
             # when the explicitly supplied value equals a built-in default.
             yt_overrides = ['yt_proxy', 'yt_dir', 'yt_proxy_role']
