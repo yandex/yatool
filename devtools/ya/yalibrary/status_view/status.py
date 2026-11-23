@@ -54,7 +54,7 @@ class Status(object):
         def add(self, task):
             with self._status._lock:
                 self._status._qty += 1
-                self._status._progress = len(self._status._finished) * 1.0 / self._status._qty
+                self._status._progress = self._status._finished_count() * 1.0 / self._status._qty
 
         def ready(self, task):
             pass
@@ -67,7 +67,7 @@ class Status(object):
             with self._status._lock:
                 del self._status._active[task]
                 self._status._finished.append(task)
-                self._status._progress = len(self._status._finished) * 1.0 / self._status._qty
+                self._status._progress = self._status._finished_count() * 1.0 / self._status._qty
 
     class _BulkListener(object):
         def __init__(self, status):
@@ -100,6 +100,7 @@ class Status(object):
         self._active = collections.OrderedDict()
         self._auxiliary = collections.OrderedDict()
         self._finished = []
+        self._finished_offset = 0
         self._lock = threading.Lock()
         self._qty = 0
         self._progress = 0.0
@@ -113,7 +114,25 @@ class Status(object):
 
     def finished(self, since):
         with self._lock:
-            return self._finished[since:]
+            return self._finished[max(0, since - self._finished_offset) :]
+
+    def discard_finished(self):
+        """Drop a batch consumed by the sole view, with no concurrent producer."""
+        with self._lock:
+            self._finished_offset += len(self._finished)
+            del self._finished[:]
+
+    def discard_silent_prefix(self, is_silent):
+        """Drop only a leading run that the sole view need not render."""
+        with self._lock:
+            count = 0
+            for task in self._finished:
+                if not is_silent(task):
+                    break
+                count += 1
+            del self._finished[:count]
+            self._finished_offset += count
+            return self._finished_offset
 
     def progress(self):
         return self._progress
@@ -125,7 +144,10 @@ class Status(object):
 
     def done(self):
         with self._lock:
-            return len(self._finished)
+            return self._finished_count()
+
+    def _finished_count(self):
+        return self._finished_offset + len(self._finished)
 
     @property
     def count(self):

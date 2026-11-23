@@ -107,6 +107,9 @@ class JsonlProgressView(object):
         if self._changed(snapshot):
             self._write(snapshot)
 
+    def discard_silent_finished(self, is_silent):
+        self._last_id = max(self._last_id, self._status.discard_silent_prefix(is_silent))
+
     def _flush_bodies(self):
         # type: () -> None
         """Emit the stderr of the tasks finished since the last call, as the terminal would print it."""

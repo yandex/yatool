@@ -228,7 +228,14 @@ class TermView(object):
                 if self._extra_progress:
                     pre.extend([1, '%s/%s' % (snapshot.completed, snapshot.total)])
 
-                self._display.emit_message(self._fmt_status(task_status, pre, []))
+                line = self._fmt_status(task_status, pre, [])
+                try:
+                    self._display.emit_message(line)
+                except OSError:
+                    if not self._ninja and not body:
+                        # A failed single-line completion can be retried on the next tick.
+                        self._last_id -= 1
+                    raise
                 if body:
                     self._display.emit_message(yalibrary.formatter.ansi_codes_to_markup(body))
 
@@ -274,3 +281,7 @@ class TermView(object):
 
     def finish(self):
         self.tick()
+
+    def discard_silent_finished(self, is_silent):
+        if self._ninja or self._progress is not None:
+            self._last_id = max(self._last_id, self._status.discard_silent_prefix(is_silent))
