@@ -2527,8 +2527,8 @@ class YaMake:
                     res = collections.defaultdict(list)
 
                 if self.opts.dump_distbuild_result:
-                    with open(self.opts.dump_distbuild_result, 'w') as result_file:
-                        json.dump(res, result_file)
+                    with open(self.opts.dump_distbuild_result, 'wb') as result_file:
+                        sjson.dump(res, result_file)
 
                 return res
 
