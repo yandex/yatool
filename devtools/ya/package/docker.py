@@ -168,20 +168,28 @@ def create_package(
     digest = None
     if push:
         cmd = ["push", image_full_name]
-        if docker_use_podman:
-            cmd += [
-                "--compression-format=gzip",
-                "--force-compression",
-                "--format=v2s2",
-            ]
+        with tmp.temp_dir() as push_dir:
+            if docker_use_podman:
+                digest_file = os.path.join(push_dir, "digest")
+                cmd += [
+                    "--compression-format=gzip",
+                    "--force-compression",
+                    "--format=v2s2",
+                    "--digestfile",
+                    digest_file,
+                ]
 
-        push_out, _ = package.process.run_process(
-            binary,
-            cmd,
-            add_line_timestamps=True,
-            tee=True,
-        )
-        digest = extract_digest(push_out)
+            push_out, _ = package.process.run_process(
+                binary,
+                cmd,
+                add_line_timestamps=True,
+                tee=True,
+            )
+            if docker_use_podman:
+                with open(digest_file) as f:
+                    digest = f.read().strip()
+            else:
+                digest = extract_digest(push_out)
 
         out += [f"{engine} push:", push_out]
 

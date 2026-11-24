@@ -1584,7 +1584,8 @@ def do_package(params):
                                     params,
                                     package_path=package_context.package_path,
                                     resource_name=name,
-                                    resource_version=version,
+                                    resource_version=package_context.context.get("docker_image") or version,
+                                    docker_image_digest=package_context.context.get("digest"),
                                 )
                                 package_context.set_context("package_resource_id", package_resource_id)
                                 package_context.set_context("package_resource_type", params.resource_type)
@@ -1639,7 +1640,9 @@ def do_package(params):
     )
 
 
-def upload_package(built_package_file, package_json, opts, package_path, resource_name, resource_version):
+def upload_package(
+    built_package_file, package_json, opts, package_path, resource_name, resource_version, docker_image_digest=None
+):
     built_package_file_name = os.path.basename(built_package_file)
     fix_logging()
     platform_run_resource_id = None
@@ -1648,6 +1651,9 @@ def upload_package(built_package_file, package_json, opts, package_path, resourc
     package_attrs = dict(
         common_attrs, package_path=package_path, resource_name=resource_name, resource_version=resource_version
     )
+
+    if docker_image_digest:
+        package_attrs["docker_image_digest"] = docker_image_digest
 
     logging.info("Uploading %s", built_package_file_name)
     logging.debug("Uploading file full path: %s", built_package_file)
