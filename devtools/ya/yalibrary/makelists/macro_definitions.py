@@ -550,22 +550,24 @@ class MakeList(Node):
     def __init__(self, name='root'):
         super(MakeList, self).__init__(name, TYPE_UNKNOWN)
 
-    def _find_project(self):
-        def _find_projects_recursivly(obj):
-            num_proj = 0
-            proj = None
+    def iter_projects(self):
+        def iter_projects_recursively(obj):
             for child in obj.children:
                 if isinstance(child, Project):
-                    num_proj += 1
-                    proj = child
-                if isinstance(child, Macro) and child.name in ['IF', 'ELSE', 'ELSEIF']:
-                    child_proj, child_num_proj = _find_projects_recursivly(child)
-                    if child_num_proj:
-                        num_proj += child_num_proj
-                        proj = child_proj
-            return proj, num_proj
+                    yield child
+                elif isinstance(child, Macro) and child.name in ['IF', 'ELSE', 'ELSEIF']:
+                    for project in iter_projects_recursively(child):
+                        yield project
 
-        return _find_projects_recursivly(self)
+        return iter_projects_recursively(self)
+
+    def _find_project(self):
+        num_proj = 0
+        proj = None
+        for project in self.iter_projects():
+            num_proj += 1
+            proj = project
+        return proj, num_proj
 
     @property
     def project(self):
