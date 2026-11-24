@@ -18,6 +18,11 @@ IF (PYTHON2)
     )
 ENDIF()
 
+PEERDIR_FROM_POLICY(
+    ALLOW
+    library/python/django
+)
+
 END()
 
 RECURSE(

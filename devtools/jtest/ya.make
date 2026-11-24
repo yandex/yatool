@@ -10,6 +10,12 @@ PEERDIR(
 )
 
 LINT(base)
+PEERDIR_FROM_POLICY(
+    ALLOW
+    contrib/java/.*/ut
+    library/recipes
+)
+
 END()
 
 RECURSE_FOR_TESTS(

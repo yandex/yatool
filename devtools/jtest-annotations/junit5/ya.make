@@ -12,4 +12,10 @@ PEERDIR(contrib/java/org/junit/jupiter/junit-jupiter-api)
 
 JAVA_SRCS(SRCDIR src/main/java **/*)
 
+PEERDIR_FROM_POLICY(
+    ALLOW
+    contrib/java/.*/ut
+    library/recipes
+)
+
 END()

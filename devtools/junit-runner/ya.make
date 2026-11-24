@@ -18,6 +18,11 @@ JAVA_SRCS(
 )
 
 LINT(base)
+PEERDIR_FROM_POLICY(
+    ALLOW
+    contrib/java/.*/ut
+)
+
 END()
 
 RECURSE_FOR_TESTS(
