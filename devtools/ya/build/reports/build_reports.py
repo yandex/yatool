@@ -84,7 +84,7 @@ def generate_results_report(builder, *, suites_prepared=False):
             instance.create(
                 junit_path,
                 suites,
-                lambda link: ar2._fix_link_prefix_and_quote(link, output_dir, results_root),
+                lambda link: ar2.fix_link_prefix_and_quote(link, output_dir, results_root),
             )
             logger.info('Dump junit report to %s', junit_path)
 

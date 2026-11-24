@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 TEST_SIZES = [TestSize.Small, TestSize.Medium, TestSize.Large]
 TIMEOUT_TARGETS_MARKER = "Process exceeds time limit"
 DEPENDS_ON_BROKEN_TARGETS_MARKER = "Depends on broken targets"
+REPORT_BUILD_ROOT = "build-release"
 IMPORTANT_FIELDS = {'path', 'toolchain', 'duration'}
 _ARCHIVE_SUFFIXES = (".tar", ".tar.gz", ".tar.zstd")
 
@@ -55,7 +56,7 @@ def is_configure_node(entry):
     return entry.get("type") == "configure"
 
 
-def _fix_link_prefix_and_quote(link, fix_from, fix_to):
+def fix_link_prefix_and_quote(link, fix_from, fix_to):
     assert link, locals()
     if not link.startswith(fix_from):
         return formatter.html.quote_url(link)
@@ -82,7 +83,7 @@ def _fix_links_entry(entry, name, fix_from, fix_to):
     for i in range(len(paths)):
         if fix_to.startswith("http") and not paths[i].startswith("http"):
             p = _ensure_posix_path(paths[i])
-            paths[i] = _fix_link_prefix_and_quote(p, fix_from, fix_to)
+            paths[i] = fix_link_prefix_and_quote(p, fix_from, fix_to)
         else:
             paths[i] = paths[i].replace(fix_from, fix_to)
     entry["links"][name] = paths
@@ -96,7 +97,7 @@ def _fix_links(entry, fix_from, fix_to):
         _fix_links_entry(entry, name, fix_from, fix_to)
     for obj in entry.get("result", {}).values():
         if fix_to.startswith("http"):
-            obj['url'] = _fix_link_prefix_and_quote(obj['url'], fix_from, fix_to)
+            obj['url'] = fix_link_prefix_and_quote(obj['url'], fix_from, fix_to)
         else:
             obj['url'] = obj['url'].replace(fix_from, fix_to)
     if "rich-snippet" in entry:
@@ -132,7 +133,7 @@ def _replace_logs_with_links(entry, output_dir, work_dir, links_map=None):
     def _any_path():
         for log_type, paths in entry.get("links", {}).items():
             for path in paths:
-                any_path = path.replace("build-release", "")
+                any_path = path.replace(REPORT_BUILD_ROOT, "")
                 return any_path
         return None
 
@@ -189,9 +190,9 @@ def _replace_logs_with_links(entry, output_dir, work_dir, links_map=None):
             # XXX
             # Fallback to reading from FS
             for path in paths:
-                link_path = path.replace("build-release", search_dir) + '.link'
-                link_tar_path = path.replace("build-release", search_dir) + '.tar.link'
-                link_tar_zstd_path = path.replace("build-release", search_dir) + '.tar.zstd.link'
+                link_path = path.replace(REPORT_BUILD_ROOT, search_dir) + '.link'
+                link_tar_path = path.replace(REPORT_BUILD_ROOT, search_dir) + '.tar.link'
+                link_tar_zstd_path = path.replace(REPORT_BUILD_ROOT, search_dir) + '.tar.zstd.link'
 
                 if os.path.exists(link_path) and os.path.isfile(link_path):
                     with open(link_path) as fp:
@@ -222,7 +223,7 @@ def _replace_logs_with_links(entry, output_dir, work_dir, links_map=None):
     return entry
 
 
-def fix_links(report, result_root, build_root='build-release'):
+def fix_links(report, result_root, build_root=REPORT_BUILD_ROOT):
     entries = []
     for entry in report["results"]:
         entries.append(_fix_links(entry, build_root, result_root))
@@ -762,10 +763,9 @@ class ReportGenerator:
         ):
             suite_prototype["rich-snippet"] += "\n{}".format("\n".join(node_errors))
 
-        results_root = "build-release"
         replacements = [
-            (self._build_root, results_root),
-            ('$(BUILD_ROOT)', results_root),
+            (self._build_root, REPORT_BUILD_ROOT),
+            ('$(BUILD_ROOT)', REPORT_BUILD_ROOT),
         ]
         import devtools.ya.test.reports as test_reports
 
@@ -817,7 +817,7 @@ class ReportGenerator:
             self._fix_roots(entry, resolver)
 
             if self._opts.build_results_resource_id is not None:
-                _fix_links(entry, results_root, tut.get_log_results_link(self._opts))
+                _fix_links(entry, REPORT_BUILD_ROOT, tut.get_log_results_link(self._opts))
             elif (
                 self._opts.use_links_in_report
                 and (entry != suite_prototype or suite_prototype["links"])
