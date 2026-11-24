@@ -2387,6 +2387,7 @@ class YaMake:
                                 raise devtools.ya.core.yarg.ArgsValidatingException(str(error)) from None
                             service_recovery = recovery.ServiceRecovery(
                                 service_paths,
+                                proactive_update_interval=self.opts.larry_proactive_update_interval,
                                 client_date=release_info.get_release_date,
                                 cache=cache,
                             )

@@ -10,6 +10,7 @@ class LarryOptions(yarg.Options):
         self.larry_addr = None
         self.larry_requested_addr = None
         self.larry_local_cache = True
+        self.larry_proactive_update_interval = 86400
         # Additional exact names; the adapter retains its built-in defaults.
         self.larry_environment_whitelist = []
         self.larry_test_environment_whitelist = []
@@ -39,12 +40,15 @@ class LarryOptions(yarg.Options):
                 visible=False,
             ),
             yarg.ConfigConsumer('larry_local_cache'),
+            yarg.ConfigConsumer('larry_proactive_update_interval'),
             yarg.ConfigConsumer('larry_betta_addr', hook=yarg.SetValueHook('larry_addr')),
             yarg.ConfigConsumer('larry_environment_whitelist'),
             yarg.ConfigConsumer('larry_test_environment_whitelist'),
         ]
 
     def postprocess(self):
+        if type(self.larry_proactive_update_interval) is not int or self.larry_proactive_update_interval < 0:
+            raise yarg.ArgsValidatingException('larry_proactive_update_interval must be nonnegative integer seconds')
         for option in ('larry_environment_whitelist', 'larry_test_environment_whitelist'):
             names = getattr(self, option)
             if not isinstance(names, list) or any(
