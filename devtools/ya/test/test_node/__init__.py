@@ -2780,7 +2780,7 @@ def inject_test_list_node(arc_root, graph, suite, opts, custom_deps, platform_de
     env = sysenv.get_common_env()
     sysenv.update_test_initial_env_vars(env, suite, opts)
 
-    log_path = os.path.join("$(BUILD_ROOT)", suite.project_path, devtools.ya.test.const.LIST_NODE_LOG_FILE)
+    log_path = suite.work_dir(devtools.ya.test.const.LIST_NODE_LOG_FILE)
     list_out_dir = suite.work_dir(devtools.ya.test.const.LIST_NODE_RESULT_FILE)
     test_list_file = suite.work_dir(devtools.ya.test.const.TEST_LIST_FILE)
     output = [log_path]
