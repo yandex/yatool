@@ -4,6 +4,7 @@
 #include <devtools/ymake/build_result.h>
 
 #include <util/generic/yexception.h>
+#include <util/charset/wide.h>
 #include <util/stream/output.h>
 
 namespace NYMake {
@@ -25,4 +26,22 @@ namespace NYMake {
         return runMain(expandedArgc, const_cast<char**>(expandedArguments.data()));
     }
 
-}
+#ifdef _win_
+    template <class TMain>
+    int RunWithWideResponseFiles(int argc, const wchar_t* const* argv, TMain runMain) {
+        TVector<TString> argumentStorage;
+        argumentStorage.reserve(argc);
+        for (int index = 0; index < argc; ++index) {
+            argumentStorage.push_back(WideToUTF8(std::wstring_view{argv[index]}));
+        }
+        TVector<char*> arguments;
+        arguments.reserve(argc + 1);
+        for (auto& argument : argumentStorage) {
+            arguments.push_back(argument.begin());
+        }
+        arguments.push_back(nullptr);
+        return RunWithResponseFiles(argc, arguments.data(), runMain);
+    }
+#endif
+
+} // namespace NYMake

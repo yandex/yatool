@@ -259,6 +259,7 @@ RECURSE_FOR_TESTS(
     lang/makelists/ut
     resolver/ut
     symbols/ut
+    tests/entrypoint
     ut
     ut/hexencoder
     ut/macro_signature
