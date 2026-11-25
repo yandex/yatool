@@ -1378,7 +1378,9 @@ def main():
     # Test wrapper exit status for test machinery
     exit_status = 0
 
-    if not options.with_wine:
+    # Changing LC_TIME after logging starts crashes native Windows test_tool.
+    # Native Unicode APIs do not require selecting a POSIX UTF-8 locale.
+    if not options.with_wine and not windows.on_win():
         for unicode_locale in ['C.UTF-8', 'en_US.UTF-8']:
             if is_locale_supported(unicode_locale):
                 env['LC_ALL'] = unicode_locale
