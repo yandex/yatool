@@ -363,8 +363,16 @@ class ChunkedQueue(BaseQueue):
 
         return True
 
-    def continuous_consume(self, consumer, chunk_size=5, send_time_s=60, check_time_s=1, first_check=True):
-        # type: (ConsumerType, threading.Event, int, float, float, bool) -> None
+    def continuous_consume(
+        self,
+        consumer,
+        chunk_size=5,
+        send_time_s=60,
+        check_time_s=1,
+        first_check=True,
+        should_stop=None,
+    ):
+        # type: (ConsumerType, int, float, float, bool, tp.Optional[tp.Callable[[], bool]]) -> None
         with self._condition:
             if self._work is False:
                 self.logger.debug("Queue was stopped, will be rerun")
@@ -381,6 +389,13 @@ class ChunkedQueue(BaseQueue):
             if not self.consume(consumer):
                 return
 
+        if should_stop is not None and should_stop():
+            if not self.consume(consumer):
+                return
+            if should_stop():
+                self.consume(consumer)
+                return
+
         while True:
             with self._condition:
                 if self._work is False:
@@ -392,6 +407,13 @@ class ChunkedQueue(BaseQueue):
             if chunk_size <= self._active_chunk_items or last_send_time + send_time_s < time.time():
                 last_send_time = time.time()
                 if not self.consume(consumer):
+                    break
+
+            if should_stop is not None and should_stop():
+                if not self.consume(consumer):
+                    break
+                if should_stop():
+                    self.consume(consumer)
                     break
 
     def stop(self):

@@ -138,19 +138,67 @@ class FilterByAge:
         return item.timestamp > self.now - self.age_limit
 
 
-def _clean_dir_selectively(logs, file_dir, file_name):
+def _truncate_file(path):
     try:
-        for i in os.listdir(logs):
-            date_dir = os.path.join(logs, i)
-            if date_dir != file_dir:
-                fs.remove_tree_safe(date_dir)
+        flags = os.O_WRONLY | os.O_TRUNC
+        if hasattr(os, 'O_NOFOLLOW'):
+            flags |= os.O_NOFOLLOW
+        file_descriptor = os.open(path, flags)
+        os.close(file_descriptor)
+    except OSError:
+        logger.debug('Failed to truncate log %s', path, exc_info=True)
 
-        if file_dir:
-            for i in os.listdir(file_dir):
-                if i != file_name:
-                    fs.remove_tree_safe(os.path.join(file_dir, i))
+
+def _clean_dir_selectively(logs, file_dir, file_name, truncate_suffixes=()):
+    current_log = os.path.join(file_dir, file_name) if file_dir else ''
+    try:
+        for date_name in os.listdir(logs):
+            date_dir = os.path.join(logs, date_name)
+            if os.path.islink(date_dir) or not os.path.isdir(date_dir):
+                if date_dir != current_log:
+                    fs.remove_tree_safe(date_dir)
+                continue
+
+            try:
+                entries = os.listdir(date_dir)
+            except OSError:
+                logger.debug('Failed to inspect log directory %s', date_dir, exc_info=True)
+                continue
+
+            for entry in entries:
+                path = os.path.join(date_dir, entry)
+                if path == current_log:
+                    continue
+                if (
+                    truncate_suffixes
+                    and entry.endswith(truncate_suffixes)
+                    and not os.path.islink(path)
+                    and os.path.isfile(path)
+                ):
+                    _truncate_file(path)
+                    continue
+                fs.remove_tree_safe(path)
+
+            try:
+                if not os.listdir(date_dir):
+                    os.rmdir(date_dir)
+            except OSError:
+                logger.debug('Failed to remove log directory %s', date_dir, exc_info=True)
     except OSError as e:
         logger.debug('Cleaning %s root failed %s', logs, e)
+
+
+def _truncate_legacy_snowden_logs():
+    snowden_root = os.path.join(cc.misc_root(), 'snowden')
+    if os.path.islink(snowden_root):
+        return
+    for store_dir in glob.iglob(os.path.join(snowden_root, 'v*')):
+        if os.path.islink(store_dir) or not os.path.isdir(store_dir):
+            continue
+        path = os.path.join(store_dir, 'snowden_daemon.log')
+        if os.path.islink(path) or not os.path.isfile(path):
+            continue
+        _truncate_file(path)
 
 
 def _clean_logs():
@@ -164,8 +212,7 @@ def _clean_logs():
         file_dir, file_name = ('', '')
         logger.debug('Log name was not obtained %s', e)
 
-    logs = os.path.join(cc.misc_root(), 'logs')
-    _clean_dir_selectively(logs, file_dir, file_name)
+    _clean_dir_selectively(cc.logs_root(), file_dir, file_name, truncate_suffixes=('.snowden.log',))
 
 
 def _clean_evlogs():
@@ -255,6 +302,7 @@ def do_cache(opts):
 
 
 def _do_collect_cache(cache, build_root, opts):
+    _truncate_legacy_snowden_logs()
     _rm_tree('Cleaning tmp root', cc.tmp_path())
     _rm_tree('Cleaning pycache root', cc.pycache_path())
     if getattr(opts, 'clear_snowden', False):
