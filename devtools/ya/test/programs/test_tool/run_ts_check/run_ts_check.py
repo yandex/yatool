@@ -36,12 +36,7 @@ def main():
     return run(args)
 
 
-def get_test_env() -> dict[str, str]:
-    if "YA_TEST_CONTEXT_FILE" not in os.environ:
-        return {}
-    with open(os.environ["YA_TEST_CONTEXT_FILE"]) as f:
-        context = json.load(f)
-    env_file = context.get("internal", {}).get("env_file")
+def get_test_env(env_file: str | None) -> dict[str, str]:
     if not env_file or not os.path.exists(env_file):
         return {}
     env = {}
@@ -68,7 +63,11 @@ def get_env(args: CliArgs, report_path: str):
         os.path.join(build_dir, pm_const.VIRTUAL_STORE_DIRNAME, pm_const.NODE_MODULES_DIRNAME),
     ]
 
-    test_env = get_test_env()
+    context = {}
+    if context_file := os.environ.get("YA_TEST_CONTEXT_FILE"):
+        with open(context_file) as f:
+            context = json.load(f)
+    test_env = get_test_env(context.get("internal", {}).get("env_file"))
 
     if "NODE_PATH" in test_env:
         node_path.append(test_env["NODE_PATH"])
@@ -79,9 +78,13 @@ def get_env(args: CliArgs, report_path: str):
     elif "--max-old-space-size" not in node_options:
         test_env["NODE_OPTIONS"] = node_options + " --max-old-space-size=4096"
 
+    global_resources = context.get("resources", {}).get("global", {})
+    bun_dir = global_resources.get("BUN_RESOURCE_GLOBAL")
+    pnpm_dir = global_resources.get("PNPM_RESOURCE_GLOBAL")
+    test_path = os.pathsep.join(filter(None, (args.nodejs, bun_dir, pnpm_dir)))
     test_env.update(
         {
-            "PATH": args.nodejs,
+            "PATH": test_path,
             "NODE_PATH": os.pathsep.join(node_path),
             "YA_TEST_REPORT_PATH": report_path,
         }
