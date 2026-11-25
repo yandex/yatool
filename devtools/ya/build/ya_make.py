@@ -405,13 +405,15 @@ def configuration_reporting(opts, app_ctx, ymake_stats, event_queue=None):
         yield errors_collector
 
 
-def _build_graph_and_tests(opts, app_ctx, ymake_stats):
-    # type: (tp.Any, tp.Any, YmakeTimeStatistic) -> tuple(tp.Any, tp.Any, tp.Any, tp.Any, tp.Any)
+def _build_graph_and_tests(opts, app_ctx, ymake_stats, *, graph_output=None):
     display = getattr(app_ctx, 'display', None)
     _checkout(opts, display)
 
+    output_options = {'graph_output': graph_output} if graph_output is not None else {}
     with configuration_reporting(opts, app_ctx, ymake_stats) as errors_collector:
-        graph, tests, stripped_tests, _, make_files = lg.build_graph_and_tests(opts, check=True, display=display)
+        graph, tests, stripped_tests, _, make_files = lg.build_graph_and_tests(
+            opts, check=True, display=display, **output_options
+        )
 
     errors = {fix_dir(k): sorted(list(v)) for k, v in errors_collector.errors.items()}
     return graph, tests, stripped_tests, errors, make_files
@@ -1138,6 +1140,32 @@ def _distbuild_trace_context_from_json(trace_context_json):
         return None
 
 
+def populate_graph_conf(graph_conf, opts):
+    graph_conf['keepon'] = opts.continue_on_fail
+    graph_conf.update(gp.gen_description())
+
+    if opts.default_node_requirements:
+        graph_conf['default_node_requirements'] = opts.default_node_requirements
+
+    if not opts.use_distbuild:
+        return
+
+    if opts.distbuild_pool:
+        graph_conf['pool'] = opts.distbuild_pool
+    if opts.dist_priority:
+        graph_conf['priority'] = opts.dist_priority
+    elif opts.coordinators_filter:
+        graph_conf['coordinator'] = opts.coordinators_filter
+    if opts.cache_namespace:
+        graph_conf['namespace'] = opts.cache_namespace
+    if opts.build_execution_time:
+        graph_conf['max_execution_time'] = opts.build_execution_time
+
+    trace_context = _distbuild_trace_context_from_json(opts.trace_context_json)
+    if trace_context is not None:
+        graph_conf['trace_context'] = trace_context
+
+
 class Context:
     RELEASED = {}  # sentinel to mark released full graph
 
@@ -1153,9 +1181,16 @@ class Context:
         stripped_tests=None,
         configure_errors=None,
         make_files=None,
+        *,
+        graph_output=None,
     ):
         self._timer = timer = exts.timer.Timer('context_creation')
         context_creation_stage = stager.start('context_creation')
+
+        def finish_context_creation():
+            context_creation_stage.finish()
+            timer.show_step("context_creation finished")
+            self.stage_times['context_creation'] = timer.full_duration()
 
         self.stage_times = {}
         graph_from_sources = graph is None and not opts.custom_json
@@ -1207,7 +1242,7 @@ class Context:
 
         self.output_replacements = [(opts.oauth_token, "<YA-TOKEN>")] if opts.oauth_token else []
 
-        dist_cache_future = self._cache_factory.start_dist_cache()
+        dist_cache_future = self._cache_factory.start_dist_cache() if graph_output is None else None
 
         display = getattr(app_ctx, 'display', None)
         print_status = get_print_status_func(opts, display, logger)
@@ -1243,6 +1278,7 @@ class Context:
             self.stripped_tests = suite_storage.Suites()
             self.make_files = []
         else:
+            output_options = {'graph_output': graph_output} if graph_output is not None else {}
             try:
                 (
                     self.graph,
@@ -1250,7 +1286,7 @@ class Context:
                     self.stripped_tests,
                     self.configure_errors,
                     self.make_files,
-                ) = _build_graph_and_tests(self.opts, app_ctx, self.ymake_stats)
+                ) = _build_graph_and_tests(self.opts, app_ctx, self.ymake_stats, **output_options)
             finally:
                 # The configure stage is over whatever its outcome: close it before the build progress starts.
                 finish_configure_progress(display)
@@ -1259,10 +1295,17 @@ class Context:
             if self.configure_errors and not opts.continue_on_fail:
                 raise ConfigurationError()
 
-        self._populate_graph_fields()
+        graph_exported = graph_output is not None and self.graph is None
+        if not graph_exported:
+            if graph_output is not None:
+                dist_cache_future = self._cache_factory.start_dist_cache()
+            self._populate_graph_fields()
 
         self.tests = suite_storage.Suites.from_models(self.tests)
         self.stripped_tests = suite_storage.Suites.from_models(self.stripped_tests)
+        if graph_exported:
+            finish_context_creation()
+            return
 
         print_status("Configuring local and dist store caches")
 
@@ -1501,9 +1544,7 @@ class Context:
                 + 'Remove --no-src-links option (*nix systems) and/or use -o/--output option, see details in help.'
             )
 
-        context_creation_stage.finish()
-        timer.show_step("context_creation finished")
-        self.stage_times['context_creation'] = timer.full_duration()
+        finish_context_creation()
 
     def get_context(self):
         return self.graph.get('conf', {}).get('context', {})
@@ -1594,37 +1635,8 @@ class Context:
         return os.path.join(self.garbage_dir, self.lock_name)
 
     def _populate_graph_fields(self):
-        if self.graph is None:
-            return
-
-        graph_conf = self.graph['conf']
-        graph_conf['keepon'] = self.opts.continue_on_fail
-        graph_conf.update(gp.gen_description())
-
-        if self.opts.default_node_requirements:
-            graph_conf['default_node_requirements'] = self.opts.default_node_requirements
-
-        if not self.opts.use_distbuild:
-            return
-
-        self._merge_distbuild_client_config(graph_conf)
-        trace_context = _distbuild_trace_context_from_json(self.opts.trace_context_json)
-        if trace_context is not None:
-            graph_conf['trace_context'] = trace_context
-
-    def _merge_distbuild_client_config(self, graph_conf):
-        """Refresh distbuild-facing keys in ``graph_conf`` from current CLI opts (e.g. custom graph reload)."""
-        opts = self.opts
-        if opts.distbuild_pool:
-            graph_conf['pool'] = opts.distbuild_pool
-        if opts.dist_priority:
-            graph_conf['priority'] = opts.dist_priority
-        elif opts.coordinators_filter:
-            graph_conf['coordinator'] = opts.coordinators_filter
-        if opts.cache_namespace:
-            graph_conf['namespace'] = opts.cache_namespace
-        if opts.build_execution_time:
-            graph_conf['max_execution_time'] = opts.build_execution_time
+        if self.graph is not None:
+            populate_graph_conf(self.graph['conf'], self.opts)
 
     def _dump_graph_diagnostics(self):
         if app_config.in_house:
@@ -1769,6 +1781,8 @@ class YaMake:
         stripped_tests=None,
         configure_errors=None,
         make_files=None,
+        *,
+        graph_output=None,
     ):
         self.opts = opts
         if getattr(opts, 'pgo_user_path', None):
@@ -1795,6 +1809,7 @@ class YaMake:
             stripped_tests=stripped_tests,
             configure_errors=configure_errors,
             make_files=make_files,
+            graph_output=graph_output,
         )
         if self._structured_test_list and self.ctx.graph:
             self._hide_test_list_output()

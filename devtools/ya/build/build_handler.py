@@ -2,9 +2,13 @@ import contextlib
 import devtools.ya.test.suite_storage.suites as suite_storage
 import logging
 import os
+import shutil
+import tempfile
 import time
 import types
 import typing
+
+import app_config
 
 import devtools.ya.core.config as core_config
 from devtools.ya.core import stage_tracer, stages_profiler
@@ -179,6 +183,45 @@ def _do_ya_make(params, app_ctx):
         return _do_ya_make_impl(params, app_ctx, resources)
 
 
+def _can_export_graph(opts):
+    if not (
+        (getattr(opts, 'regular_native_graph', False) or getattr(opts, 'full_ymake_configure', False))
+        and opts.use_distbuild
+        and opts.build_threads == 0
+        and opts.save_context_to
+        and opts.save_graph_to
+    ):
+        return False
+    if (
+        opts.custom_context
+        or opts.custom_json
+        or opts.dump_graph
+        or opts.show_command
+        or opts.list_tests
+        or opts.bazel_remote_warming
+        or opts.bazel_remote_warming_manifest
+        or opts.yt_replace_result
+        or opts.dist_cache_evict_cached
+        or opts.frepkage_target_uid
+        or opts.force_create_frepkage
+        or opts.stat_only_report_file
+        or opts.cache_stat
+        or opts.bazel_remote_store
+        or opts.yt_store_refresh_on_read
+        or opts.yt_local_max_nodes_per_core
+        or getattr(opts, 'dump_graph_execution_cost', None)
+        or getattr(opts, 'graph_stat_path', None)
+        or getattr(opts, 'run_tagged_tests_on_sandbox', False)
+    ):
+        return False
+    if app_config.in_house:
+        from yalibrary import diagnostics
+
+        if diagnostics.is_active():
+            return False
+    return True
+
+
 def _do_ya_make_impl(params, app_ctx, resources):
     from devtools.ya.build import ya_make
 
@@ -204,6 +247,7 @@ def _do_ya_make_impl(params, app_ctx, resources):
         monitoring_stage_finished('ya_make_handler')
         return 0
 
+    graph_output = None
     # XXX
     if getattr(params, 'make_context_on_distbuild', False):
         from devtools.ya.build.remote import remote_graph_generator
@@ -214,7 +258,11 @@ def _do_ya_make_impl(params, app_ctx, resources):
         context = ya_make.BuildContext.load_file(params, app_ctx)
         builder = context.builder
     else:
-        builder = ya_make.YaMake(params, app_ctx)
+        if _can_export_graph(params):
+            directory = resources.enter_context(tempfile.TemporaryDirectory(prefix='ya-graph-output-'))
+            filename = 'graph.json.uc' if os.fspath(params.save_graph_to).endswith('.uc') else 'graph.json'
+            graph_output = os.path.join(directory, filename)
+        builder = ya_make.YaMake(params, app_ctx, graph_output=graph_output)
         context = None
 
     if context is not None:
@@ -237,13 +285,17 @@ def _do_ya_make_impl(params, app_ctx, resources):
             context = context or ya_make.BuildContext(builder)
 
         context_json = context.save()
-        graph_json = context_json.pop('graph')
+        graph_to_save = context_json.pop('graph')
 
         with ucopen(params.save_context_to, mode="wb") as context_file:
             sjson.dump(context_json, context_file)
 
-        with ucopen(params.save_graph_to, mode="wb") as graph_file:
-            sjson.dump(graph_json, graph_file)
+        if graph_to_save is None and graph_output is not None:
+            with open(graph_output, 'rb') as source, open(params.save_graph_to, 'wb') as destination:
+                shutil.copyfileobj(source, destination, length=1024 * 1024)
+        else:
+            with ucopen(params.save_graph_to, mode="wb") as graph_file:
+                sjson.dump(graph_to_save, graph_file)
 
         stager.finish('save_context')
 
