@@ -402,7 +402,12 @@ class TaskContext(object):
         )
 
     def dispatch_uid(self, uid: GraphNodeUid, *args, **kwargs) -> None:
-        node = self.nodes[uid]
+        node = self.nodes.get(uid)
+        if node is None:
+            # A known graph node may have no local download task.
+            if not self.opts.use_distbuild or uid not in self._ctx.node_index.nodes:
+                raise KeyError(uid)
+            return
         try:
             task = self.task_cache(node)
             self.runq.dispatch(task, *args, **kwargs)
@@ -692,13 +697,24 @@ class TaskContext(object):
         with open(src_file, 'r') as f:
             return f.read().strip()
 
-    def _init_nodes(self):
+    def _init_nodes(self) -> None:
         self.results: frozenset[GraphNodeUid] = frozenset(self._ctx.graph['result'])
-        self.nodes: dict[GraphNodeUid, "Node"] = {
-            x.get('uid'): Node(x, self, x.get('uid') in self.results) for x in self._ctx.graph['graph']
-        }
+        use_distbuild = self.opts.use_distbuild
+        if use_distbuild and self.opts.output_only_tests:
+            # Test artifacts are selected by output UIDs, not suite result UIDs.
+            output_uids: set[GraphNodeUid] = set()
+            for suite in self._ctx.tests.metadata():
+                output_uids.update(suite.output_uids)
+            self.results = self.results.intersection(output_uids)
 
-        if not self.opts.use_distbuild:
+        self.nodes: dict[GraphNodeUid, Node] = {}
+        for graph_node in self._ctx.graph['graph']:
+            uid = graph_node['uid']
+            is_result = uid in self.results
+            if is_result or not use_distbuild:
+                self.nodes[uid] = Node(graph_node, self, is_result_node=is_result)
+
+        if not use_distbuild:
             for n in self.nodes.values():
                 for d in n.consume():
                     self.nodes[d].refcount += 1
@@ -748,19 +764,13 @@ class TaskContext(object):
         save_links_for: list[str] = getattr(self.opts, 'save_links_for', [])
 
         if self.opts.use_distbuild:
-            res_nodes = [x for x in self.nodes.values() if x.is_result_node]
-            if self.opts.output_only_tests:  # XXX
-                # We need to download test's output (testing_output_stuff.tar, etc) from distbuild - use output_uids instead of result_uids
-                res_set = set()
-                for suite in self._ctx.tests.metadata():
-                    res_set.update(suite.output_uids)
-                res_nodes = [x for x in res_nodes if x.uid in res_set]
+            res_nodes = list(self.nodes.values())
             download_test_results = _is_test_requested(self.opts)
             if not self.opts.download_artifacts and download_test_results:
                 save_links_for += _get_link_outputs(res_nodes)
                 save_links_for = list(set(save_links_for))
 
-            self.results: frozenset[GraphNodeUid] = frozenset([n.uid for n in res_nodes])
+            self.results = frozenset(self.nodes)
             self.prepare_all_nodes_task = yalibrary.runner.tasks.prepare.PrepareAllDistNodesTask(
                 self, self.opts.download_artifacts or download_test_results, res_nodes
             )
