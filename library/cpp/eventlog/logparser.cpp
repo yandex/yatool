@@ -133,12 +133,16 @@ namespace {
 }
 
 TFrameHeader::TFrameHeader(IInputStream& in) {
+    size_t skipAfter = 0;
     try {
         ::Load(&in, Basehdr);
 
-        Y_ENSURE(Basehdr.Length, "Empty frame additional data");
+        Y_ENSURE(HasValidFrameLength(), "Incomplete frame additional data");
 
         ::Load(&in, Framehdr);
+        // A short read can leave either header only partially initialized.
+        // Only use the payload length after both headers have been read.
+        skipAfter = FrameLength();
         switch (LogFormat()) {
             case COMPRESSED_LOG_FORMAT_V1:
                 break;
@@ -166,7 +170,7 @@ TFrameHeader::TFrameHeader(IInputStream& in) {
         if (const auto* cnt = dynamic_cast<TCountingInput *>(&in)) {
             location = "@ " + ToString(cnt->Counter());
         }
-        ythrow TFrameLoadError(FrameLength()) << "Frame Load Error" << location << ": " << CurrentExceptionMessage();
+        ythrow TFrameLoadError(skipAfter) << "Frame Load Error" << location << ": " << CurrentExceptionMessage();
     }
 }
 

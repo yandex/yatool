@@ -73,6 +73,10 @@ struct TFrameHeader {
         return Basehdr.Format >> 24;
     }
 
+    bool HasValidFrameLength() const noexcept {
+        return Basehdr.Length >= sizeof(TCompressedFrameHeader2);
+    }
+
     ui64 FrameLength() const {
         return Basehdr.Length - sizeof(TCompressedFrameHeader2);
     }
