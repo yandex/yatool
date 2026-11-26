@@ -17,6 +17,30 @@ namespace {
 
     const TSet<TString> INNER_PARTS = {"libc", "libcpp", "cpython"};
 
+    constexpr TStringBuf PY2_CYTHON_INCLUDES = "$S/contrib/tools/cython_py2/Cython/Includes/";
+    constexpr TStringBuf PY3_CYTHON_INCLUDES = "$S/contrib/tools/cython/Cython/Includes/";
+    constexpr TStringBuf UNRESOLVED_ROOT = "$U/";
+
+    void PreferPy3CythonIncludes(TModuleWrapper& module, TVector<TResolveFile>& resolved) {
+        if (module.GetModule().GetAttrs().DontResolveIncludes) {
+            return;
+        }
+        for (auto& file : resolved) {
+            TStringBuf path = module.GetTargetBuf(file);
+            if (!path.SkipPrefix(PY2_CYTHON_INCLUDES) && !path.SkipPrefix(UNRESOLVED_ROOT)) {
+                continue;
+            }
+            TResolveFile py3;
+            if (module.ResolveAsKnownWithCheck(TString::Join(PY3_CYTHON_INCLUDES, path), py3) != RESOLVE_SUCCESS) {
+                continue;
+            }
+            TString py3Path{module.GetTargetBuf(py3)};
+            if (py3Path.StartsWith(PY3_CYTHON_INCLUDES)) {
+                file = module.AssumeResolved(py3Path, file.GetLinkType());
+            }
+        }
+    }
+
     TStringBuf GetFirstPathPart(TStringBuf path) {
         if (path.empty()) {
             return path;
@@ -162,6 +186,7 @@ void TCythonIncludeProcessor::ProcessIncludes(TAddDepAdaptor& node,
 
     TVector<TResolveFile> resolvedIncludes;
     module.ResolveLocalIncludes(incFileName, preparedIncludes, resolvedIncludes, LanguageId);
+    PreferPy3CythonIncludes(module, resolvedIncludes);
 
     if (incFileNameStr.EndsWith(".pyx")) {
         TString pxdPath = TString{incFileName.NoExtension()} + ".pxd";
