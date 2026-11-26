@@ -1689,6 +1689,14 @@ inline void TUpdIter::Left(TState& state) {
         ui8 nodeModStamp = Graph.GetFileNodeData(st_.Node.ElemId).NodeModStamp;
         FOR_ALL_INTENTS(intent) {
             if (currProps.IsIntentRequired(intent) && chldProps.IsIntentNewerThan(intent, nodeModStamp)) {
+                if (st_.Node.NodeType == EMNT_NonParsedFile && st_.Dep.DepType == EDT_OutTogether && IsModuleType(LastType)) {
+                    // This return to the active producer concerns the shared command.
+                    // The producer handles the edit for all its outputs.
+                    if (const auto* parent = GetStateByDepth(1);
+                        parent && parent->Dep.DepType == EDT_OutTogetherBack && parent->EntryPtr == childEnt) {
+                        break;
+                    }
+                }
 
                 YDIAG(IPRP)
                     << "      +needEdit [" << IntentToChar(intent) << "] "
