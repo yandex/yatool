@@ -2351,13 +2351,14 @@ class YaMake:
             with recipe_build_context(manager, gsid.uid()) as recipe_context:
                 if self.opts.larry_addr is not None:
                     try:
+                        import devtools.ya.build.build_opts.larry as larry_options
                         from devtools.ya.build.larry_client import DiagnosticOptions, FailureOutput, LarryClient
                         from devtools.ya.build.larry_client.cache_options import from_build_options
                         from yalibrary.runner import called_by_agent
                         from devtools.ya.build.larry_client.build_variables import collect_build_variables
                         from devtools.ya.build.larry_client import release_info
                         from devtools.ya.build.larry_service import diagnostics as debug_report
-                        from devtools.ya.build.larry_service import address as addresses
+                        from devtools.ya.build.larry_service import release as service_release
                         from devtools.ya_make.libs.larry_client.py import TRANSPORT_VERSION
                     except ImportError:
                         raise devtools.ya.core.yarg.FlagNotSupportedException("--larry-runner is not supported")
@@ -2368,18 +2369,27 @@ class YaMake:
                     with debug_report.capture(
                         self.app_ctx.dump_debug,
                         self.opts.larry_requested_addr or self.opts.larry_addr,
+                        selected_address=self.opts.larry_addr,
                         transport_version=TRANSPORT_VERSION,
                         client_release_date=client_date.isoformat() if client_date is not None else None,
                         suppressions=self.app_ctx.hide_token,
                     ) as report:
                         if self.opts.larry_requested_addr == 'local:':
-                            report.update(mode='external', execution_mode='sync', selection_reason='windows')
+                            report.update(execution_mode='sync', selection_reason='windows')
                             logger.info('Larry execution selection: local: -> sync: (Windows)')
                             if getattr(self.app_ctx, 'evlog', None):
                                 self.app_ctx.evlog.get_writer('larry')(
                                     'execution-selection', requested='local', actual='sync', reason='windows'
                                 )
-                        self.opts.larry_addr = addresses.resolve_sync_address(self.opts.larry_addr)
+                        requested_address = self.opts.larry_addr
+                        address = requested_address
+                        if requested_address == larry_options.SYNC_ADDRESS:
+                            try:
+                                executable = service_release.resolve_sync_executable(tool_resolver=tools.tool)
+                                address = f'sync:{executable}'
+                            except Exception:
+                                report['error_stage'] = 'resolve_sync_executable'
+                                raise
                         service_recovery = None
                         if self.opts.larry_addr == 'local:':
                             from devtools.ya.build.larry_service import configuration, recovery, credentials, paths
@@ -2422,12 +2432,8 @@ class YaMake:
                             cache_layers=from_build_options(
                                 self.opts,
                                 CacheFactory._read_bazel_password,
+                                address=address,
                                 read_yt_token=lambda: get_yt_token(self.opts),
-                            ),
-                            yt_token=(
-                                get_yt_token(self.opts)
-                                if self.opts.yt_store and self.opts.larry_addr.startswith('sync:')
-                                else ''
                             ),
                             result_context=self.ctx,
                             build_variables=collect_build_variables(
@@ -2451,7 +2457,7 @@ class YaMake:
                         # Reports and test status processing consume build_root
                         # after dispatch returns. Finalization owns its lifetime.
                         self._larry_client = client
-                        result = client.build(self.opts.larry_addr)
+                        result = client.build(address)
                     result_analyzer = (
                         self._make_local_result_analyzer(result[8], result[1], cache_usage=client.cache_usage)
                         if diagnostics.timings != 'off'

@@ -3,6 +3,12 @@ import sys
 from devtools.ya.core import yarg
 from devtools.ya.core.yarg import groups
 
+SYNC_ADDRESS = 'sync:'
+
+
+def is_grpc_address(address: str | None) -> bool:
+    return address is not None and address.startswith(('grpc:', 'sync:', 'grpc-sync:'))
+
 
 class LarryOptions(yarg.Options):
     def __init__(self):
@@ -21,10 +27,14 @@ class LarryOptions(yarg.Options):
             yarg.ArgConsumer(
                 ['--larry-runner'],
                 help=(
-                    'Use beta Larry (compatible within beta; beta-to-stable protocol may change). '
+                    'Select a Larry runner. '
+                    'On Linux, macOS (Apple Silicon) and Windows, sync: runs one gRPC build '
+                    'with the Larry release pinned by the checkout. '
                     'With YT enabled, explicit proxy/directory/role settings from flags, environment or config '
-                    '(including values equal to defaults) require grpc: or grpc-sync:. '
-                    'Legacy JSON services also reject explicit credentials; legacy sync: retains token-file forwarding. '
+                    '(including values equal to defaults) require a gRPC address. '
+                    'Legacy JSON services also reject explicit credentials. '
+                    'sync:<path> runs a gRPC child; grpc-sync: is a temporary alias for sync:. '
+                    'On Windows, local: and sync: select a one-shot gRPC build. '
                     'These YT restrictions do not apply with --no-yt-store. '
                     'See devtools/ya/build/larry_client/README.md for YT profile compatibility.'
                 ),
@@ -60,7 +70,10 @@ class LarryOptions(yarg.Options):
         if self.larry_addr is None:
             return
 
-        if sys.platform == 'win32' and self.larry_addr == 'local:':
+        if self.larry_addr.startswith('grpc-sync:'):
+            self.larry_requested_addr = self.larry_addr
+            self.larry_addr = self.larry_addr.removeprefix('grpc-')
+        elif sys.platform == 'win32' and self.larry_addr == 'local:':
             self.larry_requested_addr = self.larry_addr
             self.larry_addr = 'sync:'
 
@@ -70,15 +83,13 @@ class LarryOptions(yarg.Options):
         if getattr(params, 'use_distbuild', False):
             raise yarg.ArgsValidatingException('--larry-runner cannot be combined with --dist')
 
-        grpc = self.larry_addr.startswith(('grpc:', 'grpc-sync:')) or (
-            sys.platform == 'win32' and self.larry_addr.startswith('sync:')
-        )
-        if getattr(params, 'yt_store', False) and not grpc:
+        if self.larry_addr == SYNC_ADDRESS and sys.platform not in ('linux', 'darwin', 'win32'):
+            raise yarg.ArgsValidatingException('A Larry sync address without a path requires Linux, macOS or Windows')
+
+        if getattr(params, 'yt_store', False) and not is_grpc_address(self.larry_addr):
             # SetValueHook tracks CLI, environment and config assignments even
             # when the explicitly supplied value equals a built-in default.
-            yt_overrides = ['yt_proxy', 'yt_dir', 'yt_proxy_role']
-            if not self.larry_addr.startswith('sync:'):
-                yt_overrides += ['yt_token', 'yt_token_path']
+            yt_overrides = ['yt_proxy', 'yt_dir', 'yt_proxy_role', 'yt_token', 'yt_token_path']
             if any(getattr(params, f'_{name}_counter', 0) for name in yt_overrides):
                 raise yarg.ArgsValidatingException('Per-build YT settings require a gRPC Larry address')
 

@@ -93,8 +93,10 @@ PEERDIR(
 
 IF (NOT YA_OPENSOURCE)
     PEERDIR(
+        devtools/ya/build/build_opts/larry
         devtools/ya/build/distbuild_mock
         devtools/ya/build/larry_client
+        devtools/ya/build/larry_service
         devtools/ya/build/remote
         devtools/ya/build/source_package
         devtools/ya/yalibrary/build_graph_cache
