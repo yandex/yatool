@@ -226,15 +226,14 @@ bool TDirParser::UserStatementImpl(const TStringBuf& name, const TVector<TString
             if (isNukedModule) {
                 // Skip the following conditions
             } else {
-                size_t prefixLen;
-                TString LintersMake;
-                if (Conf.AutoincludePathsTrie.FindLongestPrefix(Dir + NPath::PATH_SEP_S, &prefixLen, &LintersMake)) {
+                if (const auto LintersMake = FindAutoinclude(Conf.AutoincludePathsTrie, Dir); !LintersMake.empty()) {
                     if (TFsPath(Conf.RealPathEx(LintersMake)).Exists()) {
                         auto includeCtr = OnInclude(LintersMake, Makefile);
                         Y_ASSERT(!includeCtr.Ignored());
                         Vars().SetStoreOriginals(NVariableDefs::VAR_MODULE_COMMON_CONFIGS_DIR, ToString(NPath::CutType(NPath::Parent(LintersMake))), OrigVars());
                         ReadMakeFile(LintersMake);
                     } else {
+                        Includes.push_back(LintersMake);
                         TRACE(P, NEvent::TInvalidFile(LintersMake, {Dir}, TString{"File not found"}));
                         YConfErr(Misconfiguration) << LINTERS_MAKE_INC << " must be present at [[imp]]" << Dir << "[[rst]] when the path is specified in any of " << JoinStrings(Conf.AutoincludeJsonPaths.begin(), Conf.AutoincludeJsonPaths.end(), ", ") << Endl;
                     }

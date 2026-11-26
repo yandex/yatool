@@ -600,7 +600,8 @@ static inline bool IsReassemblingDirectory(const TDGIterAddable* parent) {
 bool TDGIterAddable::NeedUpdate(TYMake& yMake, TFileHolder& fileContent, bool reassemble, TDGIterAddable& lastInStack, const TDGIterAddable* prevInStack, const TDGIterAddable* pprevInStack) {
     switch (Node.NodeType) {
         case EMNT_MakeFile: {
-            if (IsReassemblingDirectory(prevInStack) || ShouldFetchIntent(EVI_GetModules)) {
+            if (yMake.NeedsMakefileContextUpdate(AssumeFile(Node.ElemId)) ||
+                IsReassemblingDirectory(prevInStack) || ShouldFetchIntent(EVI_GetModules)) {
                 return true;
             } else {
                 Entry().Props.SetIntentNotReady(EVI_GetModules, TPropertiesState::ENotReadyLocation::NeedUpdate);

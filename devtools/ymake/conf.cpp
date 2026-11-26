@@ -384,7 +384,7 @@ void TBuildConfiguration::PostProcess(const TVector<TString>& freeArgs) {
         isolatedProjectsHash.Final(YmakeIsolatedProjectsHash.RawData);
     }
     LoadLicenses(extraData);
-    LoadAutoincludes(rulesData);
+    LoadAutoincludes();
     TMd5Sig rules;
     rulesData.Final(rules.RawData);
     extraData.Update(rules.RawData);
@@ -437,14 +437,15 @@ void TBuildConfiguration::LoadLicenses(MD5& confData) {
     Licenses = ::LoadLicenses(licensesFiles, confData);
 }
 
-void TBuildConfiguration::LoadAutoincludes(MD5& confData) {
+void TBuildConfiguration::LoadAutoincludes() {
     TString autoincludes = TCommandInfo(*this, nullptr, nullptr).SubstVarDeeply(TStringBuf(VAR_AUTOINCLUDE_PATHS), CommandConf);
     TVector<TFsPath> autoincludeFiles;
     for (const auto& it : StringSplitter(autoincludes).Split(' ').SkipEmpty()) {
         autoincludeFiles.emplace_back(SourceRoot / it.Token());
         AutoincludeJsonPaths.emplace_back(it.Token());
     }
-    AutoincludePathsTrie = ::LoadAutoincludes(autoincludeFiles, confData);
+    AutoincludeRoots = LoadAutoincludeRoots(autoincludeFiles);
+    AutoincludePathsTrie = BuildAutoincludeTrie(AutoincludeRoots);
 }
 
 void TBuildConfiguration::LoadPeersRules(MD5& confData) {

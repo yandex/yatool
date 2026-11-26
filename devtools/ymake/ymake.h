@@ -100,6 +100,8 @@ private:
     TVector<TFileElemId> CurStartDirs_;
     TVector<TTarget> PrevStartTargets_;
     bool HasGraphStructuralChanges_{false};
+    TBlob CachedMakefileFingerprints_;
+    THashMap<TFileElemId, TMd5Sig> MakefileFingerprints_;
     TStringBuf ExportLang_{"?"};
 
     TVector<TFileElemId> PreserveStartTargets() const;
@@ -108,6 +110,9 @@ private:
     void TransferStartDirs();
 
     void AnalyzeGraphChanges(IChanges& changes);
+    TMd5Sig ComputeMakefileFingerprint(TFileElemId makefile) const;
+    void LoadMakefileFingerprintMetadata(const TBlob& metadata);
+    void RestoreMakefileFingerprints();
     bool LoadDependsToModulesClosure(IInputStream* input);
     bool SaveDependsToModulesClosure(IOutputStream* output);
 public:
@@ -171,6 +176,9 @@ public:
     void Compact();
     void SaveStartDirs(TCacheFileWriter& writer);
     void SaveStartTargets(TCacheFileWriter& writer);
+    void SaveMakefileFingerprints(TCacheFileWriter& writer);
+    bool NeedsMakefileContextUpdate(TFileElemId makefile);
+    void RecordMakefileFingerprint(TFileElemId makefile);
     void SetStartTargetsFromCache() {
         StartTargets = std::move(PrevStartTargets_);
         for (const auto& target: StartTargets) {

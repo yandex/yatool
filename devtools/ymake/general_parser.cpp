@@ -547,6 +547,7 @@ void TGeneralParser::ProcessMakeFile(TFileView resolvedName, TNodeAddCtx& node) 
     ProcessMakefileIncludes(node, parser.GetModules(), parser.GetIncludes());
     ProcessMakefileGlobs(node, parser.GetModules());
     ProcessNeverCacheModules(node, parser.GetModules());
+    YMake.RecordMakefileFingerprint(AssumeFile(node.ElemId));
 }
 
 void TGeneralParser::ProcessBuildCommand(TStringBuf name, TNodeAddCtx& node, TAddIterStack& stack) {

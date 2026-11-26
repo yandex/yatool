@@ -1,4 +1,5 @@
 #include "saveload.h"
+#include "autoincludes_conf.h"
 #include "graph_changes_predictor.h"
 #include "ymake.h"
 
@@ -8,6 +9,7 @@
 #include <devtools/ymake/libs/clocks/checkpoint.h>
 #include <devtools/ymake/libs/clocks/hp_clock.h>
 
+#include <library/cpp/digest/md5/md5.h>
 #include <library/cpp/json/json_reader.h>
 #include <library/cpp/svnversion/svnversion.h>
 
@@ -28,8 +30,9 @@ namespace {
     const ui64 ImageVersion = 63;
     const ui64 DMCacheVersion = 1;
     // Module records change independently of the reusable filesystem image.
-    // Older records can contain global policy matches for the transitive closure.
-    constexpr ui64 MODULE_CACHE_FORMAT_VERSION = 4;
+    constexpr ui64 MODULE_CACHE_FORMAT_VERSION = 7;
+    // Cache-only reads can bypass the configuration hash, so identify this section separately.
+    constexpr ui64 MAKEFILE_FINGERPRINT_SECTION = 0x594D4B46494E4755;
 
     template <size_t HashSize>
     class TVersionImpl {
@@ -190,6 +193,7 @@ namespace {
                 SaveDiagnostics();
                 YMake.SaveStartDirs(Writer);
                 YMake.SaveStartTargets(Writer);
+                YMake.SaveMakefileFingerprints(Writer);
                 NStats::TStatsBase::MonEvent(MON_NAME(EYmakeStats::DepsCacheSaveTime), prepareTime + TimeSince(depsCacheSaveCheckpoint));
             }
 
@@ -624,6 +628,21 @@ bool TYMake::LoadImpl(const TFsPath& file) {
             TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
             return false;
         }
+        if (!cacheReader.HasNextBlob()) {
+            TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
+            return false;
+        }
+        LoadMakefileFingerprintMetadata(cacheReader.GetNextBlob());
+        if (!cacheReader.HasNextBlob()) {
+            TCacheFileReader::RejectedMonEvent(NStats::MonName_RejectedDepsCache, TCacheFileReader::ERejectCacheReason::ERCR_IncompatibleFormat);
+            return false;
+        }
+        CachedMakefileFingerprints_ = cacheReader.GetNextBlob();
+        TMemoryInput fingerprints(CachedMakefileFingerprints_.Data(), CachedMakefileFingerprints_.Size());
+        const auto count = ::LoadSize(&fingerprints);
+        constexpr size_t recordSize = sizeof(ui32) + sizeof(TMd5Sig::RawData);
+        Y_ENSURE(fingerprints.Avail() % recordSize == 0 && count == fingerprints.Avail() / recordSize,
+            "Invalid makefile fingerprint table size");
         return true;
     };
 
@@ -799,6 +818,53 @@ bool TYMake::LoadImpl(const TFsPath& file) {
     TimeStamps.InitSession(Graph.GetFileNodeData());
 
     return true;
+}
+
+TMd5Sig TYMake::ComputeMakefileFingerprint(TFileElemId makefile) const {
+    const auto& contentHash = Names.FileConf.GetFileDataById(makefile).HashSum;
+    const auto dir = NPath::Parent(Graph.GetFileName(makefile).GetTargetStr());
+
+    MD5 hash;
+    hash.Update(contentHash.RawData);
+    hash.Update(Conf.YmakeConfMD5.RawData);
+    // An empty path represents no autoinclude. Existing graph edges track include contents.
+    hash.Update(FindAutoinclude(Conf.AutoincludePathsTrie, dir));
+    TMd5Sig fingerprint;
+    hash.Final(fingerprint.RawData);
+    return fingerprint;
+}
+
+bool TYMake::NeedsMakefileContextUpdate(TFileElemId makefile) {
+    RestoreMakefileFingerprints();
+    const auto cached = MakefileFingerprints_.find(makefile);
+    return cached == MakefileFingerprints_.end() || cached->second != ComputeMakefileFingerprint(makefile);
+}
+
+void TYMake::RecordMakefileFingerprint(TFileElemId makefile) {
+    RestoreMakefileFingerprints();
+    MakefileFingerprints_.insert_or_assign(makefile, ComputeMakefileFingerprint(makefile));
+}
+
+void TYMake::RestoreMakefileFingerprints() {
+    if (!CachedMakefileFingerprints_.Empty()) {
+        TMemoryInput input(CachedMakefileFingerprints_.Data(), CachedMakefileFingerprints_.Size());
+        ::Load(&input, MakefileFingerprints_);
+        CachedMakefileFingerprints_.Drop();
+    }
+}
+
+void TYMake::LoadMakefileFingerprintMetadata(const TBlob& metadata) {
+    TMemoryInput input(metadata.Data(), metadata.Size());
+    ui64 section;
+    ::Load(&input, section);
+    Y_ENSURE(section == MAKEFILE_FINGERPRINT_SECTION, "Unsupported makefile fingerprint section");
+
+    TVector<TString> previousRoots;
+    ::Load(&input, previousRoots);
+    if (previousRoots != Conf.AutoincludeRoots) {
+        HasGraphStructuralChanges_ = true;
+        YDebug() << "Autoinclude roots changed" << Endl;
+    }
 }
 
 void TYMake::AnalyzeGraphChanges(IChanges& changes) {
@@ -1007,6 +1073,29 @@ void TYMake::SaveStartTargets(TCacheFileWriter& writer) {
     }
     ::Save(&output, elemIds);
     writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(buffer)));
+}
+
+void TYMake::SaveMakefileFingerprints(TCacheFileWriter& writer) {
+    RestoreMakefileFingerprints();
+    TVector<std::pair<TFileElemId, TMd5Sig>> fingerprints(Reserve(MakefileFingerprints_.size()));
+    for (const auto& [makefile, fingerprint] : MakefileFingerprints_) {
+        const auto node = Graph.GetFileNodeById(makefile);
+        if (node.IsValid() && node->NodeType == EMNT_MakeFile) {
+            fingerprints.emplace_back(makefile, fingerprint);
+        }
+    }
+    SortBy(fingerprints, [](const auto& entry) { return entry.first; });
+
+    TBuffer buffer;
+    TBufferOutput output(buffer);
+    ::Save(&output, MAKEFILE_FINGERPRINT_SECTION);
+    ::Save(&output, Conf.AutoincludeRoots);
+    writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(buffer)));
+
+    TBuffer fingerprintBuffer;
+    TBufferOutput fingerprintOutput(fingerprintBuffer);
+    ::Save(&fingerprintOutput, fingerprints);
+    writer.AddBlob(new TBlobSaverMemory(TBlob::FromBufferSingleThreaded(fingerprintBuffer)));
 }
 
 void TYMake::PrepareCacheSave() {

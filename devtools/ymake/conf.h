@@ -66,6 +66,7 @@ public:
     TBlackList BlackList;
     TIsolatedProjects IsolatedProjects;
     THashSet<TString> ExcludedPeerdirs;
+    TVector<TString> AutoincludeRoots;
     TCompactTrieBuilder<char, TString> AutoincludePathsTrie;
     TVector<TString> AutoincludeJsonPaths;
     THolder<NYMake::TTraceStageWithTimer> RunStageWithTimer;
@@ -247,7 +248,7 @@ private:
     void GenerateCustomData(const TStringBuf genCustomData);
     void LoadSystemHeaders(MD5& confData);
     void LoadLicenses(MD5& confData);
-    void LoadAutoincludes(MD5& confData);
+    void LoadAutoincludes();
     void LoadPeersRules(MD5& confData);
     void LoadBlackLists(MD5& confHash);
     void LoadIsolatedProjects(MD5& confHash);
