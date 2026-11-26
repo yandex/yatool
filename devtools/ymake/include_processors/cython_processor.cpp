@@ -10,11 +10,6 @@
 namespace {
     constexpr auto CYTHON_CIMPORT = "cython"sv;
 
-    //TODO(kikht): maybe replace with CYTHON_OUTPUT_INCLUDES from ymake.core.conf
-    const TVector<TStringBuf> PREDEFINED_INDUCED = {
-        "contrib/libs/python/Include/Python.h",
-    };
-
     const TSet<TString> INNER_PARTS = {"libc", "libcpp", "cpython"};
 
     constexpr TStringBuf PY2_CYTHON_INCLUDES = "$S/contrib/tools/cython_py2/Cython/Includes/";
@@ -200,11 +195,8 @@ void TCythonIncludeProcessor::ProcessIncludes(TAddDepAdaptor& node,
         AddIncludesToNode(node, resolvedIncludes, module);
     }
 
-    TVector<TResolveFile> resolvedInduced(Reserve(preparedInduced.size() + PREDEFINED_INDUCED.size()));
+    TVector<TResolveFile> resolvedInduced(Reserve(preparedInduced.size()));
     module.ResolveAsUnset(preparedInduced, resolvedInduced);
-    if (!module.IsTrue("_USE_RESOURCE_CYTHON")) {
-        module.ResolveAsUnset(PREDEFINED_INDUCED, resolvedInduced);
-    }
     node.AddParsedIncls("cpp", resolvedInduced);
 }
 
