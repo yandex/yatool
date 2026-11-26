@@ -24,6 +24,19 @@ namespace {
         re2::RE2 Pattern;
     };
 
+    struct TExactMatcher: public IPathMatcher {
+        explicit TExactMatcher(TStringBuf path)
+            : Path(path)
+        {
+        }
+
+        bool Match(TStringBuf data) const override {
+            return data == Path;
+        }
+
+        const TString Path;
+    };
+
     struct TPrefixMatcher: public IPathMatcher {
         inline TPrefixMatcher(const TStringBuf& s)
             : Prefix(s)
@@ -37,20 +50,18 @@ namespace {
         const TString Prefix;
     };
 
-    static inline bool IsRegularChar(char ch) noexcept {
-        if (IsAsciiAlnum(ch)) {
-            return true;
-        }
-
-        if (ch == '/' || ch == '.' || ch == '-' || ch == '_') {
-            return true;
-        }
-
-        return false;
+    bool IsLiteralPathChar(char ch) noexcept {
+        return IsAsciiAlnum(ch) || ch == '/' || ch == '-' || ch == '_';
     }
 
-    static inline bool IsRegularPath(TStringBuf path) noexcept {
-        return AllOf(path.begin(), path.end(), IsRegularChar);
+    bool IsLiteralPath(TStringBuf path) noexcept {
+        return AllOf(path.begin(), path.end(), IsLiteralPathChar);
+    }
+
+    bool IsRegularPath(TStringBuf path) noexcept {
+        return AllOf(path.begin(), path.end(), [](char ch) {
+            return IsLiteralPathChar(ch) || ch == '.';
+        });
     }
 }
 
@@ -58,6 +69,13 @@ IPathMatcher::TRef IPathMatcher::Construct(const TString& regex) {
     if (regex && regex[0] == '^') {
         const TStringBuf path = TStringBuf(regex).Skip(1);
 
+        TStringBuf literal;
+        if (path.BeforeSuffix("$", literal) && IsLiteralPath(literal)) {
+            return new TExactMatcher(literal);
+        }
+        if (path.BeforeSuffix(".*", literal) && IsLiteralPath(literal)) {
+            return new TPrefixMatcher(literal);
+        }
         if (IsRegularPath(path)) {
             return new TPrefixMatcher(path);
         }
