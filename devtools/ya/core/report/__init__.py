@@ -41,6 +41,7 @@ class ReportTypes(object):
     YT_CACHE_ERROR = 'yt_cache_error'
     BUILD_RUNNER = 'build_runner'
     GRAPH_STATISTICS = 'graph_statistics'
+    LARRY_PROACTIVE_UPDATE = 'larry_proactive_update'
     DISTBUILD = 'distbuild'
     YA_METRICS = 'ya_metrics'
     YT_CACHE_METRICS = 'yt_cache_metrics'
