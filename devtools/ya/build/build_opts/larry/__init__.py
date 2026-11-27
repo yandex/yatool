@@ -7,7 +7,7 @@ SYNC_ADDRESS = 'sync:'
 
 
 def is_grpc_address(address: str | None) -> bool:
-    return address is not None and address.startswith(('grpc:', 'sync:', 'grpc-sync:'))
+    return address is not None and address.startswith(('grpc:', 'sync:'))
 
 
 class LarryOptions(yarg.Options):
@@ -33,7 +33,7 @@ class LarryOptions(yarg.Options):
                     'With YT enabled, explicit proxy/directory/role settings from flags, environment or config '
                     '(including values equal to defaults) require a gRPC address. '
                     'Legacy JSON services also reject explicit credentials. '
-                    'sync:<path> runs a gRPC child; grpc-sync: is a temporary alias for sync:. '
+                    'sync:<path> runs a gRPC child. '
                     'On Windows, local: and sync: select a one-shot gRPC build. '
                     'These YT restrictions do not apply with --no-yt-store. '
                     'See devtools/ya/build/larry_client/README.md for YT profile compatibility.'
@@ -57,6 +57,8 @@ class LarryOptions(yarg.Options):
         ]
 
     def postprocess(self):
+        if self.larry_addr is not None and self.larry_addr.startswith('grpc-sync:'):
+            raise yarg.ArgsValidatingException('Use sync: to run a Larry gRPC subprocess')
         if type(self.larry_proactive_update_interval) is not int or self.larry_proactive_update_interval < 0:
             raise yarg.ArgsValidatingException('larry_proactive_update_interval must be nonnegative integer seconds')
         for option in ('larry_environment_whitelist', 'larry_test_environment_whitelist'):
@@ -70,10 +72,7 @@ class LarryOptions(yarg.Options):
         if self.larry_addr is None:
             return
 
-        if self.larry_addr.startswith('grpc-sync:'):
-            self.larry_requested_addr = self.larry_addr
-            self.larry_addr = self.larry_addr.removeprefix('grpc-')
-        elif sys.platform == 'win32' and self.larry_addr == 'local:':
+        if sys.platform == 'win32' and self.larry_addr == 'local:':
             self.larry_requested_addr = self.larry_addr
             self.larry_addr = 'sync:'
 
