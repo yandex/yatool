@@ -39,6 +39,7 @@ class ReportTypes(object):
     FULL_VCS_INFO_JSON = 'full_vcs_info_json'
     PARAMETERS = 'parameters'
     YT_CACHE_ERROR = 'yt_cache_error'
+    BUILD_RUNNER = 'build_runner'
     GRAPH_STATISTICS = 'graph_statistics'
     DISTBUILD = 'distbuild'
     YA_METRICS = 'ya_metrics'

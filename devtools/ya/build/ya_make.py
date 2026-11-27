@@ -52,6 +52,8 @@ from devtools.ya.build.reports import build_reports as build_report
 from devtools.ya.build.reports import configure_error as ce
 from devtools.ya.build.reports import results_report
 from devtools.ya.core import stage_tracer
+from devtools.ya.core.report import ReportTypes, telemetry
+from devtools.ya.yalibrary.active_state import Cancelled
 from devtools.ya.yalibrary import sjson
 import devtools.ya.test.suite_storage.suites as suite_storage
 import devtools.ya.test.suite_storage.disk as disk_storage
@@ -2339,8 +2341,26 @@ class YaMake:
                 )
 
     def _dispatch_build(self, callback):
+        event = {}
+        try:
+            result = self._execute_build(callback, event)
+            event['outcome'] = 'succeeded' if result[4] == 0 else 'failed'
+            return result
+        except (KeyboardInterrupt, Cancelled):
+            event['outcome'] = 'cancelled'
+            raise
+        finally:
+            if 'executor' in event:
+                event.setdefault('outcome', 'error')
+                try:
+                    telemetry.report(ReportTypes.BUILD_RUNNER, event)
+                except Exception:
+                    logger.debug('Cannot report build runner', exc_info=True)
+
+    def _execute_build(self, callback, event):
         with stager.scope('dispatch_build'):
             if self.opts.use_distbuild:
+                event.update(executor='classic', mode='distbuild')
                 return self._build_distbs(callback)
             from devtools.ya.core import gsid
             from yalibrary.recipe_context import recipe_build_context
@@ -2350,6 +2370,14 @@ class YaMake:
             )
             with recipe_build_context(manager, gsid.uid()) as recipe_context:
                 if self.opts.larry_addr is not None:
+                    requested_address = self.opts.larry_addr
+                    if requested_address == 'local:':
+                        mode = 'managed_service'
+                    elif requested_address.startswith(('sync:', 'grpc-sync:')):
+                        mode = 'sync'
+                    else:
+                        mode = 'external_service'
+                    event.update(executor='larry', mode=mode, accepted=False, failure_stage='setup')
                     try:
                         import devtools.ya.build.build_opts.larry as larry_options
                         from devtools.ya.build.larry_client import DiagnosticOptions, FailureOutput, LarryClient
@@ -2381,7 +2409,6 @@ class YaMake:
                                 self.app_ctx.evlog.get_writer('larry')(
                                     'execution-selection', requested='local', actual='sync', reason='windows'
                                 )
-                        requested_address = self.opts.larry_addr
                         address = requested_address
                         if requested_address == larry_options.SYNC_ADDRESS:
                             try:
@@ -2457,7 +2484,11 @@ class YaMake:
                         # Reports and test status processing consume build_root
                         # after dispatch returns. Finalization owns its lifetime.
                         self._larry_client = client
-                        result = client.build(address)
+                        del event['failure_stage']
+                        try:
+                            result = client.build(address)
+                        finally:
+                            event.update(client.runner_report)
                     result_analyzer = (
                         self._make_local_result_analyzer(result[8], result[1], cache_usage=client.cache_usage)
                         if diagnostics.timings != 'off'
@@ -2465,6 +2496,7 @@ class YaMake:
                     )
                     return result[:7] + (result_analyzer, result[8])
                 else:
+                    event.update(executor='classic', mode='local')
                     return self._build_local(callback, recipe_context=recipe_context)
 
     def _build_distbs(self, callback):
