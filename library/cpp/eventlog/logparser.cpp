@@ -77,11 +77,12 @@ namespace {
 
             if (offset != span.size()) {
                 span = span.substr(offset);
+                const TStringBuf frame = span;
+                // Same as the stream version: the sync data is consumed before reading the header.
+                span = span.substr(COMPRESSED_LOG_FRAME_SYNC_DATA.size());
                 try {
-                    TMemoryInput in(
-                            span.data() + COMPRESSED_LOG_FRAME_SYNC_DATA.size(),
-                            span.size() - COMPRESSED_LOG_FRAME_SYNC_DATA.size());
-                    return {TFrameHeader(in), span};
+                    TMemoryInput in(span);
+                    return {TFrameHeader(in), frame};
                 } catch (const TFrameLoadError& err) {
                     Cdbg << err.what() << Endl;
                     span = span.substr(err.SkipAfter);
@@ -133,16 +134,12 @@ namespace {
 }
 
 TFrameHeader::TFrameHeader(IInputStream& in) {
-    size_t skipAfter = 0;
     try {
         ::Load(&in, Basehdr);
 
         Y_ENSURE(HasValidFrameLength(), "Incomplete frame additional data");
 
         ::Load(&in, Framehdr);
-        // A short read can leave either header only partially initialized.
-        // Only use the payload length after both headers have been read.
-        skipAfter = FrameLength();
         switch (LogFormat()) {
             case COMPRESSED_LOG_FORMAT_V1:
                 break;
@@ -170,7 +167,9 @@ TFrameHeader::TFrameHeader(IInputStream& in) {
         if (const auto* cnt = dynamic_cast<TCountingInput *>(&in)) {
             location = "@ " + ToString(cnt->Counter());
         }
-        ythrow TFrameLoadError(skipAfter) << "Frame Load Error" << location << ": " << CurrentExceptionMessage();
+        // Lengths from a header that failed to load can't be trusted (it may even be
+        // partially uninitialized), so skip nothing and let callers resync on the next sync marker.
+        ythrow TFrameLoadError(0) << "Frame Load Error" << location << ": " << CurrentExceptionMessage();
     }
 }
 
