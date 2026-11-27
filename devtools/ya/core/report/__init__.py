@@ -40,6 +40,7 @@ class ReportTypes(object):
     PARAMETERS = 'parameters'
     YT_CACHE_ERROR = 'yt_cache_error'
     BUILD_RUNNER = 'build_runner'
+    LARRY_SERVICE_RECOVERY = 'larry_service_recovery'
     GRAPH_STATISTICS = 'graph_statistics'
     LARRY_PROACTIVE_UPDATE = 'larry_proactive_update'
     DISTBUILD = 'distbuild'
