@@ -2,7 +2,6 @@ PY3_LIBRARY()
 
 PEERDIR(
     contrib/python/contextlib2
-    contrib/python/six
     contrib/python/toolz
     contrib/python/requests
     devtools/ya/app_config
@@ -14,6 +13,7 @@ PEERDIR(
     devtools/ya/yalibrary/guards
     devtools/ya/yalibrary/platform_matcher
     devtools/ya/yalibrary/toolscache
+    devtools/libs/universal_fetcher/py
     devtools/libs/yaplatform/python
 )
 
@@ -29,6 +29,7 @@ PY_SRCS(
     cache_helper.py
     common.py
     resource_fetcher.py
+    tool_registry.py
     tool_chain_fetcher.py
 )
 

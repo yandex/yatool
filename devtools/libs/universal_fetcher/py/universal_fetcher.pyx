@@ -66,6 +66,10 @@ NON_RETRIABLE_ERROR = 'non_retriable_error'
 INTERNAL_ERROR = 'internal_error'
 
 
+class IntegrityError(Exception):
+    pass
+
+
 cdef class UniversalFetcher:
     cdef THolder[TUniversalFetcher] _impl
     cdef object _log_function
@@ -144,6 +148,6 @@ cdef class UniversalFetcher:
                 if not CheckIntegrity(result_filepath, integrity.GetRef()):
                     raise
             except:
-                raise Exception("Failed to check integrity")
+                raise IntegrityError("Failed to check integrity")
 
         return result

@@ -15,6 +15,7 @@
 #include <util/string/builder.h>
 #include <util/string/join.h>
 #include <util/generic/yexception.h>
+#include <util/system/env.h>
 
 namespace NYa::NTool {
     namespace {
@@ -38,9 +39,13 @@ namespace NYa::NTool {
                 }
             }
         }
-    }
+    } // namespace
 
     void ToolFastPath(const TToolOptions& options, const TVector<TStringBuf>& args) {
+        if (GetEnv("YA_TOOL_REGISTRY_NAME")) {
+            throw yexception() << "Tool registry resolution is not supported by the C++ fast path";
+        }
+
         TVector<TString> expandedArgs;
         expandedArgs.reserve(args.size());
         for (const auto& arg : args) {
@@ -94,14 +99,13 @@ namespace NYa::NTool {
                 config,
                 invocation.ToolName,
                 tool.ToolPath.GetPath(),
-                invocation.ToolOptions
-            );
+                invocation.ToolOptions);
         }
 
         ExecTool(config, tool, invocation.ToolOptions);
     }
 
-    struct TToolHandler : public IYaHandler {
+    struct TToolHandler: public IYaHandler {
         void Run(const TVector<TStringBuf>& args) override {
             TToolOptions options{};
             try {
@@ -124,4 +128,4 @@ namespace NYa::NTool {
     };
 
     static TClassRegistrar<IYaHandler, TToolHandler> registration{"tool"};
-}
+} // namespace NYa::NTool

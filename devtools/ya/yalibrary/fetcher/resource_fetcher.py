@@ -203,7 +203,11 @@ def _get_downloader(
         import yalibrary.fetcher.ufetcher as ufetcher
 
         # TODO: kuzmich321 (ufetcher) seems like there can be a better way?
-        what_to_download = parsed_uri.resource_url or parsed_uri.resource_uri
+        if parsed_uri.resource_type == 'http' and parsed_uri.fetcher_meta:
+            fetcher_meta = parsed_uri.resource_uri.partition('#')[2]
+            what_to_download = '{}#{}'.format(parsed_uri.resource_url, fetcher_meta)
+        else:
+            what_to_download = parsed_uri.resource_url or parsed_uri.resource_uri
 
         return ufetcher.UFetcherDownloader(
             ufetcher.get_ufetcher(docker_config_path=docker_config_path, skopeo_binary=skopeo_binary),

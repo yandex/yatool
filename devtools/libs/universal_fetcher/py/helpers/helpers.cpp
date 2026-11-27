@@ -26,7 +26,6 @@ namespace NUniversalFetcher {
     }
 
     bool CheckIntegrity(const TString& filepath, const TChecksumInfo& integrity) {
-        Cout << filepath << Endl;
         TString digest = CalcContentDigest(integrity.Algorithm, filepath);
         return digest == integrity.Digest;
     }

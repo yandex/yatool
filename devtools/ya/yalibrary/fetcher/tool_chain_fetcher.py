@@ -10,7 +10,9 @@ from hashlib import md5
 
 import exts.yjson as json
 import yalibrary.fetcher.progress_info as progress_info_lib
-from exts import fs
+import yalibrary.fetcher.tool_registry as tool_registry
+from devtools.libs.universal_fetcher.py import IntegrityError as UniversalFetcherIntegrityError
+from exts import fs, http_client
 from library.python import func
 from yalibrary import guards
 from yalibrary import platform_matcher
@@ -42,6 +44,10 @@ _RESERVED_ATTRIBUTES = frozenset(
 
 
 class ResourceNotFound(RuntimeError):
+    mute = True
+
+
+class UnsupportedToolRegistryQueryError(RuntimeError):
     mute = True
 
 
@@ -88,6 +94,7 @@ def get_tool_chain_fetcher(
         return _ToolChainByPlatformFetcher(
             root,
             toolchain_name,
+            bottle_name,
             platform_replacements,
             formula["by_platform"],
             for_platform,
@@ -135,6 +142,34 @@ def get_formula_platforms(formula):
 _ToolChainInfo = namedtuple('_ToolChainInfo', 'where')
 
 
+@dataclass(kw_only=True, frozen=True)
+class _ResolvedResource:
+    resource_id: int | str | None = None
+    integrity: str | None = None
+    url: str | None = None
+    direct_uri: str | None = None
+
+    @property
+    def is_tool_registry_resource(self):
+        return self.url is not None
+
+    def public_uri(self):
+        if self.direct_uri is not None:
+            return self.direct_uri
+        if self.url is not None:
+            return '{}#integrity={}'.format(self.url, self.integrity)
+        return 'sbr:{}'.format(self.resource_id)
+
+    def download_uri(self):
+        return self.public_uri()
+
+
+def _normalize_registry_resource_id(resource_id):
+    if isinstance(resource_id, str) and resource_id.isdecimal():
+        return int(resource_id)
+    return resource_id
+
+
 class _ToolChainFetcherBase(object):
     def fetch_if_need(self):
         raise NotImplementedError()
@@ -180,16 +215,32 @@ class _ToolChainFetcherImplBase(_ToolChainFetcherBase):
 
 class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
     def __init__(
-        self, root, name, platform_replacements, by_platform, for_platform, binname, force_refetch, download_fn
+        self,
+        root,
+        name,
+        bottle_name,
+        platform_replacements,
+        by_platform,
+        for_platform,
+        binname,
+        force_refetch,
+        download_fn,
     ):
         super(_ToolChainByPlatformFetcher, self).__init__(
             root, name, platform_replacements, for_platform, binname, force_refetch, download_fn
         )
         self.__by_platform = by_platform
+        self.__tool_registry_enabled = tool_registry.is_enabled(bottle_name)
 
     def resource_id_from_cache(self):
-        resource = self._get_matched_resource()
-        return self._get_resource_uri(resource)
+        _, resource = self._get_resolved_resource()
+        return resource.public_uri()
+
+    def _get_resolved_resource(self):
+        resource_desc = self._get_matched_resource()
+        resource_uri = self._get_resource_uri(resource_desc)
+        resource = self._get_tool_registry_resource(resource_uri)
+        return resource_desc, resource or _ResolvedResource(direct_uri=resource_uri)
 
     def _get_matched_resource(self):
         best_match = platform_matcher.match_platform(
@@ -208,18 +259,35 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
     def _get_resource_uri(self, resource_desc):
         return resource_desc['uri']
 
+    def _get_tool_registry_resource(self, resource_uri):
+        if not self.__tool_registry_enabled or config.has_mapping():
+            return None
+        parsed_uri = parse_resource_uri(resource_uri)
+        if parsed_uri.resource_type != 'sbr':
+            return None
+        resource = tool_registry.get_resource(parsed_uri.resource_id)
+        if resource is None:
+            raise ResourceNotFound(
+                '{}: resource {} is not found in tool registry'.format(self._toolchain_name, parsed_uri.resource_id)
+            )
+        return _ResolvedResource(
+            resource_id=_normalize_registry_resource_id(resource.resource_id),
+            integrity=resource.integrity,
+            url=resource.url,
+        )
+
     def _details(self):
         return self.__by_platform
 
     def _fetch(self):
-        resource_desc = self._get_matched_resource()
+        resource_desc, resource = self._get_resolved_resource()
+        resource_uri = resource.download_uri()
         strip_prefix = resource_desc.get('strip_prefix')
-        parsed_uri = parse_resource_uri(self._get_resource_uri(resource_desc))
-        fetcher, progress_callback = _get_fetcher(self._toolchain_name, parsed_uri.resource_type)
+        fetcher, progress_callback = _get_fetcher(self._toolchain_name)
         res = self._download_fn(
             fetcher,
             self._root,
-            self._get_resource_uri(resource_desc),
+            resource_uri,
             progress_callback,
             force_refetch=self._force_refetch,
             strip_prefix=strip_prefix,
@@ -231,6 +299,7 @@ class _ToolChainByPlatformFetcher(_ToolChainFetcherImplBase):
 class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
     _DEFAULT_UPDATE_INTERVAL = 24 * 3600
     _DISABLE_AUTO_UPDATE_FILE_NAME = '.disable.auto.update'
+    _MAX_TOOL_REGISTRY_RESOURCE_VERSIONS = 10
     _updated_toolchains = set()
 
     def __init__(
@@ -253,14 +322,23 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         self.__bottle_name = bottle_name
         self.__update_interval = params.get('update_interval', self._DEFAULT_UPDATE_INTERVAL)
         self.__force_update = bool(os.environ.get('YA_TOOL_FORCE_UPDATE'))
+        self.__tool_registry_enabled = tool_registry.is_enabled(bottle_name)
+        if self.__tool_registry_enabled and not config.has_mapping() and extra_query:
+            raise UnsupportedToolRegistryQueryError(
+                '{}: --release, --attribute and --no-attribute are not supported by tool registry'.format(
+                    toolchain_name
+                )
+            )
         self.__extra_query_digest = extra_query.digest() if extra_query else None
         if params.get('ignore_platform', False):
             self.__platforms = []
+            self.__tool_registry_platforms = ['any']
         else:
             platforms = [for_platform] + platform_matcher.get_platform_replacements(
                 for_platform, self._platform_replacements
             )
             self.__platforms = self._add_default_arch(platforms)
+            self.__tool_registry_platforms = self._get_full_platforms(platforms)
         if extra_query:
             # Patch query
             self.__params = deepcopy(self.__params)
@@ -290,9 +368,17 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
                 result.append(p)
         return result
 
+    def _get_full_platforms(self, platforms):
+        default_arch = 'x86_64'
+        result = []
+        for platform in platforms:
+            full_platform = platform if '-' in platform else '{}-{}'.format(platform, default_arch)
+            if full_platform not in result:
+                result.append(full_platform)
+        return result
+
     def resource_id_from_cache(self):
-        resource_id = self._get_matched_resource_id()
-        return 'sbr:{}'.format(resource_id)
+        return self._get_matched_resource().public_uri()
 
     def _get_symlink_path(self):
         bottle_name = self.__bottle_name
@@ -318,23 +404,25 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         logger.debug('{}: info "{}" was read from {}'.format(self._toolchain_name, info, info_path))
         return info
 
-    def _get_matched_resource_id(self):
+    def _get_matched_resource(self, force_update=False):
         if config.has_mapping():
-            return self._get_resource_id_from_mapping_config()
+            return _ResolvedResource(resource_id=self._get_resource_id_from_mapping_config())
 
-        resource_id = self._get_resource_id_from_info_file()
-        if resource_id is None:
+        resource = None if force_update else self._get_resource_from_info_file()
+        if resource is None:
             link_path = self._get_symlink_path()
             # Use symlink path for lock file as install_symlink() does
             with safe_resource_lock(link_path):
                 resource = self._find_resource()
-                resource_id = resource['id']
                 info = {
                     'update_time': int(time.time()),
-                    'resource_id': resource_id,
+                    'resource_id': resource.resource_id,
                 }
+                if resource.url is not None:
+                    info['resource_url'] = resource.url
+                    info['resource_integrity'] = resource.integrity
                 self._write_info(info)
-        return resource_id
+        return resource
 
     def _get_resource_id_from_mapping_config(self):
         mapping = config.mapping()
@@ -347,7 +435,7 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
                 return bottle[platform]
         raise ResourceNotFound('{}: no resource is found in bottle mapping: {}'.format(self._toolchain_name, bottle))
 
-    def _get_resource_id_from_info_file(self):
+    def _get_resource_from_info_file(self):
         info_path = self._get_info_path()
         update_time_threshold = time.time() - self.__update_interval
         if os.path.exists(info_path):
@@ -359,10 +447,22 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
             ):
                 logger.debug('{}: force update'.format(self._toolchain_name))
                 _ToolChainLatestMatchedResourceFetcher._updated_toolchains.add(self._toolchain_name)
+            elif bool(info.get('resource_url')) != self.__tool_registry_enabled:
+                if self.__is_auto_update_disabled:
+                    raise ResourceNotFound(
+                        '{}: cached resource source does not match the current tool registry configuration'.format(
+                            self._toolchain_name
+                        )
+                    )
+                logger.debug('{}: cached resource source has changed'.format(self._toolchain_name))
             elif update_time > update_time_threshold or self.__is_auto_update_disabled:
-                resource_id = info['resource_id']
-                logger.debug('{}: use cached toolchain with resource id: {}'.format(self._toolchain_name, resource_id))
-                return resource_id
+                resource = _ResolvedResource(
+                    resource_id=info['resource_id'],
+                    integrity=info.get('resource_integrity'),
+                    url=info.get('resource_url'),
+                )
+                logger.debug('{}: use cached toolchain resource: {}'.format(self._toolchain_name, resource))
+                return resource
             else:
                 logger.debug('{}: it is time to check toolchain for update'.format(self._toolchain_name))
         elif self.__is_auto_update_disabled:
@@ -382,6 +482,37 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         return res
 
     def _find_resource(self):
+        if self.__tool_registry_enabled:
+            return self._find_tool_registry_resource()
+        return self._find_sandbox_resource()
+
+    def _find_tool_registry_resource(self):
+        query = self.__params['query']
+        logger.debug(
+            '%s: lookup resource in tool registry with query %s for platforms %s',
+            self._toolchain_name,
+            query,
+            self.__tool_registry_platforms,
+        )
+        resource = tool_registry.find_resource(self.__bottle_name, query, self.__tool_registry_platforms)
+        if resource is None:
+            raise ResourceNotFound(
+                '{}: no resource is found. Tool registry query: {}, platforms: {}'.format(
+                    self._toolchain_name, json.dumps(query), self.__tool_registry_platforms
+                )
+            )
+        if not isinstance(resource.resource_id, str) or not resource.resource_id.isdecimal():
+            raise ValueError(
+                '{}: tool registry object must have a numeric x-amz-meta-resource-id'.format(self._toolchain_name)
+            )
+        logger.debug('%s: found tool registry resource: %s', self._toolchain_name, resource)
+        return _ResolvedResource(
+            resource_id=_normalize_registry_resource_id(resource.resource_id),
+            integrity=resource.integrity,
+            url=resource.url,
+        )
+
+    def _find_sandbox_resource(self):
         failed_queries = []
         for sb_api_query in self._get_sb_api_queries():
             logger.debug('%s: lookup resources with query: %s', self._toolchain_name, sb_api_query)
@@ -390,7 +521,7 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
                 assert len(resources) == 1
                 resource = resources[0]
                 logger.debug('%s: found resource: %s', self._toolchain_name, self._compact_res_info(resource))
-                return resource
+                return _ResolvedResource(resource_id=resource['id'])
             failed_queries.append(json.dumps(sb_api_query))
         raise ResourceNotFound(
             '{}: no resource is found. Sandbox queries made:\n{}'.format(
@@ -421,40 +552,70 @@ class _ToolChainLatestMatchedResourceFetcher(_ToolChainFetcherImplBase):
         else:
             yield sb_api_query
 
-    def _get_resource_uri(self, resource_id):
-        return "sbr:{}".format(resource_id)
-
     def _details(self):
         return "params: {}".format(self.__params)
 
     def _fetch(self):
-        resource_id = self._get_matched_resource_id()
-        fetcher, progress_callback = _get_fetcher(self._toolchain_name, 'sbr')
-        self._download_fn(
+        resource = self._get_matched_resource()
+        seen_resources = {resource}
+        while True:
+            try:
+                return self._fetch_resource(resource)
+            except (http_client.BadMD5Exception, UniversalFetcherIntegrityError):
+                if not resource.is_tool_registry_resource or self.__is_auto_update_disabled:
+                    raise
+                self._invalidate_info(resource)
+                if len(seen_resources) >= self._MAX_TOOL_REGISTRY_RESOURCE_VERSIONS:
+                    raise
+
+                # A registry URL may be overwritten after lookup; only an integrity error proves this race,
+                # so retry only if resolving it again yields a resource version not seen before.
+                resource = self._get_matched_resource(force_update=True)
+                if resource in seen_resources:
+                    self._invalidate_info(resource)
+                    raise
+                seen_resources.add(resource)
+
+    def _fetch_resource(self, resource):
+        resource_uri = resource.download_uri()
+        fetcher, progress_callback = _get_fetcher(self._toolchain_name)
+        res = self._download_fn(
             fetcher,
             self._root,
-            self._get_resource_uri(resource_id),
+            resource_uri,
             progress_callback,
             force_refetch=self._force_refetch,
             **self._binname_kwargs,
         )
-        return self._install_symlink(resource_id)
+        return self._install_symlink(res.where)
 
-    def _install_symlink(self, resource_id):
-        resource_path = self._resource_path(resource_id)
+    def _invalidate_info(self, resource):
+        link_path = self._get_symlink_path()
+        with safe_resource_lock(link_path):
+            info_path = self._get_info_path()
+            if not os.path.exists(info_path):
+                return
+            info = self._read_info()
+            if (
+                info.get('resource_id') != resource.resource_id
+                or info.get('resource_integrity') != resource.integrity
+                or info.get('resource_url') != resource.url
+            ):
+                return
+            info['update_time'] = 0
+            self._write_info(info)
+
+    def _install_symlink(self, resource_path):
         link_path = self._get_symlink_path()
         toolscache.notify_tool_cache(link_path)
         return install_symlink(resource_path, link_path)
-
-    def _resource_path(self, resource_id):
-        return os.path.join(self._root, str(resource_id))
 
     @func.lazy_property
     def __is_auto_update_disabled(self):
         return os.path.exists(os.path.join(self._root, self._DISABLE_AUTO_UPDATE_FILE_NAME))
 
 
-def _get_fetcher(name, resource_type):
+def _get_fetcher(name, resource_type=None):
     def default_progress_callback(_, __):
         sys.stderr.write('.')
         sys.stderr.flush()
