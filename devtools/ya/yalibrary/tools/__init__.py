@@ -149,6 +149,11 @@ def xtool(
     return tool
 
 
+def get_bottle_formula(bottle_name: str) -> dict[str, object]:
+    formula = _tool_config_reader.get_bottle_formula(bottle_name)
+    return yalibrary.fetcher.tool_chain_fetcher.get_formula_value(formula)
+
+
 # Extended tool class
 class _XTool:
     def __init__(
@@ -631,6 +636,7 @@ class _ToolConfigReader:
     _TOOLCHAIN_ALIASES_KEY = "toolchain_aliases"
     _BOTTLES_KEY = "bottles"
     _DEFAULT_FORMULA_PATH = "build/external_resources/{}/resources.json"
+    _BOTTLE_NAME_SEP = "."
 
     def __init__(self) -> None:
         self._tool_cache = {}
@@ -711,6 +717,25 @@ class _ToolConfigReader:
             tool_cfgs[name_parts] = tool_cfg
 
         return list(tool_cfgs.values())
+
+    def get_bottle_formula(self, bottle_name: str) -> object:
+        name_parts = tuple(bottle_name.split(self._BOTTLE_NAME_SEP))
+        try:
+            tool_cfg = self.tool(name_parts)
+        except ToolNotFoundException:
+            tool_cfg = None
+
+        if tool_cfg is not None and bottle_name in tool_cfg.bottles:
+            return tool_cfg.bottles[bottle_name]["formula"]
+
+        self._load_toolchains()
+        assert self._tool_toolchains is not None
+        for tool_data in self._tool_toolchains.values():
+            bottles = tool_data.get("bottles", {})
+            if bottle_name in bottles:
+                return bottles[bottle_name]["formula"]
+
+        raise ToolNotFoundException(f"Bottle '{bottle_name}' is not found")
 
     def _make_cfg_path(self, *parts: str | typing.Iterable[str], ext: str = "") -> str:
         final_parts: list[str] = []
@@ -822,7 +847,7 @@ class _ToolConfigReader:
             tc_platforms.append(tc_platform)
         # Auto-updated tools use bottle name as a part of the symlink name.
         # It's a bit more safe to use file names without spaces.
-        bottle_name = ".".join(name_parts)
+        bottle_name = self._BOTTLE_NAME_SEP.join(name_parts)
 
         toolchain = {
             "tools": {
