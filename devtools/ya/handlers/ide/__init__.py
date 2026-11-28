@@ -423,7 +423,7 @@ class GradleOptions(yarg.Options):
     EXPOPT_YEXPORT_DEBUG_MODE = '--yexport-debug-mode'
     EXPOPT_EXCLUSIVE_LOCK_BUILD = '--exclusive-lock-build'
 
-    AVAILABLE_JDK_VERSIONS = ('11', '17', '21', '22', '23', '24', '25', '26')
+    AVAILABLE_JDK_VERSIONS = ('11', '17', '21', '22', '23', '24', '25', '26', '27')
     # Gradle >= 9 require JDK17 or above
     GRADLE_JDK_VERSIONS = list(filter(lambda v: int(v) >= 17, AVAILABLE_JDK_VERSIONS))
 
